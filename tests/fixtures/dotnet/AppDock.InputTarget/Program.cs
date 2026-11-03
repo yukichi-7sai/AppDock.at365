@@ -7,6 +7,8 @@ internal sealed class Target : Form
     private readonly nint previous = GetForegroundWindow();
     private readonly System.Drawing.Point previousCursor = Cursor.Position;
     private bool movedCursor;
+    private bool gestureHeld, sendKeyHeld;
+    private Form? alternateTarget;
     private bool menuProbe;
     private object? focusAttempt;
     public Target() { Text = "AppDock isolated input target"; Width = 480; Height = 180; Controls.Add(new Label { Text = "Input verification window", Dock = DockStyle.Fill }); }
@@ -98,6 +100,28 @@ internal sealed class Target : Form
             focusAttempt = Foreground(Handle);
         }
         if (method == "clear") events.Clear();
+        if (method == "beginKeyGesture") {
+            var point = PointToScreen(new Point(ClientSize.Width / 2, ClientSize.Height / 2));
+            var hit = WindowFromPoint(point);
+            if (GetForegroundWindow() != Handle || hit != Handle && GetAncestor(hit, 2) != Handle)
+                throw new Exception("The gesture fixture is not the foreground input target.");
+            movedCursor = true; Cursor.Position = point;
+            // The destination key is already down. Ctrl+T must wait even after right-up.
+            sendKeyHeld = true; keybd_event(0x54, 0, 0, 0);
+            gestureHeld = true; mouse_event(8, 0, 0, 0, 0);
+            keybd_event(0x41, 0, 0, 0);
+            keybd_event(0x41, 0, 0, 0); // OS-style repeat must not start a second command.
+        }
+        if (method == "endKeyGesture") EndKeyGesture();
+        if (method == "releaseSendKey") ReleaseSendKey();
+        if (method == "switchGestureTarget") {
+            alternateTarget?.Dispose();
+            alternateTarget = new Form { Text = "AppDock alternate gesture target", KeyPreview = true };
+            alternateTarget.KeyDown += (_, key) => events.Add("alternate:" + key.KeyData);
+            alternateTarget.Show();
+            Foreground(alternateTarget.Handle);
+            return GetForegroundWindow() == alternateTarget.Handle;
+        }
         if (method == "focusWindow") Foreground(new nint(long.Parse(request.GetProperty("params").GetProperty("window").GetString()!)));
         if (method == "hold") keybd_event(0x11, 0, 0, 0);
         if (method == "release") keybd_event(0x11, 0, 2, 0);
@@ -189,7 +213,21 @@ internal sealed class Target : Form
             } finally { BeginInvoke(Close); }
         });
     }
+    private void EndKeyGesture() {
+        if (!gestureHeld) return;
+        mouse_event(16, 0, 0, 0, 0);
+        keybd_event(0x41, 0, 2, 0);
+        gestureHeld = false;
+    }
+    private void ReleaseSendKey() {
+        if (!sendKeyHeld) return;
+        keybd_event(0x54, 0, 2, 0);
+        sendKeyHeld = false;
+    }
     protected override void OnFormClosed(FormClosedEventArgs e) {
+        EndKeyGesture();
+        ReleaseSendKey();
+        alternateTarget?.Dispose();
         if (movedCursor) Cursor.Position = previousCursor;
         keybd_event(0x11, 0, 2, 0); if (previous != 0) SetForegroundWindow(previous); base.OnFormClosed(e);
         var arguments = Environment.GetCommandLineArgs();

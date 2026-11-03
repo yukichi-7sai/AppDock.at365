@@ -20,6 +20,15 @@ fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.notifications = false;
 const ids = ['at365.web-browser-tools'];
+settings.gestures.bindings = [
+  {
+    id: 'right-a',
+    command: ids[0] + '.new-tab',
+    enabled: true,
+    gesture: 'key:A',
+    when: { scope: 'exe', processes: ['appdock.inputtarget'], appletIds: [] },
+  },
+];
 const keyId = require('node:crypto').randomUUID(),
   keyCommand = 'appdock.custom.' + keyId;
 settings.customCommands = {
@@ -169,6 +178,51 @@ async function execute(id) {
       'local host key ignores external grants',
     );
     await page.evaluate(() => window.dock.setAppletApiPermissions({ sendInput: true }));
+    const appletInputLog = () =>
+      page.evaluate(async (id) => {
+        const { logs } = await window.dock.snapshot();
+        return logs
+          .filter((l) => l.source === id && l.message.includes('API=input.sendKeys'))
+          .map((l) => l.message);
+      }, ids[0]);
+    for (const changeTarget of [false, true]) {
+      await focus();
+      await clear();
+      const previous = new Set(await appletInputLog());
+      const newLogs = async () => (await appletInputLog()).filter((message) => !previous.has(message));
+      try {
+        await targetPeer.request('beginKeyGesture');
+        await until(
+          async () => (await newLogs()).some((m) => m.includes('result=started')),
+          'gesture API started',
+        );
+        await targetPeer.request('endKeyGesture');
+        if (changeTarget) {
+          assert.equal(await targetPeer.request('switchGestureTarget'), true, 'alternate target is foreground');
+        }
+        // Give cancellation time to reach the sender while the destination key is still held.
+        await sleep(120);
+        await targetPeer.request('releaseSendKey');
+        const result = await until(
+          async () => (await newLogs()).find((m) => /result=(success|failed)/.test(m)),
+          'gesture API finished',
+        );
+        if (changeTarget) assert.match(result, /result=failed code=(CANCELLED|INPUT_FAILED)/);
+        else {
+          assert.match(result, /result=success/);
+          await until(async () => (await events()).includes('key:T, Control'), 'gesture delivered after right-up');
+        }
+        const received = await events();
+        assert.equal(received.filter((e) => e === 'key:T, Control').length, changeTarget ? 0 : 1);
+        assert.ok(!received.includes('alternate:T, Control'));
+        assert.ok(!received.includes('key:A'));
+        assert.equal((await newLogs()).filter((m) => m.includes('result=started')).length, 1);
+      } finally {
+        await targetPeer.request('endKeyGesture');
+        await targetPeer.request('releaseSendKey');
+      }
+    }
+    checks.push('right+A starts one WebBrowserTools request, waits across right-up, delivers Ctrl+T once to the original target, and cancels on a foreground change');
     const snapshot = await page.evaluate(() => window.dock.snapshot());
     const expected = {
       'close-tab': 'key:F4, Control',

@@ -7,7 +7,7 @@ using System.Windows.Threading;
 internal static partial class Program
 {
     // Calls the hook handler with memory-only data. No hooks, SendInput,
-    // foreground changes, or message pumping are used by this test mode.
+    // or foreground changes are used by this test mode.
     private static int RunGestureKeyStateTests(string assemblyPath)
     {
         const BindingFlags members = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -16,7 +16,7 @@ internal static partial class Program
             var assembly = Assembly.LoadFrom(Path.GetFullPath(assemblyPath));
             var type = assembly.GetType("AppDock.InputHost.GestureEngine", true)!;
             engine = Activator.CreateInstance(type, members, null, [Dispatcher.CurrentDispatcher, null], null)!;
-            void Set(string name, object value) => type.GetField(name, members)!.SetValue(engine, value);
+            void Set(string name, object? value) => type.GetField(name, members)!.SetValue(engine, value);
             var binding = assembly.GetType("AppDock.InputHost.Binding", true)!;
             var rows = new[] { "Pause", "A", "CapsLock", "ScrollLock", "Alphanumeric", "KanaMode", "Convert", "NonConvert" }.SelectMany(key =>
                 new[] { "", "Ctrl+", "Alt+", "Shift+", "Ctrl+Alt+", "Ctrl+Shift+", "Alt+Shift+", "Ctrl+Alt+Shift+" }
@@ -26,7 +26,7 @@ internal static partial class Program
                 JsonSerializer.Deserialize(JsonSerializer.Serialize(rows), binding.MakeArrayType(),
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!
             ]);
-            Set("busy", true); // Prevent command execution; exercise capture/release state only.
+            Set("runningGesture", "key:A"); // Prevent command execution; exercise capture/release state only.
             Set("ready", true);
             var keyboard = type.GetMethod("Keyboard", members)!;
             var keys = (HashSet<uint>)type.GetField("keys", members)!.GetValue(engine)!;
@@ -89,6 +89,28 @@ internal static partial class Program
                     name + " derived release clears gesture ownership");
                 Check(Feed(raw, scan: scan) == 0, name + " derived input passes after release");
             }
+            // Release in the same dispatcher turn as key-down, before Run can invoke the host.
+            var configType = assembly.GetType("AppDock.InputHost.Configuration", true)!;
+            Set("config", JsonSerializer.Deserialize("""{"ExecutionMode":"all","WheelDelayMs":0}""", configType));
+            Set("runningGesture", null);
+            Set("ready", true);
+            var calls = 0;
+            var cancels = 0;
+            Set("session", "fixture");
+            Set("Cancel", new Action<string>(_ => cancels++));
+            Set("Invoke", new Func<object, Task<JsonElement>>(_ => {
+                calls++;
+                return Task.FromResult(default(JsonElement));
+            }));
+            Check(Feed(0x41) == 1 && Feed(0x41) == 1, "key and repeat captured before dispatch");
+            var point = Activator.CreateInstance(assembly.GetType("AppDock.InputHost.GesturePoint", true)!)!;
+            type.GetMethod("Release", members)!.Invoke(engine, [point]);
+            Check(Feed(0x41, true) == 1, "key-up remains captured after immediate right-up");
+            // An unaccepted wheel event during the key action must not expire its session.
+            Set("lastWheel", Environment.TickCount64 - 101);
+            type.GetMethod("Tick", members)!.Invoke(engine, null);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            Check(calls == 1 && cancels == 0, "immediate right-up delivers exactly one queued key gesture");
             return 0;
         } catch (Exception error) {
             Console.Error.WriteLine(error);

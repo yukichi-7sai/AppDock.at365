@@ -43,7 +43,10 @@ internal sealed class GestureEngine : IDisposable
     private long invokedAt;
     private bool activationUsed;
     private string process = "", session = "";
-    private bool ready, cancelled, otherMode, busy, disposed;
+    private bool ready, cancelled, otherMode, disposed;
+    private string? runningGesture;
+    private bool Busy => runningGesture != null;
+    private bool KeyPending => (runningGesture ?? starting?.Gesture)?.StartsWith("key:", StringComparison.Ordinal) == true;
     private readonly HashSet<uint> clicks = [], keys = [];
     private long lastWheel, lastRun;
     private bool wheelStarted;
@@ -75,7 +78,7 @@ internal sealed class GestureEngine : IDisposable
         hostContext = CommandConditions.HostContext(next.Context);
         // A show command may move focus to the host while its invocation is still completing.
         // Keep only that command alive across focus-only synchronization.
-        if (busy && activationTarget != 0 && next.Enabled && next.SettingsKey.Length > 0 &&
+        if (Busy && activationTarget != 0 && next.Enabled && next.SettingsKey.Length > 0 &&
             next.SettingsKey == config?.SettingsKey) { config = next; ReleaseHooksIfIdle(); return; }
         // A focus synchronization requested by this press may update its conditions while starting.
         // Actual settings/command changes still cancel, as do all later context changes.
@@ -92,11 +95,11 @@ internal sealed class GestureEngine : IDisposable
     }
     private bool Current => target != 0 && GetForegroundWindow() == target && IsWindowVisible(target);
     internal bool Valid(string id,string window) => activationTarget == 0 && id==session && target.ToInt64().ToString()==window && Current && !cancelled && lifetime is {IsCancellationRequested:false};
-    private bool IntentionalForeground => busy && activationTarget != 0 &&
+    private bool IntentionalForeground => Busy && activationTarget != 0 &&
         (GetForegroundWindow() == activationTarget || GetForegroundWindow() == 0);
     internal (nint Source, uint Process)? ClaimActivation(string id, string source, nint destination)
     {
-        if (!busy || Environment.TickCount64-invokedAt > 1500 || !Valid(id,source) ||
+        if (!Busy || Environment.TickCount64-invokedAt > 1500 || !Valid(id,source) ||
             config is not {HostProcessId:>0}) return null;
         GetWindowThreadProcessId(destination,out var owner);
         if (owner != config.HostProcessId) return null;
@@ -106,7 +109,7 @@ internal sealed class GestureEngine : IDisposable
     }
     internal (nint Source, uint Process)? ConsumeActivation(string id, string source, nint destination)
     {
-        if (!busy || cancelled || lifetime is not {IsCancellationRequested:false} || activationUsed ||
+        if (!Busy || cancelled || lifetime is not {IsCancellationRequested:false} || activationUsed ||
             Environment.TickCount64-invokedAt > 1500 || id != session || target.ToInt64().ToString() != source ||
             destination != activationTarget || (!Current && !IntentionalForeground) || !IsWindowVisible(destination)) return null;
         activationUsed = true;
@@ -126,7 +129,7 @@ internal sealed class GestureEngine : IDisposable
     }
     private void Begin(GesturePoint p)
     {
-        if (config is not {Enabled:true} || busy || HasStartBlocker()) return;
+        if (config is not {Enabled:true} || Busy || HasStartBlocker()) return;
         var hit = GestureTarget.At(p);
         var foreground = GetForegroundWindow();
         if (hit == 0 || !IsWindowVisible(hit)) return;
@@ -190,7 +193,7 @@ internal sealed class GestureEngine : IDisposable
                 starting = null;
                 if (!cancelled && pending.Gesture != null) Run(pending.Gesture, pending.Repeats, pending.Released);
                 else if (pending.Released && pending.Replay) ReplayRightClick(pending.ReleasePoint);
-                if (!ready && !busy) timer.Stop();
+                if (!ready && !Busy) timer.Stop();
             });
         } catch (Exception e) {
             Console.Error.WriteLine(e.Message);
@@ -213,7 +216,7 @@ internal sealed class GestureEngine : IDisposable
             ready = false;
         } else cancelled = true;
         CancelPending();
-        if (!ready && !busy) timer.Stop();
+        if (!ready && !Busy) timer.Stop();
         ReleaseHooksIfIdle();
     }
     internal nint Mouse(int code, uint message, nint data, bool modifierWithheld)
@@ -316,9 +319,9 @@ internal sealed class GestureEngine : IDisposable
             if (ready && !otherMode && GetCursorPos(out var cursor)) Move(cursor);
             return;
         }
-        if (!ready && !busy) {timer.Stop();return;}
+        if (!ready && !Busy) {timer.Stop();return;}
         if (!Current && !IntentionalForeground) { cancelled=true; CancelPending(); }
-        if (lastWheel != 0 && Environment.TickCount64-lastWheel >= 100) CancelPending();
+        if (lastWheel != 0 && Environment.TickCount64-lastWheel >= 100 && !KeyPending) CancelPending();
         if (!ready) return;
         if (!otherMode && GetCursorPos(out var point)) Move(point);
         if (cancelled || otherMode || directions.Count == 0 || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
@@ -347,7 +350,7 @@ internal sealed class GestureEngine : IDisposable
     }
     private bool Run(string gesture, int repeats=1, bool released=false)
     {
-        if (busy || cancelled) return false;
+        if (Busy || cancelled) return false;
         var rows=SelectedRows(gesture); if (rows.Length==0) return false;
         if (starting is { } pending) {
             if (pending.Gesture != null) return false;
@@ -358,11 +361,13 @@ internal sealed class GestureEngine : IDisposable
         var token=lifetime.Token;
         var capturedSession=session; var capturedTarget=target.ToInt64().ToString();
         var capturedConfig=config!; var capturedContext=targetContext; var wheel=gesture.StartsWith("wheel-");
-        busy=true;
+        runningGesture = gesture;
+        // A key press commits the operation even when right-up precedes dispatch.
+        var requiresRightButton = !released && !KeyPending;
         dispatcher.BeginInvoke(new Action(async () => {
             try {
                 for (var i=0;i<repeats;i++) {
-                    if (token.IsCancellationRequested || disposed || !Current || (!released && !ready) ||
+                    if (token.IsCancellationRequested || disposed || !Current || (requiresRightButton && !ready) ||
                         (wheel && Environment.TickCount64-lastWheel>=100)) break;
                     invokedAt = Environment.TickCount64;
                     await Invoke!(new {session=capturedSession, window=capturedTarget, process, target=capturedContext,
@@ -371,7 +376,7 @@ internal sealed class GestureEngine : IDisposable
                     if (config!.WheelDelayMs>0) break;
                 }
             } catch (Exception e) { Console.Error.WriteLine(e.Message); }
-            finally { busy=false; activationTarget=0; }
+            finally { runningGesture=null; activationTarget=0; }
         }));
         return true;
     }
@@ -390,8 +395,8 @@ internal sealed class GestureEngine : IDisposable
         var replay=!otherMode && !cancelled && directions.Count==0;
         var stroke=!otherMode && !cancelled && directions.Count>0;
         if (stroke) Run(MovementGesture,released:true);
-        else if (activationTarget == 0) CancelPending();
-        ready=false; if (!busy) timer.Stop(); indicator?.Hide();
+        else if (activationTarget == 0 && !KeyPending) CancelPending();
+        ready=false; if (!Busy) timer.Stop(); indicator?.Hide();
         if (starting is { } pending) {
             pending.Released = true; pending.Replay = replay; pending.ReleasePoint = point; timer.Start();
         } else if (replay) ReplayRightClick(point);
