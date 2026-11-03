@@ -8,7 +8,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     IExtensionContext, ICommandService, ICustomCommandService, ITrayService, IRibbonService, ISettingsService, INotificationService,
     IAppDockService, IShellService, IUiService, IPageService, IRegisteredImageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
-    private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler, string? Description)> commands = new();
+    private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler, string? Description, string? Category)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
     private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonElement?>>> customHandlers = new();
     public ICustomCommandService CustomCommands => this;
@@ -92,26 +92,31 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public IStorageService Storage => this;
     public ISecretService Secrets => this;
     public ISchedulerService Scheduler => this;
-    private static object CommandContribution(string commandId, string title, string? description) => description is null
-        ? new { id = commandId, title }
-        : (object)new { id = commandId, title, description };
-    public object Contributions => new { commands = commands.Select(c => CommandContribution(c.Key, c.Value.Title, c.Value.Description)).ToArray(), tray };
+    private static object CommandContribution(string commandId, string title, string? description, string? category)
+    {
+        var contribution = new Dictionary<string, object> { ["id"] = commandId, ["title"] = title };
+        if (description is not null) contribution["description"] = description;
+        if (category is not null) contribution["category"] = category;
+        return contribution;
+    }
+    public object Contributions => new { commands = commands.Select(c => CommandContribution(c.Key, c.Value.Title, c.Value.Description, c.Value.Category)).ToArray(), tray };
     public void Register(string commandId, string title, Func<CancellationToken, Task> handler)
     {
         if (!commandId.StartsWith(id + ".", StringComparison.Ordinal)) throw new ArgumentException("Command ID must start with the extension ID.");
-        if (!commands.TryAdd(commandId, (title, handler, null))) throw new ArgumentException("Duplicate command ID.");
+        if (!commands.TryAdd(commandId, (title, handler, null, null))) throw new ArgumentException("Duplicate command ID.");
     }
     public void Add(string title, string command) => tray.Add(new { title, command });
     public async Task ReplaceAsync(IReadOnlyList<CommandRegistration> registrations, CancellationToken cancellationToken = default)
     {
         if (registrations.Count > 256) throw new ArgumentException("At most 256 commands are allowed.");
-        var next = new ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler, string? Description)>();
+        var next = new ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler, string? Description, string? Category)>();
         foreach (var command in registrations)
         {
             if (!command.Id.StartsWith(id + ".", StringComparison.Ordinal) || command.Id.Length > 200
                 || string.IsNullOrWhiteSpace(command.Title) || command.Title.Length > 200 || command.Handler is null
                 || (command.Description?.Length ?? 0) > 1000
-                || !next.TryAdd(command.Id, (command.Title, command.Handler, command.Description)))
+                || (command.Category?.Length ?? 0) > 100 || (command.Category?.Any(c => c <= '\u001f' || c == '\u007f') ?? false)
+                || !next.TryAdd(command.Id, (command.Title, command.Handler, command.Description, command.Category?.Trim())))
                 throw new ArgumentException("Invalid or duplicate command registration.");
         }
         await commandUpdates.WaitAsync(cancellationToken);
@@ -119,7 +124,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
         try
         {
             commands = next;
-            await CallAsync("host.commands.replace", new { commands = next.Select(c => CommandContribution(c.Key, c.Value.Title, c.Value.Description)).ToArray() }, cancellationToken);
+            await CallAsync("host.commands.replace", new { commands = next.Select(c => CommandContribution(c.Key, c.Value.Title, c.Value.Description, c.Value.Category)).ToArray() }, cancellationToken);
         }
         catch { commands = previous; throw; }
         finally { commandUpdates.Release(); }

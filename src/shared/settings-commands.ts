@@ -13,6 +13,7 @@ export function generatedSettingCommands(
     (field.generateCommands ?? []).map((action) => ({
       id: `${owner}.settings.${field.key}.${action}`,
       title: `${field.title}を${{ on: 'ONにする', off: 'OFFにする', toggle: '切り替える' }[action]}`,
+      category: hostText('commands.category.settings'),
       available,
       automation: isSettingAccessible(field, 'mcp'),
     })),

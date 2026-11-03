@@ -41,6 +41,8 @@ await context.Ribbon.SetBadgeAsync(
 
 ## 動的コマンドとキー送信の一覧設定
 
+AppDock 0.130.0から、manifestの`commands[]`とRPCのコマンド登録に任意の`category`文字列を指定できます。.NET SDK/Runtime 0.29.0では`CommandRegistration.Category`を使います。利用するAppletの`minimumHostVersion`は`0.130.0`以上にします。1コマンドにつき1カテゴリで、100 UTF-16コード単位以内、改行・制御文字は不可、前後の空白を除去します。省略と空文字は未分類です。実行時登録で省略すると同じIDのmanifestのカテゴリを引き継ぎ、明示的な空文字はそのカテゴリを解除します。Nodeの`context.commands.register`はmanifestのカテゴリを引き継ぎます。カテゴリは共通選択ダイアログの絞り込みとキーワード検索に使い、公開コマンド一覧にも返します。
+
 `dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大256件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
 
 .NETの`CommandRegistration`はID・タイトル・実行ハンドラーと、任意の`Description`プロパティを持ちます。manifestとRPCにも任意の`description`（1,000 UTF-16コード単位以内）を指定でき、カスタムコマンドと同じ説明の検証・表示を使います。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。

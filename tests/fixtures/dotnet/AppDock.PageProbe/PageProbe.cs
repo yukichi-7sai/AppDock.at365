@@ -4,13 +4,18 @@ namespace AppDock.Tests;
 public sealed class PageProbe : IAppDockExtension, IPageActionHandler
 {
     private IExtensionContext? context;
-    public Task ActivateAsync(IExtensionContext services, CancellationToken token)
+    public async Task ActivateAsync(IExtensionContext services, CancellationToken token)
     {
         context = services;
         services.Commands.Register(services.ExtensionId + ".open", "ページ検証を開く", ct => services.Pages.OpenAsync("main", ct));
         services.Commands.Register(services.ExtensionId + ".details", "説明へ戻る", ct => services.Ui.OpenDetailsAsync(ct));
         services.Commands.Register(services.ExtensionId + ".settings", "設定を開く", ct => services.Ui.OpenSettingsAsync(ct));
-        return Task.CompletedTask;
+        if (!services.Settings.Get("categoryProbe", false)) return;
+        await services.Commands.ReplaceAsync([
+            new CommandRegistration(services.ExtensionId + ".open", "ページ検証を開く", ct => services.Pages.OpenAsync("main", ct)) { Category = "  画像  " },
+            new CommandRegistration(services.ExtensionId + ".details", "説明へ戻る", ct => services.Ui.OpenDetailsAsync(ct)),
+            new CommandRegistration(services.ExtensionId + ".settings", "設定を開く", ct => services.Ui.OpenSettingsAsync(ct)) { Category = "" },
+        ], token);
     }
     public async Task<JsonElement?> HandlePageActionAsync(string actionId, JsonElement input, string pageId, CancellationToken token)
     {

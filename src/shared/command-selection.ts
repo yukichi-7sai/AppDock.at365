@@ -32,7 +32,10 @@ export function commandSelectionCatalog(commands: UiCommand[], pins: string[]) {
       provider: commandSelectionProvider(command),
       providerTitle: commandSelectionProviderTitle(command),
       favorite: favorites.has(command.id),
-      search: normalize(`${command.title} ${description} ${command.extension} ${command.id}`),
+      category: command.category?.trim() ?? '',
+      search: normalize(
+        `${command.title} ${description} ${command.extension} ${command.id} ${command.category ?? ''}`,
+      ),
     };
   });
 }
@@ -40,12 +43,14 @@ export function filterCommandSelection(
   catalog: ReturnType<typeof commandSelectionCatalog>,
   query: string,
   provider: string,
+  category?: string,
 ) {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   return catalog.filter(
     (entry) =>
       (provider === 'all' ||
         (provider === 'favorites' ? entry.favorite : entry.provider === provider)) &&
+      (category === undefined || entry.category === category) &&
       terms.every((term) => entry.search.includes(term)),
   );
 }

@@ -12,6 +12,34 @@ const command = (id, other = {}) => ({
   available: true,
   ...other,
 });
+test('category filtering combines with search, providers and favorites while missing categories remain selectable', () => {
+  const catalog = commandSelectionCatalog(
+    [
+      command('one', { category: '画像', title: '開く' }),
+      command('two', { category: '画像', extensionId: 'fixture.two' }),
+      command('three'),
+      command('four', { category: 'all' }),
+    ],
+    ['one'],
+  );
+  assert.deepEqual(
+    filterCommandSelection(catalog, '画像', 'all').map((e) => e.command.id),
+    ['one', 'two'],
+  );
+  assert.deepEqual(
+    filterCommandSelection(catalog, '開く', 'favorites', '画像').map((e) => e.command.id),
+    ['one'],
+  );
+  assert.equal(filterCommandSelection(catalog, '', 'applet:fixture.two', '画像').length, 1);
+  assert.deepEqual(
+    filterCommandSelection(catalog, '', 'all', '').map((e) => e.command.id),
+    ['three'],
+  );
+  assert.deepEqual(
+    filterCommandSelection(catalog, '', 'all', 'all').map((e) => e.command.id),
+    ['four'],
+  );
+});
 test('selection preserves caller order and unavailable commands, filters hidden commands, and leaves inputs unchanged', () => {
   const commands = [
     command('a'),

@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { commandCategory } from './command-category';
 /** Persisted command definitions are data; only current declarations grant authority. */
 export type JsonObject = Record<string, unknown>;
 export type CustomCommandOwner = { kind: 'host' } | { kind: 'applet'; id: string };
@@ -22,6 +23,7 @@ export interface CustomCommandDefinition {
   id: string;
   title: string;
   description: string;
+  category?: string;
   typeId: string;
   owner: CustomCommandOwner;
   configVersion: number;
@@ -110,6 +112,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
             'id',
             'title',
             'description',
+            'category',
             'typeId',
             'owner',
             'configVersion',
@@ -139,6 +142,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
       ...item,
       title: item.title.trim(),
       description: customDescription(item.description === undefined ? '' : item.description),
+      ...(item.category !== undefined ? { category: commandCategory(item.category) } : {}),
     };
   });
   return structuredClone({ version: customCommandVersion, items });
@@ -346,6 +350,7 @@ export const customCommandOperations = {
 export const customEditableKeys: readonly string[] = [
   'title',
   'description',
+  'category',
   'configVersion',
   'config',
   'enabled',

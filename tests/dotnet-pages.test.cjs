@@ -33,8 +33,12 @@ for (const mode of ['native', 'dotnet']) test(`.NET pages ${mode}: JSON, typed s
     }
   });
   t.after(() => peer.close());
-  const activated = await peer.request('activate', { id: 'test.pages', settings: {} });
+  const activated = await peer.request('activate', { id: 'test.pages', settings: { categoryProbe: true } });
   assert.equal(activated.commands.length, 3);
+  assert.equal(activated.commands.find(c => c.id === 'test.pages.open').category, '画像');
+  assert.equal(activated.commands.find(c => c.id === 'test.pages.settings').category, '');
+  assert.equal(Object.hasOwn(activated.commands.find(c => c.id === 'test.pages.details'), 'category'), false);
+  assert.deepEqual(calls.find(call => call.method === 'host.commands.replace').input.commands, activated.commands);
   const action = (id, input = {}) => peer.request('page.action', { id, input, pageId: 'main' });
   assert.deepEqual(await action('echo', { value: '画像', enabled: true, number: 12 }), { value: '画像', enabled: true, number: 12 });
   assert.equal(await action('null'), null);

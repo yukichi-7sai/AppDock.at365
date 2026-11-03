@@ -562,6 +562,9 @@ class ExtensionManager extends EventEmitter {
       });
     for (const command of e.commands)
       catalog.set(command.id, {
+        ...(catalog.get(command.id)?.category !== undefined
+          ? { category: catalog.get(command.id)!.category }
+          : {}),
         ...(catalog.get(command.id)?.description !== undefined
           ? { description: catalog.get(command.id)!.description }
           : {}),
@@ -585,6 +588,7 @@ class ExtensionManager extends EventEmitter {
         catalog.set(alias, {
           id: alias,
           title: target.title,
+          ...(target.category !== undefined ? { category: target.category } : {}),
           ...(target.description !== undefined ? { description: target.description } : {}),
           available: target.available,
           disabledReason: target.disabledReason,

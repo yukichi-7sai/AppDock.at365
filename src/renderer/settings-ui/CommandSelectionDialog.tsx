@@ -43,6 +43,7 @@ export function CommandSelectionDialog({
   const prefix = useId();
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState('all');
+  const [category, setCategory] = useState('all');
   const [selectedId, setSelectedId] = useState(initialCommandId);
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
@@ -70,27 +71,44 @@ export function CommandSelectionDialog({
     return () => observer.disconnect();
   }, []);
   const catalog = useMemo(() => commandSelectionCatalog(commands, pins), [commands, pins]);
+  const categories = useMemo(
+    () =>
+      [...new Set(catalog.map((entry) => entry.category).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, 'ja'),
+      ),
+    [catalog],
+  );
+  const matching = useMemo(
+    () =>
+      filterCommandSelection(
+        catalog,
+        query,
+        'all',
+        category === 'all' ? undefined : category.slice(9),
+      ),
+    [catalog, query, category],
+  );
   const providers = useMemo(() => {
     const groups = new Map<string, { id: string; title: string; count: number }>();
     for (const entry of catalog) {
       const existing = groups.get(entry.provider);
-      if (existing) existing.count++;
-      else
+      if (!existing)
         groups.set(entry.provider, {
           id: entry.provider,
           title:
             entry.provider === 'custom'
               ? t('settings.commandSelection.custom')
               : entry.providerTitle,
-          count: 1,
+          count: 0,
         });
     }
+    for (const entry of matching) groups.get(entry.provider)!.count++;
     return [
-      { id: 'all', title: t('settings.commandSelection.all'), count: catalog.length },
+      { id: 'all', title: t('settings.commandSelection.all'), count: matching.length },
       {
         id: 'favorites',
         title: t('settings.commandSelection.favorites'),
-        count: catalog.filter((c) => c.favorite).length,
+        count: matching.filter((c) => c.favorite).length,
       },
       ...[...groups.values()].sort(
         (a, b) =>
@@ -99,10 +117,10 @@ export function CommandSelectionDialog({
           a.title.localeCompare(b.title, 'ja'),
       ),
     ];
-  }, [catalog, t]);
+  }, [catalog, matching, t]);
   const filtered = useMemo(
-    () => filterCommandSelection(catalog, query, provider),
-    [catalog, query, provider],
+    () => filterCommandSelection(matching, '', provider),
+    [matching, provider],
   );
   const selected = selectedId
     ? filtered.find((entry) => entry.command.id === selectedId)
@@ -119,7 +137,7 @@ export function CommandSelectionDialog({
   }, [selected, selectedId]);
   useLayoutEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.command.id, query, provider, ready]);
+  }, [selected?.command.id, query, provider, category, ready]);
   const choose = async (id = selected?.command.id) => {
     if (!ready || choosing.current || !id) return;
     // Use the latest caller catalog, including its exclusions, at confirmation time.
@@ -242,19 +260,28 @@ export function CommandSelectionDialog({
             onKeyDown={navigate}
           />
         </div>
-        <button
-          type="button"
-          className="text-button"
-          disabled={!query && provider === 'all'}
-          onClick={() => {
-            setQuery('');
-            setProvider('all');
+        <FilterSelect
+          className="command-selection-category"
+          aria-label={t('settings.commandSelection.category')}
+          value={category}
+          onChange={(event) => {
+            setCategory(event.target.value);
             setSelectedId(undefined);
-            input.current?.focus();
           }}
         >
-          {t('settings.commandSelection.clear')}
-        </button>
+          <option value="all">{t('settings.commandSelection.allCategories')}</option>
+          <option value="category:">{t('settings.commandSelection.uncategorized')}</option>
+          {categories.map((value) => (
+            <option key={value} value={`category:${value}`}>
+              {value}
+            </option>
+          ))}
+          {category !== 'all' &&
+            category !== 'category:' &&
+            !categories.includes(category.slice(9)) && (
+              <option value={category}>{category.slice(9)}</option>
+            )}
+        </FilterSelect>
         <span aria-live="polite">
           <SettingsListCount visible={filtered.length} total={catalog.length} />
         </span>
@@ -383,7 +410,7 @@ export function CommandSelectionDialog({
             >
               <div>
                 <span className="command-selection-name">{entry.command.title}</span>
-                <small>{entry.providerTitle}</small>
+                <small>{[entry.providerTitle, entry.category].filter(Boolean).join(' · ')}</small>
               </div>
               <span className="command-selection-state">
                 {entry.command.id === initialCommandId && (

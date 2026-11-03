@@ -23,6 +23,11 @@
 .command-selection-tools > span {
   margin-left: auto;
 }
+.command-selection-category {
+  width: 180px;
+  max-width: 100%;
+  flex: none;
+}
 .command-selection-browser {
   display: grid;
   grid-template-columns: var(--command-provider-width, 170px) 12px minmax(0, 1fr);

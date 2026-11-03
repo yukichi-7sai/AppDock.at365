@@ -78,6 +78,7 @@ export interface Command {
   id: string;
   title: string;
   description?: string;
+  category?: string;
 }
 export interface DeclaredCommand extends Command {
   shellRequirement?: import('./shell').ShellRequirement;

@@ -22,6 +22,7 @@ fs.writeFileSync(
     commands: [
       {
         id: 'fixture.selection.stopped',
+        category: '画像',
         title: '停止中の長いコマンド名を選んで内容を確認する',
         description:
           '選択しても実行しないコマンドです。 [command:appdock.settings.open] の説明も確認できます。\n' +
@@ -228,7 +229,7 @@ async function inspectLayout(dialog, name) {
     assert.equal(await width(), 170);
     const size = await dialog.boundingBox();
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('存在しないコマンド');
-    assert.equal(await dialog.getByRole('option').count(), 0);
+    assert.equal(await dialog.locator('[role=option]').count(), 0);
     assert(await dialog.getByTestId('command-selection-confirm').isDisabled());
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).press('Control+Enter');
     assert(await dialog.isVisible());
@@ -247,15 +248,37 @@ async function inspectLayout(dialog, name) {
     dialog = await openTray();
     assert.equal(Number(await dialog.getByRole('separator').getAttribute('aria-valuenow')), 170);
     await dialog.getByRole('button', { name: /^お気に入り/ }).click();
-    assert.equal(await dialog.getByRole('option').count(), 2);
+    assert.equal(await dialog.locator('[role=option]').count(), 2);
+    const categoryFilter = dialog.getByRole('combobox', { name: 'カテゴリで絞り込み' });
+    await categoryFilter.selectOption('category:');
+    assert.equal(await dialog.locator('[role=option]').count(), 0);
+    await categoryFilter.selectOption('category:画像');
+    assert.equal(await dialog.locator('[role=option]').count(), 1);
+    assert.match(
+      await dialog.getByRole('button', { name: /^Selection fixture/ }).innerText(),
+      /1$/,
+    );
+    assert.match(await dialog.getByRole('button', { name: /^AppDock/ }).innerText(), /0$/);
+    await dialog.screenshot({ path: path.join(profile, 'category-filtered.png') });
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('見つからない語');
+    assert.equal(await dialog.locator('[role=option]').count(), 0);
+    assert.match(
+      await dialog.getByRole('button', { name: /^Selection fixture/ }).innerText(),
+      /0$/,
+    );
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('');
+    await categoryFilter.selectOption('all');
     await dialog.getByRole('button', { name: /^Selection fixture/ }).click();
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('日本語 説明');
-    assert.equal(await dialog.getByRole('option').count(), 1);
-    await dialog.getByRole('button', { name: '絞り込みを解除' }).click();
+    assert.equal(await dialog.locator('[role=option]').count(), 1);
+    assert.match(await dialog.getByRole('button', { name: /^Selection fixture/ }).innerText(), /1$/);
+    assert.match(await dialog.getByRole('button', { name: /^AppDock/ }).innerText(), /0$/);
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('');
+    await dialog.getByRole('button', { name: /^すべて/ }).click();
     await dialog
       .getByRole('combobox', { name: 'コマンドを検索' })
       .fill('fixture.selection.stopped');
-    await dialog.getByRole('option').click();
+    await dialog.locator('[role=option]').click();
     assert.equal((await saved()).host.trayClickCommand, 'appdock.settings.open');
     assert.match(
       await dialog.getByRole('region', { name: '選択中のコマンドの詳細' }).innerText(),
@@ -305,7 +328,7 @@ async function inspectLayout(dialog, name) {
     assert.equal((await snapshot()).navigation.route, 'settings');
     assert.deepEqual((await saved()).pinnedCommands, baseline.pinnedCommands);
     checks.push(
-      'favorites, provider+search, detail links as text, IME, Tab, narrow/light and stopped selection without execution',
+      'categories, filtered provider counts, favorites, provider+search, detail links as text, IME, Tab, narrow/light and stopped selection without execution',
     );
 
     await resize(1250, 900);
@@ -330,7 +353,11 @@ async function inspectLayout(dialog, name) {
     const child = selectionDialog(host);
     const search = child.getByRole('combobox', { name: 'コマンドを検索' });
     await search.fill('appdock.notifications.open');
-    await child.locator('[role="option"][aria-selected="true"][data-command-id="appdock.notifications.open"]').waitFor();
+    await child
+      .locator(
+        '[role="option"][aria-selected="true"][data-command-id="appdock.notifications.open"]',
+      )
+      .waitFor();
     await search.press('Control+Enter');
     await child.waitFor({ state: 'hidden' });
     assert.equal(
@@ -358,15 +385,22 @@ async function inspectLayout(dialog, name) {
     await nav('custom-commands');
     await host.getByRole('button', { name: 'Selection stackを編集', exact: true }).click();
     const stack = host.getByRole('dialog', { name: 'カスタムコマンドの編集', exact: true });
+    await stack.getByRole('textbox', { name: 'カテゴリ（任意）', exact: true }).fill('画像');
+    await stack.getByTestId('settings-dialog-confirm').click();
+    await stack.waitFor({ state: 'hidden' });
+    assert.equal((await saved()).customCommands.items[0].category, '画像');
+    await host.getByRole('button', { name: 'Selection stackを編集', exact: true }).click();
+    assert.equal(await stack.getByRole('textbox', { name: 'カテゴリ（任意）', exact: true }).inputValue(), '画像');
     await stack.getByTestId('stack-add-command').click();
     dialog = selectionDialog(host);
     await dialog
       .getByRole('combobox', { name: 'コマンドを検索' })
       .fill('appdock.custom.' + customId);
-    assert.equal(await dialog.getByRole('option').count(), 0);
-    await dialog.getByRole('button', { name: '絞り込みを解除' }).click();
+    assert.equal(await dialog.locator('[role=option]').count(), 0);
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('');
+    await dialog.getByRole('button', { name: /^すべて/ }).click();
     await dialog.getByRole('button', { name: /^お気に入り/ }).click();
-    assert.equal(await dialog.getByRole('option').count(), 2);
+    assert.equal(await dialog.locator('[role=option]').count(), 2);
     await cancel();
     assert(
       await stack.getByTestId('stack-add-command').evaluate((e) => e === document.activeElement),
@@ -378,7 +412,7 @@ async function inspectLayout(dialog, name) {
     await stack.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal((await saved()).customCommands.items[0].config.entries.length, 1);
     checks.push(
-      'stack shares favorites and caller exclusions; nested cancel and parent cancel preserve saved entries',
+      'custom category saves and reopens; stack shares favorites and caller exclusions; nested cancel and parent cancel preserve saved entries',
     );
 
     await nav('tray');
@@ -386,7 +420,7 @@ async function inspectLayout(dialog, name) {
     await dialog
       .getByRole('combobox', { name: 'コマンドを検索' })
       .fill('appdock.custom.' + customId);
-    assert.equal(await dialog.getByRole('option').count(), 1);
+    assert.equal(await dialog.locator('[role=option]').count(), 1);
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('Selection');
     await dialog
       .locator('[role=option][data-command-id="appdock.custom.' + customId + '"]')
@@ -399,7 +433,7 @@ async function inspectLayout(dialog, name) {
     await dialog
       .locator('[role=option][data-command-id="appdock.custom.' + customId + '"]')
       .waitFor({ state: 'hidden' });
-    assert((await dialog.getByRole('option').count()) > 0);
+    assert((await dialog.locator('[role=option]').count()) > 0);
     assert(await dialog.getByTestId('command-selection-confirm').isDisabled());
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).press('Enter');
     assert(await dialog.isVisible());

@@ -8,6 +8,7 @@ export interface AutomationCommand {
   id: string;
   title: string;
   description?: string;
+  category?: string;
   appletId: string | null;
   available: boolean;
   unavailableReason: string | null;
@@ -69,6 +70,7 @@ export function automationCommands(applets: ExtensionSnapshot[]): AutomationComm
         id: c.id,
         title: c.title,
         ...('description' in c ? { description: c.description } : {}),
+        ...('category' in c ? { category: c.category } : {}),
         appletId: null,
         available: true,
         unavailableReason: null,
@@ -83,6 +85,7 @@ export function automationCommands(applets: ExtensionSnapshot[]): AutomationComm
             id: c.id,
             title: c.title,
             ...(c.description !== undefined ? { description: c.description } : {}),
+            ...(c.category !== undefined ? { category: c.category } : {}),
             appletId: a.id,
             available,
             unavailableReason: available

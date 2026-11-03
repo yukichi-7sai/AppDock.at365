@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { commandCategory } from './command-category';
 import { isRetiredShellRegion, isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
 import { customDescription } from './custom-commands';
@@ -88,6 +89,7 @@ export function parseExtensionCommands(id: string, value: unknown): Command[] {
     return {
       id: command.id,
       title: command.title,
+      ...(command.category !== undefined ? { category: commandCategory(command.category) } : {}),
       ...(command.description !== undefined
         ? { description: customDescription(command.description) }
         : {}),

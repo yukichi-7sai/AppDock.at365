@@ -191,6 +191,8 @@ Appletの有効・無効はread + write、再起動はread + executeで判定し
 
 ## 公開コマンド
 
+コマンド一覧の任意の`category`は提供元が指定した分類名です。AppDock 0.130.0から返し、未指定のコマンドでは省略します。カテゴリの入力規則は[Applet API](extensions.md#動的コマンドとキー送信の一覧設定)を参照してください。
+
 設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableで編集可否、executableで独立した動作の実行可否を確認します。接尾辞・表示名・aliasから許可を推測しません。
 
 - 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。

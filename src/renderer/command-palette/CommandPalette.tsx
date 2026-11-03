@@ -53,7 +53,7 @@ export function CommandPalette({
     commands.filter(
       (c) =>
         !c.hidden &&
-        `${c.title} ${c.description ?? ''} ${c.extension} ${c.id}`
+        `${c.title} ${c.description ?? ''} ${c.extension} ${c.id} ${c.category ?? ''}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     ),

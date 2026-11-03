@@ -124,6 +124,7 @@ export function CustomCommandsSettings({
     const text = [
       item.title,
       item.description,
+      item.category,
       item.id,
       customCommandId(item.id),
       item.typeId,
@@ -368,6 +369,7 @@ function CustomCommandDialog({
   const [typeId, setTypeId] = useState(original?.typeId ?? types[0]?.id ?? '');
   const [title, setTitle] = useState(original?.title ?? '');
   const [description, setDescription] = useState(original?.description ?? '');
+  const [category, setCategory] = useState(original?.category ?? '');
   const [config, setConfig] = useState<Record<string, unknown>>(
     () => original?.config ?? defaults(typeId),
   );
@@ -473,6 +475,9 @@ function CustomCommandDialog({
           const value = {
             title: title.trim(),
             description,
+            ...(category.trim() || original?.category !== undefined
+              ? { category: category.trim() }
+              : {}),
             configVersion: migrate || !original ? type!.configVersion : original.configVersion,
             config: nextConfig,
             enabled,
@@ -593,6 +598,14 @@ function CustomCommandDialog({
                     maxLength={1000}
                     rows={3}
                     onChange={(e) => setDescription(e.target.value)}
+                  />
+                </SettingsField>
+                <SettingsField settingKey="category" title={translate('commands.category.label')}>
+                  <SettingsInput
+                    aria-label={translate('commands.category.label')}
+                    value={category}
+                    maxLength={100}
+                    onChange={(event) => setCategory(event.target.value)}
                   />
                 </SettingsField>
                 <SettingsChoice

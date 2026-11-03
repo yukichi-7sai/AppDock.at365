@@ -37,6 +37,7 @@ public interface ICommandService
 public sealed record CommandRegistration(string Id, string Title, Func<CancellationToken, Task> Handler)
 {
     public string? Description { get; init; }
+    public string? Category { get; init; }
 }
 public interface ICustomCommandService
 {

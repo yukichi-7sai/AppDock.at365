@@ -33,6 +33,7 @@ function pageCommand(pageId: string, title: string, id: string) {
     title: hostText('settings.settings-navigation.openCommand', { title: title }),
     description: hostText('settings.settings-navigation.openDescription', { title: title }),
     pageId,
+    category: hostText('commands.category.settings'),
     extension: 'AppDock',
     available: true,
   };

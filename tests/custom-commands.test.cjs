@@ -92,6 +92,22 @@ function fixture(t, extra = {}) {
   };
 }
 
+test('custom categories persist, project to catalogs, clear and reject invalid updates atomically', (t) => {
+  const f = fixture(t);
+  const item = f.add({ category: '  画像  ', automation: true });
+  assert.equal(f.store.value.customCommands.items[0].category, '画像');
+  assert.equal(f.service.uiCommands()[0].category, '画像');
+  assert.equal(f.service.publicCommands()[0].category, '画像');
+  const previous = JSON.stringify(f.store.value);
+  assert.throws(() =>
+    f.update([{ op: 'update', id: item.id, changes: { category: 'bad\ntext' } }]),
+  );
+  assert.equal(JSON.stringify(f.store.value), previous);
+  f.update([{ op: 'update', id: item.id, changes: { category: '' } }]);
+  assert.equal(f.service.uiCommands()[0].category, '');
+  assert.equal(parseCustomCommands(f.store.value.customCommands).items[0].category, '');
+});
+
 test('repeated catalog readers share thousands of accepted definitions and one-ID checks stay current', async (t) => {
   const f = fixture(t);
   f.add();
