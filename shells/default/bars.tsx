@@ -141,6 +141,20 @@ function App() {
   if (model.region === 'titlebar')
     return (
       <header className="titlebar">
+        <div className="titlebar-navigation">
+          {(['back', 'forward'] as const).map((direction) => (
+            <button
+              key={direction}
+              data-direction={direction}
+              disabled={!model.actions[direction]}
+              aria-label={direction === 'back' ? '戻る' : '進む'}
+              title={direction === 'back' ? '戻る' : '進む'}
+              onClick={() => act(direction)}
+            >
+              <Icon name="arrow" size={22} />
+            </button>
+          ))}
+        </div>
         <div className="title-brand">
           <span className="brand-mark small">
             <span />

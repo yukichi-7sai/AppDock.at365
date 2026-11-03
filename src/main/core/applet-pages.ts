@@ -208,6 +208,8 @@ export interface SurfaceOptions {
 }
 /** Trusted startup/restoration requests may attach a page without revealing its host window. */
 export interface PageOpenOptions {
+  /** The host commits its own history cursor after the surface opens. */
+  historyTraversal?: boolean;
   valid(): boolean;
   background: boolean;
 }
@@ -442,7 +444,7 @@ export class AppletSurface {
       selected = this.options.key!;
       // Wait for the host renderer to report the page's actual client rectangle.
       if (!alreadySelected) bounds = null;
-      host?.selected(selected);
+      if (!presentation?.historyTraversal) host?.selected(selected);
       const window = this.window;
       if (!presentation?.background) {
         if (window?.isMinimized()) window.restore();

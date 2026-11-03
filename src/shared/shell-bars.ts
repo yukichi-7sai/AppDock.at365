@@ -34,7 +34,15 @@ export interface ShellBarModel {
   /** Opaque host-issued IDs. Unavailable operations are omitted. */
   actions: Partial<
     Record<
-      'palette' | 'notifications' | 'minimize' | 'maximize' | 'close' | 'update' | 'cancel',
+      | 'back'
+      | 'forward'
+      | 'palette'
+      | 'notifications'
+      | 'minimize'
+      | 'maximize'
+      | 'close'
+      | 'update'
+      | 'cancel',
       string
     >
   >;

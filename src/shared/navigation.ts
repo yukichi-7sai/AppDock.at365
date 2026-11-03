@@ -1,6 +1,13 @@
 /** The built-in destination used when no startup page is selected or a page is unavailable. */
 export const defaultNavigation = { route: 'settings', section: 'about' } as const;
 
+export const navigationCommands = {
+  back: 'appdock.navigation.back',
+  forward: 'appdock.navigation.forward',
+} as const;
+export type HistoryDirection = keyof typeof navigationCommands;
+export type HistoryAvailability = Record<HistoryDirection, boolean>;
+
 export type PageRoute =
   | 'image-library'
   | 'sound-library'

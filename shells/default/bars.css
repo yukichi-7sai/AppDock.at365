@@ -84,11 +84,31 @@ kbd {
   -webkit-app-region: drag;
   user-select: none;
 }
+.titlebar-navigation {
+  display: flex;
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+.titlebar-navigation button {
+  width: 28px;
+  height: 30px;
+  padding: 0;
+  border-radius: 4px;
+}
+.titlebar-navigation svg {
+  stroke-width: 2.25;
+}
+.titlebar-navigation [data-direction='back'] svg {
+  transform: rotate(180deg);
+}
+.titlebar-navigation button:hover:not(:disabled) {
+  background: var(--raised);
+}
 .title-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-left: 18px;
+  margin-left: 8px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;

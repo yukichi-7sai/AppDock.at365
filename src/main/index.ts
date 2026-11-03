@@ -56,7 +56,8 @@ import { WindowBars } from './core/window-bars';
 import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
 import { HostPages } from './core/host-pages';
-import { defaultNavigation } from '../shared/navigation';
+import type { NavigationPlace } from './core/navigation-history';
+import { defaultNavigation, navigationCommands } from '../shared/navigation';
 import { startPageOptions, startPageState } from '../shared/start-page';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
@@ -386,6 +387,7 @@ function notifyUpdatedWindowShown() {
 }
 const shellStateSent = new Map<string, string>();
 let lastShellRevision = -1;
+let lastHistoryAvailability = '';
 let notificationBanner: NotificationSurfaceHost | undefined;
 let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationWindows: NotificationWindowsAdapter | undefined;
@@ -447,14 +449,86 @@ const navigation = new NavigationCoordinator(
   !restoreView && settings.value.host.startPage !== 'about'
     ? settings.value.host.startPage
     : undefined,
+  {
+    settingsPlace: () => {
+      const pageId = settingsEditing.metadata().pageId;
+      const move = settingsNavigation.move;
+      return {
+        route: 'settings',
+        pageId,
+        ...(move?.pageId === pageId ? { itemId: move.itemId } : {}),
+      };
+    },
+    valid: validHistoryPlace,
+    open: openHistoryPlace,
+  },
 );
+function validHistoryPlace(place: NavigationPlace) {
+  if (place.route.startsWith('page:'))
+    return !!manager && startPageState(place.route, settings.value, allApplets()) === 'open';
+  if (!place.pageId || (!place.itemId && !place.pageId.startsWith('applet:'))) return true;
+  const page = settingsEditing.catalog().find((p) => p.id === place.pageId);
+  return !!page && (!place.itemId || page.items.some((item) => item.id === place.itemId));
+}
+async function openExistingPage(
+  extensionId: string,
+  pageId: string,
+  presentation: import('./core/applet-pages').PageOpenOptions,
+) {
+  if (pageCollections.find(extensionId) && pageId === 'main')
+    await pageCollections.open(extensionId, presentation);
+  else {
+    const extension = manager.items.get(extensionId)!;
+    const page = [...(extension.manifest.pages ?? []), ...(extension.dynamicPages ?? [])].find(
+      (page) => page.id === pageId,
+    )!;
+    await manager.api(
+      extension,
+      page.source === 'web-accounts' ? 'host.webAccounts.open' : 'host.pages.open',
+      { id: pageId },
+      false,
+      presentation,
+    );
+  }
+}
+async function openHistoryPlace(place: NavigationPlace, current: () => boolean) {
+  if (place.route.startsWith('page:')) {
+    const [, extensionId, pageId] = place.route.split(':');
+    await openExistingPage(extensionId, pageId, {
+      valid: () => current() && !quitting && validHistoryPlace(place),
+      background: true,
+      historyTraversal: true,
+    });
+  } else if (place.pageId) {
+    const select = (action: import('../shared/settings-editing').SettingsEdit) => {
+      const state = settingsEditing.metadata();
+      return settingsEditing.act({
+        sessionId: state.sessionId,
+        editRevision: state.editRevision,
+        operationId: randomUUID(),
+        action,
+      });
+    };
+    await select({ type: 'select-page', pageId: place.pageId });
+    if (!current()) return;
+    if (place.itemId && settingsEditing.metadata().mode !== 'form')
+      await select({ type: 'mode', value: 'form' });
+    if (!current()) return;
+    releaseSettingsView();
+    settingsNavigation.provider = undefined;
+    settingsNavigation.commandTarget = undefined;
+    settingsNavigation.move = place.itemId
+      ? { id: randomUUID(), itemId: place.itemId, pageId: place.pageId }
+      : undefined;
+  }
+}
 const ribbonCatalog = new RibbonCatalogCache(
   () => (manager ? allApplets() : []),
   (applets) => (manager ? ribbonUiCommands(applets) : hostCommands),
 );
 let ribbonImageRevision = 0;
 function ribbonInputs() {
-  // Only state used by command Shell requirements belongs to the catalog key.
+  // Command availability depends on Shell requirements and both history directions.
   const shell =
     JSON.stringify(
       shellRegistry
@@ -467,7 +541,7 @@ function ribbonInputs() {
           region.visible,
         ]),
     ) ?? '';
-  return ribbonCatalog.get(settings.value, shell);
+  return ribbonCatalog.get(settings.value, shell + JSON.stringify(navigation.history.availability));
 }
 const presentation = new UiPresentation({
   settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
@@ -1532,6 +1606,7 @@ const changed = () => {
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
     if (quitting) return;
+    if (manager) settingsReads.run(() => navigation.history.prune(validHistoryPlace));
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
     notificationWindows?.refresh();
@@ -1559,8 +1634,13 @@ const changed = () => {
         }
       }
     const shellRevision = shellRegistry?.snapshot().revision;
-    if (shellRevision !== undefined && shellRevision !== lastShellRevision) {
-      lastShellRevision = shellRevision;
+    const historyAvailability = JSON.stringify(navigation.history.availability);
+    if (
+      (shellRevision !== undefined && shellRevision !== lastShellRevision) ||
+      historyAvailability !== lastHistoryAvailability
+    ) {
+      lastShellRevision = shellRevision ?? -1;
+      lastHistoryAvailability = historyAvailability;
       void syncHotKeys();
       trayMenu();
     }
@@ -1631,7 +1711,7 @@ function trayMenu() {
   const applets = allApplets();
   const entries = resolveTrayMenu(
     getTrayMenu(settings.value, applets),
-    trayCommandCatalog(applets, customCommands.uiCommands()),
+    trayCommandCatalog(applets, customCommands.uiCommands(), navigation.history.availability),
   );
   const template = (items: ResolvedTrayItem[]): Electron.MenuItemConstructorOptions[] =>
     items.map((item) =>
@@ -1710,6 +1790,7 @@ function commandReferenceCatalog() {
     custom = customCommands.uiCommands();
   const key = JSON.stringify([
     settings.value.host.language,
+    navigation.history.availability,
     applets.map((applet) => [
       applet.id,
       applet.displayName,
@@ -1727,7 +1808,10 @@ function commandReferenceCatalog() {
 }
 function uiCommands(applets = allApplets()): import('../shared/commands').UiCommand[] {
   const commands = [
-    ...hostCommandsForApplets(applets).map((c) => ({ ...c, extensionId: null })),
+    ...hostCommandsForApplets(applets, navigation.history.availability).map((c) => ({
+      ...c,
+      extensionId: null,
+    })),
     ...customCommands.uiCommands(),
     ...appletManagementCommands(applets),
     ...applets.flatMap((e) =>
@@ -1827,6 +1911,7 @@ function openCommandPalette(
         request: Date.now(),
       };
       await navigation.navigate('settings');
+      navigation.recordSettings();
       changed();
     },
     dark: () => nativeTheme.shouldUseDarkColors,
@@ -1853,6 +1938,14 @@ function openCommandPalette(
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
   if (id === 'appdock.noop') return { accepted: true };
+  if (id === navigationCommands.back || id === navigationCommands.forward) {
+    const direction = id === navigationCommands.back ? 'back' : 'forward';
+    navigation.history.prune(validHistoryPlace);
+    if (!navigation.history.target(direction)) return;
+    await showWindow(invocation);
+    await navigation.travel(direction);
+    return;
+  }
   if (id === 'appdock.text-palette.open' || id === 'appdock.clipboard-history.open') {
     if (!inputPalette) throw Error(hostText('services.index.notReady'));
     return inputPalette.open(
@@ -1866,19 +1959,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   const settingsPage = settingsPageCommands(allApplets()).find((command) => command.id === id);
   if (settingsPage) {
     await showWindow(invocation);
-    await flushSettingsInputs();
-    const state = settingsEditing.snapshot();
-    await settingsEditing.act({
-      sessionId: state.sessionId,
-      editRevision: state.editRevision,
-      operationId: randomUUID(),
-      action: { type: 'select-page', pageId: settingsPage.pageId },
-    });
-    releaseSettingsView();
-    settingsNavigation.provider = undefined;
-    settingsNavigation.commandTarget = undefined;
-    settingsNavigation.move = undefined;
-    await navigation.navigate('settings');
+    await navigation.selectSettings(settingsPage.pageId);
     return { accepted: true };
   }
   const update = updateCommands.find((command) => command.id === id);
@@ -1958,11 +2039,13 @@ function availableShortcutCommands(
   title: string;
 })[] {
   return [
-    ...hostCommandsForApplets(applets).map((c) => ({
-      id: c.id,
-      title: c.title,
-      extensionId: null,
-    })),
+    ...hostCommandsForApplets(applets, navigation.history.availability)
+      .filter((c) => c.available)
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        extensionId: null,
+      })),
     ...customCommands.uiCommands().filter((c) => c.available),
     ...appletManagementCommands(applets).filter((c) => c.available),
     ...applets.flatMap((e) =>
@@ -2041,6 +2124,7 @@ function snapshotCore(): HostSnapshot {
     ribbonDisplayMode: safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact'),
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
+    navigationHistory: navigation.history.availability,
     shellRegions: shellRegistry?.snapshot(),
     shell: shellHost?.status ?? {
       selected: defaultShellId,
@@ -2727,6 +2811,8 @@ function settingsPageActions(
             ? undefined
             : { id: a.id, page: 'command-triggers', request: Date.now() };
         settingsNavigation.commandTarget = undefined;
+        settingsNavigation.move = undefined;
+        navigation.recordSettings();
         changed();
       }
     };
@@ -3539,7 +3625,14 @@ function registerIpc() {
     if (['reload', 'select-page', 'mode'].includes(request?.action?.type)) {
       request = { ...request, editRevision: settingsEditing.snapshot().editRevision };
     }
-    return settingsEditing.act(request);
+    const result = await settingsEditing.act(request);
+    if (
+      request.action.type === 'select-page' &&
+      !navigation.history.availability.back &&
+      !navigation.history.availability.forward
+    )
+      navigation.recordSettings(true);
+    return result;
   });
   handle('dock:settingsPage:index', () =>
     settingsReads.run(() =>
@@ -3621,22 +3714,7 @@ function registerIpc() {
         if (!valid()) return;
         const presentation = { valid, background: true };
         try {
-          if (pageCollections.find(extensionId) && pageId === 'main')
-            await pageCollections.open(extensionId, presentation);
-          else {
-            const extension = manager.items.get(extensionId)!;
-            const page = [
-              ...(extension.manifest.pages ?? []),
-              ...(extension.dynamicPages ?? []),
-            ].find((page) => page.id === pageId)!;
-            await manager.api(
-              extension,
-              page.source === 'web-accounts' ? 'host.webAccounts.open' : 'host.pages.open',
-              { id: pageId },
-              false,
-              presentation,
-            );
-          }
+          await openExistingPage(extensionId, pageId, presentation);
           if (
             current() &&
             !quitting &&
@@ -3730,7 +3808,8 @@ function registerIpc() {
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:hostModal', (state: unknown) => {
-    if (state !== 'none' && state !== 'open' && state !== 'confirm') throw Error('Invalid modal state');
+    if (state !== 'none' && state !== 'open' && state !== 'confirm')
+      throw Error('Invalid modal state');
     hostModalLayer?.setState(state);
   });
 
@@ -4194,13 +4273,11 @@ async function initialize() {
     warnings,
     suspended: () => quitting,
     open: async (gesture) => {
-      await executeCommand('appdock.settings.touchpad-gestures.open');
-      settingsNavigation.move = {
-        id: randomUUID(),
-        pageId: 'touchpad-gestures',
-        itemId: `touchpad-gestures/connection.${gesture}`,
-      };
-      changed();
+      await showWindow();
+      await navigation.selectSettings(
+        'touchpad-gestures',
+        `touchpad-gestures/connection.${gesture}`,
+      );
     },
     report: (error) => {
       errors.report({
@@ -4536,6 +4613,7 @@ async function initialize() {
     ready: () => uiReady && !quitting,
     blocked: () => overlayHost?.kind === 'ribbon-group',
     content: new WindowBars({
+      history: () => navigation.history.availability,
       state: () => {
         const update = updater.state;
         return {
@@ -4569,6 +4647,11 @@ async function initialize() {
       run: async (operation) => {
         if (operation === 'palette')
           return openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
+        if (operation === 'back' || operation === 'forward') {
+          await executeCommand(navigationCommands[operation]);
+          window?.webContents.focus();
+          return;
+        }
         if (operation === 'notifications') {
           await executeCommand('appdock.notifications.open');
           window?.webContents.focus();
@@ -4771,6 +4854,7 @@ async function initialize() {
       return new SettingsPageSession(request, {
         read: (action) => settingsReads.run(action),
         navigation: settingsNavigation,
+        selected: () => navigation.recordSettings(),
         editor: settingsEditing,
         host: () => ({
           settings: { value: settings.value, revision: settings.revision, path: settings.file },
@@ -5111,8 +5195,12 @@ async function initialize() {
       errors.report({
         eventId: 'input-palette-' + session.id,
         source: session.kind === 'history' ? 'clipboard-history' : 'text-palette',
-        title: hostText(session.kind === 'history' ? 'inputPalette.historyTitle' : 'inputPalette.title'),
-        code: (session.kind === 'history' ? 'CLIPBOARD_HISTORY_' : 'TEXT_PALETTE_') + stage.toUpperCase(),
+        title: hostText(
+          session.kind === 'history' ? 'inputPalette.historyTitle' : 'inputPalette.title',
+        ),
+        code:
+          (session.kind === 'history' ? 'CLIPBOARD_HISTORY_' : 'TEXT_PALETTE_') +
+          stage.toUpperCase(),
         message: hostText(`inputPalette.error.${stage}`),
       }),
   );

@@ -1,6 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
-import { defaultNavigation, isPageRoute } from '../../shared/navigation';
+import { defaultNavigation, isPageRoute, type HistoryDirection } from '../../shared/navigation';
 import { visibleRibbonItems, type RibbonItem } from '../../shared/applet-pages';
 import { ribbonRoots, ribbonPlacement, ribbonPresentation } from '../../shared/ribbon-layout';
 import { ribbonBadgeView, type RibbonBadge, type RibbonAnchor } from '../../shared/ribbon';
@@ -8,7 +8,10 @@ import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/shell';
 import type { UiCommand } from '../../shared/commands';
 
+import { NavigationHistory, type NavigationPlace } from './navigation-history';
+
 export class NavigationCoordinator {
+  readonly history: NavigationHistory;
   private requestSequence = 0;
   private appliedSequence = 0;
   state: NavigationState = { ...defaultNavigation, request: 0 };
@@ -17,8 +20,54 @@ export class NavigationCoordinator {
     private beforeNavigate?: () => Promise<void>,
     private failed?: (error: unknown) => void,
     initialRoute?: string,
+    private historyHost?: {
+      settingsPlace(): NavigationPlace;
+      open(place: NavigationPlace, current: () => boolean): Promise<void>;
+      valid(place: NavigationPlace): boolean;
+    },
   ) {
     if (initialRoute && isPageRoute(initialRoute)) this.state = { route: initialRoute, request: 0 };
+    this.history = new NavigationHistory(
+      this.state.route === 'settings'
+        ? { route: 'settings', pageId: defaultNavigation.section }
+        : { route: this.state.route },
+    );
+  }
+  recordSettings(replace = false) {
+    if (
+      this.state.route === 'settings' &&
+      this.historyHost &&
+      this.history.visit(this.historyHost.settingsPlace(), replace)
+    ) {
+      if (!replace) this.appliedSequence = ++this.requestSequence;
+      this.changed();
+    }
+  }
+  async travel(direction: HistoryDirection) {
+    const host = this.historyHost;
+    if (!host) return;
+    this.history.prune(host.valid);
+    if (!this.history.target(direction)) return;
+    const sequence = ++this.requestSequence;
+    await this.beforeNavigate?.();
+    if (sequence !== this.requestSequence) return;
+    this.history.prune(host.valid);
+    const place = this.history.target(direction);
+    if (!place) {
+      this.changed();
+      return;
+    }
+    const current = () =>
+      sequence === this.requestSequence && this.history.target(direction) === place;
+    await host.open(place, current);
+    if (!current() || !host.valid(place) || !this.history.arrive(direction, place)) return;
+    this.appliedSequence = sequence;
+    this.state = {
+      route: place.route,
+      request: this.state.request + 1,
+      ...(place.route === 'logs' ? { appletId: place.logSource ?? '' } : {}),
+    };
+    this.changed();
   }
   lease(route: string) {
     const sequence = this.requestSequence;
@@ -30,13 +79,14 @@ export class NavigationCoordinator {
   restore(route: string) {
     // Startup restoration has lower priority than any explicit or pending navigation.
     if (this.requestSequence !== 0) return;
-    return this.navigate(isPageRoute(route) ? route : null);
+    return this.navigate(isPageRoute(route) ? route : null, undefined, undefined, undefined, true);
   }
   navigate(
     route: string | null,
     section?: NavigationState['section'],
     appletId?: string,
     appletDetail?: NavigationState['appletDetail'],
+    replace = false,
   ) {
     if (route === null) {
       route = defaultNavigation.route;
@@ -47,29 +97,55 @@ export class NavigationCoordinator {
       if (appletDetail !== 'settings') section = 'applets';
     }
     if (!isPageRoute(route)) throw Error('Unknown route');
+    const pageId =
+      section ?? (appletDetail === 'settings' && appletId ? 'applet:' + appletId : undefined);
+    const target = route === 'settings' && pageId ? { route, pageId } : undefined;
+    const work = this.transition(
+      { route, section, appletId, ...(appletDetail ? { appletDetail } : {}) },
+      target,
+      replace,
+    );
+    return work?.catch((error) => {
+      this.failed?.(error);
+    });
+  }
+  selectSettings(pageId: string, itemId?: string) {
+    return this.transition({ route: 'settings' }, { route: 'settings', pageId, itemId });
+  }
+  private transition(
+    next: Omit<NavigationState, 'request'>,
+    target?: NavigationPlace,
+    replace = false,
+  ) {
     const sequence = ++this.requestSequence;
-    if (route === this.state.route && !section && !appletId) {
+    const current = () => sequence === this.requestSequence;
+    if (next.route === this.state.route && !target && next.appletId === undefined) {
       this.appliedSequence = sequence;
       return;
     }
     const apply = () => {
-      if (sequence !== this.requestSequence) return;
+      if (!current()) return;
       this.appliedSequence = sequence;
-      this.state = {
-        route,
-        section,
-        appletId,
-        request: this.state.request + 1,
-        ...(appletDetail ? { appletDetail } : {}),
-      };
+      this.state = { ...next, request: this.state.request + 1 };
+      const place =
+        target ??
+        (next.route === 'settings'
+          ? (this.historyHost?.settingsPlace() ?? {
+              route: next.route,
+              pageId: defaultNavigation.section,
+            })
+          : {
+              route: next.route,
+              ...(next.route === 'logs' && next.appletId ? { logSource: next.appletId } : {}),
+            });
+      this.history.visit(place, replace);
       this.changed();
     };
     if (this.beforeNavigate)
-      return this.beforeNavigate()
-        .then(apply)
-        .catch((error) => {
-          this.failed?.(error);
-        });
+      return this.beforeNavigate().then(async () => {
+        if (target && current()) await this.historyHost?.open(target, current);
+        apply();
+      });
     apply();
   }
 }

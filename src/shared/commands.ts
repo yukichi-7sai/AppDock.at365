@@ -2,8 +2,20 @@ import type { Command } from './contracts';
 import { generatedSettingCommands, hostSettingDefinitions } from './settings-commands';
 import { hostSettingsPageCommands, appletSettingsPageCommands } from './settings-navigation';
 import { updateCommands } from './update-commands';
+import { navigationCommands, type HistoryAvailability } from './navigation';
 import { hostText } from './i18n';
-export const hostCommands = [
+function historyCommands(history?: HistoryAvailability) {
+  return (['back', 'forward'] as const).map((direction) => ({
+    id: navigationCommands[direction],
+    title: hostText(`navigation.${direction}`),
+    extension: 'AppDock',
+    available: history?.[direction] === true,
+    disabledReason: history?.[direction]
+      ? undefined
+      : hostText(`navigation.${direction}Unavailable`),
+  }));
+}
+const fixedHostCommands = [
   {
     id: 'appdock.noop',
     title: hostText('commands.noop.title'),
@@ -71,8 +83,16 @@ export const hostCommands = [
     extension: 'AppDock',
   })),
 ];
-export function hostCommandsForApplets(applets: import('./contracts').ExtensionSnapshot[]) {
-  return [...hostCommands, ...appletSettingsPageCommands(applets)];
+export const hostCommands = [...fixedHostCommands, ...historyCommands()];
+export function hostCommandsForApplets(
+  applets: import('./contracts').ExtensionSnapshot[],
+  history?: HistoryAvailability,
+) {
+  return [
+    ...fixedHostCommands,
+    ...historyCommands(history),
+    ...appletSettingsPageCommands(applets),
+  ];
 }
 export interface UiCommand extends Command {
   /** Local-only execution metadata; never projected into the external command catalog. */

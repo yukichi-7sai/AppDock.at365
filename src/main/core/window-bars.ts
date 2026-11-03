@@ -14,15 +14,19 @@ export class WindowBars {
         ShellBarModel,
         'schemaVersion' | 'contextId' | 'region' | 'revision' | 'actions'
       >;
+      history?(): import('../../shared/navigation').HistoryAvailability;
       run(operation: Operation): Promise<unknown>;
     },
   ) {}
 
   snapshot(region: ShellBarRegion): ShellBarModel {
     const state = this.options.state();
+    const history = region === 'titlebar' ? this.options.history?.() : undefined;
     const operations: Operation[] =
       region === 'titlebar'
         ? [
+            ...(history?.back ? ['back' as const] : []),
+            ...(history?.forward ? ['forward' as const] : []),
             'palette',
             'notifications',
             'minimize',

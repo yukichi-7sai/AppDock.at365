@@ -135,12 +135,6 @@ function App() {
     setLocalPage(nav.route as Page);
     if (nav.route !== pendingPage) setPendingPage(null);
     if (nav.route === 'logs' && typeof nav.appletId === 'string') setLogSource(nav.appletId);
-    if (nav.section === defaultNavigation.section) editor.selectPage(defaultNavigation.section);
-    else if (nav.section === 'applets') editor.selectPage('applets');
-    else if (nav.route === 'settings' && nav.appletId && nav.appletDetail === 'settings')
-      editor.selectPage(`applet:${nav.appletId}`);
-    if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
-    if (nav.section === 'general') setGeneralRequest((v) => v + 1);
   }, [snapshot?.navigation]);
   const [pendingPage, setPendingPage] = useState<string | null>(
     page.startsWith('page:') ? page : null,
@@ -155,8 +149,6 @@ function App() {
     if (snapshot?.uiReady && (page.startsWith('page:') || page === 'extensions')) hostUiRendered();
   }, [snapshot?.uiReady, page, hostUiRendered]);
   const [busy, setBusy] = useState(false);
-  const [ribbonRequest, setRibbonRequest] = useState(0);
-  const [generalRequest, setGeneralRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const update = () => {
@@ -206,12 +198,6 @@ function App() {
       localStorage.setItem(key, JSON.stringify(editor.pageId));
     } catch {}
   }, [snapshot?.uiReady, editor.sessionId, editor.pageId]);
-  useEffect(() => {
-    if (ribbonRequest) editor.selectPage('ribbon');
-  }, [ribbonRequest]);
-  useEffect(() => {
-    if (generalRequest) editor.selectPage('general');
-  }, [generalRequest]);
   useEffect(
     () =>
       window.dock.onFlushSettingsInputs((id) => {
@@ -368,10 +354,12 @@ function App() {
     }
   }
   const commands: UiCommand[] = [
-    ...hostCommandsForApplets(snapshot?.extensions ?? []).map((command) => ({
-      ...command,
-      extensionId: null,
-    })),
+    ...hostCommandsForApplets(snapshot?.extensions ?? [], snapshot?.navigationHistory).map(
+      (command) => ({
+        ...command,
+        extensionId: null,
+      }),
+    ),
     ...appletManagementCommands(snapshot?.extensions ?? []),
     ...(snapshot?.extensions.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),

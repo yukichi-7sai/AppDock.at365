@@ -133,9 +133,11 @@ export function resolveTrayMenu(
 export function trayCommandCatalog(
   extensions: ExtensionSnapshot[],
   additional: readonly import('./commands').UiCommand[] = [],
+  history?: import('./navigation').HistoryAvailability,
 ) {
+  const projected = new Map(additional.map((c) => [c.id, c]));
   const base = [
-    ...hostCommandsForApplets(extensions),
+    ...hostCommandsForApplets(extensions, history).map((c) => projected.get(c.id) ?? c),
     ...appletManagementCommands(extensions),
     ...extensions.flatMap((e) =>
       e.commands.map((c) => ({

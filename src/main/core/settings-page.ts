@@ -59,6 +59,7 @@ export class SettingsPageSession {
       actions(page: SettingsPageDefinition): Record<string, (args: unknown[]) => Promise<unknown>>;
       read?<T>(action: () => T): T;
       changed(): void;
+      selected?(): void;
       release?(): void;
       resize?(width: number): void;
     },
@@ -284,6 +285,7 @@ export class SettingsPageSession {
           });
         if (item.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = { id: randomUUID(), itemId: item.id, pageId: item.pageId };
+        this.options.selected?.();
       } else if (op.kind === 'moved') {
         const move = this.navigation.move;
         if (
@@ -320,6 +322,7 @@ export class SettingsPageSession {
         this.navigation.commandTarget = undefined;
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
+        this.options.selected?.();
       } else if (op.kind === 'edit') {
         if (
           !['mode', 'page-values', 'partial-text', 'reset-page', 'reload'].includes(op.action.type)
