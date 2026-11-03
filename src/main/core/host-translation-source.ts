@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { readTranslationFiles } from './translation-files';
 
 const root = path.resolve(__dirname, '../../../..');
@@ -17,7 +18,14 @@ export const translationDirectory = workerDirectory
     : packaged
       ? path.resolve(path.dirname(root), '../translations')
       : path.dirname(seed);
-export const hostResources = readTranslationFiles(translationDirectory, seed, !workerDirectory);
+export const hostResources = readTranslationFiles(
+  translationDirectory,
+  seed,
+  !workerDirectory,
+  packaged
+    ? JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version
+    : undefined,
+);
 const initialLanguage =
   process.argv
     .find((arg) => arg.startsWith('--appdock-language='))

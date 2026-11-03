@@ -48,6 +48,7 @@ export interface SettingsPageAuxiliary {
   automation?: import('./automation').AutomationState;
   startPages?: import('./contracts').SettingOption[];
   commandReferences?: import('./command-text').CommandReference[];
+  pageReferences?: import('./page-links').PageReference[];
   commandPins?: string[];
   mcpAccess?: import('./settings-mcp-access').SettingsMcpAccess;
   commandAssignments?: { shortcuts: string[]; gestures: string[]; 'touchpad-gestures': string[] };
@@ -174,8 +175,15 @@ export type SettingsPaletteRequest = Pick<
   'sessionId' | 'pageId' | 'actionId'
 > &
   ({ kind: 'open'; request: CommandPaletteRequest } | { kind: 'cancel'; requestId: string });
+export type SettingsPageLinkRequest = Pick<
+  SettingsInputModeRequest,
+  'sessionId' | 'pageId' | 'actionId'
+> & {
+  target: import('./description-text').PageLinkTarget;
+};
 /** Trusted host renderer only; never exposed in an Applet preload. */
 export interface SettingsPageApi {
+  navigate?(connectionId: string, request: SettingsPageLinkRequest): Promise<void>;
   index(): Promise<SettingsIndexModel>;
   open(request: SettingsPageRequest): Promise<SettingsPageConnection>;
   get(connectionId: string): Promise<SettingsPageModel>;

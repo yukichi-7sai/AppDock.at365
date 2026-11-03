@@ -41,6 +41,76 @@ test('partial external packs override matching keys and preserve base wording an
   assert.equal(packs.fr, undefined);
 });
 
+test('a new host version replaces complete distributed packs before loading and keeps same-version edits', t => {
+  const { readTranslationFiles } = require('../out/main/main/core/translation-files');
+  const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'appdock-translation-update-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'resources');
+  const installed = path.join(root, 'translations');
+  fs.mkdirSync(source);
+  fs.mkdirSync(installed);
+  const seed = path.join(source, 'host.json');
+  fs.writeFileSync(seed, '{"label":"新版","description":"[setting:command-triggers]"}');
+  fs.writeFileSync(path.join(source, 'host_en.json'), '{"label":"New"}');
+  fs.writeFileSync(path.join(installed, 'host.json'), '{"label":"旧版","obsolete":"remove"}');
+  fs.writeFileSync(path.join(installed, 'host_en.json'), '{"label":"Old","obsolete":"remove"}');
+  fs.writeFileSync(path.join(installed, 'host_fr.json'), '{"label":"Custom"}');
+  fs.writeFileSync(path.join(installed, '.appdock-version'), '0.131.0');
+  const updated = readTranslationFiles(installed, seed, true, '0.132.0');
+  assert.equal(updated.ja.description, '[setting:command-triggers]');
+  assert.equal(updated.en.label, 'New');
+  assert.equal(updated.fr.label, 'Custom');
+  for (const name of ['host.json', 'host_en.json'])
+    assert.equal(fs.readFileSync(path.join(installed, name), 'utf8'), fs.readFileSync(path.join(source, name), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(installed, '.appdock-version'), 'utf8'), '0.132.0');
+  fs.writeFileSync(path.join(installed, 'host.json'), '{"label":"編集"}');
+  assert.equal(readTranslationFiles(installed, seed, true, '0.132.0').ja.label, '編集');
+  assert.equal(readTranslationFiles(installed, seed, false, '0.132.0').ja.label, '編集');
+  assert.equal(readTranslationFiles(installed, seed, false, '0.133.0').ja.label, '新版');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(installed, 'host.json'))).label, '編集');
+  assert.equal(fs.readFileSync(path.join(installed, '.appdock-version'), 'utf8'), '0.132.0');
+  assert.equal(readTranslationFiles(installed, seed, true, '0.133.0').ja.label, '新版');
+});
+
+test('translation refresh uses distributed text on failure and retries without accepting a partial refresh', t => {
+  const { readTranslationFiles } = require('../out/main/main/core/translation-files');
+  const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'appdock-translation-failure-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'resources');
+  const installed = path.join(root, 'translations');
+  fs.mkdirSync(source);
+  fs.mkdirSync(installed);
+  const seed = path.join(source, 'host.json');
+  fs.writeFileSync(seed, '{"label":"新版"}');
+  fs.writeFileSync(path.join(source, 'host_en.json'), '{"label":"New"}');
+  fs.writeFileSync(path.join(installed, 'host.json'), '{"label":"旧版"}');
+  const marker = path.join(installed, '.appdock-version');
+  fs.mkdirSync(marker);
+  const fallback = readTranslationFiles(installed, seed, true, '0.132.0');
+  assert.equal(fallback.ja.label, '新版');
+  assert.equal(fallback.en.label, 'New');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(installed, 'host.json'))).label, '旧版');
+  fs.rmdirSync(marker);
+  fs.writeFileSync(marker, '0.131.0');
+  fs.writeFileSync(path.join(installed, 'host_en.json'), '{"label":"Old"}');
+  const rename = fs.renameSync;
+  fs.renameSync = (from, to) => {
+    if (to === path.join(installed, 'host_en.json')) throw Error('Fixture write failure');
+    return rename(from, to);
+  };
+  try {
+    assert.equal(readTranslationFiles(installed, seed, true, '0.132.0').en.label, 'New');
+    assert.equal(fs.readFileSync(marker, 'utf8'), '0.131.0');
+    assert.equal(readTranslationFiles(installed, seed, false, '0.132.0').en.label, 'New');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(installed, 'host_en.json'))).label, 'Old');
+  } finally {
+    fs.renameSync = rename;
+  }
+  assert.equal(readTranslationFiles(installed, seed, true, '0.132.0').ja.label, '新版');
+  assert.equal(fs.readFileSync(marker, 'utf8'), '0.132.0');
+  assert(!fs.readdirSync(installed).some(name => name.endsWith('.tmp')));
+});
+
 test('external Japanese resources initialize synchronously and remain isolated', () => {
   const instance = createHostI18n();
   assert.equal(instance.isInitialized, true);

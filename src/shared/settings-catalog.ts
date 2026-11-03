@@ -1,6 +1,7 @@
 import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { commandTextPlain, type CommandReference } from './command-text';
+import { pageReferences } from './page-links';
 import { hostSettingDefinitions } from './host-settings';
 import {
   hostPageSettingsPaths,
@@ -11,7 +12,13 @@ import {
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { commandTriggerSettingDefinitions } from './command-trigger-options';
 import { getHostTranslator } from './i18n';
-import { defaultHostLanguage, hostLanguages, hostLanguageName, isHostLanguage, type HostLanguage } from './host-language';
+import {
+  defaultHostLanguage,
+  hostLanguages,
+  hostLanguageName,
+  isHostLanguage,
+  type HostLanguage,
+} from './host-language';
 import { collectionRecord } from './page-collections';
 import { touchpadGestureTypes } from './touchpad-gestures';
 import { accentChoices } from './appearance';
@@ -42,6 +49,8 @@ export interface SettingsItem {
   key: string;
   title: string;
   description: string;
+  /** Original metadata used to collect links. Plain-text search projections must not be parsed again. */
+  referenceTexts?: string[];
   definition?: SettingDefinition;
   keywords?: string[];
   unavailableReason?: string;
@@ -510,7 +519,7 @@ export function settingsCatalog(
           ),
           keywords:
             id === 'appearance' && key === 'language'
-              ? hostLanguages.flatMap(code => [code, hostLanguageName(code)])
+              ? hostLanguages.flatMap((code) => [code, hostLanguageName(code)])
               : id === 'appearance' && key === 'theme'
                 ? [
                     t('appearance.theme.dark'),
@@ -615,17 +624,23 @@ export function settingsCatalog(
     }),
   ];
   const byId = new Map(references.map((c) => [c.id, c]));
+  let links: ReturnType<typeof pageReferences> | undefined;
   return pages.map((page) => ({
     ...page,
     items: page.items.map((field) =>
-      !field.description.includes('[command:') &&
-      !field.keywords?.some((text) => text.includes('[command:'))
+      !/\[(command|page|setting):/.test(field.description) &&
+      !field.keywords?.some((text) => /\[(command|page|setting):/.test(text))
         ? field
         : {
             ...field,
-            description: commandTextPlain(field.description, byId),
+            referenceTexts: [field.description, ...(field.keywords ?? [])],
+            description: commandTextPlain(
+              field.description,
+              byId,
+              (links ??= pageReferences(applets, current)),
+            ),
             keywords: [
-              ...(field.keywords ?? []).map((text) => commandTextPlain(text, byId)),
+              ...(field.keywords ?? []).map((text) => commandTextPlain(text, byId, links)),
               field.description,
             ],
           },
@@ -875,8 +890,12 @@ export function applySettingsJson(
 ): Settings {
   const value = JSON.parse(text);
   if (!object(value) || !page.json) throw Error(hostText('settings.settings-catalog.jsonObject'));
-  if (value.host?.language !== undefined && value.host.language !== current.host.language &&
-      !isHostLanguage(value.host.language)) throw Error(hostText('language.invalid'));
+  if (
+    value.host?.language !== undefined &&
+    value.host.language !== current.host.language &&
+    !isHostLanguage(value.host.language)
+  )
+    throw Error(hostText('language.invalid'));
   const next = structuredClone(current);
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);

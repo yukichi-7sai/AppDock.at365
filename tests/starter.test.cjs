@@ -74,6 +74,7 @@ test(
     fs.writeFileSync(path.join(hostFolder, 'resources/app.asar'), 'fixture');
     fs.mkdirSync(path.join(hostFolder, 'resources/translations'));
     fs.writeFileSync(path.join(hostFolder, 'resources/translations/host.json'), '{"language.label":"表示言語"}');
+    fs.writeFileSync(path.join(hostFolder, 'resources/translations/host_en.json'), '{"language.label":"Display language"}');
     fs.writeFileSync(
       path.join(hostFolder, 'resources/applets.json'),
       '{"applets":["owner/External"]}',
@@ -150,6 +151,7 @@ test(
     assert.equal(inspection.status, 0, inspection.stdout + inspection.stderr);
     const bundle = JSON.parse(fs.readFileSync(path.join(extracted, 'bundle.json')));
     assert.equal(JSON.parse(fs.readFileSync(path.join(extracted, 'translations/host.json')))['language.label'], '表示言語');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(extracted, 'translations/host_en.json')))['language.label'], 'Display language');
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(extracted, 'applets.json'))), {
       applets: ['owner/External'],
     });

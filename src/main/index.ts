@@ -76,6 +76,9 @@ import {
   definitionCommandTexts,
 } from '../shared/command-text';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
+import { pageLinkIds, pageLinkKey, validPageLinkTarget } from '../shared/description-text';
+import { pageReferences } from '../shared/page-links';
+import { hostDescriptionTexts } from '../shared/settings-descriptions';
 import { RibbonCatalogCache } from './core/ribbon-catalog-cache';
 import { defaultShellId } from '../shared/shell';
 import { NativeInput } from './core/native-input';
@@ -378,8 +381,16 @@ configureAppearance(
     notificationDesktopShadow: settings.value.host.notificationDesktopShadow,
   }),
   ipcMain,
-  ['appdock://host/', pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href,
-    pathToFileURL(path.join(app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'out'), 'shells/default') + path.sep).href],
+  [
+    'appdock://host/',
+    pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href,
+    pathToFileURL(
+      path.join(
+        app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'out'),
+        'shells/default',
+      ) + path.sep,
+    ).href,
+  ],
 );
 function applyAudioPlaybackSettings() {
   const enabled = settings.value.host.soundEnabled;
@@ -657,7 +668,11 @@ const allApplets = () =>
   settingsReads.once('applets', () => [...parentApplets(), ...(pageCollections?.snapshot() ?? [])]);
 // Opening settings in an isolated GUI test must never consume the user's GitHub quota.
 const appletCatalog = new AppletCatalog(app.getVersion(), {
-  repositories: () => readAppletRoster(path.join(baseDirectory,'applets.json'), path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(),'applets.json')),
+  repositories: () =>
+    readAppletRoster(
+      path.join(baseDirectory, 'applets.json'),
+      path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'applets.json'),
+    ),
   file: path.join(dataDirectory, 'applet-catalog-cache.json'),
   fetcher: testDirectory || smoke ? async () => Response.error() : undefined,
   warn: () => log.write('warn', 'applets', hostText('settings.appletCatalog.cacheError')),
@@ -2428,11 +2443,36 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     );
     auxiliary.commandPins = settings.value.pinnedCommands.filter((id) => candidates.has(id));
   }
-  const texts = page.items.flatMap((item) => [
-    item.description,
-    ...(item.keywords ?? []),
-    ...(item.definition ? definitionCommandTexts(item.definition) : []),
-  ]);
+  const texts = settingsDescriptionTexts(page, auxiliary);
+  const ids = commandTextIds(texts);
+  if (ids.size) auxiliary.commandReferences = commandReferences(ids, uiCommands());
+  const links = pageLinkIds(texts);
+  if (links.size) {
+    const references = pageReferences(allApplets(), settings.value);
+    auxiliary.pageReferences = [...links].flatMap((id) =>
+      references.has(id) ? [references.get(id)!] : [],
+    );
+  }
+  if (page.id === 'applets') {
+    const references = new Map(
+      auxiliary.commandReferences?.map((command) => [command.id, command]),
+    );
+    const pages = new Map(auxiliary.pageReferences?.map((ref) => [pageLinkKey(ref), ref]));
+    auxiliary.applets = auxiliary.applets?.map((applet) => ({
+      ...applet,
+      description: commandTextPlain(applet.description ?? '', references, pages),
+    }));
+  }
+  return auxiliary;
+}
+function settingsDescriptionTexts(page: SettingsPageDefinition, auxiliary: SettingsPageAuxiliary) {
+  const texts = [
+    ...hostDescriptionTexts(page),
+    ...page.items.flatMap((item) => [
+      ...(item.referenceTexts ?? [item.description, ...(item.keywords ?? [])]),
+      ...(item.definition ? definitionCommandTexts(item.definition) : []),
+    ]),
+  ];
   for (const applet of auxiliary.applets ?? [])
     texts.push(
       applet.description ?? '',
@@ -2440,20 +2480,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       ...(applet.settingActions ?? []).map((action) => action.description ?? ''),
       ...(applet.settingSections ?? []).map((section) => section.description ?? ''),
     );
-  const ids = commandTextIds(texts);
-  if (page.id === 'text-palette') {
-    ids.add('appdock.text-palette.open');
-    ids.add('appdock.clipboard-history.open');
-  }
-  if (ids.size) auxiliary.commandReferences = commandReferences(ids, uiCommands());
-  if (page.id === 'applets' && auxiliary.commandReferences) {
-    const references = new Map(auxiliary.commandReferences.map((command) => [command.id, command]));
-    auxiliary.applets = auxiliary.applets?.map((applet) => ({
-      ...applet,
-      description: commandTextPlain(applet.description ?? '', references),
-    }));
-  }
-  return auxiliary;
+  return texts;
 }
 function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const id = page.id;
@@ -2745,6 +2772,37 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  actions.openPageLink = async ([target, currentSource]) => {
+    if (!validPageLinkTarget(target)) throw Error(hostText('settings.index.invalidAction'));
+    if (hostModalLayer?.isActive || overlayHost?.active)
+      throw Error(hostText('pages.link.dialogActive'));
+    const source = settingsEditing.metadata();
+    const sourceNavigation = navigation.state.request;
+    await flushSettingsInputs();
+    if (hostModalLayer?.isActive || overlayHost?.active)
+      throw Error(hostText('pages.link.dialogActive'));
+    const current = settingsEditing.metadata();
+    if (
+      typeof currentSource !== 'function' ||
+      !currentSource() ||
+      navigation.state.request !== sourceNavigation ||
+      current.sessionId !== source.sessionId ||
+      current.pageId !== page.id ||
+      current.pending
+    )
+      throw Error(hostText('settings.runtime.invalidInput'));
+    const key = pageLinkKey(target);
+    const latest = settingsEditing.page(page.id);
+    const links = pageLinkIds(
+      settingsDescriptionTexts(latest, settingsPageAuxiliaryContent(latest)),
+    );
+    const available = () =>
+      pageReferences(allApplets(), settings.value).get(key)?.available === true;
+    if (!links.has(key) || !available()) throw Error(hostText('pages.link.changed'));
+    if (target.kind === 'setting') await navigation.selectSettings(target.id);
+    else if (target.id === 'settings') await navigation.selectSettings(current.pageId);
+    else await navigation.openPage(target.id, available);
+  };
   const appletPage = page.kind === 'applet' && !page.collection;
   if (page.id === 'applets' || appletPage) {
     const owner = appletPage ? page.owner : undefined;
@@ -3220,7 +3278,7 @@ function settingsPageActions(
       'command-triggers',
       'custom-commands',
     ].includes(page.id) ||
-    page.id === 'text-palette' ||
+    hostDescriptionTexts(page).some((text) => text.includes('[command:')) ||
     page.kind === 'applet' ||
     page.items.some(
       (item) =>
@@ -3675,6 +3733,7 @@ function registerIpc() {
   handle('dock:settingsPage:act', (id, action) => settingsPageHost!.act(id, action));
   handle('dock:settingsPage:input', (id, request) => settingsPageHost!.input(id, request));
   handle('dock:settingsPage:palette', (id, request) => settingsPageHost!.palette(id, request));
+  handle('dock:settingsPage:navigate', (id, request) => settingsPageHost!.navigate(id, request));
   handle('dock:settingsPage:close', (id) => {
     if (typeof id !== 'string') throw Error('Invalid settings connection');
     settingsPageHost?.close(id);

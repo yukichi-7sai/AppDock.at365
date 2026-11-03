@@ -81,7 +81,7 @@ export class SettingsViewClient {
   constructor(
     private render: (model: SettingsPageModel) => void,
     private failed: (text: string) => void,
-    private transport: Pick<SettingsPageApi, 'get' | 'act' | 'input' | 'palette'>,
+    private transport: Pick<SettingsPageApi, 'get' | 'act' | 'input' | 'palette' | 'navigate'>,
     private connectionId: string,
   ) {}
   flush = () => this.chain;
@@ -343,6 +343,18 @@ export class SettingsViewClient {
   controls(): SettingsControlsApi {
     const invoke = this.invoke;
     return {
+      openPageLink: async (target) => {
+        const model = await this.preparePageChange();
+        const actionId = model.content.actions.openPageLink;
+        if (!this.transport.navigate || !actionId || model.content.editing.error)
+          throw Error(hostText('settings.runtime.unavailable'));
+        await this.transport.navigate(this.connectionId, {
+          sessionId: model.content.editing.sessionId,
+          pageId: model.content.page.id,
+          actionId,
+          target,
+        });
+      },
       snapshot: async () => ({
         updates: this.model?.content.auxiliary.updates ?? { busy: false, phase: '', results: [] },
       }),

@@ -8,6 +8,35 @@ const {
 } = require('../out/main/main/core/settings-page');
 const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog');
 
+test('page links validate the source session, issued action and target before navigation', async () => {
+  const opened = [];
+  const f = fixture({
+    openPageLink: async ([target, current]) => {
+      assert(current());
+      opened.push(target);
+    },
+  });
+  const m = f.page.snapshot();
+  const request = {
+    sessionId: m.content.editing.sessionId,
+    pageId: m.content.page.id,
+    actionId: m.content.actions.openPageLink,
+    target: { kind: 'page', id: 'text-library' },
+  };
+  for (const change of [
+    { sessionId: 'old' },
+    { pageId: 'missing' },
+    { actionId: 'wrong' },
+    { target: { kind: 'url', id: 'https://example.com' } },
+  ])
+    await assert.rejects(f.page.navigate({ ...request, ...change }));
+  assert.deepEqual(opened, []);
+  await f.page.navigate(request);
+  assert.deepEqual(opened, [request.target]);
+  f.page.dispose();
+  await assert.rejects(f.page.navigate(request));
+});
+
 test('status bar search and page edits own only visibility and reset without touching other settings', () => {
   const {
     settingsCatalog,

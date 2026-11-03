@@ -151,6 +151,7 @@ const api: DockApi = {
     completePick: (id, result) => ipcRenderer.invoke('dock:soundPick:complete', id, result),
   },
   settingsPage: {
+    navigate: (id, request) => ipcRenderer.invoke('dock:settingsPage:navigate', id, request),
     index: () => ipcRenderer.invoke('dock:settingsPage:index'),
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
     get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),

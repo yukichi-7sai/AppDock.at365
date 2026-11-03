@@ -1,4 +1,5 @@
-import type { HostTextKey } from '../../shared/i18n';
+import { settingsDescriptionKey } from '../../shared/settings-descriptions';
+import { DescriptionText } from '../settings-ui/DescriptionText';
 import { useHostTranslation } from '../HostTranslation';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
@@ -10,26 +11,6 @@ import {
   CommandListScrollProvider,
   CommandListScrollbar,
 } from '../settings-ui/CommandListScroll';
-
-const descriptions: Record<string, HostTextKey> = {
-  'command-triggers': 'settings.commandTriggers.description',
-  applets: 'settings.settingsPageLayout.applets',
-  'text-palette': 'settings.settingsPageLayout.textPalette',
-  notifications: 'settings.settingsPageLayout.notifications',
-  tts: 'settings.settingsPageLayout.tts',
-  ribbon: 'settings.settingsPageLayout.ribbon',
-  tray: 'settings.settingsPageLayout.tray',
-  shortcuts: 'settings.settingsPageLayout.shortcuts',
-  gestures: 'settings.settingsPageLayout.gestures',
-  'touchpad-gestures': 'settings.settingsPageLayout.touchpad',
-  'custom-commands': 'settings.settingsPageLayout.customCommands',
-  ai: 'settings.settingsPageLayout.ai',
-  'mcp-client': 'settings.settingsPageLayout.mcpClient',
-  'web-accounts': 'settings.settingsPageLayout.webAccounts',
-  permissions: 'settings.settingsPageLayout.permissions',
-  codex: 'settings.settingsPageLayout.codex',
-  about: 'settings.settingsPageLayout.about',
-};
 
 /** One frame for host settings, Applets, and both form / JSON views. */
 export function SettingsPageLayout({
@@ -84,16 +65,7 @@ export function SettingsPageLayout({
     };
   }, [page.id, mode]);
   const pageScroll = page.id === 'command-triggers' && mode === 'form';
-  const description =
-    page.kind === 'host'
-      ? page.id === 'appearance' || page.id === 'general'
-        ? t(`pages.${page.id}.description`)
-        : descriptions[page.id]
-          ? t(descriptions[page.id])
-          : undefined
-      : page.collection
-        ? t('settings.collectionDescription')
-        : t('settings.appletDescription');
+  const description = t(settingsDescriptionKey(page));
   return (
     <SettingsStatusProvider key={page.id + mode} error={error} target={page.title} busy={pending}>
       <CommandListScrollProvider pageScroll={pageScroll}>
@@ -113,7 +85,9 @@ export function SettingsPageLayout({
                 {heading ?? (
                   <>
                     <h1>{page.title}</h1>
-                    <p>{description ?? t('settings.defaultDescription')}</p>
+                    <p>
+                      <DescriptionText text={description} />
+                    </p>
                   </>
                 )}
               </header>

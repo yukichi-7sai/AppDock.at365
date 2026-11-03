@@ -1,6 +1,6 @@
 # 設定基盤と本体の共通設定画面
 
-対応するAppletの概要・セクション・項目・アクション・一覧フィールドのdescriptionは、`[command:ID]`を共通`CommandText`でコマンドリンクへ解決する。任意のReactNodeや入力値には適用しない。参照情報はページ単位で必要IDだけ投影し、リンクは保存キューの完了後に対象選択の本体パレットを開く。構文・参照切れ・非対話表示は[コマンドリンク](command-links-design.md)を参照する。
+対応するAppletの概要・セクション・項目・アクション・一覧フィールドのdescriptionと本体の対応説明は、共通`DescriptionText`で`[command:ID]`・`[page:ID]`・`[setting:ID]`を解決する。任意のReactNodeや入力値には適用しない。必要な参照だけを投影し、入力・保存の完了後にコマンドパレットを開く、またはページ・設定カテゴリへ移動する。構文・参照切れ・非対話表示は[コマンドリンク](command-links-design.md)と[ページリンク](page-links.md)を参照する。
 
 本体rendererで全体設定とApplet設定を共用する。画面構成・説明・状態・エラー表示の設計基準は[共通レイアウト指針](settings-ui-guidelines.md)、保存場所とファイル同期は[設定同期](settings-sync.md)、複数項目の一覧編集は[一覧とダイアログ](settings-list-editing.md)を正本とする。
 

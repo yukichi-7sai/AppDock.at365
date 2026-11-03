@@ -10,9 +10,11 @@ import type {
   SettingsPageAction,
   SettingsInputModeRequest,
   SettingsPaletteRequest,
+  SettingsPageLinkRequest,
 } from '../../shared/settings-page';
 import type { CommandPaletteResult } from '../../shared/overlays';
 import { validSettingsPaletteRequest } from '../../shared/overlays';
+import { validPageLinkTarget } from '../../shared/description-text';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
 import type { SettingsIndexModel } from '../../shared/settings-page';
@@ -30,10 +32,12 @@ export function projectSettingsIndex(
     page: { id: pageId },
     navigation: catalog.map(({ id, title, owner }) => ({ id, title, owner })),
     query,
-    results: searchSettings(catalog, query).map(({ definition, keywords, ...item }) => ({
-      ...item,
-      pageTitle: titles.get(item.pageId)!,
-    })),
+    results: searchSettings(catalog, query).map(
+      ({ definition, keywords, referenceTexts, ...item }) => ({
+        ...item,
+        pageTitle: titles.get(item.pageId)!,
+      }),
+    ),
   };
 }
 
@@ -218,9 +222,21 @@ export class SettingsPageSession {
       throw Error(hostText('settings.pageError.operationDenied'));
     await this.transientAction(request, 'cancelCommandPalette')([request.requestId]);
   }
+  async navigate(request: SettingsPageLinkRequest) {
+    if (!request || this.error || !validPageLinkTarget(request.target))
+      throw Error(hostText('settings.pageError.operationDenied'));
+    await this.transientAction(
+      request,
+      'openPageLink',
+    )([
+      request.target,
+      () =>
+        !this.error && this.isCurrent() && this.options.editor.metadata().pageId === request.pageId,
+    ]);
+  }
   private transientAction(
     request: Pick<SettingsInputModeRequest, 'sessionId' | 'pageId' | 'actionId'>,
-    name: 'setShortcutRecording' | 'openCommandPalette' | 'cancelCommandPalette',
+    name: 'setShortcutRecording' | 'openCommandPalette' | 'cancelCommandPalette' | 'openPageLink',
   ) {
     const state = this.options.editor.metadata();
     const issued = this.actions.get(name);

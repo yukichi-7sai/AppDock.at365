@@ -12,7 +12,7 @@
 
 ## 配布物と所有範囲
 
-本体の翻訳は `translations/host.json` を基本に、同じフォルダーの追加言語を重ねる。更新ZIPには初期値を `resources/translations/host.json` として収録し、EXEの隣の翻訳フォルダーは本体交換の対象外とする。[翻訳ファイルの仕様](localization.md)を参照。
+本体の翻訳は `translations/host.json` を基本に、同じフォルダーの追加言語を重ねる。更新ZIPの `resources/translations/` を正本とし、発行時と更新後の初回起動で同梱ファイルをEXE隣へ上書きする。適用済み版は `translations/.appdock-version` に記録する。翻訳フォルダー全体を交換する更新項目は追加せず、既存の `resources` 交換と起動時の反映を使う。[翻訳ファイルの仕様](localization.md)を参照。
 
 Appletカタログの編集用ファイルはEXEの隣の `applets.json`。通常発行では未配置の場合だけ作成し、スターターにも同梱する。更新ZIPには外部ファイル `resources/applets.json` として初期値を収録する。ZIPの新規展開や旧版からの更新では、管理ページを初めて開いたときにEXEの隣へ初期値を複製する。配置先が読み取り専用なら初期値を参照する。編集用ファイルは本体交換の対象外で、再発行・更新・再配置後も編集を保持する。
 

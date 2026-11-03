@@ -24,6 +24,7 @@ export type SettingsControlsApi = Pick<
   | 'automation'
   | 'executeCommand'
 > & {
+  openPageLink?(target: import('../../shared/description-text').PageLinkTarget): Promise<void>;
   snapshot(): Promise<{ updates: UpdateState }>;
   checkHostOnAboutOpen?(): Promise<void>;
 };

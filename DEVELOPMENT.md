@@ -6,6 +6,8 @@
 
 設定で使用する[共通コマンド選択ダイアログ](docs/command-selection.md)は、リボン・トレイ・コマンドスタックで共用します。
 
+説明文に埋め込むページ・設定カテゴリへの移動は[共通ページリンク](docs/page-links.md)を参照してください。
+
 ## 発行先
 
 標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepoから実行します。詳細は[共通発行手順](docs/publishing.md)を参照してください。

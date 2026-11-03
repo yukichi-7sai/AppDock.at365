@@ -18,7 +18,9 @@ fs.writeFileSync(
       moduleResolution: 'Node16',
       customConditions: [],
       types: ['node'],
-      paths: { '#host-translations': [path.join(root, 'src/main/core/host-translation-source.ts')] },
+      paths: {
+        '#host-translations': [path.join(root, 'src/main/core/host-translation-source.ts')],
+      },
       rootDir: path.join(root, 'src'),
       outDir: path.join(output, 'compiled'),
     },
@@ -39,7 +41,7 @@ const { mergeSettingsInput } = require(path.join(output, 'compiled/shared/settin
 const { settingsCatalog, settingsProjection } = require(
   path.join(output, 'compiled/shared/settings-catalog.js'),
 );
-function fixture(pageId = 'touchpad-gestures') {
+function fixture(pageId = 'touchpad-gestures', actions = {}) {
   const settings = createDefaultSettings();
   const page = settingsCatalog([], settings).find((item) => item.id === pageId);
   let model = {
@@ -51,7 +53,7 @@ function fixture(pageId = 'touchpad-gestures') {
       values: settingsProjection(settings, page, []),
       editing: { sessionId: 'edit', editRevision: 1, mode: 'form' },
       auxiliary: {},
-      actions: {},
+      actions,
     },
   };
   let displayed,
@@ -139,6 +141,49 @@ function fixture(pageId = 'touchpad-gestures') {
     },
   };
 }
+
+test('page links wait for queued saves and never hold the queue during navigation', async () => {
+  const f = fixture('general', { openPageLink: 'link' });
+  let release,
+    navigated = 0;
+  const saved = new Promise((resolve) => {
+    release = resolve;
+  });
+  f.behavior(async (operation) => {
+    await saved;
+    f.save(operation);
+  });
+  f.client.transport.navigate = async (_id, request) => {
+    await f.client.flush();
+    assert.equal(request.actionId, 'link');
+    assert.equal(f.client.model.content.values.host.soundEnabled, false);
+    navigated++;
+  };
+  f.edit((value) => {
+    value.host.soundEnabled = false;
+  });
+  const pending = f.client.controls().openPageLink({ kind: 'page', id: 'text-library' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(navigated, 0);
+  release();
+  await pending;
+  assert.equal(navigated, 1);
+});
+test('page links preserve failed form input without issuing a navigation request', async () => {
+  const f = fixture('general');
+  let navigated = 0;
+  f.client.transport.navigate = async () => {
+    navigated++;
+  };
+  f.edit((value) => {
+    value.host.soundEnabled = false;
+  });
+  await assert.rejects(
+    f.client.controls().openPageLink({ kind: 'setting', id: 'command-triggers' }),
+  );
+  assert.equal(navigated, 0);
+  assert.equal(f.displayed.content.values.host.soundEnabled, false);
+});
 
 test('transient recording uses no page get, action model or render and rejects a changed page', async () => {
   const f = fixture();

@@ -2,6 +2,8 @@
 
 説明文の `[command:コマンドID]` は、対応する設定画面で再生アイコン付きのコマンドリンクとして表示されます。クリックは本体固定パレットで対象を初期選択するだけで、明示実行までコマンドを実行しません。対応するdescription、エスケープ、検索・参照切れと対応ホスト版は[コマンドリンク](command-links-design.md)を参照してください。
 
+AppDock 0.131.0以降では、同じ説明文に`[page:ページID]`・`[setting:設定カテゴリID]`も混在できます。固定IDから現在名を表示し、クリックで本体のページ・設定へ移動します。新しいタグを使うAppletは`minimumHostVersion`を`0.131.0`以上にします。対応範囲・停止中の扱い・保存待ちは[ページリンク](page-links.md)を参照してください。
+
 `registered-image`設定、`list.imageKey`、`registered-images` API、`ribbon-items`宣言を提供します。.NET SDKは0.27.0。設定・原画像・生成コピーの寿命とNode/.NETの例は[共通画像とリボン](registered-images.md)を参照してください。
 
 .NET/nativeも`IPageActionHandler`でHTML/JavaScriptからのページ操作に対応します。`IPageService`の動的登録・変更通知・画像登録と解放、`Ui.OpenDetailsAsync`・`Ui.OpenSettingsAsync`の契約は[Appletページ](applet-pages.md)と[.NETページ連携](applet-pages.md)を参照してください。Nodeも同じ通知・画像・説明/設定表示APIを使えます。

@@ -680,6 +680,8 @@ async function checkSectionTitles() {
     const englishPack = path.join(packDirectory, 'host_en.json');
     if (translationPacksOnly) {
       fs.mkdirSync(packDirectory, { recursive: true });
+      // This fixture edits the current version; upgrade replacement has its own GUI check.
+      fs.writeFileSync(path.join(packDirectory, '.appdock-version'), require('../package.json').version);
       fs.writeFileSync(path.join(packDirectory, 'host.json'), JSON.stringify({ 'appearance.theme.label': '基本の配色' }));
       fs.writeFileSync(englishPack, JSON.stringify({
         'language.label': 'Display language',

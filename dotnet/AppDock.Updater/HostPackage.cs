@@ -121,9 +121,16 @@ internal static partial class Program
         if (!Directory.Exists(destination)) throw new IOException("配置先フォルダーがありません。");
         var roster = Path.Combine(destination, AppletRoster); NoLinks(roster);
         var translations = Path.Combine(destination, "translations");
-        var translationFile = Path.Combine(translations, "host.json");
-        NoLinks(translationFile);
-        if (File.Exists(translations) || Directory.Exists(translationFile)) throw new IOException("翻訳の配置先の形式が一致しません。");
+        NoLinks(translations);
+        if (File.Exists(translations)) throw new IOException("翻訳の配置先の形式が一致しません。");
+        var translationSource = Path.Combine(source, "resources", "translations");
+        var translationFiles = Directory.Exists(translationSource) ? Files(translationSource, HostLimit) : [];
+        foreach (var file in translationFiles)
+        {
+            var target = Path.Combine(translations, Path.GetRelativePath(translationSource, file));
+            NoLinks(target);
+            if (Directory.Exists(target)) throw new IOException("翻訳の配置先の形式が一致しません。");
+        }
         if (Directory.Exists(roster)) throw new IOException("Applet一覧の配置先にフォルダーがあります。");
         var previous = File.Exists(Path.Combine(destination, HostManifest)) ? ReadHostPackage(destination) : new List<string>();
         // Inspect every destination first; do not follow links while copying or pruning.
@@ -159,11 +166,11 @@ internal static partial class Program
             if (!File.Exists(seed)) seed = Path.Combine(source, "resources", AppletRoster);
             if (File.Exists(seed)) File.Copy(seed, roster, false);
         }
-        var seedFile = Path.Combine(source, "resources", "translations", "host.json");
-        if (File.Exists(seedFile) && !File.Exists(translationFile))
+        foreach (var file in translationFiles)
         {
-            Directory.CreateDirectory(translations);
-            File.Copy(seedFile, translationFile, false);
+            var target = Path.Combine(translations, Path.GetRelativePath(translationSource, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, true);
         }
         File.Copy(Path.Combine(source, HostManifest), Path.Combine(destination, HostManifest), true);
     }

@@ -11,7 +11,7 @@ import type { SettingsPageModel } from '../../shared/settings-page';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
-import { CommandLink } from '../settings-ui/CommandLink';
+import { DescriptionText } from '../settings-ui/DescriptionText';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { AboutSettings } from './AboutSettings';
 import { AppletManagementSettings } from './AppletManagementSettings';
@@ -279,7 +279,9 @@ export function SettingsForm({
                 >
                   {!isHostLanguage(settings.host.language) && (
                     <option value={settings.host.language} disabled>
-                      {t('language.unavailable', { language: hostLanguageName(settings.host.language) })}
+                      {t('language.unavailable', {
+                        language: hostLanguageName(settings.host.language),
+                      })}
                     </option>
                   )}
                   {hostLanguages.map((value) => (
@@ -474,7 +476,10 @@ export function SettingsForm({
 
         {category === 'text-palette' && (
           <>
-            <SettingsSection title={t('inputPalette.title')}>
+            <SettingsSection
+              title={t('inputPalette.title')}
+              description={<DescriptionText text={t('inputPalette.description')} />}
+            >
               <SettingsField title={t('inputPalette.snippetCandidates')}>
                 <SettingsActions inline>
                   <button onClick={() => void run(() => invoke('manageSnippets'))}>
@@ -491,23 +496,16 @@ export function SettingsForm({
                   }
                 />
               </SettingRow>
-              <SettingsField title={t('inputPalette.openCommand')}>
-                <SettingsActions inline>
-                  <CommandLink commandId="appdock.text-palette.open" />
-                </SettingsActions>
-              </SettingsField>
             </SettingsSection>
-            <SettingsSection title={t('inputPalette.historyTitle')}>
+            <SettingsSection
+              title={t('inputPalette.historyTitle')}
+              description={<DescriptionText text={t('inputPalette.historyDescription')} />}
+            >
               <SettingsField title={t('inputPalette.windowsHistory')}>
                 <SettingsActions inline>
                   <button onClick={() => void run(() => invoke('openClipboardSettings'))}>
                     {t('inputPalette.windowsSettings')}
                   </button>
-                </SettingsActions>
-              </SettingsField>
-              <SettingsField title={t('inputPalette.openCommand')}>
-                <SettingsActions inline>
-                  <CommandLink commandId="appdock.clipboard-history.open" />
                 </SettingsActions>
               </SettingsField>
             </SettingsSection>

@@ -6,6 +6,7 @@ import type {
   SettingsPageRequest,
   SettingsInputModeRequest,
   SettingsPaletteRequest,
+  SettingsPageLinkRequest,
 } from '../../shared/settings-page';
 import type { SettingsPageSession } from './settings-page';
 
@@ -65,6 +66,10 @@ export class SettingsPageHost {
     const response = await current.page.act(action);
     this.bound(id);
     return response;
+  }
+  async navigate(id: string, request: SettingsPageLinkRequest) {
+    // Successful navigation may dispose the source page. Never return its stale model.
+    await this.bound(id).page.navigate(request);
   }
   async input(id: string, request: SettingsInputModeRequest) {
     await this.bound(id).page.input(request);

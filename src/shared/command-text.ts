@@ -1,48 +1,25 @@
-import { validCommandId } from './command-id';
+import { parseDescriptionText, pageLinkKey, type DescriptionToken } from './description-text';
 
-export type CommandTextToken = { kind: 'text'; text: string } | { kind: 'command'; id: string };
+export type CommandTextToken = DescriptionToken;
 export interface CommandReference {
   id: string;
   title: string;
   available: boolean;
   disabledReason?: string;
 }
-export function parseCommandText(text: string): CommandTextToken[] {
-  const result: CommandTextToken[] = [];
-  const append = (value: string) => {
-    if (!value) return;
-    const previous = result.at(-1);
-    if (previous?.kind === 'text') previous.text += value;
-    else result.push({ kind: 'text', text: value });
-  };
-  let cursor = 0;
-  while (cursor < text.length) {
-    const start = text.indexOf('[command:', cursor);
-    if (start < 0) break;
-    const end = text.indexOf(']', start + 9);
-    if (end < 0) break;
-    const id = text.slice(start + 9, end);
-    if (!validCommandId(id)) append(text.slice(cursor, end + 1));
-    else if (start > cursor && text[start - 1] === '\\') {
-      append(text.slice(cursor, start - 1));
-      append(text.slice(start, end + 1));
-    } else {
-      append(text.slice(cursor, start));
-      result.push({ kind: 'command', id });
-    }
-    cursor = end + 1;
-  }
-  append(text.slice(cursor));
-  return result;
-}
+export const parseCommandText = parseDescriptionText;
 export function commandTextPlain(
   text: string,
   references: ReadonlyMap<string, Pick<CommandReference, 'title'>> = new Map(),
+  pages: ReadonlyMap<string, { title: string }> = new Map(),
 ): string {
-  if (!text.includes('[command:')) return text;
   return parseCommandText(text)
     .map((token) =>
-      token.kind === 'text' ? token.text : (references.get(token.id)?.title ?? token.id),
+      token.kind === 'text'
+        ? token.text
+        : token.kind === 'command'
+          ? (references.get(token.id)?.title ?? token.id)
+          : (pages.get(pageLinkKey(token))?.title ?? token.id),
     )
     .join('');
 }

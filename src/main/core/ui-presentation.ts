@@ -112,13 +112,18 @@ export class NavigationCoordinator {
   selectSettings(pageId: string, itemId?: string) {
     return this.transition({ route: 'settings' }, { route: 'settings', pageId, itemId });
   }
+  openPage(route: string, valid: () => boolean) {
+    if (!isPageRoute(route)) throw Error('Unknown route');
+    return this.transition({ route }, { route }, false, valid);
+  }
   private transition(
     next: Omit<NavigationState, 'request'>,
     target?: NavigationPlace,
     replace = false,
+    valid?: () => boolean,
   ) {
     const sequence = ++this.requestSequence;
-    const current = () => sequence === this.requestSequence;
+    const current = () => sequence === this.requestSequence && (!valid || valid());
     if (next.route === this.state.route && !target && next.appletId === undefined) {
       this.appliedSequence = sequence;
       return;

@@ -68,20 +68,24 @@ test('folder host packs ZIP and deploys program files while preserving user data
   assert(!fs.existsSync(path.join(f.base, 'resources/obsolete.dll')));
   f.preserved();
 });
-test('host updates carry the base seed and preserve installed translation packs and edits', t => {
+test('host deployment overwrites complete distributed translation files and keeps unrelated languages', t => {
   const f = fixture(t);
   const resources = path.join(f.source, 'resources/translations');
   fs.mkdirSync(resources);
   fs.writeFileSync(path.join(resources,'host.json'), '{"key":"基本"}');
+  fs.writeFileSync(path.join(resources,'host_en.json'), '{"key":"English"}');
   ok(['--deploy-host', f.source, f.base]);
   const folder = path.join(f.base,'translations');
   assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host.json'))).key, '基本');
-  fs.writeFileSync(path.join(folder,'host_en.json'), '{"key":"English"}');
-  fs.writeFileSync(path.join(folder,'host.json'), '{"key":"編集"}');
+  fs.writeFileSync(path.join(folder,'host_en.json'), '{"key":"Old","obsolete":"remove"}');
+  fs.writeFileSync(path.join(folder,'host.json'), '{"key":"編集","obsolete":"remove"}');
+  fs.writeFileSync(path.join(folder,'host_fr.json'), '{"key":"Custom"}');
   ok(['--deploy-host', f.source, f.base]);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host.json'))).key, '編集');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host_en.json'))).key, 'English');
+  for (const file of ['host.json', 'host_en.json'])
+    assert.equal(fs.readFileSync(path.join(folder, file), 'utf8'), fs.readFileSync(path.join(resources, file), 'utf8'));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host_fr.json'))).key, 'Custom');
   assert.ok(!f.plan().some(item => path.basename(item.destination) === 'translations'));
+  f.preserved();
 });
 test('host packaging rejects a bundled runtime in a new helper and preserves the existing feed', (t) => {
   const { source, stage } = fixture(t);
@@ -127,6 +131,10 @@ test('folder deployment seeds a new editable Applet roster and preserves edits o
 });
 test('folder host update adds/removes managed assets in the existing transaction', (t) => {
   const f = fixture(t);
+  fs.mkdirSync(path.join(f.source, 'resources/translations'));
+  fs.writeFileSync(path.join(f.source, 'resources/translations/host.json'), '{"description":"[setting:command-triggers]"}');
+  fs.mkdirSync(path.join(f.base, 'translations'));
+  fs.writeFileSync(path.join(f.base, 'translations/host.json'), '{"description":"旧説明","obsolete":"remove"}');
   fs.writeFileSync(path.join(f.base, 'dxil.dll'), 'old DLL');
   const items = f.plan();
   assert(items.some((i) => i.id === 'resources' && i.operation === 'install'));
@@ -155,6 +163,10 @@ test('folder host update adds/removes managed assets in the existing transaction
     result.updated.map((item) => item.id),
     ['host'],
   );
+  const { readTranslationFiles } = require('../out/main/main/core/translation-files');
+  const translation = readTranslationFiles(path.join(f.base, 'translations'), path.join(f.base, 'resources/translations/host.json'), true, '2.0.0');
+  assert.deepEqual(translation.ja, { description: '[setting:command-triggers]' });
+  assert.equal(fs.readFileSync(path.join(f.base, 'translations/host.json'), 'utf8'), fs.readFileSync(path.join(f.base, 'resources/translations/host.json'), 'utf8'));
   f.preserved();
 });
 test('folder host rejects protected paths, unexpected files, and changed versions before handoff', (t) => {
