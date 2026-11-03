@@ -349,7 +349,7 @@ internal static partial class Program
             id = "host"; payload = "AppDock.at365.exe";
             if (Directory.Exists(source))
             {
-                WriteHostPackage(source, version); files = Files(source, HostLimit); payload = "update.zip";
+                files = WriteHostPackage(source, version); payload = "update.zip";
             }
         }
         else if (kind == "applet")

@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup Condition="'$(SelfContained)' == ''">
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+  <Target Name="RequireAppDockSharedRuntime" BeforeTargets="PrepareForPublish"
+          Condition="'$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe'">
+    <Error Condition="'$(SelfContained)' == 'true' Or '$(PublishSelfContained)' == 'true' Or '$(PublishAot)' == 'true'"
+           Text="AppDock processes must use the installed .NET runtime. Publish framework-dependent (--self-contained false)." />
+  </Target>
+</Project>

@@ -57,13 +57,29 @@ internal static partial class Program
         }
         return entries;
     }
-    private static void WriteHostPackage(string directory, string version)
+    private static List<string> WriteHostPackage(string directory, string version)
     {
         var entries = Directory.EnumerateFileSystemEntries(directory).Select(p => Path.GetFileName(p)).Where(n => n != HostManifest).Append(HostManifest).Order(StringComparer.Ordinal).ToList();
         if (entries.Any(n => !IsHostEntry(n))) throw new IOException("本体配布フォルダーに利用者データ・不明なファイルがあります。");
         NoLinks(Path.Combine(directory, HostManifest)); NoLinks(Path.Combine(directory, HostManifest + ".tmp"));
         Write(Path.Combine(directory, HostManifest), new { schemaVersion = 1, version, entries });
         ReadHostPackage(directory, version, true);
+        var files = Files(directory, HostLimit);
+        foreach (var file in files)
+        {
+            var name = Path.GetFileName(file).ToLowerInvariant();
+            if (name is "coreclr.dll" or "clrjit.dll" or "hostfxr.dll" or "hostpolicy.dll" or "system.private.corelib.dll")
+                throw new IOException($".NET ランタイムは本体に同梱できません: {Path.GetRelativePath(directory, file)}");
+            if (name.EndsWith(".runtimeconfig.json", StringComparison.Ordinal))
+            {
+                using var config = JsonDocument.Parse(File.ReadAllText(file));
+                var options = config.RootElement.GetProperty("runtimeOptions");
+                if (options.TryGetProperty("includedFrameworks", out _) ||
+                    !(options.TryGetProperty("framework", out _) || options.TryGetProperty("frameworks", out _)))
+                    throw new IOException($"本体の .NET プロセスには共有ランタイムを指定してください: {Path.GetRelativePath(directory, file)}");
+            }
+        }
+        return files;
     }
     private static List<Item> PlanHost(string source, string destination, string version)
     {

@@ -28,7 +28,7 @@
 
 ## 入力・実行
 
-`AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。通常の待機表示は本体専用の透明なElectron Windowへ分離する。Windowは最前面・クリック透過・非アクティブ・タスクバー/Alt+Tab対象外で、初回表示前にページとpreloadを準備する。コールバック内で描画・コマンド・RPC応答を待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
+`AppDock.InputHost`は本体の子プロセス。WPFを使うため、PCにインストールした.NET 10 Desktop Runtime（Windows x64）で実行する。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。通常の待機表示は本体専用の透明なElectron Windowへ分離する。Windowは最前面・クリック透過・非アクティブ・タスクバー/Alt+Tab対象外で、初回表示前にページとpreloadを準備する。コールバック内で描画・コマンド・RPC応答を待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
 
 メニュー操作中と、一時的なポップアップ上の右押下ではジェスチャーを開始しない。押下・解放を捕捉せず元の入力を通し、前面化や右クリックの再送を行わない。`activateOnStart`のON/OFFにかかわらず適用する。対象/前面スレッドのメニューモード、標準メニュー・コンボ一覧のWindowクラス、タイトルバー/サイズ変更枠を持たない`WS_POPUP`の所有元または非アクティブ属性を使って判定する。前面化workerも同じ判定を再確認する。通常の所有付きダイアログと、独立したアプリの枠なしWindowは引き続き開始対象にできる。属性の根拠はMicrosoftの[メニュー状態](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-guithreadinfo)、[Windowスタイル](https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles)、[拡張スタイル](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles)を参照する。同じWindow内に独自描画され、これらの情報で区別できないポップアップは判定対象に含まれない。
 

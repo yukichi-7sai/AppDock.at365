@@ -68,6 +68,32 @@ test('folder host packs ZIP and deploys program files while preserving user data
   assert(!fs.existsSync(path.join(f.base, 'resources/obsolete.dll')));
   f.preserved();
 });
+test('host packaging rejects a bundled runtime in a new helper and preserves the existing feed', (t) => {
+  const { source, stage } = fixture(t);
+  const feed = path.join(stage, 'feed');
+  const helperDir = path.join(source, 'resources', 'future-worker');
+  fs.mkdirSync(helperDir);
+  const pack = ['--pack', 'host', source, '2.0.1', feed];
+  const config = path.join(helperDir, 'Future.runtimeconfig.json');
+  const framework = { name: 'Microsoft.NETCore.App', version: '10.0.0' };
+  const writeConfig = (options) =>
+    fs.writeFileSync(config, JSON.stringify({ runtimeOptions: options }));
+  writeConfig({ frameworks: [framework] });
+  ok(pack);
+  const hashes = () => ['update.json', 'update.zip'].map((name) => digest(path.join(feed, name)));
+  const original = hashes();
+  writeConfig({ includedFrameworks: [framework] });
+  const selfContained = run(pack);
+  assert.equal(selfContained.status, 1);
+  assert.match(selfContained.stderr, /Future\.runtimeconfig\.json/);
+  assert.deepEqual(hashes(), original);
+  writeConfig({ framework });
+  fs.writeFileSync(path.join(helperDir, 'CoreCLR.dll'), 'stale runtime');
+  const stale = run(pack);
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /CoreCLR\.dll/);
+  assert.deepEqual(hashes(), original);
+});
 test('folder deployment seeds a new editable Applet roster and preserves edits on redeploy and self-update', (t) => {
   const f = fixture(t);
   const seed = path.join(f.source, 'resources', 'applets.json');

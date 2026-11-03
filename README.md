@@ -2,7 +2,7 @@
 
 ## インストール方法
 
-[Releases](https://github.com/yukichi-7sai/AppDock.at365/releases/latest)から本体の `update.zip` をダウンロードし、書き込み可能なフォルダーへ全体を展開して、中の `AppDock.at365.exe` を起動します。インストーラーは不要です。
+初回は [.NET 10 Desktop Runtime（Windows x64）](https://dotnet.microsoft.com/ja-jp/download/dotnet/10.0) をインストールします。[Releases](https://github.com/yukichi-7sai/AppDock.at365/releases/latest)から本体の `update.zip` をダウンロードし、書き込み可能なフォルダーへ全体を展開して、中の `AppDock.at365.exe` を起動します。
 
 6つの拡張機能（Applet）を同梱したスターター `AppDock.at365-starter-<バージョン>.zip` も利用できます。ZIP全体を展開し、中の `AppDock.at365.exe` を起動してください。
 

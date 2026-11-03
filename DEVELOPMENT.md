@@ -136,7 +136,7 @@ pnpm本体はnpmで導入するため、workspace設定だけでは保護され�
 
 `.tools`のツール本体・npmキャッシュと、`.pnpm_store`の依存パッケージストアはGit管理・EXEへの同梱対象外です。
 
-`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 フォルダー型本体作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+`pnpm run dist` は.NETホストのframework-dependent発行、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 フォルダー型本体作成を行います。`publish.bat` からも発行できます。本体に.NETプロセスを追加する際は[本体の.NETプロセスの発行手順](docs/publishing.md#本体のnetプロセス)に従います。`.artifacts/dotnet-host` は再生成するため、手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
 `build`は`scripts/build-main.cjs`で生成済みの`out/main`を整理してからTypeScriptをコンパイルします。削除したモジュールが次の配布物に残ることを防ぎます。React/Viteも`out/renderer`を再生成します。設定の読み込み・保存は定義済みのトップレベル項目のみを返し、Applet固有の`extensions.<id>.settings`は保持します。
 

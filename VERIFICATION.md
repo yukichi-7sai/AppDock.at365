@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-11-03 本体の.NETプロセスをPC側の共有ランタイムへ統一（0.128.0）
+
+- コミット前に、発行済みZIP・ステージ・発行フォルダーの114ファイルと、GUI試験2組の実行物一覧をSHA256で再照合した。実装時の標準回帰4ファイル53件を再利用し、残る174ファイル1,563件を追加実行。計178ファイル1,616件すべて成功した。利用者の実環境でも更新が速くなったとの確認を受けた。照合記録と追加回帰ログは `.artifacts/commit-validation-runtime-policy-01280/`。
+
+- InputHost・ProcessHostの発行をframework-dependentへ変更。ExtensionHostと単一ファイルのUpdaterを含む本体4プロセスは、Windows x64版.NET 10 Desktop Runtimeの導入で実行できる。従来はDesktop RuntimeのないPCでも入力機能を使えたため、本体の動作要件変更としてマイナー版を更新した。独立配布Appletの発行方式、SDK・Applet連携API、設定・保存形式の変更はない。
+- 発行前レビューで標準発行・テスト用個別発行の旧出力除去、Updaterの単一ファイル発行、既存配布からの更新と独立Appletへの影響を確認。個別出力がまだない場合にも親の実パスを確認するよう修正した。共通MSBuild設定で自己完結・PublishSelfContained・単一ファイルの自己完結・Native AOTを拒否する4ケースを確認。隔離した新規ヘルパーのruntimeconfigと旧CoreCLRをそれぞれ混入させ、既存ZIP/feedを保持して発行が失敗することを確認した。
+- 固定lockfileのinstall、全.NETホスト・Updater・Release fixtureのビルドに成功した。最終のfolder-host、process-launch、portable-updates、lifecycle関連回帰は53/53。通常のpublish.batで発行し、ステージ・発行フォルダー・更新ZIPの管理対象114ファイルのSHA256、manifest/feedの版、ZIPサイズが一致。発行先の既存設定・Applet一覧3ファイルもハッシュが一致した。ZIPは277,570,372 → 175,569,442バイト（約97.28 MiB減）、SHA256は `77c31c3436f6a3a900367fdabd159553bd1c7624cc4a74ef7f6489f088f1cd9e`。
+- 発行済み4 EXEの起動・応答とhost traceから、全件がPC側のMicrosoft.NETCore.App 10.0.14を使用し、通常起動したInputHostはMicrosoft.WindowsDesktop.App 10.0.14を選択したことを確認。各プロセスに空のDOTNET_ROOT_X64を指定した隔離試験では全件がランタイム未検出で終了した。実際にランタイムを削除したPCでの導入試験は対象外。
+- 共用EXE・隔離profileのGUIで通常／復元起動直後の外部マウスジェスチャー、DLL・native・Node Appletの接続、ページ表示・入力保持、設定画面・停止を確認。実行物のSHA256は発行元と一致。証跡は `.artifacts/runtime-policy-01280/` のregression-final.log、publish.log、package.json.report、fixed-runtime.json、fixed-pages.log、fixed-gestures.log。個別の本体コピーは作成せず、この2種類のGUI試験のprofileは各1件のため整理対象0件。
+
 ## 2026-11-03 外部Applet一覧・未導入限定の取得・24時間キャッシュ（0.127.0）
 
 - コミット前検証では、実装時の入力1,027件と固定EXEの管理対象696ファイル、ステージ・発行先・更新ZIPのハッシュを再照合した。関連8ファイル99件とGUIの成功記録を再利用し、残り170ファイル1,516件を追加実行した。標準回帰は合計178ファイル1,615件すべて成功。ChatCodexとプロフィールも同じ発行物であることを確認した。照合結果と追加実行ログは `.artifacts/commit-validation-catalog-cache-01270/`。

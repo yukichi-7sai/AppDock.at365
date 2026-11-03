@@ -28,6 +28,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
 - GUI試験は直列・隔離profileで行う。通常の固定配布物のGUI/MCP試験は`copy-host.cjs`の`testHostPath`または`prepareTestHost`で共通EXEを取得し、`--test-profile`等で保存先を分ける。Applet側の試験は自身の`.artifacts`をprofile保存rootとして明示する。[共通実行場所と配置検証の例外](docs/testing.md#固定配布物の共通実行場所)に従う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
 - フォルダー型ポータブルの配布・更新・保存先は[配布仕様](docs/portable-distribution.md)に従う。直接起動、再起動、二重起動、異常終了、Tray識別と本体ファイルの保持を確認する。設定・data・認証と本体ファイルの寿命を混ぜない。
+- 本体所有の.NETプロセスはすべてPC側の共有ランタイムで動かす。新規追加・変更・テスト用発行も[本体の.NETプロセスの発行手順](docs/publishing.md#本体のnetプロセス)に従い、ランタイムを同梱しない。
 - .NET SDK/Runtime・接続契約を変えたらnative AppletもRelease buildし、接続・停止・表示・保存を確認する。runtimeconfig欠落は発行元・EXE内・展開先を比較する。
 - PowerShell 5.1用PS1はUTF-8 BOM/CRLF、BATはCP932/CRLFを保つ。File.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATH・認証・実行権限はその環境で確認する。
 - 権限不足の切り分けと再実行は[制限付き実行環境](docs/development-workflow.md#制限付き実行環境)に従う。無関係アプリの停止や、検査・セキュリティ機構の無効化で成功扱いにしない。
