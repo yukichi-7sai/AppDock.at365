@@ -7,11 +7,22 @@ const file = require('./test-settings.cjs').file(
   profile,
   `settings-${require('node:os').hostname()}.json`,
 );
+const initialSettings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+initialSettings.host.checkUpdatesOnStartup = false;
+initialSettings.host.soundEnabled = false;
+initialSettings.updates.checkHostOnAboutOpen = false;
+initialSettings.keybindingOptions.enabled = false;
+initialSettings.gestures.enabled = false;
+initialSettings.touchpadGestures.enabled = false;
+fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(initialSettings));
 const application = require('./data-settings-host.cjs').isolatedHost(profile, process.argv[2]);
 async function launch(show = true) {
   await application.start();
   const page = await application.firstWindow();
-  await page.waitForFunction(async () => (await window.dock.snapshot()).startupReady);
+  await require('./settings-host-helper.cjs').waitForHost(
+    page,
+    async () => (await window.dock.snapshot()).startupReady,
+  );
   assert.equal(
     await page.evaluate(async () => (await window.dock.snapshot()).version),
     require('../package.json').version,
@@ -50,9 +61,81 @@ const saved = () =>
   try {
     await launch();
     await waitFor(async () => (await current()).visible);
+    const initial = await application.evaluate(({ BrowserWindow, screen }) => {
+      const window = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
+      const area = screen.getDisplayMatching(window.getBounds()).workArea;
+      const minimum = window.getMinimumSize();
+      const initialBounds = window.getNormalBounds();
+      window.setSize(900, 500);
+      return { area, minimum, initialBounds, bounds: window.getNormalBounds() };
+    });
+    assert.deepEqual(initial.minimum, [
+      Math.min(1200, initial.area.width),
+      Math.min(670, initial.area.height),
+    ]);
+    assert(initial.initialBounds.width <= initial.area.width + 1);
+    assert(initial.initialBounds.height <= initial.area.height + 1);
+    assert(initial.bounds.width >= initial.minimum[0]);
+    assert(initial.bounds.height >= initial.minimum[1]);
+    const page = await application.firstWindow();
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await require('./settings-host-helper.cjs').settingsPage(page);
+    await page.getByTestId('settings-nav:tray').click();
+    await page.getByTestId('settings-page:tray').waitFor();
+    await page.getByRole('button', { name: 'トレイクリックのコマンドを選択', exact: true }).click();
+    const dialog = require('./command-selection-helper.cjs').selectionDialog(page);
+    await dialog.waitFor();
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('appdock.noop');
+    await dialog.getByRole('listbox').getByRole('option').click();
+    const checkDialog = async (name) => {
+      const confirm = dialog.getByTestId('command-selection-confirm');
+      assert(await confirm.isEnabled());
+      const bounds = await confirm.boundingBox();
+      const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+      assert(bounds.x >= 0 && bounds.y >= 0);
+      assert(bounds.x + bounds.width <= viewport.width + 1);
+      assert(bounds.y + bounds.height <= viewport.height + 1);
+      assert(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1));
+      await dialog.screenshot({ path: path.join(profile, name + '.png') });
+    };
+    await checkDialog('minimum-dialog');
+    const small = await application.evaluate(({ BrowserWindow, screen }) => {
+      const window = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
+      const display = screen.getDisplayMatching(window.getBounds());
+      globalThis.windowTestDisplayMatching = screen.getDisplayMatching;
+      const workArea = { ...display.workArea, width: 960, height: 540 };
+      screen.getDisplayMatching = () => ({ ...display, workArea });
+      screen.emit('display-metrics-changed', {}, { ...display, workArea }, ['workArea']);
+      return {
+        minimum: window.getMinimumSize(),
+        bounds: window.getNormalBounds(),
+        workArea,
+        scaleFactor: display.scaleFactor,
+      };
+    });
+    assert.deepEqual(small.minimum, [960, 540]);
+    assert(Math.abs(small.bounds.width - 960) <= 1);
+    assert(Math.abs(small.bounds.height - 540) <= 1);
+    await checkDialog('small-work-area-dialog');
+    const restoredMinimum = await application.evaluate(({ BrowserWindow, screen }) => {
+      screen.getDisplayMatching = globalThis.windowTestDisplayMatching;
+      delete globalThis.windowTestDisplayMatching;
+      screen.emit('display-metrics-changed', {}, screen.getPrimaryDisplay(), ['workArea']);
+      const window = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
+      return window.getMinimumSize();
+    });
+    assert.deepEqual(restoredMinimum, initial.minimum);
+    await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
     let expected = await application.evaluate(({ BrowserWindow, screen }) => {
       const area = screen.getPrimaryDisplay().workArea;
-      const bounds = { x: area.x + 40, y: area.y + 40, width: 1000, height: 680 };
+      const bounds = { x: area.x + 40, y: area.y + 40, width: 1240, height: 680 };
       BrowserWindow.getAllWindows()
         .find((w) => w.webContents.getURL().startsWith('appdock://host/index.html'))
         .setBounds(bounds);
@@ -167,7 +250,12 @@ const saved = () =>
           ok: true,
           mode: process.argv[2] ? 'fixed' : 'source',
           executableHash: application.executableHash,
+          initial,
+          small,
           checks: [
+            'initial bounds and native minimum size',
+            'command selection remains operable at minimum size',
+            'simulated work area shrink and return update native minimum and dialog layout',
             'restart bounds',
             'maximize/unmaximize',
             'minimize',
@@ -182,7 +270,7 @@ const saved = () =>
       ),
     );
     console.log(
-      'PASS: restart bounds, maximize/unmaximize, minimize, tray close, hidden startup, incoming position conflict recovery',
+      'PASS: initial bounds, minimum size, small work area, minimum dialog, restart bounds, maximize/unmaximize, minimize, tray close, hidden startup, incoming position conflict recovery',
     );
   } finally {
     await application?.close();

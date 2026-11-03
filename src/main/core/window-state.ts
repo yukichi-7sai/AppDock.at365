@@ -1,5 +1,5 @@
 import { hostText } from '../../shared/i18n';
-import type { BrowserWindow, Rectangle } from 'electron';
+import type { BrowserWindow, Rectangle, Screen } from 'electron';
 import { stateStorage, type StateStorage } from './state-storage';
 import { SettingsConflictError } from './settings';
 
@@ -8,25 +8,110 @@ export interface WindowState {
   maximized: boolean;
 }
 
-export const windowMinimum = { width: 900, height: 620 };
+export const windowMinimum = { width: 1200, height: 670 };
+
+export function windowMinimumForArea(area: Rectangle) {
+  return {
+    width: Math.min(windowMinimum.width, area.width),
+    height: Math.min(windowMinimum.height, area.height),
+  };
+}
+
+export function defaultWindowState(area: Rectangle): WindowState {
+  return fitWindowState(
+    {
+      bounds: {
+        x: area.x + Math.floor((area.width - 1280) / 2),
+        y: area.y + Math.floor((area.height - 840) / 2),
+        width: 1280,
+        height: 840,
+      },
+      maximized: false,
+    },
+    [area],
+  );
+}
+
+/** Keep the host usable when moving between displays or changing display scaling. */
+export function trackWindowWorkArea(window: BrowserWindow, screen: Screen) {
+  let previousArea: Rectangle | undefined;
+  let updating = false;
+  const equal = (a: Rectangle | undefined, b: Rectangle) =>
+    a && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+  const refresh = (force = false) => {
+    if (updating || window.isDestroyed() || window.isMinimized()) return;
+    const area = screen.getDisplayMatching(window.getBounds()).workArea;
+    if (!force && equal(previousArea, area)) return;
+    previousArea = { ...area };
+    updating = true;
+    try {
+      const minimum = windowMinimumForArea(area);
+      const [width, height] = window.getMinimumSize();
+      if (width !== minimum.width || height !== minimum.height)
+        window.setMinimumSize(minimum.width, minimum.height);
+      if (window.isMaximized() || window.isFullScreen()) return;
+      const bounds = window.getNormalBounds();
+      const fitted = fitWindowState({ bounds, maximized: false }, [area]).bounds;
+      if (!equal(bounds, fitted)) restoreWindowBounds(window, fitted);
+    } finally {
+      updating = false;
+    }
+  };
+  const moved = () => refresh();
+  const changed = () => refresh(true);
+  window.on('move', moved);
+  window.on('resize', moved);
+  window.on('restore', changed);
+  window.on('unmaximize', changed);
+  window.on('leave-full-screen', changed);
+  screen.on('display-added', changed);
+  screen.on('display-removed', changed);
+  screen.on('display-metrics-changed', changed);
+  window.once('closed', () => {
+    screen.removeListener('display-added', changed);
+    screen.removeListener('display-removed', changed);
+    screen.removeListener('display-metrics-changed', changed);
+    window.removeListener('move', moved);
+    window.removeListener('resize', moved);
+    window.removeListener('restore', changed);
+    window.removeListener('unmaximize', changed);
+    window.removeListener('leave-full-screen', changed);
+  });
+  refresh();
+}
 
 export function restoreWindowBounds(window: BrowserWindow, bounds: Rectangle) {
   const requested = { ...bounds };
+  const minimum = window.getMinimumSize();
+  let relaxedMinimum = false;
   // Fractional Windows scaling can round DIP sizes up on each setBounds call.
   // Compensate against the actual native result so restarts do not grow the window.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    window.setBounds(requested);
-    const actual = window.getNormalBounds();
-    if (
-      Object.keys(bounds).every(
-        (key) => actual[key as keyof Rectangle] === bounds[key as keyof Rectangle],
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      window.setBounds(requested);
+      const actual = window.getNormalBounds();
+      if (
+        Object.keys(bounds).every(
+          (key) => actual[key as keyof Rectangle] === bounds[key as keyof Rectangle],
+        )
       )
-    )
-      return;
-    for (const key of ['x', 'y', 'width', 'height'] as const)
-      requested[key] += bounds[key] - actual[key];
-    requested.width = Math.max(1, requested.width);
-    requested.height = Math.max(1, requested.height);
+        return;
+      for (const key of ['x', 'y', 'width', 'height'] as const)
+        requested[key] += bounds[key] - actual[key];
+      requested.width = Math.max(1, requested.width);
+      requested.height = Math.max(1, requested.height);
+      // Allow the compensating request below the nominal minimum; the resulting
+      // native bounds still target the fitted size. Restore the constraint below.
+      if (requested.width < minimum[0] || requested.height < minimum[1]) {
+        window.setMinimumSize(
+          Math.min(minimum[0], requested.width),
+          Math.min(minimum[1], requested.height),
+        );
+        relaxedMinimum = true;
+      }
+    }
+  } finally {
+    if (relaxedMinimum) window.setMinimumSize(minimum[0], minimum[1]);
   }
 }
 
