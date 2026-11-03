@@ -19,6 +19,7 @@ const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
 const localizationOnly = process.argv.includes('--localization-only');
+const translationPacksOnly = process.argv.includes('--translation-packs-only');
 const serviceLocalizationOnly = process.argv.includes('--service-localization-only');
 const webAccountListOnly = process.argv.includes('--web-account-list-only');
 const listActionsOnly = process.argv.includes('--list-actions-only');
@@ -97,12 +98,12 @@ async function stop() {
   if (browser) await browser.close();
   host = browser = child = null;
 }
-async function select(title) {
+async function select(title, heading = title) {
   await host
     .locator('.settings-categories')
     .getByRole('button', { name: title, exact: true })
     .click();
-  await host.getByRole('heading', { name: title, level: 1, exact: true }).waitFor();
+  await host.getByRole('heading', { name: heading, level: 1, exact: true }).waitFor();
   await settleSettings(host);
 }
 async function hints(enabled) {
@@ -675,7 +676,55 @@ async function checkSectionTitles() {
       require('./copy-host.cjs').copyHost(source, testHostPath(profile));
       assert.equal(hash(source), hash(testHostPath(profile)));
     }
+    const packDirectory = path.join(profile, 'translations');
+    const englishPack = path.join(packDirectory, 'host_en.json');
+    if (translationPacksOnly) {
+      fs.mkdirSync(packDirectory, { recursive: true });
+      fs.writeFileSync(path.join(packDirectory, 'host.json'), JSON.stringify({ 'appearance.theme.label': '基本の配色' }));
+      fs.writeFileSync(englishPack, JSON.stringify({
+        'language.label': 'Display language',
+        'pages.appearance.title': 'Appearance',
+        'settings.settings-navigation.shortcuts': 'Keyboard shortcuts',
+        'services.updaterWindow.title': 'Updating AppDock',
+      }));
+    }
     await launch();
+    if (translationPacksOnly) {
+      await select('表示');
+      const control = host.getByTestId('host-language');
+      assert.equal(await control.locator('option[value=en]').innerText(), 'English');
+      await control.selectOption('en');
+      await until(async () => (await control.getAttribute('aria-label')) === 'Display language', 'language selection');
+      await host.getByRole('heading', { name: 'Appearance', exact: true }).waitFor();
+      await host.locator('.settings-categories').getByRole('button', { name: 'Keyboard shortcuts', exact: true }).waitFor();
+      assert.equal(await control.inputValue(), 'en');
+      const progress = await inspect(inspector,
+        `process.getBuiltinModule('module').createRequire((${electronExpression}).app.getAppPath() + '/package.json')('./out/main/shared/i18n').updaterWindowMessages()`);
+      assert.equal(progress.title, 'Updating AppDock');
+      assert.equal(progress.waiting, 'AppDockの終了を待っています…');
+      await host.screenshot({ path: path.join(profile, 'translations-en.png') });
+      await stop();
+      await launch();
+      await select('Appearance');
+      assert.equal(await host.getByTestId('host-language').getAttribute('aria-label'), 'Display language');
+      const base = JSON.parse(fs.readFileSync(path.join(packDirectory, 'host.json'), 'utf8'));
+      assert.equal(base['appearance.theme.label'], '基本の配色');
+      await host.getByRole('combobox', { name: base['appearance.theme.label'], exact: true }).waitFor();
+      await stop();
+      fs.renameSync(englishPack, englishPack + '.disabled');
+      await launch();
+      await select('表示');
+      assert.equal(await host.getByTestId('host-language').inputValue(), 'en');
+      assert.equal(await host.getByTestId('host-language').locator('option[value=en]').isDisabled(), true);
+      assert.equal((await snapshot()).settings.value.host.language, 'en');
+      await host.screenshot({ path: path.join(profile, 'translations-missing.png') });
+      await host.getByTestId('host-language').selectOption('ja');
+      await until(async () => (await snapshot()).settings.value.host.language === 'ja', 'reset missing language');
+      assert.deepEqual(errors, []);
+      checks.push('Partial pack discovery, live catalog and form switch, fallback, restart and removed pack');
+      success = true;
+      return;
+    }
     if (webAccountListOnly) {
       await require('./web-account-list-checks.cjs')({
         host,

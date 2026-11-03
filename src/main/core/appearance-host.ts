@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostResources } from './host-translation-source';
 import type { IpcMain, WebContents } from 'electron';
 import {
   defaultAccentColor,
@@ -16,6 +17,7 @@ export function appearanceSnapshot(): AppearanceSnapshot {
   const next = read();
   const key = JSON.stringify([
     next.palette,
+    next.language,
     next.dark,
     next.colors,
     next.overlayBackground,
@@ -29,14 +31,23 @@ export function appearanceSnapshot(): AppearanceSnapshot {
   }
   return current;
 }
-export function configureAppearance(reader: typeof read, ipc: Pick<IpcMain, 'handle'>) {
+export function configureAppearance(
+  reader: typeof read,
+  ipc: Pick<IpcMain, 'handle'>,
+  translationRoots: string[] = [],
+) {
   read = reader;
-  ipc.handle('appearance:snapshot', (event) => {
+  ipc.handle('appearance:snapshot', (event, request?: string) => {
     if (
       event.senderFrame !== event.sender.mainFrame ||
       surfaces.get(event.sender) !== event.senderFrame?.url
     )
       throw Error(hostText('services.appearanceHost.unauthorizedSurface'));
+    if (request === 'translations') {
+      if (!translationRoots.some((root) => event.senderFrame!.url.startsWith(root)))
+        throw Error(hostText('services.appearanceHost.unauthorizedSurface'));
+      return hostResources;
+    }
     return appearanceSnapshot();
   });
 }

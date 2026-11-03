@@ -68,6 +68,21 @@ test('folder host packs ZIP and deploys program files while preserving user data
   assert(!fs.existsSync(path.join(f.base, 'resources/obsolete.dll')));
   f.preserved();
 });
+test('host updates carry the base seed and preserve installed translation packs and edits', t => {
+  const f = fixture(t);
+  const resources = path.join(f.source, 'resources/translations');
+  fs.mkdirSync(resources);
+  fs.writeFileSync(path.join(resources,'host.json'), '{"key":"基本"}');
+  ok(['--deploy-host', f.source, f.base]);
+  const folder = path.join(f.base,'translations');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host.json'))).key, '基本');
+  fs.writeFileSync(path.join(folder,'host_en.json'), '{"key":"English"}');
+  fs.writeFileSync(path.join(folder,'host.json'), '{"key":"編集"}');
+  ok(['--deploy-host', f.source, f.base]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host.json'))).key, '編集');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host_en.json'))).key, 'English');
+  assert.ok(!f.plan().some(item => path.basename(item.destination) === 'translations'));
+});
 test('host packaging rejects a bundled runtime in a new helper and preserves the existing feed', (t) => {
   const { source, stage } = fixture(t);
   const feed = path.join(stage, 'feed');

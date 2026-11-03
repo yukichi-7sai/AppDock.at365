@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import type { CustomCommandType } from './custom-commands';
 import type { KeyStroke } from './commands';
@@ -99,7 +100,7 @@ export function inputKeysFromEvent(event: KeyStroke): string | null {
   }
 }
 
-export const inputCommandType: CustomCommandType = {
+export const inputCommandType = localizedMetadata<CustomCommandType>(() => ({
   id: 'appdock.input.sendKeys',
   title: hostText('settings.input-command.title'),
   description: hostText('settings.input-command.hint'),
@@ -119,4 +120,4 @@ export const inputCommandType: CustomCommandType = {
       default: 'Enter',
     },
   ],
-};
+}));

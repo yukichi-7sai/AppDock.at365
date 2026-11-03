@@ -82,6 +82,7 @@ async function scenario(schema, mode = 'host') {
       schemaVersion: schema,
       operationId: randomUUID(),
       showProgress: true,
+      progressMessages: { ...require('../out/main/shared/i18n').updaterWindowMessages(), title: 'Updating AppDock' },
       baseDirectory: base,
       executable,
       result: path.join(base, 'data/update-result.json'),
@@ -115,6 +116,15 @@ async function scenario(schema, mode = 'host') {
       'helper did not prepare',
     );
     assert.equal(child.exitCode, null, diagnostics);
+    if (schema === 2 && mode === 'host') {
+      const probe = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `Add-Type -AssemblyName UIAutomationClient; $w = [System.Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id ${child.pid}).MainWindowHandle); [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $w.Current.Name; $w.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name }`],
+        { encoding: 'utf8', windowsHide: true, timeout: 15000 });
+      assert.equal(probe.status, 0, probe.stderr);
+      assert.match(probe.stdout, /Updating AppDock/);
+      assert.match(probe.stdout, /AppDockの終了を待っています/);
+      checks.push('native window displays the handed-off title and base-language waiting message');
+    }
     fs.writeFileSync(job + '.commit', 'apply');
     assert.equal(fs.readFileSync(path.join(destination, 'payload.txt'), 'utf8'), '1.0.0');
     if (pause && schema === 2 && mode === 'host') {

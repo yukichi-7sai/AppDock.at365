@@ -93,6 +93,7 @@ export function isAccentColor(value: unknown): value is AccentColor {
   );
 }
 export interface AppearanceSnapshot {
+  language?: string;
   overlayBackground?: 'blur' | 'transparent';
   overlayShadow?: boolean;
   notificationBannerShadow?: boolean;
@@ -103,6 +104,7 @@ export interface AppearanceSnapshot {
   colors: { accent: string; soft: string; text: string; hover: string };
 }
 export interface AppearanceApi {
+  translations(): Promise<Record<string, Record<string, string>>>;
   snapshot(): Promise<AppearanceSnapshot>;
   onChanged(callback: (appearance: AppearanceSnapshot) => void): () => void;
 }

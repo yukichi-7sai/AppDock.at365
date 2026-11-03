@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import type { Command } from './contracts';
 import { generatedSettingCommands, hostSettingDefinitions } from './settings-commands';
 import { hostSettingsPageCommands, appletSettingsPageCommands } from './settings-navigation';
@@ -15,7 +16,7 @@ function historyCommands(history?: HistoryAvailability) {
       : hostText(`navigation.${direction}Unavailable`),
   }));
 }
-const fixedHostCommands = [
+const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.noop',
     title: hostText('commands.noop.title'),
@@ -82,8 +83,8 @@ const fixedHostCommands = [
     ...c,
     extension: 'AppDock',
   })),
-];
-export const hostCommands = [...fixedHostCommands, ...historyCommands()];
+]);
+export const hostCommands = localizedMetadata(() => [...fixedHostCommands, ...historyCommands()]);
 export function hostCommandsForApplets(
   applets: import('./contracts').ExtensionSnapshot[],
   history?: HistoryAvailability,

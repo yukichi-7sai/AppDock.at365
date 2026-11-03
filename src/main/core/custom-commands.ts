@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { effectiveHostLanguage } from '../../shared/host-language';
 import { settingsLookups } from '../../shared/settings-lookups';
 import { hostStartupTiming } from './host-startup-timing';
 import { createHash, randomUUID } from 'node:crypto';
@@ -124,7 +125,7 @@ export class CustomCommandService {
     return [...this.hosts.keys()];
   }
   registerHost(
-    type: CustomCommandType,
+    type: CustomCommandType | (() => CustomCommandType),
     handler: (
       config: JsonObject,
       context: InputInvocation,
@@ -135,13 +136,23 @@ export class CustomCommandService {
       'validateConfig' | 'unavailableReason' | 'stateVersion' | 'authorized'
     > = {},
   ) {
-    const [parsed] = parseCustomTypes(null, [type]);
+    const read = () => parseCustomTypes(null, [typeof type === 'function' ? type() : type]);
+    let types = read();
+    const [parsed] = types;
+    let language = effectiveHostLanguage();
     if (this.hosts.has(parsed.id)) throw Error(hostText('services.customCommands.duplicateType'));
     compileCustomType(parsed);
     this.hosts.set(parsed.id, {
       owner: { kind: 'host' },
       title: 'AppDock',
-      types: [parsed],
+      get types() {
+        const current = effectiveHostLanguage();
+        if (typeof type === 'function' && language !== current) {
+          types = read();
+          language = current;
+        }
+        return types;
+      },
       available: true,
       generation: randomUUID(),
       invoke: (definition, context) => handler(definition.config, context, definition),

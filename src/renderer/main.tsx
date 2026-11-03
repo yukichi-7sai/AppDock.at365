@@ -1,5 +1,6 @@
 import { SettingsControlsProvider } from './settings-ui/api';
 import { hostText } from '../shared/i18n';
+import { HostTranslationProvider } from './HostTranslation';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { HostPageSlot } from './pages/HostPageSlot';
@@ -549,7 +550,7 @@ function App() {
   );
 }
 createRoot(document.getElementById('root')!).render(
-  <SettingsControlsProvider api={window.dock}>
+  <HostTranslationProvider><SettingsControlsProvider api={window.dock}>
     <RegisteredImagesProvider api={window.dock.imageLibrary}>
       <ImageLibraryDialogProvider>
         <App />
@@ -559,5 +560,5 @@ createRoot(document.getElementById('root')!).render(
         </RegisteredImagesProvider>
       </ImageLibraryDialogProvider>
     </RegisteredImagesProvider>
-  </SettingsControlsProvider>,
+  </SettingsControlsProvider></HostTranslationProvider>,
 );

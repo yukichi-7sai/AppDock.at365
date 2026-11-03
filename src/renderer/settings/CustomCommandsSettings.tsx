@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -46,7 +47,7 @@ import { SettingsDescriptionIcon } from '../settings-ui/SettingsHintIcon';
 import { CustomCommandOptions } from './CustomCommandOptions';
 import './custom-command-editor.css';
 
-const list: SettingDefinition = {
+const list = localizedMetadata<SettingDefinition>(() => ({
   key: 'definitions',
   title: hostText('settings.customCommandsSettings.title'),
   type: 'object-list',
@@ -72,7 +73,7 @@ const list: SettingDefinition = {
     descriptionKey: 'unavailableReason',
     enabledKey: 'enabled',
   },
-};
+}));
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
 export function CustomCommandsSettings({
   settings,

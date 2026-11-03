@@ -4,6 +4,30 @@ const fs = require('node:fs'),
   path = require('node:path'),
   { spawn } = require('node:child_process');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
+test('Node workers share the host translation directory and update language without writing a base file', async t => {
+  const dir = fs.mkdtempSync(path.resolve('.artifacts/node-translation-'));
+  const file = path.join(dir, 'index.cjs');
+  fs.writeFileSync(file, 'exports.activate=async()=>{}');
+  fs.writeFileSync(path.join(dir,'host_en.json'), '{"services.nodeWorker.pageActionUnsupported":"Unsupported fixture page"}');
+  const child = spawn(process.execPath, [path.resolve('out/main/main/node-worker.js'), file,
+    '--appdock-translations=' + dir, '--appdock-language=en'], { windowsHide: true, stdio: ['pipe','pipe','pipe'] });
+  const exited = require('node:events').once(child,'exit');
+  child.stderr.resume();
+  const peer = new JsonLinePeer(child.stdout, child.stdin, async () => null);
+  t.after(async () => {
+    peer.close();
+    if(child.exitCode === null)child.kill();
+    await exited;
+    fs.rmSync(dir,{recursive:true,force:true});
+  });
+  await peer.request('activate', {settings:{}});
+  await assert.rejects(peer.request('page.action', {}), /Unsupported fixture page/);
+  await peer.request('host.language.changed', {language:'ja'});
+  await assert.rejects(peer.request('page.action', {}), {
+    message: require('../src/shared/locales/ja/host.json')['services.nodeWorker.pageActionUnsupported']
+  });
+  assert.equal(fs.existsSync(path.join(dir,'host.json')),false);
+});
 test('Node worker preserves concurrent command identity and only cancels the requested gesture', async (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/node-invocation-'));
   const file = path.join(dir, 'index.cjs');

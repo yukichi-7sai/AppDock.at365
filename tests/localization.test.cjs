@@ -22,8 +22,26 @@ const { DeviceSettingsStore } = require('../out/main/main/core/device-settings-s
 const { hostSettingDefinitions } = require('../out/main/shared/settings-commands');
 const resources = require('../src/shared/locales/ja/host.json');
 
-test('Japanese resources initialize synchronously, ship in main output, and remain isolated', () => {
-  assert.deepEqual(require('../out/main/shared/locales/ja/host.json'), resources);
+test('partial external packs override matching keys and preserve base wording and user placeholders', t => {
+  const { readTranslationFiles } = require('../out/main/main/core/translation-files');
+  const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'appdock-translations-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const folder = path.join(root,'translations');
+  const seed = path.join(root,'seed.json');
+  fs.writeFileSync(seed, JSON.stringify({ label: '表示', empty: '基本', named: '{{name}}', newKey: '追加' }));
+  readTranslationFiles(folder, seed);
+  fs.writeFileSync(path.join(folder,'host.json'), JSON.stringify({ label: '編集した基本', empty: '共通' }));
+  fs.writeFileSync(path.join(folder,'host_en.json'), JSON.stringify({ label: 'Display', empty: ' ', named: '{{wrong}}', typo: 'ignored' }));
+  fs.writeFileSync(path.join(folder,'host_fr.json'), '{');
+  fs.writeFileSync(path.join(folder,'host_en-US.json'), '\uFEFF{"named":"Hi, {{name}}"}');
+  const packs = readTranslationFiles(folder, seed);
+  assert.deepEqual(packs.ja, { label: '編集した基本', empty: '共通', named: '{{name}}', newKey: '追加' });
+  assert.deepEqual(packs.en, { label: 'Display' });
+  assert.deepEqual(packs['en-US'], { named: 'Hi, {{name}}' });
+  assert.equal(packs.fr, undefined);
+});
+
+test('external Japanese resources initialize synchronously and remain isolated', () => {
   const instance = createHostI18n();
   assert.equal(instance.isInitialized, true);
   for (const [key, value] of Object.entries(resources)) {
@@ -35,6 +53,28 @@ test('Japanese resources initialize synchronously, ship in main output, and rema
   assert.equal(instance.t('language.label'), '試験用の文言');
   assert.equal(createHostI18n().t('language.label'), '表示言語');
   assert.equal(hostText('language.label'), '表示言語');
+});
+
+test('regional packs fall back to the base directly and startup metadata uses the selected language', t => {
+  const parent = path.resolve('.artifacts/localization-unit');
+  fs.mkdirSync(parent, { recursive: true });
+  const folder = fs.mkdtempSync(path.join(parent, 'packs-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(folder, 'translations'));
+  fs.writeFileSync(path.join(folder, 'translations/host_en.json'), '{"language.label":"English label"}');
+  fs.writeFileSync(path.join(folder, 'translations/host_en-US.json'), '{"pages.appearance.title":"Appearance"}');
+  const result = require('node:child_process').spawnSync(process.execPath, ['-e', `
+    process.argv.push('--test-profile=' + process.argv[1]);
+    const assert = require('node:assert/strict');
+    const i18n = require('./out/main/shared/i18n');
+    assert.equal(i18n.getHostTranslator('en-US')('language.label'), '表示言語');
+    const { hostSettingsPages } = require('./out/main/shared/settings-navigation');
+    require('./out/main/main/core/host-translation-source').configureHostLanguage(() => 'en-US');
+    require('./out/main/shared/translation-metadata').refreshTranslationMetadata('en-US');
+    assert.equal(hostSettingsPages[0][1], 'Appearance');
+    assert.equal(i18n.hostText('language.label'), '表示言語');
+  `, folder], { cwd: path.resolve(__dirname, '..'), windowsHide: true, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
 });
 
 test('interpolation preserves user names, resource-looking strings, and external text verbatim', () => {
@@ -58,7 +98,7 @@ test('interpolation preserves user names, resource-looking strings, and external
   }
 });
 
-test('missing language uses Japanese without mutating input; unsupported values are rejected', () => {
+test('missing language uses Japanese, unavailable saved packs survive, and malformed tags are rejected', () => {
   assert.deepEqual(hostLanguages, ['ja']);
   const old = createDefaultSettings();
   delete old.host.language;
@@ -68,7 +108,12 @@ test('missing language uses Japanese without mutating input; unsupported values 
   const device = initialDeviceSettings('TEST');
   delete device.host.language;
   assert.equal(parseDeviceSettings(device, 'TEST').host.language, 'ja');
-  for (const invalid of ['en', '', 'ja-JP', null, 1]) {
+  for (const code of ['en','ja-JP']) {
+    assert.equal(parseSettings({ ...old, host: { ...old.host, language: code } }).host.language, code);
+    assert.equal(parseDeviceSettings({ ...device, host: { ...device.host, language: code } }, 'TEST').host.language, code);
+    assert.equal(createHostI18n(code).t('language.label'), '表示言語');
+  }
+  for (const invalid of ['../../en', '', 'EN-us', null, 1]) {
     assert.throws(
       () => parseSettings({ ...old, host: { ...old.host, language: invalid } }),
       /host.language/,

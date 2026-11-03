@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import type { Settings, SettingDefinition } from './contracts';
 import { defaultConditionEnvironment, processNames } from './command-conditions';
 import { hostText } from './i18n';
@@ -13,7 +14,7 @@ type Definition = Omit<SettingDefinition, 'key' | 'type' | 'default'> & {
   normalize?(value: unknown): unknown;
 };
 /** One declaration drives defaults, parsing, native controls, catalog and settings discovery. */
-export const commandTriggerOptionDeclarations = {
+export const commandTriggerOptionDeclarations = localizedMetadata(() => ({
   browsers: {
     type: 'string-list',
     title: hostText('settings.settings-catalog.browsers'),
@@ -31,7 +32,7 @@ export const commandTriggerOptionDeclarations = {
     description: hostText('settings.inputBrowserOptions.chromiumHint'),
     default: false,
   },
-} satisfies Record<string, Definition>;
+} satisfies Record<string, Definition>));
 export type CommandTriggerOptions = {
   [
     K in keyof typeof commandTriggerOptionDeclarations

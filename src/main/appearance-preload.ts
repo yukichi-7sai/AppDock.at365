@@ -43,6 +43,7 @@ if (!document.body) {
 }
 ipcRenderer.on('appearance:changed', (_event, value: AppearanceSnapshot) => receive(value));
 const api: AppearanceApi = {
+  translations: () => ipcRenderer.invoke('appearance:snapshot', 'translations'),
   snapshot: async () => {
     receive(await ipcRenderer.invoke('appearance:snapshot'));
     return current!;

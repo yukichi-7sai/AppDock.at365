@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -17,14 +18,14 @@ import {
 } from '../../shared/appdock-api';
 import type { AutomationAction, AutomationState } from '../../shared/automation';
 
-const rows: {
+const rows = localizedMetadata<{
   key: AppletApiPermission;
   description: string;
   mcp?: keyof AutomationState;
   action?: string;
   label?: string;
   mcpWarning?: string;
-}[] = [
+}[]>(() => [
   { key: 'read', description: hostSettingItem('permissions', 'read').description },
   {
     key: 'write',
@@ -80,7 +81,7 @@ const rows: {
     label: hostText('settings.apiPermissionsSettings.tts'),
     mcpWarning: hostText('settings.apiPermissionsSettings.ttsWarning'),
   },
-];
+]);
 
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
   if (key === 'read' || (key === 'sendInput' && applet)) return [];

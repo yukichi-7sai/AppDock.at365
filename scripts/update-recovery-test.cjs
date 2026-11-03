@@ -66,7 +66,7 @@ for (const name of [
   );
 fs.writeFileSync(
   path.join(output, 'Probe.csproj'),
-  `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>RecoveryProbe</AssemblyName></PropertyGroup><ItemGroup><EmbeddedResource Include="${path.join(root, 'src/shared/locales/ja/host.json')}" LogicalName="AppDock.Updater.Messages.json" /></ItemGroup></Project>`,
+  `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>RecoveryProbe</AssemblyName></PropertyGroup></Project>`,
 );
 const build = spawnSync(
   'dotnet',

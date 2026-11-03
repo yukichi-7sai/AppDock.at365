@@ -1,7 +1,7 @@
 import { hostSettingsDefaults, hostSettingDefinitions } from './host-settings';
 import { isStartPage } from './start-page';
 import { validateSettingValue } from './setting-definitions';
-import { defaultHostLanguage, isHostLanguage } from './host-language';
+import { defaultHostLanguage, validHostLanguageCode } from './host-language';
 import { hostText } from './i18n';
 import { prepareSettingsLookups } from './settings-lookups';
 import { parseMcpRoster } from './mcp-client';
@@ -133,7 +133,8 @@ export function parseSettings(value: unknown): Settings {
       throw new Error(hostText('validation.hostBoolean', { key }));
   const shellProviders = parseShellProviders(value.host);
   const language = value.host.language === undefined ? defaultHostLanguage : value.host.language;
-  if (!isHostLanguage(language)) throw new Error(hostText('language.invalid'));
+  // A shared profile can select a pack installed only on another PC.
+  if (!validHostLanguageCode(language)) throw new Error(hostText('language.invalid'));
   const showHints = value.host.showHints === undefined ? true : value.host.showHints;
   if (typeof showHints !== 'boolean')
     throw new Error(hostText('validation.hostBoolean', { key: 'showHints' }));
@@ -162,7 +163,8 @@ export function parseSettings(value: unknown): Settings {
     value.host.trayDoubleClickCommand === undefined ? null : value.host.trayDoubleClickCommand;
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
     throw new Error(hostText('settings.settings-schema.trayDoubleClick'));
-  for (const field of hostSettingDefinitions) validateSettingValue(field, value.host[field.key]);
+  for (const field of hostSettingDefinitions)
+    if (field.key !== 'language') validateSettingValue(field, value.host[field.key]);
   if (!isStartPage(value.host.startPage)) throw Error(hostText('general.startPage.invalid'));
   const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
   const trayCommands =

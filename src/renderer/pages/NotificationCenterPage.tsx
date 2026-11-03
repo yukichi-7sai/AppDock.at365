@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { NotificationDismissButton } from '../../../ui/notifications/DismissButton';
 import { useEffect, useRef, useState } from 'react';
@@ -10,26 +11,26 @@ import type {
 import './notification-center.css';
 import { FilterSelect } from '../settings-ui/FilterSelect';
 const api = window.dock.pages;
-const states = {
+const states = localizedMetadata(() => ({
   active: hostText('notifications.active'),
   resolved: hostText('notifications.resolved'),
   dismissed: hostText('notifications.dismissed'),
   expired: hostText('notifications.expired'),
   withdrawn: hostText('notifications.withdrawn'),
-};
-const reasons: Record<string, string> = {
+}));
+const reasons = localizedMetadata<Record<string, string>>(() => ({
   'source-stopped': hostText('notifications.sourceStopped'),
   'type-disabled': hostText('notifications.typeDisabled'),
   'applet-disabled': hostText('notifications.appletDisabled'),
   'type-removed': hostText('notifications.typeRemoved'),
   'type-definition-changed': hostText('notifications.typeChanged'),
   'no-available-targets': hostText('notifications.noTargets'),
-};
-const levels = {
+}));
+const levels = localizedMetadata(() => ({
   info: hostText('notifications.info'),
   warning: hostText('notifications.warning'),
   error: hostText('notifications.error'),
-};
+}));
 export function NotificationCenterPage({
   initialModel,
 }: {

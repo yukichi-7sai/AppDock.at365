@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import type { ExtensionSnapshot, Settings } from './contracts';
 import type { NotificationLevel, NotificationLifetime, NotificationTarget } from './notifications';
@@ -73,7 +74,7 @@ const id = (v: unknown): v is string =>
   !['constructor', 'prototype', '__proto__'].includes(v);
 const targetNames = ['banner', 'desktop', 'windows'];
 export const legacyNotificationTypeId = 'appdock.legacy';
-const legacyNotificationType: NotificationTypeDefinition = {
+const legacyNotificationType = localizedMetadata<NotificationTypeDefinition>(() => ({
   typeId: legacyNotificationTypeId,
   title: hostText('settings.notification-types.legacy'),
   description: hostText('settings.notification-types.legacyHint'),
@@ -85,7 +86,7 @@ const legacyNotificationType: NotificationTypeDefinition = {
   lifetimePolicy: 'userDuration',
   defaultDurationSeconds: null,
   history: 'persistent',
-};
+}));
 const targets = (v: unknown): v is NotificationTarget[] =>
   Array.isArray(v) &&
   v.length <= 3 &&

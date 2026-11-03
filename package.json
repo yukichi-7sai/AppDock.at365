@@ -1,11 +1,17 @@
 {
   "name": "appdock-at365",
-  "version": "0.128.3",
+  "version": "0.129.1",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
   "license": "MIT",
   "main": "out/main/main/bootstrap.js",
+  "imports": {
+    "#host-translations": {
+      "browser": "./src/renderer/host-translation-source.ts",
+      "default": "./out/main/main/core/host-translation-source.js"
+    }
+  },
   "scripts": {
     "postinstall": "install-electron",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
@@ -55,10 +61,12 @@
     },
     "files": [
       "out/**/*",
+      "!out/main/shared/locales/**/*",
       "assets/icon.png",
       "package.json"
     ],
     "extraResources": [
+      { "from": "src/shared/locales/ja/host.json", "to": "translations/host.json" },
       {
         "from": "applets.json",
         "to": "applets.json"

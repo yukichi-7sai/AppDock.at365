@@ -1,8 +1,9 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import type { ExtensionSnapshot } from './contracts';
 
 /** The settings index and its commands share these stable page IDs and labels. */
-export const hostSettingsPages = [
+export const hostSettingsPages = localizedMetadata(() => [
   ['appearance', hostText('pages.appearance.title')],
   ['general', hostText('pages.general.title')],
   ['text-palette', hostText('inputPalette.settings')],
@@ -23,7 +24,7 @@ export const hostSettingsPages = [
   ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
   ['about', hostText('settings.settings-navigation.about')],
   ['applets', hostText('settings.settings-navigation.applets')],
-] as const;
+] as const);
 
 export const appletSettingsPageId = (id: string) => `applet:${id}`;
 function pageCommand(pageId: string, title: string, id: string) {
@@ -36,7 +37,7 @@ function pageCommand(pageId: string, title: string, id: string) {
     available: true,
   };
 }
-export const hostSettingsPageCommands = hostSettingsPages.map(([pageId, title]) =>
+export const hostSettingsPageCommands = localizedMetadata(() => hostSettingsPages.map(([pageId, title]) =>
   pageCommand(
     pageId,
     title,
@@ -46,7 +47,7 @@ export const hostSettingsPageCommands = hostSettingsPages.map(([pageId, title]) 
         ? 'appdock.updates.open'
         : `appdock.settings.${pageId}.open`,
   ),
-);
+));
 /** Opening settings belongs to the host and never starts or enables the Applet. */
 export function appletSettingsPageCommands(
   applets: Pick<ExtensionSnapshot, 'id' | 'displayName'>[],

@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import type { SettingDefinition } from './contracts';
 import { hostText } from './i18n';
 import { validateSettingValue } from './setting-definitions';
@@ -9,7 +10,7 @@ export type AppletCommonDefinition = Omit<SettingDefinition, 'key' | 'type'> & {
   applies?: string;
 };
 /** Host-owned primitive preferences. Lifecycle, credentials and update sources use their owners. */
-export const appletCommonSettingDeclarations = {
+export const appletCommonSettingDeclarations = localizedMetadata(() => ({
   startupDelaySeconds: {
     title: hostText('settings.appletSettingsForm.delay'),
     description: hostText('settings.settings-catalog.appletDelay'),
@@ -22,7 +23,7 @@ export const appletCommonSettingDeclarations = {
     fromManifest: true,
     applies: 'appletStartupScheduleChanged',
   },
-} satisfies Record<string, AppletCommonDefinition>;
+} satisfies Record<string, AppletCommonDefinition>));
 export type AppletCommonKey = keyof typeof appletCommonSettingDeclarations;
 export type AppletCommonValues = {
   [K in AppletCommonKey]: (typeof appletCommonSettingDeclarations)[K]['type'] extends 'boolean'

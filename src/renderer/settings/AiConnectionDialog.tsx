@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from '../settings-ui/SettingsButton';
@@ -15,13 +16,13 @@ import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField } from '../settings-ui/SettingsSections';
 
-export const aiPresetNames = {
+export const aiPresetNames = localizedMetadata(() => ({
   ollama: 'Ollama',
   'lm-studio': 'LM Studio',
   'llama-cpp': 'llama.cpp',
   openai: 'OpenAI',
   custom: hostText('settings.aiConnectionDialog.otherServer'),
-};
+}));
 export type AiInvoke = (name: string, args?: unknown[]) => Promise<any>;
 export function AiConnectionDialog({
   original,

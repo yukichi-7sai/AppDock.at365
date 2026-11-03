@@ -1,19 +1,27 @@
 import { createInstance } from 'i18next';
-import japanese from './locales/ja/host.json';
-import { defaultHostLanguage, hostLanguages, type HostLanguage } from './host-language';
+import type japanese from './locales/ja/host.json';
+import { hostResources } from '#host-translations';
+import {
+  defaultHostLanguage,
+  effectiveHostLanguage,
+  hostLanguages,
+  type HostLanguage,
+} from './host-language';
 
 export type HostTextKey = keyof typeof japanese;
 export type HostTextValues = Record<string, string | number>;
 export type HostTranslator = (key: HostTextKey, values?: HostTextValues) => string;
 
-/** Bundled resources initialize synchronously; no network, detector or writable language pack. */
-export function createHostI18n(language: HostLanguage = defaultHostLanguage) {
+export function createHostI18n(language: HostLanguage = effectiveHostLanguage()) {
   const instance = createInstance();
   void instance.init({
-    lng: language,
+    lng: effectiveHostLanguage(language),
+    load: 'currentOnly',
     fallbackLng: defaultHostLanguage,
     supportedLngs: [...hostLanguages],
-    resources: { ja: { host: { ...japanese } } },
+    resources: Object.fromEntries(
+      hostLanguages.map((code) => [code, { host: { ...hostResources[code] } }]),
+    ),
     ns: ['host'],
     defaultNS: 'host',
     keySeparator: false,
@@ -25,11 +33,20 @@ export function createHostI18n(language: HostLanguage = defaultHostLanguage) {
   return instance;
 }
 
-const hostI18n = createHostI18n();
+export const hostI18n = createHostI18n();
 
 /** Translate only owned resource keys. User names, paths and external messages are values. */
-export function getHostTranslator(language: HostLanguage = defaultHostLanguage): HostTranslator {
-  return (key, values) => hostI18n.t(key, { ...values, lng: language });
+export function getHostTranslator(language?: HostLanguage): HostTranslator {
+  return (key, values) => hostI18n.t(key, { ...values, lng: effectiveHostLanguage(language) });
 }
 
 export const hostText = getHostTranslator();
+
+export function updaterWindowMessages() {
+  const prefix = 'services.updaterWindow.';
+  return Object.fromEntries(
+    (Object.keys(hostResources.ja) as HostTextKey[])
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => [key.slice(prefix.length), hostText(key)]),
+  );
+}

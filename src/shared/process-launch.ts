@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { boundedJson, jsonObject, type CustomCommandType } from './custom-commands';
 
@@ -93,14 +94,14 @@ export const processLaunchSchema = {
     ]),
   ],
 };
-export const processCommandType: CustomCommandType = {
+export const processCommandType = localizedMetadata<CustomCommandType>(() => ({
   id: 'appdock.process.start',
   title: hostText('settings.process-launch.title'),
   description: hostText('settings.process-launch.hint'),
   configVersion: 1,
   automation: true,
   configSchema: processLaunchSchema,
-};
+}));
 export const processLaunchOperations = {
   'processes.start': {
     callers: ['applet'],

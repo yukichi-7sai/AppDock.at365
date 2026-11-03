@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { commandTextPlain, type CommandReference } from './command-text';
 import { hostSettingDefinitions } from './host-settings';
@@ -10,7 +11,7 @@ import {
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { commandTriggerSettingDefinitions } from './command-trigger-options';
 import { getHostTranslator } from './i18n';
-import { defaultHostLanguage, type HostLanguage } from './host-language';
+import { defaultHostLanguage, hostLanguages, hostLanguageName, isHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
 import { touchpadGestureTypes } from './touchpad-gestures';
 import { accentChoices } from './appearance';
@@ -57,7 +58,7 @@ export interface SettingsPageDefinition {
 }
 export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
-const hostItems: Record<string, [string, string, string?][]> = {
+const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>(() => ({
   'command-triggers': [
     [
       'bindings',
@@ -358,7 +359,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       } as Record<string, string>
     )[key],
   ]),
-};
+}));
 const localizedHostFields = {
   statusbar: [['showStatusBar', 'statusbar.visible.label', 'statusbar.visible.description']],
   appearance: [
@@ -454,10 +455,10 @@ export function hostSettingItem(
     hostSettingDefinitions.find((field) => field.pageId === pageId && field.key === key),
   );
 }
-export const appletCommonDescriptions = {
+export const appletCommonDescriptions = localizedMetadata(() => ({
   display: hostText('settings.settings-catalog.appletDisplay'),
   startupDelaySeconds: hostText('settings.settings-catalog.appletDelay'),
-};
+}));
 const updateKeys = updateSettingKeys;
 
 const item = (
@@ -509,7 +510,7 @@ export function settingsCatalog(
           ),
           keywords:
             id === 'appearance' && key === 'language'
-              ? [t('language.ja'), 'ja']
+              ? hostLanguages.flatMap(code => [code, hostLanguageName(code)])
               : id === 'appearance' && key === 'theme'
                 ? [
                     t('appearance.theme.dark'),
@@ -874,6 +875,8 @@ export function applySettingsJson(
 ): Settings {
   const value = JSON.parse(text);
   if (!object(value) || !page.json) throw Error(hostText('settings.settings-catalog.jsonObject'));
+  if (value.host?.language !== undefined && value.host.language !== current.host.language &&
+      !isHostLanguage(value.host.language)) throw Error(hostText('language.invalid'));
   const next = structuredClone(current);
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);

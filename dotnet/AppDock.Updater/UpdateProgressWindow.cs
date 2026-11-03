@@ -10,21 +10,18 @@ internal sealed class UpdateProgressWindow : IDisposable
     private readonly object gate = new();
     private readonly Thread thread;
     private nint window, phaseLabel, headingLabel, detailLabel, progress, closeButton;
-    private string phase = Text("waiting"), heading = Text("heading"), detail = Text("detail");
+    private string phase, heading, detail;
     private bool dismissible;
     private readonly string executable;
     private readonly WindowProcedure procedure;
-    private static readonly Dictionary<string, string> Messages = ReadMessages();
-
-    private static Dictionary<string, string> ReadMessages()
-    {
-        using var stream = typeof(UpdateProgressWindow).Assembly.GetManifestResourceStream("AppDock.Updater.Messages.json")!;
-        return JsonSerializer.Deserialize<Dictionary<string, string>>(stream)!;
-    }
-    internal static string Text(string key) => Messages["services.updaterWindow." + key];
-    private UpdateProgressWindow(string executable)
+    private readonly JsonElement messages;
+    private string Text(string key) => messages.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+        ? value.GetString()! : key;
+    private UpdateProgressWindow(string executable, JsonElement messages)
     {
         this.executable = executable;
+        this.messages = messages;
+        phase = Text("waiting"); heading = Text("heading"); detail = Text("detail");
         procedure = WindowProc;
         thread = new Thread(Run) { IsBackground = true, Name = "Update progress" };
         thread.Start();
@@ -32,7 +29,8 @@ internal sealed class UpdateProgressWindow : IDisposable
     public static UpdateProgressWindow? Open(JsonElement job, string executable)
     {
         if (!job.TryGetProperty("showProgress", out var enabled) || enabled.ValueKind != JsonValueKind.True) return null;
-        var view = new UpdateProgressWindow(executable);
+        if (!job.TryGetProperty("progressMessages", out var messages) || messages.ValueKind != JsonValueKind.Object) return null;
+        var view = new UpdateProgressWindow(executable, messages);
         if (view.shown.Wait(TimeSpan.FromSeconds(5)) && view.window != 0) return view;
         view.Dispose();
         return null;

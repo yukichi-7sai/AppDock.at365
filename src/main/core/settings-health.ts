@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 export type SettingsIssueKind =
   | 'read-invalid'
@@ -7,20 +8,20 @@ export type SettingsIssueKind =
   | 'apply-failed'
   | 'launch-save-failed';
 
-export const settingsIssueMessages: Record<SettingsIssueKind, string> = {
+export const settingsIssueMessages = localizedMetadata<Record<SettingsIssueKind, string>>(() => ({
   'read-invalid': hostText('health.readInvalid'),
   'read-unavailable': hostText('health.readUnavailable'),
   'save-failed': hostText('health.saveFailed'),
   'backup-failed': hostText('health.backupFailed'),
   'apply-failed': hostText('health.applyFailed'),
   'launch-save-failed': hostText('health.launchSaveFailed'),
-};
-const applyMessages: Record<string, string> = {
+}));
+const applyMessages = localizedMetadata<Record<string, string>>(() => ({
   'apply-hotkeys': hostText('health.hotkeysFailed'),
   'apply-window': hostText('health.windowFailed'),
   'apply-applets': hostText('health.appletsFailed'),
   'apply-services': hostText('health.servicesFailed'),
-};
+}));
 
 export interface SettingsIssue {
   key: string;

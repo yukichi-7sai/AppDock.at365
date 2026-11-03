@@ -12,6 +12,8 @@
 
 ## 配布物と所有範囲
 
+本体の翻訳は `translations/host.json` を基本に、同じフォルダーの追加言語を重ねる。更新ZIPには初期値を `resources/translations/host.json` として収録し、EXEの隣の翻訳フォルダーは本体交換の対象外とする。[翻訳ファイルの仕様](localization.md)を参照。
+
 Appletカタログの編集用ファイルはEXEの隣の `applets.json`。通常発行では未配置の場合だけ作成し、スターターにも同梱する。更新ZIPには外部ファイル `resources/applets.json` として初期値を収録する。ZIPの新規展開や旧版からの更新では、管理ページを初めて開いたときにEXEの隣へ初期値を複製する。配置先が読み取り専用なら初期値を参照する。編集用ファイルは本体交換の対象外で、再発行・更新・再配置後も編集を保持する。
 
 `appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布フォルダーに一覧外のファイルやリンクがあれば発行・更新準備を拒否する。

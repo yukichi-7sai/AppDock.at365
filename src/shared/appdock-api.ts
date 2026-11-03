@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { mcpClientOperations } from './mcp-client';
 import { aiOperations } from './ai-api';
@@ -5,7 +6,7 @@ import { customCommandOperations } from './custom-commands';
 import { processLaunchOperations } from './process-launch';
 import { settingsOperations } from './settings-operations';
 // One operation catalog drives MCP tools and both Applet SDK entry points.
-export const appDockOperations = {
+export const appDockOperations = localizedMetadata(() => ({
   ...aiOperations,
   ...mcpClientOperations,
   ...customCommandOperations,
@@ -457,7 +458,7 @@ export const appDockOperations = {
       openWorldHint: false,
     },
   },
-} as const;
+} as const));
 export type ApiCaller = 'mcp' | 'applet';
 export function operationsFor(caller: ApiCaller) {
   return Object.entries(appDockOperations).filter(([, d]) =>
@@ -466,7 +467,7 @@ export function operationsFor(caller: ApiCaller) {
 }
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
-export const appletApiPermissionLabels = {
+export const appletApiPermissionLabels = localizedMetadata(() => ({
   useMcp: hostText('settings.appdock-api.mcpUse'),
   useAi: hostText('settings.appdock-api.ai'),
   useTts: hostText('settings.appdock-api.tts'),
@@ -475,7 +476,7 @@ export const appletApiPermissionLabels = {
   read: hostText('settings.appdock-api.read'),
   execute: hostText('settings.appdock-api.execute'),
   write: hostText('settings.appdock-api.write'),
-} as const;
+} as const));
 // Accepted only while reading existing permission files; never independent grants.
 export const retiredAppletApiPermissions = [
   'manageCustomCommands',

@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -32,14 +33,14 @@ import {
   SettingsContent,
   SettingsActions,
 } from '../settings-ui/SettingsSections';
-const targetTitles = {
+const targetTitles = localizedMetadata(() => ({
   banner: hostText('settings.notificationSettings.banner'),
   desktop: hostText('settings.notificationSettings.desktop'),
   windows: hostText('settings.notificationSettings.windows'),
-};
-const reasonTitles: Record<string, string> = {
+}));
+const reasonTitles = localizedMetadata<Record<string, string>>(() => ({
   'type-definition-changed': hostText('settings.notificationSettings.changed'),
-};
+}));
 const bannerPositionSetting = hostSettingDefinitions.find(
   (field) => field.key === 'notificationBannerPosition',
 )!;

@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { createContext, useContext, useLayoutEffect, useRef } from 'react';
@@ -5,13 +6,13 @@ import type { UiCommand } from '../../shared/commands';
 import { Icon, type IconName } from '../../shared/ui-icons';
 import { CommandProviderFilter } from './CommandProviderFilter';
 
-export const commandSettingsPages = [
+export const commandSettingsPages = localizedMetadata(() => [
   {
     id: 'command-triggers',
     title: hostText('settings.commandTriggers.title'),
     icon: 'bolt',
   },
-] as const satisfies { id: string; title: string; icon: IconName }[];
+] as const satisfies { id: string; title: string; icon: IconName }[]);
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
 export type CommandSettingsTarget = {
   page: CommandSettingsPage;

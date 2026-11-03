@@ -1,15 +1,16 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import type { ExtensionManifest } from './contracts';
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Shell targets are deliberately limited. New targets require an explicit request. */
-export const shellRegions = [
+export const shellRegions = localizedMetadata(() => [
   { id: 'titlebar', title: hostText('services.sharedShell.titleBar') },
   { id: 'ribbon', title: hostText('services.sharedShell.ribbon') },
   { id: 'statusbar', title: hostText('services.sharedShell.statusBar') },
   { id: 'notification.banner', title: hostText('services.sharedShell.banner') },
   { id: 'notification.desktop', title: hostText('services.sharedShell.desktopNotifications') },
-] as const;
+] as const);
 export type ShellRegion = (typeof shellRegions)[number]['id'];
 /** Selection candidates follow declared views, independently of worker availability. */
 export function shellProviderCandidates<T extends Pick<ExtensionManifest, 'id' | 'shell'>>(

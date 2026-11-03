@@ -230,6 +230,9 @@ import { AiSettingsController } from './core/ai-settings';
 import { ErrorReporter } from './core/error-reporter';
 import { WarningReporter } from './core/warning-reporter';
 import { FileWatchAssistance } from './core/file-watch-assistance';
+import { configureHostLanguage } from './core/host-translation-source';
+import { effectiveHostLanguage } from '../shared/host-language';
+import { refreshTranslationMetadata } from '../shared/translation-metadata';
 import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
@@ -351,6 +354,10 @@ if (locked) {
   }
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
+configureHostLanguage(() => settings.value.host.language);
+const refreshLanguage = () => refreshTranslationMetadata(effectiveHostLanguage());
+refreshLanguage();
+settings.on('changed', refreshLanguage);
 configureDisplayZoom(() => settings.value.host.zoomFactor);
 configureAppearance(
   () => ({
@@ -359,11 +366,14 @@ configureAppearance(
       light: settings.value.host.customAccentLight,
     }),
     overlayBackground: settings.value.host.overlayBackground,
+    language: effectiveHostLanguage(),
     overlayShadow: settings.value.host.overlayShadow,
     notificationBannerShadow: settings.value.host.notificationBannerShadow,
     notificationDesktopShadow: settings.value.host.notificationDesktopShadow,
   }),
   ipcMain,
+  ['appdock://host/', pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href,
+    pathToFileURL(path.join(app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'out'), 'shells/default') + path.sep).href],
 );
 function applyAudioPlaybackSettings() {
   const enabled = settings.value.host.soundEnabled;
@@ -1282,7 +1292,7 @@ const validateInputConfig = (config: Record<string, unknown>) => {
   }
 };
 customCommands.registerHost(
-  processCommandType,
+  () => processCommandType,
   async (config, context) => {
     try {
       return await processLauncher.start(config, context, () =>
@@ -1302,7 +1312,7 @@ customCommands.registerHost(
   },
 );
 customCommands.registerHost(
-  inputCommandType,
+  () => inputCommandType,
   async (config, context) => {
     if (!customExecutionAllowed('sendInput', context))
       throw new CustomCommandError('API_DISABLED', hostText('services.index.inputPermission'));
@@ -1364,7 +1374,7 @@ customCommands.registerHost(
   },
 );
 customCommands.registerHost(
-  commandStackType(),
+  commandStackType,
   async (_config, context, definition) => {
     const id = 'appdock.custom.' + definition.id;
     const captured = context.triggerContext ?? (await captureCommandContext());
@@ -2575,7 +2585,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
       launch: launch.state,
       settingsHealth: {
         restartRequired: settingsRestartRequired(),
-        reasons: settingsRestartRequired() ? [settingsRestartReason] : [],
+        reasons: settingsRestartRequired() ? [settingsRestartReason()] : [],
         errors: settings.health.all().map((i) => i.message),
         recovered: settings.recovered,
         canRestore: settings.recovered && !!settings.backupCandidate(),

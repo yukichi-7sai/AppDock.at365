@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -28,7 +29,7 @@ import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
 
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
-const definition: SettingDefinition = {
+const definition = localizedMetadata<SettingDefinition>(() => ({
   key: 'connections',
   title: hostText('settings.mcpClientSettings.title'),
   type: 'object-list',
@@ -44,23 +45,23 @@ const definition: SettingDefinition = {
     columns: ['name', 'transport', 'status'],
     enabledKey: 'enabled',
   },
-};
-const states: Record<string, string> = {
+}));
+const states = localizedMetadata<Record<string, string>>(() => ({
   unconfigured: hostText('settings.mcpClientSettings.unconfigured'),
   disabled: 'OFF',
   disconnected: hostText('settings.mcpClientSettings.disconnected'),
   connecting: hostText('settings.mcpClientSettings.connecting'),
   connected: hostText('settings.mcpClientSettings.connected'),
   error: hostText('settings.mcpClientSettings.attention'),
-};
-const jobStates: Record<string, string> = {
+}));
+const jobStates = localizedMetadata<Record<string, string>>(() => ({
   running: hostText('settings.mcpClientSettings.running'),
   succeeded: hostText('settings.mcpClientSettings.completed'),
   'tool-error': hostText('settings.mcpClientSettings.toolError'),
   failed: hostText('settings.mcpClientSettings.failed'),
   cancelled: hostText('settings.mcpClientSettings.canceled'),
   'outcome-unknown': hostText('settings.mcpClientSettings.unknownResult'),
-};
+}));
 export function McpClientSettingsForm({
   settings,
   auxiliary,

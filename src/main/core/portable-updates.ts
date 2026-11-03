@@ -1,4 +1,4 @@
-import { hostText } from '../../shared/i18n';
+import { hostText, updaterWindowMessages } from '../../shared/i18n';
 import { physicalFs } from './physical-fs';
 import { orderedReads } from './ordered-io';
 import path from 'node:path';
@@ -1065,6 +1065,7 @@ export class PortableUpdates {
       schemaVersion,
       operationId,
       showProgress: true,
+      progressMessages: updaterWindowMessages(),
       baseDirectory: this.options.baseDirectory,
       executable: this.options.executable,
       args: this.options.restartArgs,

@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText, type HostTranslator } from '../../shared/i18n';
 import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
@@ -32,14 +33,14 @@ import {
 } from '../settings-ui/AppletPackageDialogs';
 import { SettingsListCount } from '../settings-ui/SettingsListCount';
 
-const states = {
+const states = localizedMetadata(() => ({
   running: hostText('settings.appletManagementSettings.running'),
   stopped: hostText('settings.appletManagementSettings.stopped'),
   waiting: hostText('settings.appletManagementSettings.waiting'),
   starting: hostText('settings.appletManagementSettings.starting'),
   stopping: hostText('settings.appletManagementSettings.stopping'),
   error: hostText('settings.appletManagementSettings.error'),
-};
+}));
 const startupPhaseLabels = {
   prepare: 'settings.appletManagementSettings.startupPrepare',
   process: 'settings.appletManagementSettings.startupProcess',

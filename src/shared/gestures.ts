@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { inputRows } from './settings-indexes';
 import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
@@ -22,13 +23,13 @@ import {
 export { processNames } from './command-conditions';
 import { planCommandBatch } from './command-execution';
 
-export const moveDirections = [
+export const moveDirections = localizedMetadata(() => [
   ['up', hostText('settings.gestures.up')],
   ['down', hostText('settings.gestures.down')],
   ['left', hostText('settings.gestures.left')],
   ['right', hostText('settings.gestures.right')],
-] as const;
-export const gestureTypes = [
+] as const);
+export const gestureTypes = localizedMetadata(() => [
   ...moveDirections.map(
     ([id, label]) =>
       [`move-${id}`, hostText('settings.gestures.movement', { direction: label })] as const,
@@ -51,7 +52,7 @@ export const gestureTypes = [
   ['click-middle', hostText('settings.gestures.clickMiddle')],
   ['wheel-up', hostText('settings.gestures.wheelUp')],
   ['wheel-down', hostText('settings.gestures.wheelDown')],
-] as const;
+] as const);
 export type GestureScope = ShortcutScope | 'browser' | 'exe' | 'desktop';
 export interface GestureBinding {
   id: string;

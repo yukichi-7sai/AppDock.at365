@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { useState } from 'react';
 import { hostText } from '../../shared/i18n';
 import { gestureTypes, moveDirections, gestureTitle } from '../../shared/gestures';
@@ -6,12 +7,12 @@ import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
 import './binding-editor.css';
-const families = [
+const families = localizedMetadata(() => [
   { id: 'move', title: hostText('settings.gestureBindingDialog.move'), icon: '↗' },
   { id: 'click', title: hostText('settings.gestureBindingDialog.click'), icon: '◉' },
   { id: 'wheel', title: hostText('settings.gestureBindingDialog.wheel'), icon: '↕' },
   { id: 'key', title: hostText('settings.gestureBindingDialog.keyboard'), icon: '⌨' },
-];
+]);
 const directionIcons = { up: '↑', down: '↓', left: '←', right: '→' } as const;
 function MoveDirectionPicker({
   label,

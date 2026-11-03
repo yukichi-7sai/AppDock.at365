@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { inputRows } from './settings-indexes';
 import {
@@ -17,7 +18,7 @@ import { defaultGestures, parseGestureBindings, type GestureBinding } from './ge
 import { getKeybindings, parseKeybindingOptions } from './keybindings';
 import type { Settings } from './contracts';
 
-export const touchpadGestureTypes = [
+export const touchpadGestureTypes = localizedMetadata(() => [
   ['three.tap', hostText('settings.touchpad-gestures.threeTap')],
   ['three.up', hostText('settings.touchpad-gestures.threeUp')],
   ['three.down', hostText('settings.touchpad-gestures.threeDown')],
@@ -28,7 +29,7 @@ export const touchpadGestureTypes = [
   ['four.down', hostText('settings.touchpad-gestures.fourDown')],
   ['four.left', hostText('settings.touchpad-gestures.fourLeft')],
   ['four.right', hostText('settings.touchpad-gestures.fourRight')],
-] as const;
+] as const);
 export type TouchpadGestureId = (typeof touchpadGestureTypes)[number][0];
 export const touchpadModifiers = ['Ctrl', 'Alt', 'Shift', 'Win'] as const;
 export interface TouchpadConnection {

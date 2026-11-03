@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { inputRows } from './settings-indexes';
 import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
@@ -28,25 +29,24 @@ import {
 import { planCommandBatch } from './command-execution';
 import type { GestureExecutionMode } from './command-execution-mode';
 
-export const shortcutScopes = [
+export const shortcutScopes = localizedMetadata(() => [
   { id: 'global', title: hostText('settings.keybindings.global') },
   { id: 'app', title: hostText('settings.keybindings.app') },
   { id: 'pages', title: hostText('settings.keybindings.pages') },
   { id: 'owner', title: hostText('settings.keybindings.owner') },
   { id: 'applets', title: hostText('settings.keybindings.selectedPages') },
-] as const;
+] as const);
 export type ShortcutScope = (typeof shortcutScopes)[number]['id'];
-export const externalShortcutScopes = [
+export const externalShortcutScopes = localizedMetadata(() => [
   { id: 'desktop', title: hostText('settings.keybindings.desktop'), after: 'global' },
   { id: 'exe', title: hostText('settings.keybindings.exe'), after: 'global' },
   { id: 'browser', title: hostText('settings.keybindings.browser'), after: 'global' },
-] as const;
+] as const);
 export type KeybindingScope = ShortcutScope | (typeof externalShortcutScopes)[number]['id'];
-export const keybindingScopes: readonly { id: KeybindingScope; title: string }[] =
-  shortcutScopes.flatMap((scope) => [
+export const keybindingScopes = localizedMetadata<readonly { id: KeybindingScope; title: string }[]>(() => shortcutScopes.flatMap((scope) => [
     scope,
     ...externalShortcutScopes.filter((extra) => extra.after === scope.id),
-  ]);
+  ]));
 export const externalShortcutScope = (scope: string) =>
   ['global', 'desktop', 'browser', 'exe'].includes(scope);
 export interface Keybinding {

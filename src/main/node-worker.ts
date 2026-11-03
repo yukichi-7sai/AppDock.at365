@@ -1,10 +1,14 @@
 import { hostText } from '../shared/i18n';
+import { configureHostLanguage } from './core/host-translation-source';
+import { effectiveHostLanguage } from '../shared/host-language';
+import { refreshTranslationMetadata } from '../shared/translation-metadata';
 import type { OwnShellState } from '../shared/shell';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
 import { webAccountReader, type AccountRead } from './core/web-account-read';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
+refreshTranslationMetadata(effectiveHostLanguage());
 export interface NodeCommandInvocation {
   signal: AbortSignal;
   session?: string;
@@ -154,6 +158,12 @@ const settingsHandlers = new Set<Handler>();
 const notificationHandlers = new Set<Handler>();
 const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) => {
   switch (method) {
+    case 'host.language.changed': {
+      const language = effectiveHostLanguage(p.language);
+      configureHostLanguage(() => language);
+      refreshTranslationMetadata(language);
+      return null;
+    }
     case 'activate': {
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;

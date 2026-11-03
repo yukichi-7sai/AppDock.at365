@@ -107,7 +107,7 @@ module.exports = async function ({
           .hostSettingsPages.filter(([id]) => !['appearance', 'general'].includes(id))
           .map(([id, title]) => [title, id]),
       ]) {
-        await select(page);
+        await select(page, id === 'about' ? 'AppDock.at365' : page);
         const untranslated = await host.locator('.settings-body').evaluate(
           (body, keys) => {
             const known = new Set(keys),
@@ -147,7 +147,7 @@ module.exports = async function ({
   await sound.click();
   await settleSettings(host);
   checks.push(
-    'all 17 host settings pages render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
+    'all host settings pages render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
   );
 
   await select('AI');

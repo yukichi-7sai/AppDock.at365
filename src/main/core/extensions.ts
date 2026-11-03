@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import { effectiveHostLanguage } from '../../shared/host-language';
+import { translationDirectory } from './host-translation-source';
 import { validateAppletCommonValues } from '../../shared/applet-common-settings';
 import { shellView, isRetiredShellRegion, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
@@ -360,7 +362,7 @@ export interface ExtensionInstance {
   startTimer?: ReturnType<typeof setTimeout>;
   child?: ChildProcessWithoutNullStreams | null;
   peer?: JsonLinePeer | null;
-  settingsDelivery?: { json?: string };
+  settingsDelivery?: { json?: string; language?: string };
 }
 interface ManagerOptions {
   startAllowed?(id: string): boolean;
@@ -618,6 +620,11 @@ class ExtensionManager extends EventEmitter {
             const values = this.settings.value.extensions[e.manifest.id]?.settings ?? {};
             const json = JSON.stringify(values);
             const delivery = (e.settingsDelivery ??= {});
+            const language = effectiveHostLanguage(this.settings.value.host.language);
+            if (e.manifest.runtime === 'node' && (delivery.language ?? 'ja') !== language) {
+              await e.peer!.request('host.language.changed', { language });
+              delivery.language = language;
+            }
             if (delivery.json === json) continue;
             // A lost reply may have applied the new settings. Reconfirm even on a revert.
             delivery.json = undefined;
@@ -724,9 +731,12 @@ class ExtensionManager extends EventEmitter {
       // Revalidate paths on each activation, including after an external extension update.
       m.entryPath = contained(m.folder, m.entry);
       this.advanceStartup(e, 'process');
+      const language = effectiveHostLanguage(this.settings.value.host.language);
       let child: ChildProcessWithoutNullStreams;
       if (m.runtime === 'node')
-        child = spawn(this.nodeExecutable, [this.nodeWorker, m.entryPath], {
+        child = spawn(this.nodeExecutable, [this.nodeWorker, m.entryPath,
+          '--appdock-translations=' + translationDirectory,
+          '--appdock-language=' + language], {
           cwd: m.folder,
           windowsHide: true,
           env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
@@ -786,7 +796,7 @@ class ExtensionManager extends EventEmitter {
       this.advanceStartup(e, 'activate');
       const values = this.settings.value.extensions[m.id]?.settings ?? {};
       const initial = JSON.stringify(values);
-      const delivery: { json?: string } = {};
+      const delivery: { json?: string; language?: string } = { language };
       e.settingsDelivery = delivery;
       const result = await peer.request('activate', {
         id: m.id,

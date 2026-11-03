@@ -1,5 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
-import { hostLanguages } from '../../shared/host-language';
+import { isHostLanguage, hostLanguages, hostLanguageName } from '../../shared/host-language';
 import { McpClientSettingsForm } from './McpClientSettings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
@@ -277,9 +277,14 @@ export function SettingsForm({
                     })
                   }
                 >
+                  {!isHostLanguage(settings.host.language) && (
+                    <option value={settings.host.language} disabled>
+                      {t('language.unavailable', { language: hostLanguageName(settings.host.language) })}
+                    </option>
+                  )}
                   {hostLanguages.map((value) => (
                     <option key={value} value={value}>
-                      {t(`language.${value}`)}
+                      {hostLanguageName(value)}
                     </option>
                   ))}
                 </select>

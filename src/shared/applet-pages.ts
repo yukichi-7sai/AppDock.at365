@@ -1,3 +1,4 @@
+import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
 import { validCommandId } from './commands';
@@ -38,7 +39,7 @@ export interface RibbonItem {
   extensionId?: string;
   pageId?: string;
 }
-export const builtinRibbon: RibbonItem[] = [
+export const builtinRibbon = localizedMetadata<RibbonItem[]>(() => [
   { id: 'image-library', title: hostText('settings.applet-pages.images'), icon: 'image' },
   { id: 'sound-library', title: hostText('sounds.title'), icon: 'music' },
   { id: 'text-library', title: hostText('texts.title'), icon: 'file' },
@@ -52,7 +53,7 @@ export const builtinRibbon: RibbonItem[] = [
     icon: 'chevron',
     defaultPlacement: 'top',
   },
-];
+]);
 export const pageKey = (extensionId: string, pageId: string) => `page:${extensionId}:${pageId}`;
 export const validPageId = (id: unknown): id is string =>
   typeof id === 'string' &&

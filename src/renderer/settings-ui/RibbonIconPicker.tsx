@@ -1,3 +1,4 @@
+import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useId, useState } from 'react';
@@ -7,7 +8,7 @@ import { RegisteredImageInput } from './RegisteredImagePicker';
 import type { RegisteredImageRef } from '../../shared/registered-images';
 import { SettingsField } from './SettingsSections';
 
-const labels: Record<RibbonBuiltinIcon, string> = {
+const labels = localizedMetadata<Record<RibbonBuiltinIcon, string>>(() => ({
   folder: hostText('settings.ribbonIconPicker.folder'),
   mail: hostText('settings.ribbonIconPicker.mail'),
   clock: hostText('settings.ribbonIconPicker.clock'),
@@ -48,7 +49,7 @@ const labels: Record<RibbonBuiltinIcon, string> = {
   trash: hostText('settings.ribbonIconPicker.trash'),
   info: hostText('settings.ribbonIconPicker.info'),
   help: hostText('settings.ribbonIconPicker.help'),
-};
+}));
 /** Only the active source is sent to the parent draft; inactive choices live until close. */
 export function RibbonIconPicker({
   label,

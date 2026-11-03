@@ -5,7 +5,7 @@ import type { ErrorReporter, ErrorEpisode } from './error-reporter';
 import type { NotificationInput } from './notification-service';
 import type { TypedNotifications } from './typed-notifications';
 
-export const settingsRestartReason = hostText('health.restartReason');
+export const settingsRestartReason = () => hostText('health.restartReason');
 
 /** Notification episodes are separate from health: hiding a notice never clears a failure. */
 export class SettingsHealthNotifications {
@@ -84,7 +84,7 @@ export class SettingsHealthNotifications {
     if (this.restart.publication === publication) return;
     this.restart.publication = publication;
     const title = hostText('health.restartTitle'),
-      body = settingsRestartReason;
+      body = settingsRestartReason();
     const result = this.options.notifications.publish(owner, 'restart-required', {
       title,
       body,

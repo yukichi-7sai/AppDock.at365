@@ -20,7 +20,7 @@ internal static partial class Program
         HostFiles.Contains(name) ? "host-file" : name is "resources" or "locales" ? "host-directory" :
         throw new IOException("本体に含められないファイル・フォルダーです。");
     private static bool IsHostEntry(string name) => HostFiles.Contains(name) || name is "resources" or "locales";
-    private static List<string> ReadHostPackage(string directory, string? version = null, bool exact = false, bool allowEditableRoster = false)
+    private static List<string> ReadHostPackage(string directory, string? version = null, bool exact = false, bool allowEditableFiles = false)
     {
         NoLinks(directory);
         var manifest = Path.Combine(directory, HostManifest); NoLinks(manifest);
@@ -38,10 +38,15 @@ internal static partial class Program
         if (exact)
         {
             var actual = Directory.EnumerateFileSystemEntries(directory).Select(p => Path.GetFileName(p)).ToHashSet(StringComparer.Ordinal);
-            if (allowEditableRoster && actual.Remove(AppletRoster))
+            if (allowEditableFiles && actual.Remove(AppletRoster))
             {
                 var roster = Path.Combine(directory, AppletRoster); NoLinks(roster);
                 if (!File.Exists(roster)) throw new IOException("Applet一覧のファイル形式が一致しません。");
+            }
+            if (allowEditableFiles && actual.Remove("translations"))
+            {
+                var directoryPath = Path.Combine(directory, "translations"); NoLinks(directoryPath);
+                if (!Directory.Exists(directoryPath)) throw new IOException("翻訳フォルダーの形式が一致しません。");
             }
             if (!actual.SetEquals(entries)) throw new IOException("本体の一覧と配布フォルダーの内容が一致しません。");
             foreach (var name in entries)
@@ -111,10 +116,14 @@ internal static partial class Program
     private static void DeployHost(string source, string destination)
     {
         source = Full(source); destination = Full(destination); NoLinks(source); NoLinks(destination);
-        var entries = ReadHostPackage(source, exact: true, allowEditableRoster: true);
+        var entries = ReadHostPackage(source, exact: true, allowEditableFiles: true);
         if (Same(source, destination) || Within(source, destination) || Within(destination, source)) throw new IOException("配布元と配置先が重複しています。");
         if (!Directory.Exists(destination)) throw new IOException("配置先フォルダーがありません。");
         var roster = Path.Combine(destination, AppletRoster); NoLinks(roster);
+        var translations = Path.Combine(destination, "translations");
+        var translationFile = Path.Combine(translations, "host.json");
+        NoLinks(translationFile);
+        if (File.Exists(translations) || Directory.Exists(translationFile)) throw new IOException("翻訳の配置先の形式が一致しません。");
         if (Directory.Exists(roster)) throw new IOException("Applet一覧の配置先にフォルダーがあります。");
         var previous = File.Exists(Path.Combine(destination, HostManifest)) ? ReadHostPackage(destination) : new List<string>();
         // Inspect every destination first; do not follow links while copying or pruning.
@@ -149,6 +158,12 @@ internal static partial class Program
             var seed = Path.Combine(source, AppletRoster);
             if (!File.Exists(seed)) seed = Path.Combine(source, "resources", AppletRoster);
             if (File.Exists(seed)) File.Copy(seed, roster, false);
+        }
+        var seedFile = Path.Combine(source, "resources", "translations", "host.json");
+        if (File.Exists(seedFile) && !File.Exists(translationFile))
+        {
+            Directory.CreateDirectory(translations);
+            File.Copy(seedFile, translationFile, false);
         }
         File.Copy(Path.Combine(source, HostManifest), Path.Combine(destination, HostManifest), true);
     }

@@ -1,7 +1,8 @@
+import { localizedMetadata } from './translation-metadata';
 import type { HostSettings, SettingDefinition } from './contracts';
 import { hostText } from './i18n';
 import { notificationBannerPositions } from './notifications';
-import { defaultHostLanguage, hostLanguages } from './host-language';
+import { defaultHostLanguage, hostLanguages, hostLanguageName } from './host-language';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import {
   defaultFileWatchAssistanceOptions,
@@ -34,7 +35,7 @@ export type HostSettingDefinition = SettingDefinition & {
 };
 type HostField = Omit<HostSettingDefinition, 'key'>;
 const switches = ['on', 'off', 'toggle'] as const;
-const definitions = {
+const definitions = localizedMetadata(() => ({
   language: {
     pageId: 'appearance',
     title: hostText('language.label'),
@@ -42,7 +43,7 @@ const definitions = {
     type: 'select',
     default: defaultHostLanguage,
     automation: true,
-    options: hostLanguages.map((value) => ({ value, label: hostText(`language.${value}`) })),
+    options: hostLanguages.map((value) => ({ value, label: hostLanguageName(value) })),
   },
   zoomFactor: {
     pageId: 'appearance',
@@ -237,12 +238,12 @@ const definitions = {
     minimum: minimumFileWatchAssistanceIntervalSeconds,
     automation: true,
   },
-} satisfies Record<OrdinaryHostKey, HostField>;
+} satisfies Record<OrdinaryHostKey, HostField>));
 
 /** Defaults, ordinary validation, UI metadata and MCP publication share this registration. */
-export const hostSettingDefinitions: HostSettingDefinition[] = Object.entries(definitions).map(
+export const hostSettingDefinitions = localizedMetadata<HostSettingDefinition[]>(() => Object.entries(definitions).map(
   ([key, definition]) => ({ key: key as OrdinaryHostKey, ...definition }),
-);
+));
 export function hostSettingsDefaults(): HostSettings {
   return structuredClone({
     ...specializedHostDefaults,
