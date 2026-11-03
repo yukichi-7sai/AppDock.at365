@@ -17,6 +17,9 @@ const base = path.join(output, 'profile'),
 fs.mkdirSync(base, { recursive: true });
 const value = require('../out/main/shared/settings-schema').createDefaultSettings();
 Object.assign(value.host, { theme: 'light', soundEnabled: false, closeToTray: false });
+value.updates.checkHostOnAboutOpen = false;
+value.updates.checkHostOnStartup = false;
+value.updates.checkAppletsOnStartup = false;
 value.gestures.enabled = false;
 value.keybindings = [];
 value.globalShortcutCommands = [];
@@ -131,7 +134,8 @@ const checks = [];
     let state = await start(),
       page = state.page;
     const toggle = () => page.getByTestId('settings-storage-local');
-    assert.equal(await toggle().isChecked(), true);
+    assert.equal(await toggle().isChecked(), false);
+    await toggle().check();
     assert.equal(await toggle().isDisabled(), false);
     await page.getByLabel('テーマ', { exact: true }).selectOption('dark');
     await settleSettings(state.host);
@@ -143,7 +147,7 @@ const checks = [];
       require('../out/main/shared/settings-schema').parseSettings(disk(sharedFile)).host.theme,
       'light',
     );
-    checks.push('appearance defaults local and is switchable; theme local');
+    checks.push('appearance defaults shared and can store the theme locally');
     const reset = () => page.getByRole('button', { name: 'このページを既定値に戻す', exact: true });
     const dialog = () => page.getByRole('dialog');
     await reset().click();
@@ -189,7 +193,7 @@ const checks = [];
     );
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('heading', { name: '一般', exact: true }).waitFor();
-    assert.equal(await toggle().isChecked(), true);
+    assert.equal(await toggle().isChecked(), false);
     assert.equal(await toggle().isDisabled(), false);
     const general = await page.evaluate(() =>
       window.dock.settingsPage.get(
@@ -198,9 +202,9 @@ const checks = [];
     );
     assert.deepEqual(
       general.content.auxiliary.storage.files.map((file) => file.scope),
-      ['device'],
+      ['shared', 'device'],
     );
-    checks.push('general defaults local and is switchable; JSON and file target device');
+    checks.push('general defaults shared with separate device-only launch settings');
     const hostPages = [
       ['appearance', '表示', { host: { theme: 'dark', showHints: false } }],
       [
@@ -224,6 +228,7 @@ const checks = [];
         },
       ],
       ['ribbon', 'リボン', { ribbon: { rightClickCommand: 'appdock.open' } }],
+      ['text-palette', 'パレット', { host: { textPaletteHistory: false } }],
       ['statusbar', 'ステータスバー', { host: { showStatusBar: false } }],
       [
         'tray',
@@ -248,11 +253,8 @@ const checks = [];
       await page.getByRole('button', { name: title, exact: true }).click();
       await page.getByTestId(`settings-page:${pageId}`).waitFor();
       assert.equal(await toggle().isDisabled(), false);
-      assert.equal(
-        await toggle().isChecked(),
-        ['appearance', 'general', 'notifications', 'statusbar'].includes(pageId),
-      );
-      if (!(await toggle().isChecked())) await toggle().check();
+      assert.equal(await toggle().isChecked(), pageId === 'appearance');
+      await toggle().check();
       await until(
         () => disk(deviceFile).hostPages[pageId].useLocalSettings,
         pageId + ' local mode',
@@ -349,20 +351,27 @@ const checks = [];
     checks.push(
       'general shared mode keeps all three startup settings local; hardware is grouped under startup and survives mode switches',
     );
+    await page.getByTestId('settings-nav:text-palette').click();
+    await toggle().check();
+    await until(
+      () => disk(deviceFile).hostPages['text-palette'].useLocalSettings,
+      'palette local before restart',
+    );
     await stop();
     state = await start();
     page = state.page;
     for (const [pageId, title] of hostPages) {
       await page.getByRole('button', { name: title, exact: true }).click();
       await page.getByTestId(`settings-page:${pageId}`).waitFor();
-      assert.equal(await toggle().isChecked(), false);
+      const local = pageId === 'text-palette';
+      assert.equal(await toggle().isChecked(), local);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        pageId === 'general' ? ['shared', 'device'] : ['shared'],
+        local ? ['device'] : pageId === 'general' ? ['shared', 'device'] : ['shared'],
       );
     }
     checks.push(
-      'all seven host page modes and file targets survive a real app restart; narrow toolbar remains accessible',
+      'all eight host pages retain their saved modes and file targets across restart, including the local palette',
     );
     assert.equal(
       (await state.host.evaluate(() => window.dock.snapshot())).settings.value.host

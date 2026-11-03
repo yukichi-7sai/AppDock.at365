@@ -270,18 +270,8 @@ let app,
     assert.equal(afterGrowth.y + afterGrowth.height, beforeGrowth.y + beforeGrowth.height);
     await host.screenshot({ path: path.join(profile, 'banner-bottom-left.png') });
     await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.end'));
-    const raw = JSON.parse(
-      fs.readFileSync(
-        require('./test-settings.cjs').file(
-          profile,
-          `settings-${require('node:os').hostname()}.json`,
-        ),
-      ),
-    );
-    assert.equal(
-      raw.hostPages.notifications.configuration.host.notificationBannerPosition,
-      'bottom-left',
-    );
+    const sharedFile = require('./test-settings.cjs').file(profile);
+    assert.equal(JSON.parse(fs.readFileSync(sharedFile)).host.notificationBannerPosition, 'bottom-left');
     await host.reload();
     await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
     await open('notifications');
@@ -503,14 +493,7 @@ let app,
     );
     assert.deepEqual(
       (await saved()).notificationPreferences.overrides,
-      JSON.parse(
-        fs.readFileSync(
-          require('./test-settings.cjs').file(
-            profile,
-            `settings-${require('node:os').hostname()}.json`,
-          ),
-        ),
-      ).hostPages.notifications.configuration.notificationPreferences.overrides,
+      JSON.parse(fs.readFileSync(sharedFile)).notificationPreferences.overrides,
     );
     assert(
       (await saved()).notificationPreferences.overrides

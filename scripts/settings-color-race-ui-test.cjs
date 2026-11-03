@@ -139,11 +139,8 @@ async function stop() {
     const state = await host.evaluate(() => window.dock.snapshot());
     assert.equal(state.settings.value.host.accentColor, last);
     assert.equal(state.settings.syncError, undefined);
-    const saved = JSON.parse(
-      fs.readFileSync(require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`), 'utf8'),
-    );
-    assert.equal(saved.hostPages.appearance.useLocalSettings, true);
-    assert.equal(saved.hostPages.appearance.configuration.host.accentColor, last);
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile), 'utf8'));
+    assert.equal(saved.host.accentColor, last);
     const log = fs.readFileSync(
       path.join(profile, 'data', 'logs', require('node:os').hostname(), 'host.log'),
       'utf8',

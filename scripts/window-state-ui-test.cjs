@@ -83,8 +83,10 @@ const saved = () =>
     incoming.uiState.windows.host.bounds = externalPosition;
     const otherWindow = { bounds: expected, maximized: true };
     incoming.uiState.windows['test:other'] = otherWindow;
-    incoming.hostPages.appearance.configuration.host ??= {};
-    incoming.hostPages.appearance.configuration.host.theme = 'dark';
+    incoming.hostPages.appearance = {
+      useLocalSettings: true,
+      configuration: { host: { theme: 'dark' } },
+    };
     fs.writeFileSync(file, JSON.stringify(incoming));
     await application.evaluate(
       ({ BrowserWindow }, bounds) => {
@@ -146,7 +148,10 @@ const saved = () =>
     assert.deepEqual(saved(), { bounds: expected, maximized: false });
     await application.close();
     const settings = JSON.parse(fs.readFileSync(file, 'utf8'));
-    (settings.hostPages.general.configuration.host ??= {}).startMinimized = true;
+    settings.hostPages.general = {
+      useLocalSettings: true,
+      configuration: { host: { startMinimized: true } },
+    };
     settings.uiState.windows.host = { bounds: expected, maximized: true };
     fs.writeFileSync(file, JSON.stringify(settings));
     await launch(false);

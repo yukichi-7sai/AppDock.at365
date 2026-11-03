@@ -2006,6 +2006,7 @@ test('integrated ribbon groups are not separate Shell settings and dormant assig
   const retired = 'overlay.ribbon-group',
     provider = shellApplet('shell.legacy', [retired]),
     f = fixture(t, { device: true, updateApplets: [provider] });
+  f.store.setHostPageLocalSettings('appearance', true, f.store.revision);
   f.store.save(
     {
       ...f.store.value,
@@ -2074,6 +2075,7 @@ test('Shell selection discovers declared regions and per-region providers withou
 
 test('Shell selection dryRun, replay, default omission and dotted IDs preserve unrelated and retired values', (t) => {
   const f = fixture(t, { device: true, updateApplets: [shellApplet('shell.a')] });
+  f.store.setHostPageLocalSettings('appearance', true, f.store.revision);
   f.store.save(
     {
       ...f.store.value,
@@ -2216,6 +2218,7 @@ test('Shell selection rejects invalid batches atomically and checks current writ
 
 test('Shell save failure preserves settings, device data and encrypted credentials', (t) => {
   const f = fixture(t, { device: true, updateApplets: [shellApplet('shell.a')] });
+  f.store.setHostPageLocalSettings('appearance', true, f.store.revision);
   f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI');
   f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS');
   const files = [f.store.shared.file, f.store.device.file, f.aiFile, f.ttsFile],

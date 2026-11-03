@@ -72,6 +72,7 @@ test('general-page device storage preserves assistance values through reload wit
   const file = path.join(root, 'data/settings.json');
   let store = new DeviceSettingsStore(file, path.join(root, 'local'), 'TEST');
   store.load();
+  store.setHostPageLocalSettings('general', true, store.revision);
   t.after(() => store.close());
   const shared = fs.readFileSync(file);
   store.save(

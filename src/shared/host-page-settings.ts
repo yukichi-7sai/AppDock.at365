@@ -69,9 +69,6 @@ export function hostPageForPath(path: readonly string[]): HostPageSettingsId | u
     ),
   );
 }
-export function defaultHostPageLocal(pageId: HostPageSettingsId) {
-  return ['appearance', 'general', 'notifications', 'statusbar', 'text-palette'].includes(pageId);
-}
 export const readHostPagePath = (value: unknown, path: readonly string[]): any =>
   path.reduce((current: any, key) => current?.[key], value);
 export function writeHostPagePath(target: object, path: readonly string[], value: unknown) {

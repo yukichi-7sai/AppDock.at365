@@ -140,6 +140,7 @@ test('hint visibility accepts old device files and remains independent per PC wi
   old.host.showHints = null;
   assert.throws(() => parseDeviceSettings(old, 'PC-A'), /showHints/);
   const { store: a, file, base } = fixture(t);
+  a.setHostPageLocalSettings('appearance', true, a.revision);
   const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
   t.after(() => b.close());
   b.load();
@@ -161,6 +162,7 @@ test('hint visibility accepts old device files and remains independent per PC wi
 
 test('accent colors remain independent per PC, persist across reload, and omit the default without rewriting shared settings', (t) => {
   const { store: a, file, base } = fixture(t);
+  a.setHostPageLocalSettings('appearance', true, a.revision);
   const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
   t.after(() => b.close());
   b.load();
@@ -199,6 +201,7 @@ test('accent colors remain independent per PC, persist across reload, and omit t
 
 test('migration preserves shared bytes and initializes local flags once', (t) => {
   const { store, file, shared } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
   assert.equal(store.value.extensions['example.wallpaper'].enabled, true);
   const next = structuredClone(store.value);
@@ -213,6 +216,8 @@ test('migration preserves shared bytes and initializes local flags once', (t) =>
 });
 test('all display/general settings remain local while other settings synchronize', (t) => {
   const { store, file } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
+  store.setHostPageLocalSettings('general', true, store.revision);
   const next = structuredClone(store.value);
   Object.assign(next.host, {
     theme: 'dark',
@@ -269,6 +274,7 @@ test('whole Applet configurations stay independent and survive OFF/ON', (t) => {
 });
 test('two PC names see only their own state in the same synchronized placement', (t) => {
   const { store: a, file, base } = fixture(t);
+  a.setHostPageLocalSettings('general', true, a.revision);
   const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
   t.after(() => b.close());
   b.load();
@@ -311,6 +317,7 @@ test('dynamic page flags never leak into shared or local configuration arrays', 
 });
 test('mixed save failure rolls back both files and leaves no successful partial state', (t) => {
   const { store, file, base } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   const before = fs.readFileSync(file, 'utf8'),
     device = fs.readFileSync(store.device.file, 'utf8');
   const save = store.device.save;
@@ -328,6 +335,7 @@ test('mixed save failure rolls back both files and leaves no successful partial 
 });
 test('rollback accepts and preserves a legacy UTF-8 BOM byte for byte', (t) => {
   const { store, file } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   fs.writeFileSync(file, '\uFEFF' + fs.readFileSync(file, 'utf8'));
   store.shared.reload();
   const before = fs.readFileSync(file);
@@ -369,6 +377,7 @@ test('interrupted mixed transaction recovers before settings activation', (t) =>
 });
 test('missing local state is recovered independently and never reimported from shared', (t) => {
   const { store, file, base } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   const next = structuredClone(store.value);
   next.host.theme = 'dark';
   store.save(next, store.revision);
@@ -414,6 +423,7 @@ test('invalid local file, foreign PC and malicious identities cannot change stor
 });
 test('local edits can continue during shared read failure, but switching to shared is refused', (t) => {
   const { store, file } = fixture(t);
+  store.setHostPageLocalSettings('general', true, store.revision);
   store.setLocalSettings('example.wallpaper', true, store.revision);
   fs.writeFileSync(file, '{broken');
   store.assertRevision(store.revision);
@@ -457,6 +467,7 @@ test('generated setting commands and dryRun use the selected storage without exp
 });
 test('committed journal cleanup failure cannot roll back assets or saved settings', (t) => {
   const { store, file, base } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   const journal = path.join(base, 'local/settings-transactions/settings.json');
   const unlink = fs.unlinkSync;
   let rollback = 0;
@@ -485,6 +496,7 @@ test('committed journal cleanup failure cannot roll back assets or saved setting
 });
 test('rollback preserves external changes and retains unresolved recovery evidence', (t) => {
   const { store, file, base } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   store.device.save = () => {
     const external = disk(file);
     external.profile = { ...external.profile, name: 'External' };

@@ -318,6 +318,7 @@ test('page reset includes the relocated update source while retaining enabled st
 
 test('reading old full files does not rewrite them, and resetting defaults never regenerates keys after restart', (t) => {
   const { store, file } = fixture(t);
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   const original = fs.readFileSync(file, 'utf8');
   store.reload();
   assert.equal(fs.readFileSync(file, 'utf8'), original);

@@ -20,15 +20,8 @@ let child,
   server,
   success = false;
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
-const savedNotifications = () => {
-  const file = require('./test-settings.cjs').file(
-    profile,
-    `settings-${require('node:os').hostname()}.json`,
-  );
-  const device = JSON.parse(fs.readFileSync(file));
-  assert.equal(device.hostPages.notifications.useLocalSettings, true);
-  return device.hostPages.notifications.configuration.notificationPreferences;
-};
+const savedNotifications = () =>
+  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile))).notificationPreferences;
 const until = async (fn, label) => {
   const end = Date.now() + 30000;
   while (Date.now() < end) {

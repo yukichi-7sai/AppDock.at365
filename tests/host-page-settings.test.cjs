@@ -5,6 +5,7 @@ const path = require('node:path');
 const { DeviceSettingsStore } = require('../out/main/main/core/device-settings-store');
 const { SettingsConflictError } = require('../out/main/main/core/settings');
 const {
+  combineSettings,
   initialDeviceSettings,
   parseDeviceSettings,
 } = require('../out/main/main/core/device-settings');
@@ -76,20 +77,18 @@ function change(value, pageId, alternate = false) {
   return parseSettings(next);
 }
 
-test('legacy mixed notification values and status visibility migrate once without changing shared bytes', (t) => {
+test('legacy PC overrides without a saved mode stay dormant while all pages follow shared settings', (t) => {
   const { store, file, shared } = fixture(t, (device) => {
     device.host.notificationBannerPosition = 'bottom-right';
     device.host.notificationBannerShadow = false;
     device.host.showStatusBar = false;
+    assert.equal(combineSettings(createDefaultSettings(), device, []).host.showStatusBar, true);
   });
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
   for (const pageId of hostPageSettingsIds)
-    assert.equal(
-      store.hostPageLocalSettings(pageId),
-      ['appearance', 'general', 'notifications', 'statusbar', 'text-palette'].includes(pageId),
-    );
-  assert.equal(store.value.host.notificationBannerPosition, 'bottom-right');
-  assert.equal(store.value.host.showStatusBar, false);
+    assert.equal(store.hostPageLocalSettings(pageId), false, pageId);
+  assert.equal(store.value.host.notificationBannerPosition, shared.host.notificationBannerPosition);
+  assert.equal(store.value.host.showStatusBar, shared.host.showStatusBar);
   assert.equal(store.value.notificationPreferences.speech.voice, 'shared');
   assert.equal(disk(store.device.file).host.notificationBannerPosition, undefined);
   const before = fs.readFileSync(store.device.file, 'utf8');
@@ -99,7 +98,25 @@ test('legacy mixed notification values and status visibility migrate once withou
   incoming.notificationPreferences.speech.voice = 'incoming';
   fs.writeFileSync(file, JSON.stringify(incoming));
   store.reload();
+  assert.equal(store.value.notificationPreferences.speech.voice, 'incoming');
+  store.setHostPageLocalSettings('notifications', true, store.revision);
+  store.setHostPageLocalSettings('statusbar', true, store.revision);
+  assert.equal(store.value.host.notificationBannerPosition, 'bottom-right');
+  assert.equal(store.value.host.showStatusBar, false);
   assert.equal(store.value.notificationPreferences.speech.voice, 'shared');
+});
+
+test('a new PC adopts later shared changes before first enabling local palette settings', (t) => {
+  const { store, file } = fixture(t);
+  assert.deepEqual(disk(store.device.file).hostPages['text-palette'], { useLocalSettings: false });
+  const shared = disk(file);
+  shared.host.textPaletteHistory = false;
+  fs.writeFileSync(file, JSON.stringify(shared));
+  store.reload();
+  assert.equal(store.value.host.textPaletteHistory, false);
+  store.setHostPageLocalSettings('text-palette', true, store.revision);
+  assert.equal(store.value.host.textPaletteHistory, false);
+  assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
 });
 
 for (const pageId of hostPageSettingsIds) {
@@ -108,6 +125,7 @@ for (const pageId of hostPageSettingsIds) {
     const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
     t.after(() => b.close());
     b.load();
+    assert.deepEqual(disk(b.device.file).hostPages[pageId], { useLocalSettings: false });
     store.setHostPageLocalSettings(pageId, true, store.revision);
     const sharedBytes = fs.readFileSync(file, 'utf8');
     const next = change(store.value, pageId);
@@ -135,8 +153,6 @@ for (const pageId of hostPageSettingsIds) {
     applyHostPageConfiguration(unrelated, local, pageId);
     assert.deepEqual(store.shared.value, parseSettings(unrelated));
     assert.equal(disk(store.device.file).hostPages[pageId].configuration, undefined);
-    b.reload();
-    b.setHostPageLocalSettings(pageId, false, b.revision);
     b.reload();
     assert.deepEqual(hostPageConfiguration(b.value, pageId), local);
     const final = change(store.value, pageId, true);
@@ -195,6 +211,7 @@ test('host page configuration rejects foreign pages, invalid values and escaping
 
 test('selected persisted overrides and stale revisions follow the host page mode', (t) => {
   const { store } = fixture(t);
+  store.setHostPageLocalSettings('statusbar', true, store.revision);
   store.save(change(store.value, 'statusbar'), store.revision);
   assert.equal(store.storedSettingOverrides('appdock').showStatusBar, false);
   store.setHostPageLocalSettings('statusbar', false, store.revision);
@@ -249,7 +266,7 @@ test('switching a legacy tray command list to local retains its resolved menu an
   assert.deepEqual(store.value.trayMenu, expected);
 });
 
-test('appearance/general adopt existing PC values while preserving all earlier page modes', (t) => {
+test('missing pages default to shared while saved modes and dormant configurations survive reload', (t) => {
   const { store, file, shared } = fixture(t, (device) => {
     device.host.theme = 'dark';
     device.host.zoomFactor = 1.25;
@@ -257,7 +274,14 @@ test('appearance/general adopt existing PC values while preserving all earlier p
     device.host.hardwareAcceleration = true;
     device.host.startAtLogon = true;
     device.hostPages = {
-      notifications: { useLocalSettings: false },
+      notifications: {
+        useLocalSettings: false,
+        configuration: { host: { notificationBannerShadow: false } },
+      },
+      'text-palette': {
+        useLocalSettings: true,
+        configuration: { host: { textPaletteHistory: false } },
+      },
       statusbar: { useLocalSettings: false },
       ribbon: {
         useLocalSettings: true,
@@ -268,7 +292,15 @@ test('appearance/general adopt existing PC values while preserving all earlier p
     };
   });
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
+  store.reload();
   const device = disk(store.device.file);
+  assert.equal(store.hostPageLocalSettings('appearance'), false);
+  assert.equal(store.value.host.theme, shared.host.theme);
+  assert.equal(store.hostPageLocalSettings('general'), false);
+  assert.equal(store.value.host.soundEnabled, shared.host.soundEnabled);
+  assert.equal(store.hostPageLocalSettings('text-palette'), true);
+  assert.equal(store.value.host.textPaletteHistory, false);
+  assert.equal(device.hostPages.notifications.configuration.host.notificationBannerShadow, false);
   assert.equal(device.hostPages.appearance.configuration.host.theme, 'dark');
   assert.equal(device.hostPages.appearance.configuration.host.zoomFactor, 1.25);
   assert.equal(device.hostPages.general.configuration.host.soundEnabled, false);
@@ -284,6 +316,7 @@ test('appearance/general adopt existing PC values while preserving all earlier p
 test('general shared/local modes and sharing never transfer launch or hardware flags to another PC', (t) => {
   const { store, file, base } = fixture(t);
   const fixed = ['startAtLogon', 'runAsAdministrator', 'hardwareAcceleration'];
+  store.setHostPageLocalSettings('general', true, store.revision);
   const next = change(store.value, 'general');
   for (const key of fixed) next.host[key] = true;
   store.save(next, store.revision);

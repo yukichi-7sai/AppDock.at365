@@ -144,6 +144,7 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
   const store = new DeviceSettingsStore(file, path.join(dir, 'local'), 'LOCALIZATION');
   t.after(() => store.close());
   store.load();
+  store.setHostPageLocalSettings('appearance', true, store.revision);
   const next = structuredClone(store.value);
   next.host.language = 'ja';
   next.host.showHints = false;

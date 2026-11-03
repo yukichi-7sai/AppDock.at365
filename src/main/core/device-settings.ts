@@ -15,7 +15,7 @@ import { fillSettingDefaults, omitSettingDefaults } from '../../shared/settings-
 import { compactAppletConfiguration, settingsStorageDefaults } from '../../shared/settings-storage';
 import {
   applyHostPageConfiguration,
-  defaultHostPageLocal,
+  deviceOnlyHostKeys,
   hostPageConfiguration,
   hostPageForPath,
   hostPageSettingsIds,
@@ -305,12 +305,10 @@ export function combineSettings(
   collections: DeviceCollection[],
 ): Settings {
   const result = structuredClone(shared);
-  Object.assign(result.host, structuredClone(device.host));
+  for (const key of deviceOnlyHostKeys) result.host[key] = device.host[key];
   for (const pageId of hostPageSettingsIds) {
     const entry = device.hostPages?.[pageId];
-    if (!entry) continue;
-    applyHostPageConfiguration(result, hostPageConfiguration(shared, pageId), pageId);
-    if (entry.useLocalSettings) {
+    if (entry?.useLocalSettings) {
       applyHostPageConfiguration(result, entry.configuration ?? {}, pageId);
       if (pageId === 'tray') delete (result as Partial<Settings>).trayCommands;
     }
@@ -344,23 +342,23 @@ export function combineSettings(
   }
   return parseSettings(result);
 }
-/** Preserve the effective legacy values once before making each host page independent. */
+/** Missing pages start shared. Keep legacy PC overrides available for a later switch to local. */
 export function initializeHostPageSettings(
-  shared: Settings,
   device: DeviceSettings,
+  legacyShared?: Settings,
 ): DeviceSettings {
   if (hostPageSettingsIds.every((pageId) => device.hostPages?.[pageId])) return device;
-  const current = combineSettings(shared, device, []);
+  const legacyHost = legacyShared && omitSettingDefaults(device.host, createDefaultSettings().host);
+  const legacy = legacyShared && { ...legacyShared, host: { ...legacyShared.host, ...device.host } };
   const result = structuredClone(device);
   result.hostPages ??= {};
-  for (const pageId of hostPageSettingsIds)
-    if (!result.hostPages[pageId]) {
-      const local = defaultHostPageLocal(pageId);
-      result.hostPages[pageId] = {
-        useLocalSettings: local,
-        ...(local ? { configuration: hostPageConfiguration(current, pageId) } : {}),
-      };
-    }
+  for (const pageId of hostPageSettingsIds) {
+    if (result.hostPages[pageId]) continue;
+    const entry: DeviceHostPage = { useLocalSettings: false };
+    if (legacy && hostPageConfiguration({ host: legacyHost }, pageId).host)
+      entry.configuration = hostPageConfiguration(legacy, pageId);
+    result.hostPages[pageId] = entry;
+  }
   return result;
 }
 /** Route only edited fields, retaining the original shared values hidden by local overrides. */
@@ -372,7 +370,7 @@ export function splitSettings(
   collections: DeviceCollection[],
 ) {
   const shared = structuredClone(originalShared),
-    device = structuredClone(initializeHostPageSettings(originalShared, originalDevice));
+    device = structuredClone(initializeHostPageSettings(originalDevice, originalShared));
   const copyChanges = (
     target: Record<string, any>,
     previous: Record<string, any>,

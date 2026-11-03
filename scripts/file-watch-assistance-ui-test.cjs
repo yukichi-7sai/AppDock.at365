@@ -124,15 +124,10 @@ async function main() {
   assert.equal((await snapshot()).settings.value.host.fileWatchAssistanceEnabled, false);
   assert.equal(await interval.inputValue(), '2');
   assert.equal(await interval.isDisabled(), true);
-  const data = path.dirname(settingsFile);
-  const deviceFile = path.join(
-    data,
-    fs.readdirSync(data).find((name) => /^settings-.+\.json$/.test(name)),
-  );
-  const device = JSON.parse(fs.readFileSync(deviceFile));
-  device.hostPages.general.configuration.host.closeToTray = false;
-  fs.writeFileSync(deviceFile + '.received', JSON.stringify(device));
-  fs.renameSync(deviceFile + '.received', deviceFile);
+  const incoming = JSON.parse(fs.readFileSync(settingsFile));
+  (incoming.host ??= {}).closeToTray = false;
+  fs.writeFileSync(settingsFile + '.received', JSON.stringify(incoming));
+  fs.renameSync(settingsFile + '.received', settingsFile);
   await until(
     async () => (await snapshot()).settings.value.host.closeToTray === false,
     'native watch remains active with assistance OFF',

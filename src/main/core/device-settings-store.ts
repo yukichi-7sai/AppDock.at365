@@ -20,7 +20,6 @@ import { parseSettings } from '../../shared/settings-schema';
 import { appletCommonKeys } from '../../shared/applet-common-settings';
 import {
   applyHostPageConfiguration,
-  defaultHostPageLocal,
   hostPageConfiguration,
   hostPageForPath,
   hostPageSettingsIds,
@@ -111,7 +110,7 @@ export class DeviceSettingsStore extends SettingsStore {
     };
   }
   hostPageLocalSettings(pageId: HostPageSettingsId) {
-    return this.device.value.hostPages[pageId]?.useLocalSettings ?? defaultHostPageLocal(pageId);
+    return this.device.value.hostPages[pageId]?.useLocalSettings ?? false;
   }
   override settingScope(path: readonly string[]): Scope {
     const pageId = hostPageForPath(path);
@@ -127,7 +126,7 @@ export class DeviceSettingsStore extends SettingsStore {
     result.host ??= {};
     for (const key of deviceHostKeys) {
       const pageId = hostPageForPath(['host', key]);
-      if (pageId && device.hostPages?.[pageId]) continue;
+      if (pageId) continue;
       delete result.host[key];
       if (device.host && Object.hasOwn(device.host, key)) result.host[key] = device.host[key];
     }
@@ -249,7 +248,7 @@ export class DeviceSettingsStore extends SettingsStore {
     this.recovered = this.shared.recovered || this.device.recovered;
   }
   private refreshCombined(notify: boolean) {
-    const initialized = initializeHostPageSettings(this.shared.value, this.device.value);
+    const initialized = initializeHostPageSettings(this.device.value, this.shared.value);
     if (initialized !== this.device.value && !this.shared.recovered && !this.device.recovered) {
       const mutating = this.mutating;
       this.mutating = true;
@@ -286,7 +285,9 @@ export class DeviceSettingsStore extends SettingsStore {
       atomicWrite(
         this.device.file,
         this.device.serialize(
-          initialDeviceSettings(this.machineName, this.shared.value, this.collections()),
+          initializeHostPageSettings(
+            initialDeviceSettings(this.machineName, this.shared.value, this.collections()),
+          ),
         ),
         { previous: undefined },
       );
@@ -532,7 +533,7 @@ export class DeviceSettingsStore extends SettingsStore {
     )
       throw Error(hostText('services.deviceSettingsStore.invalidScope'));
     const shared = structuredClone(this.shared.value);
-    const next = structuredClone(initializeHostPageSettings(shared, this.device.value));
+    const next = structuredClone(initializeHostPageSettings(this.device.value, shared));
     const entry = next.hostPages[pageId]!;
     if (entry.useLocalSettings === enabled) return this.snapshot();
     if (enabled && !entry.configuration) {

@@ -2357,9 +2357,7 @@ function settingsPageStorage(
   const local =
     page.kind === 'applet'
       ? settings.localSettings(owner!)
-      : isHostPageSettingsId(page.id)
-        ? settings.hostPageLocalSettings(page.id)
-        : ['appearance', 'general'].includes(page.id);
+      : isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id);
   const scopes = new Set<'shared' | 'device'>();
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
   for (const p of settingsResetPaths(page, allApplets(), resetScope)) {

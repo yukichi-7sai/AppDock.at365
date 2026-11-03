@@ -580,6 +580,7 @@ test('field registration drives host defaults, validation, UI metadata, storage 
 
 test('status bar setting is discoverable, immediate and device-owned through the common MCP path', (t) => {
   const f = fixture(t, { device: true });
+  f.store.setHostPageLocalSettings('statusbar', true, f.store.revision);
   const targetId = f
     .call('targets.list', { ownerId: 'appdock' })
     .items.find((target) => target.category === 'statusbar').targetId;
@@ -600,6 +601,7 @@ test('device-backed resets preserve per-PC ownership and shared bytes', (t) => {
     targetId = f
       .call('targets.list', { ownerId: 'appdock' })
       .items.find((target) => target.category === 'general').targetId;
+  f.store.setHostPageLocalSettings('general', true, f.store.revision);
   const sharedBefore = fs.readFileSync(f.store.shared.file, 'utf8');
   f.call('apply', f.request([{ kind: 'set', changes: { soundEnabled: false } }], { targetId }));
   assert.equal(f.store.value.host.soundEnabled, false);
@@ -622,6 +624,7 @@ test('reset clears an explicit override equal to its default and detects represe
       targetId = f
         .call('targets.list', { ownerId: 'appdock' })
         .items.find((target) => target.category === 'general').targetId;
+    if (device) f.store.setHostPageLocalSettings('general', true, f.store.revision);
     const stale = f.request([{ kind: 'reset', keys: ['soundEnabled'] }], { targetId });
     const file = device ? f.store.device.file : f.store.file;
     const sharedBefore = device ? fs.readFileSync(f.store.shared.file, 'utf8') : null;

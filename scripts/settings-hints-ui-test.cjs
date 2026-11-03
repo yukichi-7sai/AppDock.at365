@@ -1366,22 +1366,11 @@ async function checkSectionTitles() {
     }
     checks.push('light/dark at 1280/760 with hints ON/OFF; preference remains accessible');
     await stop();
-    assert.equal(
-      JSON.parse(
-        fs.readFileSync(
-          require('./test-settings.cjs').file(
-            profile,
-            `settings-${require('node:os').hostname()}.json`,
-          ),
-        ),
-      ).host.showHints,
-      false,
-    );
-    assert.notEqual(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')))
-        .host.showHints,
-      false,
-    );
+    const shared = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile)));
+    assert.equal(shared.host.showHints, false);
+    const deviceFile = require('./test-settings.cjs').file(profile, 'settings-' + require('node:os').hostname() + '.json');
+    const device = JSON.parse(fs.readFileSync(deviceFile));
+    assert.deepEqual(device.hostPages.appearance, { useLocalSettings: false });
     await launch();
     await appearance();
     assert.equal((await snapshot()).settings.value.host.showHints, false);

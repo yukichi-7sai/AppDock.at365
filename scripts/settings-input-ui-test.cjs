@@ -123,7 +123,7 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
         .click();
       await page.getByRole('heading', { level: 1, name, exact: true }).waitFor();
     };
-    async function pending(input, text, read, readStorage = disk) {
+    async function pending(input, text, read) {
       const before = read(await saved());
       const revision = (await snapshot()).settings.revision;
       await input.fill(text);
@@ -131,7 +131,7 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
       await settleSettings(page);
       assert.equal(await input.inputValue(), text);
       assert.deepEqual(read(await saved()), before, 'typing does not change runtime settings');
-      assert.deepEqual(read(readStorage()), before, 'typing does not change persisted settings');
+      assert.deepEqual(read(disk()), before, 'typing does not change persisted settings');
       assert.equal((await snapshot()).settings.revision, revision);
       return before;
     }
@@ -352,20 +352,17 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
     await page.getByRole('switch', { name: '通知の声に共通設定を使う', exact: true }).click();
     await settleSettings(page);
     const voice = page.getByLabel('通知用のボイスID', { exact: true });
-    const deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`);
-    const notificationStorage = () => JSON.parse(fs.readFileSync(deviceFile, 'utf8')).hostPages.notifications.configuration;
     const originalVoice = await pending(
       voice,
       'unconfirmed-voice',
       (s) => s.notificationPreferences?.speech?.voice,
-      notificationStorage,
     );
     await voice.press('Escape');
     assert.equal(await voice.inputValue(), originalVoice ?? '');
     await voice.fill('confirmed-voice');
     await voice.press('Enter');
     await settleSettings(page);
-    assert.equal(notificationStorage().notificationPreferences.speech.voice, 'confirmed-voice');
+    assert.equal(disk().notificationPreferences.speech.voice, 'confirmed-voice');
     checks.push('editable voice combobox defers direct text and supports Escape/Enter');
 
     const search = page.getByLabel('設定を検索', { exact: true });
