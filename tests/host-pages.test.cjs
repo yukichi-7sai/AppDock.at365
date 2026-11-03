@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { HostPages } = require('../out/main/main/core/host-pages');
+const { LibraryReadCancelled } = require('../out/main/main/core/registered-assets');
 const { LogPageSession } = require('../out/main/main/core/log-page');
 function fixture() {
   let route = 'image-library',
@@ -102,6 +103,27 @@ test('modal operations are blocked while scoped image requests may finish', asyn
   );
   assert.throws(() => f.pages.open({ ...gallery(), kind: 'unknown' }), /Invalid/);
   assert.throws(() => f.pages.open({ id: 'retired', kind: 'home', route: 'home' }), /Invalid/);
+});
+test('closing a library cancels its display requests but preserves read failures and edit guards', async () => {
+  const f = fixture();
+  const image = { id: 'gallery-1', type: 'gallery', command: 'image', assetId: 'a', edge: 64 };
+  f.pages.open(gallery());
+  const old = f.created[0];
+  const read = Promise.withResolvers();
+  const conflict = Promise.withResolvers();
+  old.act = () => read.promise;
+  const closing = f.pages.act(image);
+  old.act = () => conflict.promise;
+  const genuine = f.pages.act(image);
+  f.pages.open(gallery('gallery-2'));
+  read.reject(new LibraryReadCancelled());
+  conflict.reject(Error('original changed'));
+  assert.deepEqual(await closing, { pageClosed: true });
+  await assert.rejects(genuine, /original changed/);
+  for (const command of ['image', 'more', 'anchor'])
+    assert.deepEqual(await f.pages.act({ ...image, command }), { pageClosed: true });
+  await assert.rejects(f.pages.act({ ...image, command: 'dialog', kind: 'delete-image' }), /stale/);
+  assert.equal(f.pages.get().id, 'gallery-2');
 });
 test('updating the log source preserves search and level filters', async () => {
   const request = {

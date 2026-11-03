@@ -2,6 +2,7 @@ import type { LibraryRef } from '../../shared/library-assets';
 import type { LibraryPlayback } from '../../shared/registered-images';
 import { libraryText } from '../../shared/library-text';
 import type { RegisteredSoundLibrary } from './registered-sound-library';
+import { LibraryReadCancelled } from './registered-assets';
 import { audioPlayback } from './audio-service';
 import { decodeRegisteredImage } from './registered-image-decoder';
 
@@ -90,10 +91,10 @@ export class SoundGallery {
   session() {
     let live = true;
     const get = async (ref: LibraryRef, generation?: string) => {
-      if (!live) throw Error('Closed sound view');
+      if (!live) throw new LibraryReadCancelled('Closed sound view');
       await this.files.read(ref, generation, { active: () => live, cachePreview: false });
       const source = await thumbnail();
-      if (!live) throw Error('Closed sound view');
+      if (!live) throw new LibraryReadCancelled('Closed sound view');
       return source;
     };
     return {

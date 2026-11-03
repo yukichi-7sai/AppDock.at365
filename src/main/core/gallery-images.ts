@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import type { RegisteredImages } from './registered-images';
+import { LibraryReadCancelled } from './registered-assets';
 import { imageKey, type RegisteredImageRef } from '../../shared/registered-images';
 import { decodeRegisteredImage } from './registered-image-decoder';
 
@@ -29,7 +30,7 @@ export class GalleryImages {
   session(): GalleryImageSession {
     const owner: Owner = { live: true, keys: new Set() };
     const check = () => {
-      if (!owner.live) throw Error(hostText('services.galleryImages.changed'));
+      if (!owner.live) throw new LibraryReadCancelled(hostText('services.galleryImages.changed'));
     };
     return {
       get: async (ref, generation, edge) => {
@@ -132,7 +133,7 @@ export class GalleryImages {
     const owners = new Set([owner]);
     const active = () => [...owners].some((value) => value.live);
     const check = () => {
-      if (!active()) throw Error(hostText('services.galleryImages.changed'));
+      if (!active()) throw new LibraryReadCancelled(hostText('services.galleryImages.changed'));
     };
     const task = this.queue
       .then(async () => {

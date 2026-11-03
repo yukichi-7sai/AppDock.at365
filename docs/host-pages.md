@@ -52,6 +52,8 @@ src/shared/host-pages.tsが本体専用の要求・モデル・操作型を定�
 
 本体ダイアログまたは共通オーバーレイの表示中はページの変更操作を拒否する。画像取得と、表示中セッションに属する画像ID・有限offsetの最終スクロール記録だけは継続できる。画像プレビュー・グループ編集は本体の共通ダイアログを使い、背景クリック・Escape・フォーカス復帰を共通管理する。
 
+ライブラリーを離れると、旧ページのサムネイル取得・スクロール位置報告・追加表示の要求を取り消す。取り消した要求は本体のエラーログに記録せず、次のページにも反映しない。実際のファイル変更や読み込み失敗、旧ページからの編集・削除要求は従来どおりエラーを返す。
+
 ## ページ別の表示・操作
 
 - ログは起動後の直近500件、source・種類・レベル・文字検索、保存先を開く操作を持つ。初期表示・debugと監査の分類・記録と表示の関係は[ログ仕様](logging.md)を正本とする。Applet管理からは全体ログへsourceを指定して移動し、解除して全体へ戻れる。source更新時も他の検索条件を保つ。
@@ -67,3 +69,5 @@ src/shared/host-pages.tsが本体専用の要求・モデル・操作型を定�
 旧ページShellの割り当ては保存したまま使わず、選択UI・状態取得・起動・再試行へ含めない。設定・画像・グループ・通知履歴の自動変換・削除は行わない。既存の追加Shellによるページの差し替えは提供しない。
 
 tests/host-pages.test.cjsとlog-page/image-gallery/notification-centerの単体回帰、scripts/host-pages-ui-test.cjs・image-gallery-ui-test.cjs・image-library-session-ui-test.cjs・notification-center-ui-test.cjsを使用する。固定EXEで3ページが本体documentに表示されること、起動・復元・戻り先、旧指定が不活性なこと、テーマ・サイズ・zoom・フォーカス・ダイアログ・通常Appletとの合成を確認する。検証結果はVERIFICATIONへ記録する。
+
+`scripts/library-navigation-ui-test.cjs [固定EXE]` は、画像・音の読み込み中にページを離れた場合と、表示中に原画像を差し替えた場合の要求結果・本体ログを確認する。

@@ -183,7 +183,13 @@ const api: DockApi = {
   pages: {
     open: (request) => ipcRenderer.invoke('dock:pages:open', request),
     get: (id) => ipcRenderer.invoke('dock:pages:get', id),
-    act: (action) => ipcRenderer.invoke('dock:pages:act', action),
+    act: async (action) => {
+      const result = await ipcRenderer.invoke('dock:pages:act', action);
+      // Keep cancelled requests rejected in the renderer without reporting an IPC failure.
+      if (action.type === 'gallery' && result?.pageClosed)
+        throw Error('Host page connection is stale');
+      return result;
+    },
     close: (id) => ipcRenderer.invoke('dock:pages:close', id),
     onChanged: (callback) => {
       const handler = (

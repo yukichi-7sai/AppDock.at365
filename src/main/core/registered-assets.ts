@@ -53,6 +53,8 @@ interface ReadAsset {
   generation: string;
   thumbnail: string;
 }
+/** A requesting view no longer needs the bytes. The file itself may still be current. */
+export class LibraryReadCancelled extends Error {}
 export class RegisteredAssets {
   private entries = new Map<string, AssetRecord>();
   folders: string[] = [''];
@@ -187,7 +189,8 @@ export class RegisteredAssets {
       cachePreview: options.cachePreview !== false,
     };
     const checkInterest = () => {
-      if (!interest.active()) throw Error(this.text('services.registeredImages.changed'));
+      if (!interest.active())
+        throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
     };
     checkInterest();
     await this.refresh(false, [ref.file]);
@@ -209,8 +212,8 @@ export class RegisteredAssets {
     const interests = new Set([interest]);
     const active = () => [...interests].some((value) => value.active());
     const check = () => {
-      if (!active() || !this.current(record))
-        throw Error(this.text('services.registeredImages.changed'));
+      if (!active()) throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
+      if (!this.current(record)) throw Error(this.text('services.registeredImages.changed'));
     };
     const run = async (): Promise<ReadAsset> => {
       check();

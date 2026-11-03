@@ -30,6 +30,7 @@ import {
 import { libraryGallerySize, validGalleryWidth } from '../../shared/image-gallery';
 import type { ImageLibraryHost } from './image-library-host';
 import type { GalleryImages } from './gallery-images';
+import { LibraryReadCancelled } from './registered-assets';
 import type { GalleryViewStateStore } from './gallery-view-state';
 import type { ImageLibraryDialogs } from './image-library-dialogs';
 
@@ -364,8 +365,9 @@ export class ImageLibraryPageSession implements HostPageController {
         value.entry.generation,
         action.edge,
       );
+      if (this.closed) throw new LibraryReadCancelled('Stale image');
       this.catalogue();
-      if (this.closed || ![...this.items.values()].some((v) => v.assetId === action.assetId))
+      if (![...this.items.values()].some((v) => v.assetId === action.assetId))
         throw Error('Stale image');
       return result;
     }

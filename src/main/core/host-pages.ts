@@ -1,5 +1,6 @@
 import type { HostPageAction, HostPageModel, HostPageRequest } from '../../shared/host-pages';
 import type { HostPageController } from './host-page-controller';
+import { LibraryReadCancelled } from './registered-assets';
 
 /** One host-rendered page. There are no provider bindings or native child views. */
 export class HostPages {
@@ -52,18 +53,24 @@ export class HostPages {
   }
   async act(action: HostPageAction) {
     const current = this.current;
-    if (
-      !current ||
-      !action ||
-      action.id !== current.id ||
-      current.route !== this.options.route() ||
-      !this.options.ready()
-    )
+    if (!action?.id) throw Error('Host page connection is stale');
+    const displayRequest =
+      action.type === 'gallery' && ['image', 'anchor', 'more'].includes(action.command);
+    const connected = () => current === this.current && current?.route === this.options.route();
+    if (!current || action.id !== current.id || !connected()) {
+      if (displayRequest) return { pageClosed: true };
       throw Error('Host page connection is stale');
+    }
+    if (!this.options.ready()) throw Error('Host page connection is stale');
     if (this.options.blocked() && !current.passive?.(action))
       throw Error('Close the dialog before operating the page');
     try {
-      return await current.act(action);
+      const result = await current.act(action);
+      return displayRequest && !connected() ? { pageClosed: true } : result;
+    } catch (error) {
+      if (displayRequest && error instanceof LibraryReadCancelled && !connected())
+        return { pageClosed: true };
+      throw error;
     } finally {
       if (this.current === current) this.refresh();
     }
