@@ -683,7 +683,8 @@ const appletManagement = new AppletManagement({
     pageCollections.reconcile();
     await manager.reconcile();
   },
-  restart: (id) => (pageCollections.find(id) ? pageCollections.restart(id) : manager.restart(id)),
+  restart: (id, immediate) =>
+    pageCollections.find(id) ? pageCollections.restart(id) : manager.restart(id, immediate),
 });
 const settingsCommands = new SettingsCommands({
   settings,
@@ -2574,7 +2575,18 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     };
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner)!;
+    const commands = !page.collection
+      ? settingsUiCommands().filter((command) => command.extensionId === a.id)
+      : [];
     return {
+      appletStats: !page.collection
+        ? {
+            commandCount: new Set(commands.map((command) => command.id)).size,
+            availableCommandCount: new Set(
+              commands.filter((command) => command.available).map((command) => command.id),
+            ).size,
+          }
+        : undefined,
       appletManagement: !page.collection
         ? {
             assignments: { shortcuts: [], gestures: [] },
@@ -2814,11 +2826,47 @@ function settingsPageActions(
       target(id);
       assertSettingsWritable();
       if (updater.state.busy) throw Error(hostText('settings.index.packageBusy'));
-      if (
-        !(appletPage ? ['restart'] : ['enable', 'disable', 'restart']).includes(operation as string)
-      )
+      if (!['enable', 'disable', 'restart'].includes(operation as string))
         throw Error(hostText('settings.index.invalidAction'));
       return appletManagement.run(id as string, operation as 'enable' | 'disable' | 'restart');
+    };
+    actions.startAppletNow = async ([id]) => {
+      target(id);
+      assertSettingsWritable();
+      if (updater.state.busy) throw Error(hostText('settings.index.packageBusy'));
+      return appletManagement.start(id as string);
+    };
+    actions.openAppletDestination = async ([id, destination]) => {
+      const a = target(id);
+      const destinations = appletPage
+        ? ['command-triggers']
+        : ['settings', 'command-triggers', 'shortcuts', 'gestures', 'logs'];
+      if (!destinations.includes(destination as string))
+        throw Error(hostText('settings.index.invalidDestination'));
+      await flushSettingsInputs();
+      target(id);
+      if (destination === 'logs') {
+        await navigation.navigate('logs', undefined, a.id);
+      } else {
+        const s = settingsEditing.snapshot();
+        await settingsEditing.act({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: randomUUID(),
+          action: {
+            type: 'select-page',
+            pageId: destination === 'settings' ? appletSettingsPageId(a.id) : 'command-triggers',
+          },
+        });
+        settingsNavigation.provider =
+          destination === 'settings'
+            ? undefined
+            : { id: a.id, page: 'command-triggers', request: Date.now() };
+        settingsNavigation.commandTarget = undefined;
+        settingsNavigation.move = undefined;
+        navigation.recordSettings();
+        changed();
+      }
     };
     actions.prepareAppletUninstall = async ([id]) => {
       const a = target(id);
@@ -2847,54 +2895,11 @@ function settingsPageActions(
       await flushSettingsInputs();
       await navigation.navigate('logs', undefined, '');
     };
-    const target = (value: unknown) => {
-      const found = managedApplets(allApplets()).find((a) => a.id === value);
-      if (!found) throw Error(hostText('settings.index.missingApplet'));
-      return found;
-    };
-    actions.startAppletNow = async ([id]) => {
-      if (target(id).state !== 'waiting' || updater.state.busy)
-        throw Error(hostText('settings.index.missingScheduledApplet'));
-      return manager.restart(id as string, true);
-    };
     actions.reorderApplets = async ([ordered, original]) => {
       assertSettingsWritable();
       const value = settings.value;
       const appletOrder = reorderManagedApplets(allApplets(), value.appletOrder, ordered, original);
       return settings.save({ ...value, appletOrder }, settings.revision);
-    };
-    actions.openAppletDestination = async ([id, destination]) => {
-      const a = target(id);
-      if (
-        !['settings', 'command-triggers', 'shortcuts', 'gestures', 'logs'].includes(
-          destination as string,
-        )
-      )
-        throw Error(hostText('settings.index.invalidDestination'));
-      await flushSettingsInputs();
-      target(id);
-      if (destination === 'logs') {
-        await navigation.navigate('logs', undefined, a.id);
-      } else {
-        const s = settingsEditing.snapshot();
-        await settingsEditing.act({
-          sessionId: s.sessionId,
-          editRevision: s.editRevision,
-          operationId: randomUUID(),
-          action: {
-            type: 'select-page',
-            pageId: destination === 'settings' ? appletSettingsPageId(a.id) : 'command-triggers',
-          },
-        });
-        settingsNavigation.provider =
-          destination === 'settings'
-            ? undefined
-            : { id: a.id, page: 'command-triggers', request: Date.now() };
-        settingsNavigation.commandTarget = undefined;
-        settingsNavigation.move = undefined;
-        navigation.recordSettings();
-        changed();
-      }
     };
     actions.prepareAppletInstall = async ([url]): Promise<AppletPackagePreviewResult> => {
       try {

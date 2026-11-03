@@ -19,6 +19,7 @@ import { Icon } from '../../shared/ui-icons';
 import './about.css';
 import { HostStartupTimingPanel } from './HostStartupTimingPanel';
 import { SettingsAppIdentity } from '../settings-ui/SettingsAppIdentity';
+import { SettingsStatistic } from '../settings-ui/SettingsStatistic';
 
 export function AboutInformationPanel({
   settings,
@@ -28,6 +29,7 @@ export function AboutInformationPanel({
   version,
   busy,
   openApplets,
+  openCommands,
 }: {
   settings: Settings;
   extensions: ExtensionSnapshot[];
@@ -36,10 +38,10 @@ export function AboutInformationPanel({
   version: string;
   busy: boolean;
   openApplets(): void;
+  openCommands(): void;
 }) {
   const { t: translate, language } = useHostTranslation();
   const headingId = useId();
-  const appletCountId = useId();
   const updates = useUpdateState();
   const controls = useSettingsControls();
   const [checking, setChecking] = useState(false);
@@ -97,36 +99,24 @@ export function AboutInformationPanel({
           <UpdateCheckTime checkedAt={hostUpdate?.checkedAt} />
         </SettingsAppIdentity>
         <div className="about-statistics">
-          <button
-            type="button"
-            className="about-applet-link"
-            aria-label={translate('settings.aboutSettings.applets')}
-            aria-describedby={appletCountId}
+          <SettingsStatistic
+            label="Applet"
+            count={applets.length}
+            detail={translate('settings.aboutSettings.running', { count: count(running) })}
+            testId="about-applet-count"
+            title={translate('settings.aboutSettings.applets')}
             onClick={openApplets}
-          >
-            <span className="about-statistic-label">Applet</span>
-            <span
-              id={appletCountId}
-              className="about-statistic-count"
-              data-testid="about-applet-count"
-            >
-              {count(applets.length)}
-            </span>
-            <small>{translate('settings.aboutSettings.running', { count: count(running) })}</small>
-          </button>
-          <div className="about-statistic">
-            <span className="about-statistic-label">
-              {translate('settings.aboutSettings.commands')}
-            </span>
-            <span className="about-statistic-count" data-testid="about-command-count">
-              {count(stats?.commandCount)}
-            </span>
-            <small>
-              {translate('settings.aboutSettings.available', {
-                count: count(stats?.availableCommandCount),
-              })}
-            </small>
-          </div>
+          />
+          <SettingsStatistic
+            label={translate('settings.aboutSettings.commands')}
+            count={stats?.commandCount}
+            detail={translate('settings.aboutSettings.available', {
+              count: count(stats?.availableCommandCount),
+            })}
+            testId="about-command-count"
+            title={translate('settings.aboutSettings.openCommands')}
+            onClick={openCommands}
+          />
         </div>
       </div>
       <div className="about-environment" {...settingAnchor('about', 'runtime')}>

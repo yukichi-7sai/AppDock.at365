@@ -88,7 +88,10 @@ async function until(fn, label) {
         updateSource: base + '/' + id + '.json',
       };
     }
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(initial),
+    );
     const portable = !!process.argv[2],
       executablePath = portable ? testHostPath(profile) : require('electron');
     if (portable) {
@@ -422,6 +425,75 @@ async function until(fn, label) {
     await page.getByRole('heading', { name: 'Applet管理', exact: true, level: 1 }).waitFor();
     await page.getByTestId('settings-nav:about').click();
     await overview.waitFor();
+    const savedBeforeNavigation = (await snapshot()).settings.value;
+    const commandTile = overview.getByRole('button', {
+      name: 'コマンドトリガーを設定',
+      exact: true,
+    });
+    const commandList = page.getByTestId('command-triggers-list');
+    const assertAllCommands = async () => {
+      await commandList.waitFor();
+      await until(
+        async () =>
+          (await page.getByTestId('command-trigger-tab:commands').getAttribute('aria-pressed')) ===
+          'true',
+        'command list tab selected',
+      );
+      const expected = [
+        ...new Set((await model()).content.auxiliary.commands.map((c) => c.id)),
+      ].sort();
+      await until(
+        async () =>
+          (await commandList.locator('[data-shortcut-command]').count()) === expected.length,
+        'all commands rendered',
+      );
+      assert.deepEqual(
+        await commandList
+          .locator('[data-shortcut-command]')
+          .evaluateAll((elements) =>
+            elements.map((element) => element.dataset.shortcutCommand).sort(),
+          ),
+        expected,
+      );
+      assert.equal(await commandList.locator('[data-filter-kind]').count(), 0);
+      assert.equal(await commandList.getByRole('searchbox').inputValue(), '');
+      for (const name of ['カテゴリで絞り込み', 'トリガーの絞り込み'])
+        assert.equal(
+          await commandList.getByRole('combobox', { name, exact: true }).inputValue(),
+          'all',
+        );
+      for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])
+        assert.equal(
+          await page.getByTestId(`command-trigger-filter:${kind}`).getAttribute('aria-pressed'),
+          'true',
+        );
+    };
+    await commandTile.click();
+    await assertAllCommands();
+    await page.getByTestId('settings-nav:applet:fixture.about.a').click();
+    await page
+      .getByRole('button', { name: 'このAppletのコマンドトリガーを設定', exact: true })
+      .click();
+    await commandList.locator('[data-filter-kind="provider"]').waitFor();
+    await commandList.getByRole('searchbox').fill('previous filter');
+    await commandList
+      .getByRole('combobox', { name: 'トリガーの絞り込み', exact: true })
+      .selectOption('assigned');
+    await commandList
+      .getByRole('combobox', { name: 'カテゴリで絞り込み', exact: true })
+      .selectOption({ index: 1 });
+    await page.getByTestId('command-trigger-filter:touchpad-gestures').click();
+    await page.getByTestId('command-trigger-tab:gestures').click();
+    await page.getByTestId('settings-nav:about').click();
+    await commandTile.focus();
+    await commandTile.press('Enter');
+    await assertAllCommands();
+    assert.deepEqual((await snapshot()).settings.value, savedBeforeNavigation);
+    checks.push(
+      'About command count opens all commands by click and Enter, clearing previous Applet/search/status/category/kinds and tab without changing settings',
+    );
+    await page.getByTestId('settings-nav:about').click();
+    await overview.waitFor();
     for (const theme of ['light', 'dark']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -434,13 +506,13 @@ async function until(fn, label) {
         () => page.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
         'theme',
       );
-      for (const width of [1280, 900, 760, 600]) {
+      for (const width of [1720, 1280, 900, 760, 600]) {
         await app.evaluate(({ BrowserWindow }, width) => {
           const w = BrowserWindow.getAllWindows().find((w) =>
             w.webContents.getURL().startsWith('appdock://host/'),
           );
           w.setMinimumSize(600, 600);
-          w.setSize(width, 1000);
+          w.setSize(width, width === 900 ? 620 : 1000);
         }, width);
         await until(() => page.evaluate((width) => innerWidth === width, width), 'window width');
         await page.locator('.settings-body').evaluate((e) => {
@@ -503,7 +575,7 @@ async function until(fn, label) {
       }
     }
     checks.push(
-      'Applet management link and real light/dark widths 1280/900/760/600 fit without horizontal page overflow',
+      'Applet management link and real light/dark widths 1720/1280/900/760/600, including minimum 900x620, fit without horizontal page overflow',
     );
     assert.deepEqual(errors, []);
     success = true;

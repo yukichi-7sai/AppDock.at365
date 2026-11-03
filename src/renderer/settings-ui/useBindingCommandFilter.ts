@@ -39,6 +39,10 @@ export function useBindingCommandFilter(
     if (provider?.request !== undefined) {
       setLocalProvider(null);
       providerFocus.current = null;
+      setFilter('');
+      setStatusFilter('all');
+      setInputFilter(null);
+      inputFocus.current = null;
     }
   }, [provider?.request]);
   const selectInput = (input: BindingInputFilter, trigger: HTMLButtonElement) => {

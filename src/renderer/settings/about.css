@@ -11,48 +11,6 @@
   gap: 10px;
   margin: 0;
 }
-.about-statistics > :is(div, button) {
-  padding: 16px 18px;
-  border: 1px solid transparent;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--panel) 72%, transparent);
-}
-.about-statistic-label {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-}
-.about-statistic-count {
-  display: block;
-  margin: 7px 0 4px;
-  color: var(--text);
-  font-size: 30px;
-  line-height: 1.15;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-.about-applet-link {
-  display: block;
-  width: 100%;
-  line-height: inherit;
-  text-align: left;
-  color: var(--text);
-}
-.about-statistics .about-applet-link:hover {
-  background: var(--accent-soft);
-  border-color: var(--border);
-}
-.about-applet-link:focus-visible {
-  outline: 2px solid var(--accent-focus);
-  outline-offset: 2px;
-}
-.about-statistics small {
-  display: block;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 400;
-}
 .about-environment {
   margin-top: 26px;
   padding-top: 22px;
@@ -125,10 +83,5 @@
   .about-runtime {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
-  }
-}
-@container settings-page (max-width: 360px) {
-  .about-statistics > :is(div, button) {
-    padding: 13px;
   }
 }

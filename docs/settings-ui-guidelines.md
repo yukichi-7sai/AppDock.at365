@@ -30,6 +30,8 @@
 
 本体とAppletの情報パネルの名前・アイコン・キャッチコピー・バージョンは`SettingsAppIdentity`を共用し、同じ文字サイズ・配色・余白・狭幅での配置を使う。情報パネルの外枠に影を付けない。Appletごとに装飾を複製しない。
 
+情報パネルの件数は`SettingsStatistic`で表示する。Appletの提供コマンド数は右上に置き、狭幅では名前の下の右側へ配置する。件数からの移動と開始・停止ボタンの契約は[Applet管理](applet-management-settings-design.md#個別設定の情報パネル)を参照する。
+
 - 現在の設定値や状態、説明・補足情報は、必要に応じてレイアウト部品の `description`・`hint` へ渡す。
 - `description`・`hint` は、次の基準で使い分ける。
 

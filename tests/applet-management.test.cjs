@@ -18,6 +18,8 @@ function fixture(t) {
   settings.updateExtension('test.provider', { enabled: true, settings: { retained: 7 } });
   let state = 'running',
     restarts = 0,
+    immediate,
+    reconcileState,
     finish;
   const applets = () => [
     {
@@ -35,11 +37,13 @@ function fixture(t) {
     applets,
     ready: () => true,
     reconcile: async () => {
-      state = applets()[0].enabled ? 'running' : 'stopped';
+      state = applets()[0].enabled ? (reconcileState ?? 'running') : 'stopped';
     },
-    restart: async () => {
+    restart: async (_id, now) => {
       restarts++;
+      immediate = now;
       if (finish) await finish;
+      state = 'running';
     },
   });
   return {
@@ -49,8 +53,61 @@ function fixture(t) {
     dir,
     restarts: () => restarts,
     hold: (p) => (finish = p),
+    state: (value) => (state = value),
+    afterEnable: (value) => (reconcileState = value),
+    immediate: () => immediate,
   };
 }
+test('explicit start enables persistently, starts delayed Applets immediately and preserves their configuration', async (t) => {
+  const f = fixture(t);
+  await f.management.run('test.provider', 'disable');
+  f.afterEnable('waiting');
+  const result = await f.management.start('test.provider');
+  assert.equal(result.applet.state, 'running');
+  assert.equal(result.applet.enabled, true);
+  assert.equal(f.immediate(), true);
+  assert.equal(f.restarts(), 1);
+  assert.equal(f.settings.value.extensions['test.provider'].settings.retained, 7);
+  const revision = f.settings.revision;
+  await f.management.start('test.provider');
+  assert.equal(f.settings.revision, revision);
+  assert.equal(f.restarts(), 1, 'starting an already running Applet is idempotent');
+});
+test('explicit start retries enabled errors and waiting/stopped Applets without rewriting enabled', async (t) => {
+  const f = fixture(t),
+    revision = f.settings.revision;
+  for (const state of ['error', 'waiting', 'stopped']) {
+    f.state(state);
+    assert.equal((await f.management.start('test.provider')).applet.state, 'running');
+    assert.equal(f.immediate(), true);
+    assert.equal(f.settings.revision, revision);
+  }
+  assert.equal(f.restarts(), 3);
+});
+test('a newly enabled Applet failing activation reports the failure without automatically retrying', async (t) => {
+  const f = fixture(t);
+  await f.management.run('test.provider', 'disable');
+  f.afterEnable('error');
+  await assert.rejects(f.management.start('test.provider'), { code: 'LIFECYCLE_FAILED' });
+  assert.equal(f.restarts(), 0);
+  assert.equal(f.settings.value.extensions['test.provider'].enabled, true);
+});
+test('explicit start shares the lifecycle busy guard and rejects unsettled state', async (t) => {
+  const f = fixture(t);
+  for (const state of ['starting', 'stopping']) {
+    f.state(state);
+    await assert.rejects(f.management.start('test.provider'), { code: 'BUSY' });
+  }
+  f.state('waiting');
+  let release;
+  f.hold(new Promise((resolve) => (release = resolve)));
+  const start = f.management.start('test.provider');
+  await assert.rejects(f.management.start('test.provider'), { code: 'BUSY' });
+  await assert.rejects(f.management.run('test.provider', 'disable'), { code: 'BUSY' });
+  release();
+  await start;
+  assert.equal(f.restarts(), 1);
+});
 test('enable/disable persist and preserve settings; redundant changes and restart do not save', async (t) => {
   const f = fixture(t),
     revision = f.settings.revision;

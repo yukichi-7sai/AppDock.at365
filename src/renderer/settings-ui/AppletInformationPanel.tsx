@@ -18,6 +18,7 @@ import {
 } from './VersionCheck';
 import './applet-information.css';
 import { SettingsAppIdentity } from './SettingsAppIdentity';
+import { SettingsStatistic } from './SettingsStatistic';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import type { AppletPackagePlan } from '../../shared/applet-packages';
 import { AppletUninstallDialog, type AppletActionInvoker } from './AppletPackageDialogs';
@@ -29,6 +30,7 @@ export function AppletInformationPanel({
   busy = false,
   headingLevel = 2,
   management,
+  stats,
   invoke,
 }: {
   applet: ExtensionSnapshot;
@@ -36,9 +38,10 @@ export function AppletInformationPanel({
   busy?: boolean;
   headingLevel?: 1 | 2;
   management: SettingsPageAuxiliary['appletManagement'];
+  stats?: SettingsPageAuxiliary['appletStats'];
   invoke: AppletActionInvoker;
 }) {
-  const { t } = useHostTranslation();
+  const { t, language } = useHostTranslation();
   const headingId = useId();
   const controls = useSettingsControls();
   const updates = useUpdateState();
@@ -47,7 +50,9 @@ export function AppletInformationPanel({
   const [errorTarget, setErrorTarget] = useState('');
   const pending = useRef(false);
   const openingRepository = useRef(false);
-  const [operation, setOperation] = useState<'restart' | 'uninstall'>();
+  const removalOpener = useRef<HTMLButtonElement | null>(null);
+  type Operation = 'start' | 'stop' | 'restart' | 'uninstall' | 'commands';
+  const [operation, setOperation] = useState<Operation>();
   const [removal, setRemoval] = useState<AppletPackagePlan>();
   const changing =
     busy ||
@@ -56,14 +61,36 @@ export function AppletInformationPanel({
     !!management?.busy ||
     updates.busy ||
     ['starting', 'stopping'].includes(applet.state);
-  const run = async (kind: 'restart' | 'uninstall') => {
+  const stop = operation === 'stop' || applet.state === 'running' || applet.state === 'stopping';
+  const lifecycleLabel =
+    operation === 'start' || applet.state === 'starting'
+      ? t('settings.appletInformation.starting')
+      : operation === 'stop' || applet.state === 'stopping'
+        ? t('settings.appletInformation.stopping')
+        : stop
+          ? t('settings.appletInformation.stop')
+          : applet.state === 'waiting'
+            ? t('settings.appletManagementSettings.start')
+            : t('settings.appletInformation.start');
+  const commandsLabel = t('settings.appletInformation.openCommands');
+  const run = async (kind: Operation) => {
     if (pending.current) return;
     pending.current = true;
     setOperation(kind);
     setError('');
-    setErrorTarget(t(`settings.appletManagementSettings.${kind}`));
+    setErrorTarget(
+      kind === 'commands'
+        ? commandsLabel
+        : kind === 'start' || kind === 'stop'
+          ? lifecycleLabel
+          : t(`settings.appletManagementSettings.${kind}`),
+    );
     try {
       if (kind === 'restart') await invoke('manageApplet', [applet.id, 'restart']);
+      else if (kind === 'start') await invoke('startAppletNow', [applet.id]);
+      else if (kind === 'stop') await invoke('manageApplet', [applet.id, 'disable']);
+      else if (kind === 'commands')
+        await invoke('openAppletDestination', [applet.id, 'command-triggers']);
       else setRemoval(await invoke('prepareAppletUninstall', [applet.id]));
     } catch (reason) {
       setError(updateError(reason));
@@ -98,60 +125,74 @@ export function AppletInformationPanel({
       data-testid="applet-information"
       {...settingAnchor(appletSettingsPageId(applet.id), 'information')}
     >
-      <SettingsAppIdentity
-        icon={
-          <span
-            className="about-app-icon applet-identity-icon"
-            aria-hidden="true"
-            data-testid="applet-identity-icon"
-            data-icon={applet.icon ?? 'extensions'}
-          >
-            <Icon name={applet.icon ?? 'extensions'} size={48} />
-          </span>
-        }
-        name={applet.displayName}
-        tagline={applet.tagline?.trim()}
-        headingId={headingId}
-        headingLevel={headingLevel}
-        status={
-          <span className="applet-information-state" data-testid="applet-information-state">
-            <span className={`state ${applet.state}`}>
-              {t(`settings.appletManagementSettings.${applet.state}`)}
+      <div className="applet-information-top">
+        <SettingsAppIdentity
+          icon={
+            <span
+              className="about-app-icon applet-identity-icon"
+              aria-hidden="true"
+              data-testid="applet-identity-icon"
+              data-icon={applet.icon ?? 'extensions'}
+            >
+              <Icon name={applet.icon ?? 'extensions'} size={48} />
             </span>
-          </span>
-        }
-      >
-        <VersionDisplay version={applet.version} result={result} />
-        <SettingsButton
-          icon
-          className="about-update-check"
-          title={checkLabel}
-          aria-label={checkLabel}
-          disabled={changing || !source}
-          pending={checking}
-          onClick={() => {
-            if (pending.current) return;
-            pending.current = true;
-            setError('');
-            setErrorTarget(checkLabel);
-            setChecking(true);
-            void controls
-              .checkUpdates(applet.id)
-              .then((checked) => {
-                if (checked.status === 'error')
-                  setError(checked.message ?? t('settings.versionCheck.failed'));
-              })
-              .catch((reason) => setError(updateError(reason)))
-              .finally(() => {
-                pending.current = false;
-                setChecking(false);
-              });
-          }}
+          }
+          name={applet.displayName}
+          tagline={applet.tagline?.trim()}
+          headingId={headingId}
+          headingLevel={headingLevel}
+          status={
+            <span className="applet-information-state" data-testid="applet-information-state">
+              <span className={`state ${applet.state}`}>
+                {t(`settings.appletManagementSettings.${applet.state}`)}
+              </span>
+            </span>
+          }
         >
-          <Icon name="refresh" size={16} />
-        </SettingsButton>
-        {source && <UpdateCheckTime checkedAt={result?.checkedAt} />}
-      </SettingsAppIdentity>
+          <VersionDisplay version={applet.version} result={result} />
+          <SettingsButton
+            icon
+            className="about-update-check"
+            title={checkLabel}
+            aria-label={checkLabel}
+            disabled={changing || !source}
+            pending={checking}
+            onClick={() => {
+              if (pending.current) return;
+              pending.current = true;
+              setError('');
+              setErrorTarget(checkLabel);
+              setChecking(true);
+              void controls
+                .checkUpdates(applet.id)
+                .then((checked) => {
+                  if (checked.status === 'error')
+                    setError(checked.message ?? t('settings.versionCheck.failed'));
+                })
+                .catch((reason) => setError(updateError(reason)))
+                .finally(() => {
+                  pending.current = false;
+                  setChecking(false);
+                });
+            }}
+          >
+            <Icon name="refresh" size={16} />
+          </SettingsButton>
+          {source && <UpdateCheckTime checkedAt={result?.checkedAt} />}
+        </SettingsAppIdentity>
+        <SettingsStatistic
+          label={t('settings.aboutSettings.commands')}
+          count={stats?.commandCount}
+          detail={t('settings.aboutSettings.available', {
+            count: stats
+              ? new Intl.NumberFormat(language).format(stats.availableCommandCount)
+              : '—',
+          })}
+          testId="applet-command-count"
+          title={commandsLabel}
+          onClick={() => void run('commands')}
+        />
+      </div>
       {description && (
         <p className="applet-information-description" data-testid="applet-description">
           <CommandText text={description} />
@@ -212,6 +253,18 @@ export function AppletInformationPanel({
           disabledReason={!source ? t('settings.versionCheck.noRepository') : undefined}
         />
         <SettingsButton
+          data-testid="applet-lifecycle"
+          title={t(
+            stop ? 'settings.appletInformation.stopHint' : 'settings.appletInformation.startHint',
+          )}
+          disabled={changing}
+          pending={operation === 'start' || operation === 'stop'}
+          onClick={() => void run(stop ? 'stop' : 'start')}
+        >
+          <Icon name={stop ? 'square' : 'play'} size={16} />
+          {lifecycleLabel}
+        </SettingsButton>
+        <SettingsButton
           disabled={changing || !applet.enabled}
           pending={operation === 'restart'}
           onClick={() => void run('restart')}
@@ -228,7 +281,10 @@ export function AppletInformationPanel({
           }
           disabled={changing || !management?.mutableIds.includes(applet.id)}
           pending={operation === 'uninstall'}
-          onClick={() => void run('uninstall')}
+          onClick={(event) => {
+            removalOpener.current = event.currentTarget;
+            void run('uninstall');
+          }}
         >
           <Icon name="trash" size={16} />
           {t('settings.appletManagementSettings.uninstall')}
@@ -238,6 +294,7 @@ export function AppletInformationPanel({
         <AppletUninstallDialog
           plan={removal}
           invoke={invoke}
+          returnFocus={removalOpener.current}
           onClose={() => setRemoval(undefined)}
         />
       )}

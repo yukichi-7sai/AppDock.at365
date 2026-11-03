@@ -77,9 +77,27 @@
   border-color: var(--destructive);
   background: transparent;
 }
+.applet-information-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+.applet-information-top > .settings-statistic {
+  flex: none;
+  width: auto;
+}
 @container settings-page (max-width: 660px) {
+  .applet-information-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
+  }
   .applet-information-metadata {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .applet-information-top > .settings-statistic {
+    align-self: flex-end;
   }
 }
 @media (max-width: 620px) {

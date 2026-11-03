@@ -119,6 +119,7 @@ export interface SettingsPageAuxiliary {
   launch?: HostSnapshot['launch'];
   runtime?: HostSnapshot['runtime'];
   aboutStats?: { commandCount: number; availableCommandCount: number };
+  appletStats?: { commandCount: number; availableCommandCount: number };
   hostStartupTiming?: import('./host-startup-timing').HostStartupTiming;
   version?: string;
   updates?: HostSnapshot['updates'];

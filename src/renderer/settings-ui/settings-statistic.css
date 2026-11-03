@@ -1,0 +1,47 @@
+.settings-statistic {
+  box-sizing: border-box;
+  display: block;
+  min-width: 100px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  line-height: inherit;
+  text-align: left;
+  color: var(--text);
+}
+.settings-statistic-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.settings-statistic-count {
+  display: block;
+  margin: 7px 0 4px;
+  color: var(--text);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+button.settings-statistic:hover {
+  background: var(--accent-soft);
+  border-color: var(--border);
+}
+button.settings-statistic:focus-visible {
+  outline: 2px solid var(--accent-focus);
+  outline-offset: 2px;
+}
+.settings-statistic small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+@container settings-page (max-width: 360px) {
+  .settings-statistic {
+    padding: 13px;
+  }
+}

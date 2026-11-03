@@ -167,6 +167,12 @@ export function CommandTriggersEditor({
   }, [tab]);
   const [kinds, setKinds] = useState<readonly CommandTriggerKind[]>(commandTriggerKinds);
   const [category, setCategory] = useState('all');
+  useEffect(() => {
+    if (provider?.request !== undefined) {
+      setKinds(commandTriggerKinds);
+      setCategory('all');
+    }
+  }, [provider?.request]);
   const [error, setError] = useState('');
   const lastStatuses = useRef(statuses);
   useEffect(() => {

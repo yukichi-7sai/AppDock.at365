@@ -361,12 +361,14 @@ export function SettingsPage({
               version={model.content.auxiliary.version ?? ''}
               busy={editing.pending}
               openApplets={() => act({ kind: 'select', pageId: 'applets' })}
+              openCommands={() => act({ kind: 'select', pageId: 'command-triggers' })}
             />
           ) : headingApplet ? (
             <AppletInformationPanel
               key={headingApplet.id}
               applet={headingApplet}
               management={model.content.auxiliary.appletManagement}
+              stats={model.content.auxiliary.appletStats}
               invoke={c.invoke}
               updateSource={editor.value.extensions[headingApplet.id]?.updateSource}
               busy={editing.pending}

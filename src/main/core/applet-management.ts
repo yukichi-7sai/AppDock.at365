@@ -21,7 +21,7 @@ export class AppletManagement {
       applets(): ExtensionSnapshot[];
       ready(): boolean;
       reconcile(): Promise<unknown>;
-      restart(id: string): Promise<unknown>;
+      restart(id: string, immediate?: boolean): Promise<unknown>;
     },
   ) {}
   commands() {
@@ -117,7 +117,14 @@ export class AppletManagement {
       );
     return applet;
   }
-  async run(id: string, operation: AppletOperation) {
+  /** Explicit UI start also retries failures and bypasses an existing startup delay. */
+  start(id: string) {
+    return this.apply(id, 'enable', true);
+  }
+  run(id: string, operation: AppletOperation) {
+    return this.apply(id, operation);
+  }
+  private async apply(id: string, operation: AppletOperation, startNow = false) {
     const applet = this.target(id, operation);
     const { settings } = this.options;
     const savedEnabled = applet.collection
@@ -132,6 +139,14 @@ export class AppletManagement {
         await this.options.reconcile();
       } else if (operation === 'restart') {
         await this.options.restart(id);
+      }
+      if (startNow) {
+        const current = this.options.applets().find((a) => a.id === id);
+        if (
+          current?.enabled &&
+          (['waiting', 'stopped'].includes(current.state) || (!next && current.state === 'error'))
+        )
+          await this.options.restart(id, true);
       }
       const current = this.options.applets().find((a) => a.id === id);
       if (!current || !['running', 'waiting', 'stopped'].includes(current.state))

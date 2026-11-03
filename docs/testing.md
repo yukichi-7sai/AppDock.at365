@@ -32,6 +32,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 固定配布物の共通実行場所
 
+`scripts/applet-information-ui-test.cjs [固定EXE]`の`applet-information-action-checks.cjs`は、提供コマンド数・利用可能数、提供元で絞った一覧への移動と解除、0件・停止中の閲覧、開始・停止のPC専用保存、処理中の排他、遅延起動の即時開始、エラーからの明示再試行を確認する。本体を実際に終了して同じ隔離profileで再起動し、有効・無効と設定値の保持を確認する。Appletはローカルfixtureで、実アカウントや外部サービスを使わない。
+
 新規・修正するテストでも、以下の共通ヘルパーと固定ランタイムを必ず使います。具体的な追加手順、準備コード、`.artifacts`の初回・削除後の再作成、専用コピーが必要な場合の記録は[共通テストモジュールの利用手順](test-runtime.md)を参照してください。
 
 通常のGUI/MCPテストは、`scripts/copy-host.cjs`の`testHostPath(profile)`で取得した`.artifacts/test-runtime/host/AppDock.at365.exe`を起動します。`copyHost(source, executable)`は本体manifestに含まれるランタイムを一緒に準備し、配布物全体の内容をSHA256で照合します。同じ内容ならコピーを再利用し、異なる内容や破損したコピーは、実行中プロセスがないことを確認して更新します。EXEだけでなく`resources/app.asar`等の変更も判定対象です。
@@ -103,7 +105,7 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 各スクリプトの引数・前提は現物と機能別文書で確認します。標準の`.\dev.bat test`はビルドと`tests/*.test.cjs`を実行し、上記の専用GUIスクリプトを一律には実行しません。
 
-`scripts/applet-information-ui-test.cjs [固定EXE]`は、概要のプレーンテキスト表示、停止・開始待ち・失敗・再起動中の計測、読み取り専用データ、概要からの検索移動、設定の確定保存、選択Appletに限定した更新確認と他対象/全体更新の拒否を隔離fixtureで確認する。配布元リンクは外部ブラウザー呼出しを捕捉し、クリック/Enter/中クリック、更新先の上書きとの独立、起動失敗時の閲覧、起動エラーの表示と再試行、保存値と設定ページの保持を確認する。情報パネルが唯一の見出しとしてツールバーの上にあること、両ページの「起動時間の計測」が最下部にあること、Aboutのフォーム/JSON切替と自動確認の抑制は、専用Applet試験と`scripts/about-ui-test.cjs [固定EXE]`で確認する。既存の本体計測の共通表示は`scripts/host-startup-timing-ui-test.cjs [固定EXE]`を使う。
+`scripts/applet-information-ui-test.cjs [固定EXE]`は、概要のプレーンテキスト表示、停止・開始待ち・失敗・再起動中の計測、読み取り専用データ、概要からの検索移動、設定の確定保存、選択Appletに限定した更新確認と他対象/全体更新の拒否を隔離fixtureで確認する。配布元リンクは外部ブラウザー呼出しを捕捉し、クリック/Enter/中クリック、更新先の上書きとの独立、起動失敗時の閲覧、起動エラーの表示と再試行、保存値と設定ページの保持を確認する。情報パネルが唯一の見出しとしてツールバーの上にあること、両ページの「起動時間の計測」が最下部にあること、Aboutのフォーム/JSON切替と自動確認の抑制は、専用Applet試験と`scripts/about-ui-test.cjs [固定EXE]`で確認する。Aboutのコマンド数リンクはクリック/Enter、前のApplet・検索・状態・カテゴリ・種類・タブの解除、全コマンド表示と設定不変を同試験で確認する。既存の本体計測の共通表示は`scripts/host-startup-timing-ui-test.cjs [固定EXE]`を使う。
 
 `command-triggers-ui-test.cjs --trigger-tabs-only`は、3方式の種類別タブと機能ページで、登録コマンドの順序、無効・利用不可の表示、編集取消と設定保持、操作列のアクセシブルな見出しを確認する。折り返しや列幅の見た目は変更時の代表画面で確認し、細かな寸法の一致を永続試験にしない。
 

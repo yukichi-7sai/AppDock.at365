@@ -55,6 +55,11 @@ if (bindingEditorsOnly) {
 const source = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 initial.host.hardwareAcceleration = false;
 initial.host.checkUpdatesOnStartup = false;
+Object.assign(initial.updates, {
+  checkHostOnStartup: false,
+  checkHostOnAboutOpen: false,
+  checkAppletsOnStartup: false,
+});
 initial.extensions['fixture.triggers'] = { enabled: true, settings: {} };
 if (featureSettingsOnly || tabResetOnly) {
   delete initial.commandTriggerOptions;

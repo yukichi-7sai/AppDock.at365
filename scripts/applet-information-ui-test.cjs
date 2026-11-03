@@ -55,14 +55,25 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     path.join(folder, 'index.cjs'),
     `
     const fs = require('node:fs'), path = require('node:path');
-    exports.activate = async () => {
+    exports.activate = async (context) => {
+      const marker = path.join(__dirname, 'activations.json');
+      fs.writeFileSync(marker, JSON.stringify((fs.existsSync(marker) ? JSON.parse(fs.readFileSync(marker)) : 0) + 1));
       if (fs.existsSync(path.join(__dirname, 'gate')))
         await new Promise(resolve => {
           const timer = setInterval(() => {
             if (fs.existsSync(path.join(__dirname, 'release'))) { clearInterval(timer); resolve(); }
           }, 20);
         });
-      ${fail ? "throw Error('fixture activation failed');" : ''}
+      ${fail ? "if (!fs.existsSync(path.join(__dirname, 'recover'))) throw Error('fixture activation failed');" : ''}
+      ${JSON.stringify(extra.commands ?? [])}.forEach(command => context.commands.register(command.id, command.title, async () => {}));
+    };
+    exports.deactivate = async () => {
+      if (fs.existsSync(path.join(__dirname, 'stop-gate')))
+        await new Promise(resolve => {
+          const timer = setInterval(() => {
+            if (fs.existsSync(path.join(__dirname, 'stop-release'))) { clearInterval(timer); resolve(); }
+          }, 20);
+        });
     };
   `,
   );
@@ -107,6 +118,10 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       icon: 'clock',
       tagline,
       updateRepository: 'fixture/info',
+      commands: ['one', 'two'].map((name) => ({
+        id: 'fixture.info.' + name,
+        title: 'Info ' + name,
+      })),
     });
     fixture(initial, 'fixture.empty', {}, false);
     fixture(initial, 'fixture.failed', { updateRepository: 'fixture/failed' }, true, true);
@@ -138,7 +153,10 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
         });
       }
     }
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(initial),
+    );
     const exe = source ? testHostPath(profile) : require('electron');
     if (source) {
       require('./copy-host.cjs').copyHost(source, exe);
@@ -146,16 +164,18 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     }
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
-    app = await launchTestHost({
-      executablePath: exe,
-      portable: !!source,
-      env,
-      args: [
-        ...(!source ? [root] : []),
-        `--test-profile=${profile}`,
-        `--test-local-state=${path.join(profile, 'local')}`,
-      ],
-    });
+    const launch = () =>
+      launchTestHost({
+        executablePath: exe,
+        portable: !!source,
+        env,
+        args: [
+          ...(!source ? [root] : []),
+          `--test-profile=${profile}`,
+          `--test-local-state=${path.join(profile, 'local')}`,
+        ],
+      });
+    app = await launch();
     await until(async () => {
       page = app
         .context()
@@ -317,8 +337,11 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       const results = [];
       for (const [name, args] of [
         ['manageApplet', ['fixture.empty', 'restart']],
-        ['manageApplet', ['fixture.info', 'enable']],
-        ['manageApplet', ['fixture.info', 'disable']],
+        ['manageApplet', ['fixture.empty', 'enable']],
+        ['manageApplet', ['fixture.empty', 'disable']],
+        ['startAppletNow', ['fixture.empty']],
+        ['openAppletDestination', ['fixture.empty', 'command-triggers']],
+        ['openAppletDestination', ['fixture.info', 'logs']],
         ['prepareAppletUninstall', ['fixture.empty']],
       ]) {
         const model = await window.dock.settingsPage.get(connection);
@@ -534,7 +557,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       const w = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock://host/'),
       );
-      w.setSize(1180, 900);
+      w.setSize(1720, 1000);
       w.show();
     });
     await info.scrollIntoViewIfNeeded();
@@ -547,7 +570,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()
         .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
-        .setSize(700, 850);
+        .setSize(900, 620);
     });
     await info.scrollIntoViewIfNeeded();
     assert.equal(await info.evaluate((el) => el.scrollWidth > el.clientWidth + 1), false);
@@ -593,6 +616,36 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       checks.push(
         `all ${realApplets.length} published Applet identities render without activating them`,
       );
+    await require('./applet-information-action-checks.cjs')({
+      app,
+      page,
+      profile,
+      checks,
+      select,
+      info,
+      until,
+      snapshot,
+    });
+    await app.close();
+    app = await launch();
+    await until(async () => {
+      page = app
+        .context()
+        .pages()
+        .find((p) => p.url().startsWith('appdock://host/'));
+      return page && (await page.evaluate(() => window.dock?.snapshot()))?.startupReady;
+    }, 'host restart after lifecycle edits');
+    const restored = await snapshot();
+    assert.equal(restored.extensions.find((a) => a.id === 'fixture.info').state, 'stopped');
+    assert.equal(restored.extensions.find((a) => a.id === 'fixture.empty').state, 'running');
+    assert.equal(restored.settings.value.extensions['fixture.info'].enabled, false);
+    assert.equal(
+      restored.settings.value.extensions['fixture.info'].settings.text,
+      'saved through JSON',
+    );
+    checks.push(
+      'actual host restart retains both enabled and disabled Applets and their configuration',
+    );
     assert.deepEqual(errors, []);
     success = true;
   } catch (error) {
@@ -602,6 +655,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     await page?.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
   } finally {
     fs.writeFileSync(path.join(profile, 'extensions/fixture.info/release'), '');
+    fs.writeFileSync(path.join(profile, 'extensions/fixture.info/stop-release'), '');
     await app?.close().catch((error) => {
       errors.push(String(error));
       success = false;

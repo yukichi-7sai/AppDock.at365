@@ -22,14 +22,17 @@ export function AppletUninstallDialog({
   plan,
   invoke,
   onClose,
+  returnFocus,
 }: {
   plan: AppletPackagePlan;
   invoke: AppletActionInvoker;
   onClose(): void;
+  returnFocus?: HTMLElement | null;
 }) {
   const { t } = useHostTranslation();
   return (
     <SettingsDialog
+      returnFocus={returnFocus}
       title={t('settings.appletManagementSettings.uninstallTitle')}
       applyLabel={t('settings.appletManagementSettings.uninstallRestart')}
       onClose={() => {
