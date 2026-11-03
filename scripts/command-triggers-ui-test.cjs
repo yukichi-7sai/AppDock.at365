@@ -46,6 +46,7 @@ const filterConsistencyOnly = process.argv.includes('--filter-consistency-only')
 const usabilityOnly = process.argv.includes('--usability-only');
 const tabResetOnly = process.argv.includes('--tab-reset-only');
 const enablementOnly = process.argv.includes('--enablement-only');
+const reselectionOnly = process.argv.includes('--reselection-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -208,6 +209,34 @@ if (filterConsistencyOnly) {
   }
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
+if (reselectionOnly) {
+  initial.host.soundEnabled = false;
+  initial.updates.checkHostOnStartup = false;
+  initial.updates.checkAppletsOnStartup = false;
+  for (const [kind, key, input, duplicate] of [
+    ['shortcuts', 'keybindingOptions', 'Ctrl+F8', 'Ctrl+F9'],
+    ['gestures', 'gestures', 'move-up', 'move-right'],
+    ['touchpad-gestures', 'touchpadGestures', 'four.right', 'three.tap'],
+  ]) {
+    const field = kind === 'shortcuts' ? 'key' : 'gesture';
+    const rows = [
+      { ...common, [field]: input, when: { ...common.when, processes: [] } },
+      {
+        ...common,
+        id: 'second',
+        command: 'fixture.triggers.two',
+        enabled: false,
+        [field]: input,
+        when: { scope: 'exe', appletIds: [], processes: ['editor'] },
+        ...(kind === 'shortcuts' ? { blockOriginalInput: false } : {}),
+      },
+      { ...common, id: 'occupied', [field]: duplicate, when: { ...common.when, processes: [] } },
+    ];
+    if (kind === 'shortcuts') initial.keybindings = rows;
+    else initial[key].bindings = rows;
+    initial[key].inputExecutionModes = { [input]: { mode: 'count', count: 2 } };
+  }
+}
 fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(initial),
@@ -294,6 +323,7 @@ const recordSuccess = () => {
         usabilityOnly,
         tabResetOnly,
         enablementOnly,
+        reselectionOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -327,6 +357,28 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (reselectionOnly) {
+      await require('./trigger-reselection-checks.cjs')({
+        host,
+        open,
+        saved,
+        save,
+        checks,
+        profile,
+        row,
+        until,
+      });
+      const durable = await saved();
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      assert.deepEqual(await saved(), durable);
+      checks.push('all trigger replacements and stack entries survive an actual restart');
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
     if (enablementOnly) {
       await require('./gesture-enablement-checks.cjs')({
         host,

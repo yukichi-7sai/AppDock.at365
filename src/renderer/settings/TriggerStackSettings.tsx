@@ -73,6 +73,7 @@ export function TriggerStackDialog({
   }, [selecting]);
   const inherited = inheritedMode ?? inheritedTriggerExecutionMode(settings, value.kind);
   let validInput = true;
+  let normalizedInput = value.input;
   let validMode = true;
   try {
     if (value.executionMode !== 'inherit') parseCommandExecutionMode(value.executionMode);
@@ -80,12 +81,15 @@ export function TriggerStackDialog({
     validMode = false;
   }
   try {
-    normalizeStackInput(value.kind, value.input);
+    normalizedInput = normalizeStackInput(value.kind, value.input);
   } catch {
     validInput = false;
   }
-  const duplicate =
-    !before && triggerStacks(settings, value.kind).some((stack) => stack.input === value.input);
+  const duplicate = triggerStacks(settings, value.kind).some(
+    (stack) =>
+      stack.input === normalizedInput &&
+      !(stack.kind === before?.kind && stack.input === before.input),
+  );
   return (
     <SettingsMcpScope itemId={settingsItemId(value.kind, 'bindings')}>
       <SettingsDialog
@@ -94,16 +98,14 @@ export function TriggerStackDialog({
           before ? 'settings.commandStacks.editTrigger' : 'settings.commandStacks.addTrigger',
         )}
         description={
-          !before && (
-            <span className="stack-creation-steps">
-              <span aria-current={selecting ? 'step' : undefined}>
-                {t('settings.commandStacks.chooseTriggerStep')}
-              </span>
-              <span aria-current={!selecting ? 'step' : undefined}>
-                {t('settings.commandStacks.editStackStep')}
-              </span>
+          <span className="stack-creation-steps">
+            <span aria-current={selecting ? 'step' : undefined}>
+              {t('settings.commandStacks.chooseTriggerStep')}
             </span>
-          )
+            <span aria-current={!selecting ? 'step' : undefined}>
+              {t('settings.commandStacks.editStackStep')}
+            </span>
+          </span>
         }
         onClose={onClose}
         valid={
@@ -127,7 +129,7 @@ export function TriggerStackDialog({
         }
         closeAfterApply={!selecting}
         resetAction={
-          !before && !selecting
+          !selecting
             ? {
                 label: t('settings.commandStacks.backToTrigger'),
                 onClick: () => setSelecting(true),
@@ -139,44 +141,36 @@ export function TriggerStackDialog({
             setSelecting(false);
             return;
           }
-          onChange(
-            applyTriggerStack(
-              settings,
-              before ? { ...value, kind: before.kind, input: before.input } : value,
-              before,
-            ),
-          );
+          onChange(applyTriggerStack(settings, value, before));
         }}
       >
         {(ready, setError) => (
           <>
-            {!before && (
-              <div
-                ref={selection}
-                className="stack-trigger-selection"
-                hidden={!selecting}
-                data-testid="stack-trigger-selection"
-              >
-                {value.kind === 'shortcuts' ? (
-                  <ShortcutCaptureField
-                    label={t('settings.commandStacks.input')}
-                    showDescription={false}
-                    value={value.input}
-                    onChange={(input) => setValue({ ...value, input })}
-                    recordingReady={ready}
-                    setError={setError}
-                  />
-                ) : (
-                  <GestureInputPicker
-                    touchpad={value.kind === 'touchpad-gestures'}
-                    value={value.input}
-                    onChange={(input) => setValue({ ...value, input })}
-                    recordingReady={ready}
-                    setError={setError}
-                  />
-                )}
-              </div>
-            )}
+            <div
+              ref={selection}
+              className="stack-trigger-selection"
+              hidden={!selecting}
+              data-testid="stack-trigger-selection"
+            >
+              {value.kind === 'shortcuts' ? (
+                <ShortcutCaptureField
+                  label={t('settings.commandStacks.input')}
+                  showDescription={false}
+                  value={value.input}
+                  onChange={(input) => setValue({ ...value, input })}
+                  recordingReady={ready && selecting}
+                  setError={setError}
+                />
+              ) : (
+                <GestureInputPicker
+                  touchpad={value.kind === 'touchpad-gestures'}
+                  value={value.input}
+                  onChange={(input) => setValue({ ...value, input })}
+                  recordingReady={ready && selecting}
+                  setError={setError}
+                />
+              )}
+            </div>
             <div
               ref={editor}
               className="stack-command-step"
@@ -190,7 +184,7 @@ export function TriggerStackDialog({
                     settingKey={value.kind === 'shortcuts' ? 'key' : 'gesture'}
                   >
                     <div className="stack-trigger-summary" data-testid="stack-trigger-readonly">
-                      {triggerStackTitle(before ?? value)}
+                      {triggerStackTitle(value)}
                     </div>
                   </SettingsField>
                 </div>

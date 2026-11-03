@@ -562,10 +562,13 @@ async function close() {
       assert.equal(
         await dialog
           .locator('.shortcut-capture, .gesture-input-picker, [data-testid=stack-trigger-input]')
+          .filter({ visible: true })
           .count(),
         0,
       );
-      assert.equal(await dialog.getByTestId('settings-dialog-reset').count(), 0);
+      assert(
+        await dialog.getByRole('button', { name: 'トリガーを選び直す', exact: true }).isVisible(),
+      );
       const fixedInput = await dialog.getByTestId('stack-trigger-readonly').innerText();
       await dialog.getByTestId('binding-scope:exe').filter({ visible: true }).click();
       await checkTriggerLayout(kind);
