@@ -19,8 +19,14 @@ export function SettingsInputActions({
 }
 
 /** A shared, wrapping action row for section bodies and field controls. */
-export function SettingsActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...props} className={`settings-actions ${className}`} />;
+export function SettingsActions({
+  inline = false,
+  className = '',
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { inline?: boolean }) {
+  return (
+    <div {...props} className={`settings-actions ${className}`} data-inline={inline || undefined} />
+  );
 }
 
 /** A section content slot for structured widgets with their own internal layout. */

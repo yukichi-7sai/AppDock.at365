@@ -199,9 +199,7 @@ export function SettingsForm({
     );
   return (
     <div className="settings-layout">
-      <div
-        className={`settings-form${['general', 'appearance', 'statusbar', 'shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(category) ? ' settings-sections' : ''}`}
-      >
+      <div className="settings-form settings-sections">
         {category === 'statusbar' && (
           <SettingsSection>
             <SettingRow pageId={category} itemKey="showStatusBar">
@@ -471,8 +469,14 @@ export function SettingsForm({
 
         {category === 'text-palette' && (
           <>
-            <SettingsSection title={t('inputPalette.snippets')}>
-              <CommandLink commandId="appdock.text-palette.open" />
+            <SettingsSection title={t('inputPalette.title')}>
+              <SettingsField title={t('inputPalette.snippetCandidates')}>
+                <SettingsActions inline>
+                  <button onClick={() => void run(() => invoke('manageSnippets'))}>
+                    {t('inputPalette.manage')}
+                  </button>
+                </SettingsActions>
+              </SettingsField>
               <SettingRow pageId={category} itemKey="textPaletteHistory">
                 <Toggle
                   label={t('inputPalette.history')}
@@ -482,19 +486,25 @@ export function SettingsForm({
                   }
                 />
               </SettingRow>
-              <SettingsActions>
-                <button onClick={() => void run(() => invoke('manageSnippets'))}>
-                  {t('inputPalette.manage')}
-                </button>
-              </SettingsActions>
+              <SettingsField title={t('inputPalette.openCommand')}>
+                <SettingsActions inline>
+                  <CommandLink commandId="appdock.text-palette.open" />
+                </SettingsActions>
+              </SettingsField>
             </SettingsSection>
-            <SettingsSection title={t('inputPalette.historySection')}>
-              <CommandLink commandId="appdock.clipboard-history.open" />
-              <SettingsActions>
-                <button onClick={() => void run(() => invoke('openClipboardSettings'))}>
-                  {t('inputPalette.windowsSettings')}
-                </button>
-              </SettingsActions>
+            <SettingsSection title={t('inputPalette.historyTitle')}>
+              <SettingsField title={t('inputPalette.windowsHistory')}>
+                <SettingsActions inline>
+                  <button onClick={() => void run(() => invoke('openClipboardSettings'))}>
+                    {t('inputPalette.windowsSettings')}
+                  </button>
+                </SettingsActions>
+              </SettingsField>
+              <SettingsField title={t('inputPalette.openCommand')}>
+                <SettingsActions inline>
+                  <CommandLink commandId="appdock.clipboard-history.open" />
+                </SettingsActions>
+              </SettingsField>
             </SettingsSection>
           </>
         )}

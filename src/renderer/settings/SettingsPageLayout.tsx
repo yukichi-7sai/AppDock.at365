@@ -14,6 +14,7 @@ import {
 const descriptions: Record<string, HostTextKey> = {
   'command-triggers': 'settings.commandTriggers.description',
   applets: 'settings.settingsPageLayout.applets',
+  'text-palette': 'settings.settingsPageLayout.textPalette',
   notifications: 'settings.settingsPageLayout.notifications',
   tts: 'settings.settingsPageLayout.tts',
   ribbon: 'settings.settingsPageLayout.ribbon',
