@@ -1141,7 +1141,7 @@
   "settings.settingsPageLayout.customCommands": "よく使う操作をコマンドとして登録し、実行内容や外部への公開を設定します。[setting:command-triggers]でトリガーを割り当てることができます。",
   "settings.settingsPageLayout.ai": "AIサーバーの接続先・モデル・応答の既定値を設定します。",
   "settings.settingsPageLayout.mcpClient": "MCPサーバーへの接続先と、利用を許可するツールを設定します。名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。",
-  "settings.settingsPageLayout.webAccounts": "WebApplet専用のアカウント枠を管理します。同じ枠を選んだWebAppletはログイン状態を共有し、Gmailのアカウントとは別管理です。使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。",
+  "settings.settingsPageLayout.webAccounts": "Webサイトのアカウント枠を管理します。同じ枠を選んだWebサイトはログイン状態を共有します。使用中の枠は削除できません。削除は枠と保存データをまとめて消します。クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。",
   "settings.settingsPageLayout.permissions": "AppletとMCPの許可を、それぞれ設定します。Applet側はすべてのAppletに共通です。変更はすぐに反映されます。",
   "settings.settingsPageLayout.codex": "同じPCのCodexやネットワーク上のMCPクライアントから、AppDockの状態確認・設定変更・公開コマンドの実行ができます。連携の設定はこのPCへ即時反映されます。",
   "settings.settingsPageLayout.about": "AppDockの情報と実行環境を確認し、本体とAppletの更新を管理します。",
