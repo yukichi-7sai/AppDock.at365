@@ -167,7 +167,7 @@ Watchは独自のWPFウィンドウで時計を描画し、配置とフォント
 
 ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で有効です。未保存時の判定は起動・開始待ち・再起動・Shell/コマンドの利用可否・設定画面で共用し、保存済みのOFFを上書きしません。他のAppletと重複しないIDを使います。
 
-時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)と[ローカル配置スクリプト](../../Applet.Watch.at365/deployment/scripts/install-local.ps1)は、native EXEとmanifestを配置し、AppDockの設定を変更しない例です。配置前に対象のAppDockを終了してください。[WebBrowserToolsの開発ガイド](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md)も参照できます。既存Watch等の実行中出力やソースには上書きしません。
+時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)は、native EXEとmanifestを発行し、AppDockの設定を変更しない例です。配置前に対象のAppDockを終了してください。[WebBrowserToolsの開発ガイド](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md)も参照できます。既存Watch等の実行中出力やソースには上書きしません。
 
 最低限、次を確認して `VERIFICATION.md`へ実測と未検証事項を残します:
 

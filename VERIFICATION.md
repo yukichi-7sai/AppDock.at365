@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-11-03 配置ツール整理のコミット前照合
+
+- 実装時の最終差分と削除状態、試験入力・成功ログ・発行先185ファイルのSHA256を照合した。関連試験6件と構文・参照検査の成功を再利用し、追加の製品回帰・再発行は行っていない。
+- 共通指示と本体・8Appletの今回差分だけをコミット対象とした。再利用判定、stage treeとcommit treeの照合結果は`.artifacts/commit-validation-deploy-removal-20261103/`に保存する。push・Release・実利用先配置は行わない。
+
+## 2026-11-03 開発用配置スクリプトの除去
+
+- 本体と8つのAppletからdeployment一式、配置専用の発行ヘルパー・試験、不要なdeploy.local.txtと除外規則を削除した。publishの配置ツール追加処理を外し、現行の開発文書と30.PROJECTの共通指示を整合させた。削除はrepo側35ファイル（追跡29・ローカル設定6）、40.ARTIFACT側32ファイルの計67ファイル。過去の検証記録は履歴として保持する。
+- 差分レビューで、発行・自己更新が使用するUpdaterの--deploy-host、保護対象・journal復旧の試験、Appletのビルド・パッケージ生成・終了コードの経路を保持していることを確認した。廃止するCLI配置ツール専用のscripts/test-published-deployment.ps1とWebAppletのtests/deploy.test.ps1を削除し、残る内部配置・データ保持・更新復旧の契約はtests/folder-host.test.cjsが担当する。
+- 固定ツールのdev.bat exec node --test tests/folder-host.test.cjsが6件成功。変更したPowerShell 8本の構文・BOM/CRLF、全9repoの発行先計算、WebAppletのpublish終了コード伝達、現行の廃止ファイル参照とgit diff --checkを確認した。40.ARTIFACTに残る185ファイルは削除前後のSHA256がすべて一致した。
+- アプリ機能・製品コード・manifest・依存・設定/保存仕様と既存の本体/更新payloadは不変。開発用配置ツールの整理として製品版更新・再ビルド・再発行は行わず、GUI・全製品回帰・実利用先配置は実施していない。commit・push・Releaseなし。証跡: .artifacts/deploy-removal-20261103/のbefore.json、preservation.json、folder-host.log、validation.json。
+
 ## 2026-11-03 コマンド検索パレットで背後のページが隠れる問題（0.128.3）
 
 - 0.128.2の固定EXEで再現した。パレットの外側は透明でも、後から読み込む共通テーマが文書のルートを不透明な背景色で塗っていた。Windowsの試験ウィンドウをPrintWindowで取得し、ライト・ダーク双方で、開く前は12,600画素見えた本文の縞模様が「透明」「ブラー」のどちらでも見えなくなることを確認した。

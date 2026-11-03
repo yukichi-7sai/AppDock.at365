@@ -11,7 +11,7 @@ package.json、各Appletのmanifest、発行物のupdate.jsonから対象版を�
 | AppDock | `A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe` と `A:/40.ARTIFACT/AppDock.at365/update.json` | `A:\40.ARTIFACT\AppDock.at365` |
 | 各Applet | `A:\40.ARTIFACT\<リポジトリ名>`の`update.zip`と`update.json` | `A:\40.ARTIFACT\Applet.Watch.at365` |
 
-Appletの初回追加は、各発行先の`deploy.bat`から配置します。更新ボタンはインストール済みAppletを対象にします。ZIPは各リポジトリで同名なので、別AppletのJSON/ZIPを混ぜないでください。
+Appletの初回追加は、AppDockを完全終了し、各発行先のApplet配布フォルダーを対応する`extensions/`のサブフォルダーへコピーします。更新ボタンはインストール済みAppletを対象にします。ZIPは各リポジトリで同名なので、別AppletのJSON/ZIPを混ぜないでください。
 
 同じバージョンを試す場合は「更新の設定 → 同じバージョンの再適用」をONにすると即時保存され、確認が終わったらOFFへ戻します。
 

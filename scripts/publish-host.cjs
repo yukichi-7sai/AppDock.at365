@@ -17,10 +17,3 @@ run(helper, ['--seal-host', staged, require('../package.json').version]);
 fs.mkdirSync(path.join(output, 'win-unpacked'), { recursive: true });
 run(helper, ['--deploy-host', staged, path.join(output, 'win-unpacked')]);
 run(process.execPath, [path.join(__dirname, 'pack-update.cjs'), 'host', staged, output]);
-run('powershell.exe', [
-  '-NoProfile',
-  '-ExecutionPolicy',
-  'Bypass',
-  '-File',
-  path.join(__dirname, 'publish-deployment.ps1'),
-]);

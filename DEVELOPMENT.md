@@ -6,9 +6,9 @@
 
 設定で使用する[共通コマンド選択ダイアログ](docs/command-selection.md)は、リボン・トレイ・コマンドスタックで共用します。
 
-## 発行・配置ファイルの保存先
+## 発行先
 
-標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepo、`deploy.bat`は発行先から実行します。配置用ファイル・設定の保持とテンプレートの更新は[共通発行手順](docs/publishing.md)を参照してください。
+標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepoから実行します。詳細は[共通発行手順](docs/publishing.md)を参照してください。
 
 現在のコードを基準に、開発環境と機能別の仕様・検証への入口をまとめます。インストールとビルドの概要は[README](README.md)、作業規則は[AGENTS](AGENTS.md)、実測結果は[VERIFICATION](VERIFICATION.md)を参照してください。
 
@@ -201,10 +201,6 @@ OSの一時領域に試験用の更新ステージが残った場合は、試験
 ## 配置
 
 共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行したフォルダー型本体とnative fixtureで全体/個別ログ画面・終了時ログを確認します。
-
-`deploy.bat` はPowerShell 7（`pwsh.exe`）を使用します。
-
-`deploy.bat "配置先の既存フォルダ"` でEXEのみコピーします。引数省略時は `deploy.local.txt` の先頭行を使います。`deploy.local.txt.example` を参考にしてください。設定や追加拡張はコピーしません。配置先で実行中の場合は先に終了してください。既存EXEを置換する操作なので、配置はユーザーが必要な時に実行してください。
 
 ### Windows通知の起動先
 
