@@ -10,6 +10,7 @@ export interface HostSettings {
   customAccentLight: string;
   showHints: boolean;
   showStatusBar: boolean;
+  ribbonExpandOnHover: boolean;
   overlayBackground: 'blur' | 'transparent';
   overlayShadow: boolean;
   soundEnabled: boolean;

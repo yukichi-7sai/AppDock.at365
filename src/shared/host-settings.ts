@@ -29,13 +29,21 @@ type OrdinaryHostKey = Exclude<
 >;
 export type HostSettingDefinition = SettingDefinition & {
   key: OrdinaryHostKey;
-  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications' | 'text-palette';
+  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications' | 'text-palette' | 'ribbon';
   catalogKey?: string;
   applies?: string;
 };
 type HostField = Omit<HostSettingDefinition, 'key'>;
 const switches = ['on', 'off', 'toggle'] as const;
 const definitions = localizedMetadata(() => ({
+  ribbonExpandOnHover: {
+    pageId: 'ribbon',
+    title: hostText('settings.ribbonSettings.expandOnHover'),
+    description: hostText('settings.ribbonSettings.expandOnHoverDescription'),
+    type: 'boolean',
+    default: false,
+    automation: true,
+  },
   language: {
     pageId: 'appearance',
     title: hostText('language.label'),

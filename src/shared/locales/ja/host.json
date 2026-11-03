@@ -1079,6 +1079,8 @@
   "settings.ribbonSettings.chooseRightClick": "右クリックのコマンドを選択",
   "settings.ribbonSettings.commandUnavailable": "現在利用できません。",
   "settings.ribbonSettings.rightClick": "右クリックのコマンド",
+  "settings.ribbonSettings.expandOnHover": "カーソルホバー時に大きくする",
+  "settings.ribbonSettings.expandOnHoverDescription": "リボンにカーソルを重ねると大きく、離すと小さくします。表示モードの切り替えを押すと、自動を解除して手動で切り替えます。",
   "settings.ribbonSettings.rightClickHint": "リボンを右クリックしたときに実行するコマンドです。",
   "settings.ribbonSettings.behavior": "動作設定",
   "settings.ribbonSettings.addCommand": "＋ コマンド",

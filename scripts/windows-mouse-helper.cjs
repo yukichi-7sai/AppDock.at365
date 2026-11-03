@@ -38,4 +38,33 @@ try {
   );
   assert.equal(result.status, 0, result.stderr);
 }
-module.exports = { leftDrag };
+/** Move without clicking; the caller restores the returned physical cursor position in finally. */
+function moveCursor(point) {
+  for (const key of ['x', 'y']) assert(Number.isInteger(point[key]));
+  const code = `
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class CursorMove {
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out Point p);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+}';
+[void][CursorMove]::SetProcessDPIAware();
+$point=New-Object CursorMove+Point;
+if (-not [CursorMove]::GetCursorPos([ref]$point)) { throw 'GetCursorPos failed' }
+if (-not [CursorMove]::SetCursorPos(${point.x},${point.y})) { throw 'SetCursorPos failed' }
+@{x=$point.X;y=$point.Y} | ConvertTo-Json -Compress
+`;
+  const result = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-EncodedCommand',
+      Buffer.from(code, 'utf16le').toString('base64'),
+    ],
+    { windowsHide: true, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout.trim());
+}
+module.exports = { leftDrag, moveCursor };

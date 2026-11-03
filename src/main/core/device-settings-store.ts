@@ -443,6 +443,7 @@ export class DeviceSettingsStore extends SettingsStore {
     revision: number,
     asset?: { commit(): void; rollback(): void },
     rewrite: Scope[] = [],
+    ribbonDisplayMode?: import('../../shared/ribbon').RibbonDisplayMode,
   ) {
     this.assertRevision(revision);
     const next = restoreSettingsCollections(parseSettings(value), this.applets());
@@ -458,6 +459,17 @@ export class DeviceSettingsStore extends SettingsStore {
       this.device.value,
       this.collections(),
     );
+    if (ribbonDisplayMode !== undefined) {
+      split.device.uiState = parseDeviceUiState({
+        ...split.device.uiState,
+        ribbon: {
+          schemaVersion: 1,
+          expanded: {},
+          ...split.device.uiState?.ribbon,
+          displayMode: ribbonDisplayMode,
+        },
+      });
+    }
     return this.commitPair(split.shared, split.device, revision, asset, rewrite);
   }
   setLocalSettings(

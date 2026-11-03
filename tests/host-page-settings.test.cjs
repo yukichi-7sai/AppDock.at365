@@ -59,6 +59,7 @@ function change(value, pageId, alternate = false) {
       speech: { voice: alternate ? 'incoming' : 'local', speed: alternate ? 0.75 : 1.5 },
     };
   } else if (pageId === 'ribbon') {
+    next.host.ribbonExpandOnHover = !alternate;
     next.ribbon.rightClickCommand = alternate ? 'appdock.quit' : 'appdock.open';
     next.ribbon.hidden = alternate ? ['settings'] : [];
   } else if (pageId === 'statusbar') {
@@ -248,6 +249,58 @@ test('sharing a local page rolls both files back if the second write fails', (t)
   assert.equal(fs.readFileSync(file, 'utf8'), sharedBefore);
   assert.equal(fs.readFileSync(store.device.file, 'utf8'), deviceBefore);
   assert.equal(store.hostPageLocalSettings('about'), true);
+});
+
+test('manual ribbon override commits auto OFF and the remembered mode together, preserving groups', (t) => {
+  const { store } = fixture(t);
+  const { RibbonState } = require('../out/main/main/core/ribbon-state');
+  const ribbon = new RibbonState(
+    store.uiStateStorage('ribbon'),
+    () => {},
+    () => {},
+  );
+  ribbon.set('group:keep', true);
+  const automatic = structuredClone(store.value);
+  automatic.host.ribbonExpandOnHover = true;
+  store.save(automatic, store.revision);
+  const next = structuredClone(store.value);
+  next.host.ribbonExpandOnHover = false;
+  const before = [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8'));
+  const save = store.device.save;
+  store.device.save = () => {
+    throw Error('injected ribbon mode failure');
+  };
+  try {
+    assert.throws(
+      () =>
+        ribbon.setDisplayMode('expanded', () =>
+          store.save(next, store.revision, undefined, [], 'expanded'),
+        ),
+      /injected/,
+    );
+  } finally {
+    store.device.save = save;
+  }
+  assert.equal(store.value.host.ribbonExpandOnHover, true);
+  assert.equal(ribbon.displayMode, 'compact');
+  assert.deepEqual(
+    [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8')),
+    before,
+  );
+  ribbon.setDisplayMode('expanded', () =>
+    store.save(next, store.revision, undefined, [], 'expanded'),
+  );
+  assert.equal(store.value.host.ribbonExpandOnHover, false);
+  assert.equal(ribbon.displayMode, 'expanded');
+  ribbon.set('group:second', true); // The state-storage comparison is refreshed after the transaction.
+  const restored = new RibbonState(
+    store.uiStateStorage('ribbon'),
+    () => {},
+    () => {},
+  );
+  assert.equal(restored.displayMode, 'expanded');
+  assert.equal(restored.isExpanded('group:keep'), true);
+  assert.equal(restored.isExpanded('group:second'), true);
 });
 
 test('switching a legacy tray command list to local retains its resolved menu and unknown commands', (t) => {

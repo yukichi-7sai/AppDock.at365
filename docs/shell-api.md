@@ -92,6 +92,8 @@ AppDockを終了してから`--safe-shell`で起動すると、選択とリボ�
 
 ## リボンの表示モード
 
+ホバー自動表示を有効にした場合も、Shellは本体から受け取る`displayMode`を描画する。検出・一時状態・手動への復帰は本体が所有し、追加Shellへの新しいメソッド要求は設けない。自動ON中の既存切替操作は自動を解除して現在の表示の反対を保存する。[自動表示の仕様](ribbon-customization-design.md#ホバーによる自動表示)を参照する。
+
 切替項目の画像/アイコンは、現在のdisplayModeに対応した共有設定のdisplayModeIconsを本体で解決し、既存のicon.name/assetIdへ投影する。Shell側で状態ごとの設定を解釈したり、新しい描画用操作を設けたりしない。未指定時の共通値引き継ぎと復元は[リボンの表示モード](ribbon-customization-design.md#リボンの表示モード)に従う。
 
 schema 2は任意のdisplayMode（compact / expanded）を持つ。0.89.0以降のローカルリボンモデルはdisplayModeToggle（actionId / title / enabled）を追加し、Shellは本体発行のactionIdをinvokeへ渡して切り替える。切替は通常のribbon-display-mode項目として配置し、Default Shellは独立した固定ボタンを重ねない。displayModeToggleは表示中の切替項目に対する互換メタデータとして保持する。通常Applet/MCP向けモデルとschema 1の切替項目は無効でactionIdを渡さず、外部invokeは拒否する。グループpopupでは、実際にそのグループへ配置された切替項目だけを候補検査後に選択できる。モードはPC専用UI状態で、本体の予約幅はcompact 56px / expanded 200px。追加Shellも同じモデルと操作を利用し、Default Shell専用のAPIは設けない。

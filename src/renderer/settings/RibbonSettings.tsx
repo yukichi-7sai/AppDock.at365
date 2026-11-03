@@ -34,17 +34,23 @@ import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
 import { imageReference, type RegisteredImageRef } from '../../shared/registered-images';
 import { CommandSelectionDialog } from '../settings-ui/CommandSelectionDialog';
 import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 
 export function RibbonSettings({
   settings,
   extensions,
   commands,
   onEdit,
+  onChange,
+  busy,
 }: {
   settings: Settings;
   extensions: ExtensionSnapshot[];
   commands: UiCommand[];
   onEdit(operation: unknown, before: Settings['ribbon']): Promise<unknown>;
+  onChange(settings: Settings): void;
+  busy: boolean;
 }) {
   const { t: translate } = useHostTranslation();
   const layout = settings.ribbon;
@@ -471,6 +477,25 @@ export function RibbonSettings({
       aria-label={translate('settings.ribbonSettings.title')}
     >
       <SettingsSection data-testid="ribbon-behavior-settings">
+        <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonExpandOnHover')}>
+          <SettingsField
+            title={translate('settings.ribbonSettings.expandOnHover')}
+            description={translate('settings.ribbonSettings.expandOnHoverDescription')}
+            {...settingAnchor('ribbon', 'ribbonExpandOnHover')}
+          >
+            <Toggle
+              label={translate('settings.ribbonSettings.expandOnHover')}
+              checked={settings.host.ribbonExpandOnHover}
+              disabled={busy}
+              onChange={(ribbonExpandOnHover) =>
+                onChange({
+                  ...settings,
+                  host: { ...settings.host, ribbonExpandOnHover },
+                })
+              }
+            />
+          </SettingsField>
+        </SettingsMcpScope>
         <SettingsField
           title={translate('settings.ribbonSettings.rightClick')}
           hint={translate('settings.ribbonSettings.rightClickHint')}

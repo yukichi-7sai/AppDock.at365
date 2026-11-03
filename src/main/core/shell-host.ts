@@ -55,6 +55,8 @@ export class ShellHost {
         viewport: import('../../shared/ribbon').RibbonAnchor,
       ): void;
       invalidateAnchor?(): void;
+      pointer?(inside: boolean): void;
+      hoverChanged?(): void;
     },
   ) {
     try {
@@ -202,6 +204,25 @@ export class ShellHost {
       safeMode: this.options.safeMode,
     };
   }
+  get hoverBounds() {
+    const b = this.active;
+    return b?.ready &&
+      !b.view.webContents.isDestroyed() &&
+      b.view.getVisible() &&
+      this.options.registry.usable('ribbon', {
+        provider: b.id,
+        version: b.version,
+        generation: b.generation,
+      })
+      ? this.bounds
+      : null;
+  }
+  containsContentPoint(point: { x: number; y: number }) {
+    const b = this.hoverBounds;
+    return (
+      !!b && point.x >= b.x && point.x < b.x + b.width && point.y >= b.y && point.y < b.y + b.height
+    );
+  }
   focus(edge: 'first' | 'last') {
     if (!['first', 'last'].includes(edge) || !this.active || !this.bounds) return;
     this.active.view.webContents.focus();
@@ -234,6 +255,7 @@ export class ShellHost {
     if (!this.active) return;
     if (this.bounds) this.active.view.setBounds(this.bounds);
     this.active.view.setVisible(!!this.bounds);
+    this.options.hoverChanged?.();
     this.options.layer?.();
   }
   refresh() {
@@ -380,6 +402,10 @@ export class ShellHost {
     view.webContents.on('unresponsive', () => this.fail(b, 'Shell renderer is unresponsive'));
     view.webContents.on('before-input-event', (event, input) => {
       if (this.options.shortcut(input)) event.preventDefault();
+    });
+    view.webContents.on('before-mouse-event', (_event, mouse) => {
+      if (b === this.active && this.hoverBounds)
+        this.options.pointer?.(mouse.type !== 'mouseLeave');
     });
     void view.webContents.loadURL(b.url).catch(() => this.fail(b, 'Shell UI load failed'));
   }

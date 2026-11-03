@@ -165,6 +165,8 @@ export function SettingsForm({
           extensions={extensions}
           commands={commands}
           onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
+          onChange={edit}
+          busy={busy}
         />
       </SettingsMcpScope>
     );

@@ -137,17 +137,14 @@ import { stopRegisteredImageDecoder } from './core/registered-image-decoder';
 import { coverAppletPagesForImagePicker } from './core/applet-pages';
 import { imageReference } from '../shared/registered-images';
 import { WindowsLaunch } from './core/windows-launch';
-import {
-  WindowStateStore,
-  windowMinimum,
-  restoreWindowBounds,
-} from './core/window-state';
+import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
 import { PortableUpdates, type UpdateTarget } from './core/portable-updates';
 import { execFileSync } from 'node:child_process';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
 import { RibbonState } from './core/ribbon-state';
+import { RibbonHover } from './core/ribbon-hover';
 import { RibbonBadges } from './core/ribbon-badges';
 import { RibbonGroupSession } from './core/ribbon-group-session';
 import { RibbonCommands } from './core/ribbon-commands';
@@ -465,6 +462,12 @@ const releaseRendererImages = () => {
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
+let ribbonHover: RibbonHover | undefined;
+function ribbonDisplayMode() {
+  return safeShell
+    ? 'compact'
+    : (ribbonHover?.displayMode ?? ribbonState?.displayMode ?? 'compact');
+}
 const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(
   () => changed(),
@@ -585,12 +588,21 @@ const presentation = new UiPresentation({
     if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
     ribbonState.set(id, !ribbonState.isExpanded(id));
   },
-  displayMode: () => (safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact')),
+  displayMode: ribbonDisplayMode,
   toggleDisplayMode: safeShell
     ? undefined
     : () => {
         if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
-        ribbonState.setDisplayMode(ribbonState.displayMode === 'compact' ? 'expanded' : 'compact');
+        const mode = ribbonDisplayMode() === 'compact' ? 'expanded' : 'compact';
+        if (settings.value.host.ribbonExpandOnHover) {
+          const value = prepareSettings({
+            ...settings.value,
+            host: { ...settings.value.host, ribbonExpandOnHover: false },
+          });
+          ribbonState.setDisplayMode(mode, () =>
+            commitSettings(value, settings.revision, undefined, [], 'page', mode),
+          );
+        } else ribbonState.setDisplayMode(mode);
       },
   badge: (id) => {
     if (id !== 'notifications') return ribbonBadges.get(id);
@@ -1627,6 +1639,7 @@ const operationApi = new AppDockApi({
   ready: () => startupReady && !quitting,
 });
 const changed = () => {
+  ribbonHover?.refresh();
   gestures?.requestRefresh();
   refreshAppearance();
   setAppletPageBlur(
@@ -2159,7 +2172,7 @@ function snapshot(): HostSnapshot {
 }
 function snapshotCore(): HostSnapshot {
   return {
-    ribbonDisplayMode: safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact'),
+    ribbonDisplayMode: ribbonDisplayMode(),
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
     navigationHistory: navigation.history.availability,
@@ -2348,6 +2361,7 @@ function commitSettings(
   resetPage?: SettingsPageDefinition,
   rewrite: ('shared' | 'device')[] = [],
   resetScope: SettingsResetScope = 'page',
+  ribbonMode?: import('../shared/ribbon').RibbonDisplayMode,
 ) {
   assertSettingsWritable();
   settings.assertRevision(revision);
@@ -2377,6 +2391,7 @@ function commitSettings(
     resetPage
       ? settingsPageStorage(resetPage, resetScope).files.map((file) => file.scope)
       : rewrite,
+    ribbonMode,
   );
 }
 function settingsPageStorage(
@@ -4563,6 +4578,7 @@ async function initialize() {
     });
   }
   hostModalLayer = new HostModalLayer(window, () => {
+    ribbonHover?.refresh();
     shellRegistry?.touch();
     void gestures?.refresh();
   });
@@ -4789,6 +4805,8 @@ async function initialize() {
   window.on('unmaximize', changed);
   shellHost = new ShellHost({
     window,
+    pointer: (inside) => ribbonHover?.pointer(inside),
+    hoverChanged: () => ribbonHover?.refresh(),
     layer: () => {
       overlayHost?.layout();
     },
@@ -4873,6 +4891,8 @@ async function initialize() {
     },
   });
   overlayHost = new OverlayHost({
+    ribbonPointer: (point) =>
+      ribbonHover?.pointer(!!point && !!shellHost?.containsContentPoint(point)),
     asset: (id) => presentation.getAsset(id),
     window,
     preload: path.join(__dirname, 'overlay-preload.js'),
@@ -4910,6 +4930,31 @@ async function initialize() {
       });
     },
   });
+  ribbonHover = new RibbonHover({
+    enabled: () => !safeShell && settings.value.host.ribbonExpandOnHover,
+    canExpand: () => overlayHost?.kind !== 'ribbon-group',
+    available: () =>
+      !!window &&
+      !window.isDestroyed() &&
+      window.isVisible() &&
+      !window.isMinimized() &&
+      !!shellHost?.hoverBounds &&
+      !quitting &&
+      !hostModalLayer?.isActive &&
+      overlayHost?.kind !== 'command-palette',
+    containsCursor: () => {
+      if (!window || window.isDestroyed()) return false;
+      const point = screen.getCursorScreenPoint(),
+        origin = window.getContentBounds();
+      return !!shellHost?.containsContentPoint({ x: point.x - origin.x, y: point.y - origin.y });
+    },
+    manualMode: () => ribbonState?.displayMode ?? 'compact',
+    changed,
+  });
+  window.on('blur', () => ribbonHover?.reset());
+  window.on('move', () => ribbonHover?.pointer(false));
+  window.on('resize', () => ribbonHover?.pointer(false));
+  window.once('closed', () => ribbonHover?.dispose());
   settingsPageHost = new SettingsPageHost({
     activeChanged: changed,
     allowed: (request) =>

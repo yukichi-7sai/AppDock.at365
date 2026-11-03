@@ -55,6 +55,7 @@ export class OverlayHost {
       changed(): void;
       failed(message: string): void;
       shortcut?(input: Electron.Input): boolean;
+      ribbonPointer?(point: { x: number; y: number } | null): void;
       asset?(id: unknown): { dataUrl: string } | Promise<{ dataUrl: string }>;
     },
   ) {
@@ -274,6 +275,18 @@ export class OverlayHost {
       s.view.webContents.on('before-input-event', (event, input) => {
         if (this.surface === s && this.current && s.ready && this.options.shortcut?.(input))
           event.preventDefault();
+      });
+      s.view.webContents.on('before-mouse-event', (_event, mouse) => {
+        if (s.kind !== 'ribbon-group' || this.surface !== s || !s.ready) return;
+        const zoom = s.view.webContents.getZoomFactor();
+        this.options.ribbonPointer?.(
+          mouse.type === 'mouseLeave'
+            ? null
+            : {
+                x: mouse.x * zoom,
+                y: mouse.y * zoom,
+              },
+        );
       });
       void s.view.webContents.loadURL(s.url).catch(() => this.fail(s, 'load failed'));
     } catch {

@@ -44,11 +44,16 @@ export class RibbonState {
   get displayMode() {
     return this.mode;
   }
-  setDisplayMode(mode: RibbonDisplayMode) {
+  setDisplayMode(mode: RibbonDisplayMode, persist?: () => void) {
     if (mode !== 'compact' && mode !== 'expanded')
       throw Error(hostText('services.ribbonState.invalidMode'));
-    if (mode === this.mode) return false;
-    this.write(this.expanded, mode);
+    if (mode === this.mode && !persist) return false;
+    if (persist) {
+      persist();
+      // The host can commit the setting and UI mode in one settings transaction.
+      const stored = this.storage.read() as { expanded: Record<string, boolean> };
+      this.expanded = stored.expanded;
+    } else this.write(this.expanded, mode);
     this.mode = mode;
     this.changed();
     return true;
