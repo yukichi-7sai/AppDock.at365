@@ -1,5 +1,5 @@
 import { hostText } from '../../shared/i18n';
-import type { BrowserWindow, Rectangle, Screen } from 'electron';
+import type { BrowserWindow, Rectangle } from 'electron';
 import { stateStorage, type StateStorage } from './state-storage';
 import { SettingsConflictError } from './settings';
 
@@ -8,77 +8,7 @@ export interface WindowState {
   maximized: boolean;
 }
 
-export const windowMinimum = { width: 1200, height: 670 };
-
-export function windowMinimumForArea(area: Rectangle) {
-  return {
-    width: Math.min(windowMinimum.width, area.width),
-    height: Math.min(windowMinimum.height, area.height),
-  };
-}
-
-export function defaultWindowState(area: Rectangle): WindowState {
-  return fitWindowState(
-    {
-      bounds: {
-        x: area.x + Math.floor((area.width - 1280) / 2),
-        y: area.y + Math.floor((area.height - 840) / 2),
-        width: 1280,
-        height: 840,
-      },
-      maximized: false,
-    },
-    [area],
-  );
-}
-
-/** Keep the host usable when moving between displays or changing display scaling. */
-export function trackWindowWorkArea(window: BrowserWindow, screen: Screen) {
-  let previousArea: Rectangle | undefined;
-  let updating = false;
-  const equal = (a: Rectangle | undefined, b: Rectangle) =>
-    a && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
-  const refresh = (force = false) => {
-    if (updating || window.isDestroyed() || window.isMinimized()) return;
-    const area = screen.getDisplayMatching(window.getBounds()).workArea;
-    if (!force && equal(previousArea, area)) return;
-    previousArea = { ...area };
-    updating = true;
-    try {
-      const minimum = windowMinimumForArea(area);
-      const [width, height] = window.getMinimumSize();
-      if (width !== minimum.width || height !== minimum.height)
-        window.setMinimumSize(minimum.width, minimum.height);
-      if (window.isMaximized() || window.isFullScreen()) return;
-      const bounds = window.getNormalBounds();
-      const fitted = fitWindowState({ bounds, maximized: false }, [area]).bounds;
-      if (!equal(bounds, fitted)) restoreWindowBounds(window, fitted);
-    } finally {
-      updating = false;
-    }
-  };
-  const moved = () => refresh();
-  const changed = () => refresh(true);
-  window.on('move', moved);
-  window.on('resize', moved);
-  window.on('restore', changed);
-  window.on('unmaximize', changed);
-  window.on('leave-full-screen', changed);
-  screen.on('display-added', changed);
-  screen.on('display-removed', changed);
-  screen.on('display-metrics-changed', changed);
-  window.once('closed', () => {
-    screen.removeListener('display-added', changed);
-    screen.removeListener('display-removed', changed);
-    screen.removeListener('display-metrics-changed', changed);
-    window.removeListener('move', moved);
-    window.removeListener('resize', moved);
-    window.removeListener('restore', changed);
-    window.removeListener('unmaximize', changed);
-    window.removeListener('leave-full-screen', changed);
-  });
-  refresh();
-}
+export const windowMinimum = { width: 900, height: 620 };
 
 export function restoreWindowBounds(window: BrowserWindow, bounds: Rectangle) {
   const requested = { ...bounds };
@@ -144,8 +74,9 @@ export function fitWindowState(
     Math.max(0, Math.min(b.x + b.width, area.x + area.width) - Math.max(b.x, area.x)) *
     Math.max(0, Math.min(b.y + b.height, area.y + area.height) - Math.max(b.y, area.y));
   const area = workAreas.reduce((best, next) => (overlap(next) > overlap(best) ? next : best));
-  const width = Math.min(area.width, Math.max(minimum.width, b.width));
-  const height = Math.min(area.height, Math.max(minimum.height, b.height));
+  // Preserve the saved size even on a smaller display; only recover its position.
+  const width = Math.max(minimum.width, b.width);
+  const height = Math.max(minimum.height, b.height);
   return {
     bounds: {
       x: Math.max(area.x, Math.min(b.x, area.x + area.width - width)),

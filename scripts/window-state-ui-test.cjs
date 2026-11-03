@@ -68,15 +68,10 @@ const saved = () =>
       const area = screen.getDisplayMatching(window.getBounds()).workArea;
       const minimum = window.getMinimumSize();
       const initialBounds = window.getNormalBounds();
-      window.setSize(900, 500);
+      window.setSize(600, 400);
       return { area, minimum, initialBounds, bounds: window.getNormalBounds() };
     });
-    assert.deepEqual(initial.minimum, [
-      Math.min(1200, initial.area.width),
-      Math.min(670, initial.area.height),
-    ]);
-    assert(initial.initialBounds.width <= initial.area.width + 1);
-    assert(initial.initialBounds.height <= initial.area.height + 1);
+    assert.deepEqual(initial.minimum, [900, 620]);
     assert(initial.bounds.width >= initial.minimum[0]);
     assert(initial.bounds.height >= initial.minimum[1]);
     const page = await application.firstWindow();
@@ -101,26 +96,46 @@ const saved = () =>
       await dialog.screenshot({ path: path.join(profile, name + '.png') });
     };
     await checkDialog('minimum-dialog');
+    const reference = await application.evaluate(({ BrowserWindow, app }) => {
+      const window = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
+      const requireMain = process
+        .getBuiltinModule('module')
+        .createRequire(app.getAppPath() + '/package.json');
+      requireMain('./out/main/main/core/window-state.js').restoreWindowBounds(window, {
+        ...window.getNormalBounds(),
+        width: 1720,
+        height: 1000,
+      });
+      return { bounds: window.getNormalBounds(), pageZoom: window.webContents.getZoomFactor() };
+    });
+    assert.equal(reference.bounds.width, 1720);
+    assert.equal(reference.bounds.height, 1000);
+    await checkDialog('reference-dialog');
     const small = await application.evaluate(({ BrowserWindow, screen }) => {
       const window = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock://host/index.html'),
       );
       const display = screen.getDisplayMatching(window.getBounds());
       globalThis.windowTestDisplayMatching = screen.getDisplayMatching;
-      const workArea = { ...display.workArea, width: 960, height: 540 };
+      const before = window.getNormalBounds();
+      const workArea = { ...display.workArea, width: 800, height: 500 };
       screen.getDisplayMatching = () => ({ ...display, workArea });
       screen.emit('display-metrics-changed', {}, { ...display, workArea }, ['workArea']);
+      window.setPosition(workArea.x + 20, workArea.y + 20);
       return {
+        before,
         minimum: window.getMinimumSize(),
         bounds: window.getNormalBounds(),
         workArea,
         scaleFactor: display.scaleFactor,
       };
     });
-    assert.deepEqual(small.minimum, [960, 540]);
-    assert(Math.abs(small.bounds.width - 960) <= 1);
-    assert(Math.abs(small.bounds.height - 540) <= 1);
-    await checkDialog('small-work-area-dialog');
+    assert.deepEqual(small.minimum, [900, 620]);
+    // Moving a native window can round its DIP size by one at fractional scaling.
+    assert(Math.abs(small.bounds.width - small.before.width) <= 1);
+    assert(Math.abs(small.bounds.height - small.before.height) <= 1);
     const restoredMinimum = await application.evaluate(({ BrowserWindow, screen }) => {
       screen.getDisplayMatching = globalThis.windowTestDisplayMatching;
       delete globalThis.windowTestDisplayMatching;
@@ -241,6 +256,34 @@ const saved = () =>
     assert.equal((await current()).visible, false);
     await application.close();
     assert.deepEqual(saved(), { bounds: expected, maximized: true });
+    const offscreenSettings = JSON.parse(fs.readFileSync(file, 'utf8'));
+    offscreenSettings.hostPages.general.configuration.host.startMinimized = false;
+    offscreenSettings.uiState.windows.host = {
+      bounds: { ...expected, x: 99999, y: 99999 },
+      maximized: false,
+    };
+    fs.writeFileSync(file, JSON.stringify(offscreenSettings));
+    await launch();
+    await waitFor(async () => (await current()).visible);
+    const positionRecovered = await current();
+    // Position recovery at a display edge may round by one DIP, but repeated
+    // startup must preserve the resulting size rather than keep growing it.
+    assert(Math.abs(positionRecovered.bounds.width - expected.width) <= 1);
+    assert(Math.abs(positionRecovered.bounds.height - expected.height) <= 1);
+    assert(
+      positionRecovered.bounds.x >= initial.area.x &&
+        positionRecovered.bounds.x < initial.area.x + initial.area.width,
+    );
+    assert(
+      positionRecovered.bounds.y >= initial.area.y &&
+        positionRecovered.bounds.y < initial.area.y + initial.area.height,
+    );
+    await application.close();
+    await launch();
+    const recoveryRestart = await current();
+    assert.equal(recoveryRestart.bounds.width, positionRecovered.bounds.width);
+    assert.equal(recoveryRestart.bounds.height, positionRecovered.bounds.height);
+    await application.close();
     const log = path.join(profile, 'data/logs', require('node:os').hostname(), 'host.log');
     assert.doesNotMatch(fs.readFileSync(log, 'utf8'), /ウィンドウ状態の読み込み・保存に失敗/);
     fs.writeFileSync(
@@ -251,17 +294,22 @@ const saved = () =>
           mode: process.argv[2] ? 'fixed' : 'source',
           executableHash: application.executableHash,
           initial,
+          reference,
           small,
+          savedBounds: expected,
+          positionRecovered,
+          recoveryRestart,
           checks: [
             'initial bounds and native minimum size',
-            'command selection remains operable at minimum size',
-            'simulated work area shrink and return update native minimum and dialog layout',
+            'command selection remains operable at 900x620 and reference 1720x1000',
+            'work area changes and window movement preserve size and fixed minimum',
             'restart bounds',
             'maximize/unmaximize',
             'minimize',
             'tray close',
             'hidden startup',
             'incoming position conflict recovery preserves settings and other windows',
+            'offscreen saved position recovers without resizing',
           ],
           file,
         },
@@ -270,7 +318,7 @@ const saved = () =>
       ),
     );
     console.log(
-      'PASS: initial bounds, minimum size, small work area, minimum dialog, restart bounds, maximize/unmaximize, minimize, tray close, hidden startup, incoming position conflict recovery',
+      'PASS: fixed minimum, no auto resize, minimum/reference dialog, restart bounds, maximize/unmaximize, minimize, tray close, hidden startup, incoming position conflict recovery, offscreen position recovery',
     );
   } finally {
     await application?.close();

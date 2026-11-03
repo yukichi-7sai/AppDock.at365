@@ -9,8 +9,6 @@ const {
   parseWindowState,
   fitWindowState,
   restoreWindowBounds,
-  defaultWindowState,
-  trackWindowWorkArea,
 } = require('../out/main/main/core/window-state.js');
 const area = { x: 0, y: 0, width: 1920, height: 1040 };
 const state = { bounds: { x: 100, y: 120, width: 1300, height: 700 }, maximized: false };
@@ -85,81 +83,38 @@ test('hidden startup preserves saved maximum state', (t) => {
   window.emit('close');
   assert.equal(JSON.parse(fs.readFileSync(file)).maximized, true);
 });
-test('negative monitor coordinates survive; disconnected monitor and smaller work area are clamped', () => {
+test('negative monitor coordinates survive and disconnected monitor recovery preserves the saved size', () => {
   const left = { x: -1920, y: 0, width: 1920, height: 1040 };
   const onLeft = { bounds: { ...state.bounds, x: -1800 }, maximized: true };
   assert.deepEqual(fitWindowState(onLeft, [area, left]), onLeft);
   assert.equal(fitWindowState(onLeft, [area]).bounds.x, 0);
   const small = { x: 40, y: 30, width: 800, height: 580 };
-  assert.deepEqual(fitWindowState(state, [small]).bounds, small);
-});
-test('old small bounds expand to the host minimum while short and narrow displays remain usable', () => {
-  const old = { bounds: { x: 100, y: 120, width: 900, height: 620 }, maximized: false };
-  assert.deepEqual(fitWindowState(old, [area]).bounds, {
-    ...old.bounds,
-    width: 1200,
-    height: 670,
+  assert.deepEqual(fitWindowState(state, [small]).bounds, {
+    ...state.bounds,
+    x: small.x,
+    y: small.y,
   });
+});
+test('the minimum is fixed while a smaller work area only changes the restored position', () => {
+  const old = { bounds: { x: 100, y: 120, width: 900, height: 620 }, maximized: false };
+  assert.deepEqual(fitWindowState(old, [area]), old);
+  assert.deepEqual(
+    fitWindowState({ ...old, bounds: { ...old.bounds, width: 500, height: 400 } }, [area]),
+    old,
+  );
+  const large = { bounds: { x: 9999, y: 9999, width: 1720, height: 1000 }, maximized: true };
   for (const workArea of [
     { x: 0, y: 0, width: 960, height: 500 },
     { x: -1280, y: 0, width: 1280, height: 600 },
     { x: 1920, y: 0, width: 1100, height: 900 },
   ]) {
-    const bounds = fitWindowState(old, [workArea]).bounds;
-    assert.equal(bounds.width, Math.min(1200, workArea.width));
-    assert.equal(bounds.height, Math.min(670, workArea.height));
-    assert(bounds.x >= workArea.x && bounds.x + bounds.width <= workArea.x + workArea.width);
-    assert(bounds.y >= workArea.y && bounds.y + bounds.height <= workArea.y + workArea.height);
-    const initial = defaultWindowState(workArea).bounds;
-    assert(initial.width <= workArea.width && initial.height <= workArea.height);
-    assert(initial.x >= workArea.x && initial.y >= workArea.y);
+    const restored = fitWindowState(large, [workArea]);
+    assert.deepEqual(restored, {
+      ...large,
+      bounds: { ...large.bounds, x: workArea.x, y: workArea.y },
+    });
   }
-  assert.deepEqual(defaultWindowState(area).bounds, { x: 320, y: 100, width: 1280, height: 840 });
-});
-
-test('moving displays and changing the work area update the minimum without restricting normal dragging', (t) => {
-  const { window } = fixture(t);
-  let workArea = area;
-  const screen = Object.assign(new EventEmitter(), {
-    getDisplayMatching: () => ({ workArea }),
-  });
-  let minimum = [1200, 670];
-  Object.assign(window, {
-    getBounds: () => ({ ...window.bounds }),
-    getMinimumSize: () => minimum,
-    setMinimumSize: (width, height) => {
-      minimum = [width, height];
-    },
-    setBounds: (bounds) => {
-      window.bounds = { ...bounds };
-      window.emit('move');
-      window.emit('resize');
-    },
-  });
-  trackWindowWorkArea(window, screen);
-  window.bounds.x = -50;
-  window.emit('move');
-  assert.equal(window.bounds.x, -50, 'normal dragging is not snapped back');
-  workArea = { x: -960, y: 0, width: 960, height: 500 };
-  window.emit('move');
-  assert.deepEqual(minimum, [960, 500]);
-  assert.deepEqual(window.bounds, workArea);
-  workArea = area;
-  window.emit('move');
-  assert.deepEqual(minimum, [1200, 670]);
-  assert.deepEqual(window.bounds, { x: 0, y: 0, width: 1200, height: 670 });
-  window.maximized = true;
-  workArea = { ...area, height: 600 };
-  screen.emit('display-metrics-changed');
-  assert.deepEqual(minimum, [1200, 600]);
-  assert.equal(window.bounds.height, 670, 'maximum state keeps its normal bounds until restored');
-  window.maximized = false;
-  window.emit('unmaximize');
-  assert.equal(window.bounds.height, 600);
-  window.emit('closed');
-  assert.equal(screen.listenerCount('display-metrics-changed'), 0);
-  assert.equal(screen.listenerCount('display-removed'), 0);
-  assert.equal(screen.listenerCount('display-added'), 0);
+  assert.deepEqual(fitWindowState(large, []), large);
 });
 test('invalid geometry and broken JSON fall back without preventing startup', (t) => {
   for (const value of [
@@ -252,7 +207,7 @@ for (const invalid of [
 test('fractional DPI rounding does not grow bounds on each restart', () => {
   let actual;
   const window = {
-    getMinimumSize: () => [1200, 670],
+    getMinimumSize: () => [900, 620],
     setBounds(bounds) {
       actual = { ...bounds, width: bounds.width + 1 };
     },
@@ -266,9 +221,9 @@ test('fractional DPI rounding does not grow bounds on each restart', () => {
   assert.deepEqual(actual, state.bounds);
 });
 
-test('DPI compensation at a small display boundary preserves both fitted bounds and the minimum', () => {
-  const bounds = { x: 0, y: 0, width: 960, height: 540 };
-  let minimum = [960, 540];
+test('DPI compensation at the fixed minimum preserves the saved size and minimum', () => {
+  const bounds = { x: 0, y: 0, width: 900, height: 620 };
+  let minimum = [900, 620];
   let actual;
   const window = {
     getMinimumSize: () => [...minimum],
@@ -286,7 +241,7 @@ test('DPI compensation at a small display boundary preserves both fitted bounds 
   };
   restoreWindowBounds(window, bounds);
   assert.deepEqual(actual, bounds);
-  assert.deepEqual(minimum, [960, 540]);
+  assert.deepEqual(minimum, [900, 620]);
 });
 
 test('first show records bounds even if immediately minimized', (t) => {

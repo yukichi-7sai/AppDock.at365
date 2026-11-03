@@ -139,9 +139,7 @@ import { imageReference } from '../shared/registered-images';
 import { WindowsLaunch } from './core/windows-launch';
 import {
   WindowStateStore,
-  defaultWindowState,
-  windowMinimumForArea,
-  trackWindowWorkArea,
+  windowMinimum,
   restoreWindowBounds,
 } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
@@ -4516,17 +4514,15 @@ async function initialize() {
     ...screen.getAllDisplays().filter((display) => display.id !== primary.id),
   ];
   const savedWindow = windowState.load(displays.map((display) => display.workArea));
-  const initialWindow = savedWindow ?? defaultWindowState(primary.workArea);
-  const windowMinimum = windowMinimumForArea(
-    screen.getDisplayMatching(initialWindow.bounds).workArea,
-  );
   restoreMaximized = savedWindow?.maximized ?? false;
   const windowIcon = app.isPackaged
     ? path.join(process.resourcesPath, 'icon.ico')
     : path.join(app.getAppPath(), 'assets', 'icon.ico');
   const endWindow = hostStartupTiming.begin('window');
   window = new BrowserWindow({
-    ...initialWindow.bounds,
+    width: 1280,
+    height: 840,
+    ...savedWindow?.bounds,
     minWidth: windowMinimum.width,
     minHeight: windowMinimum.height,
     title: 'AppDock.at365',
@@ -5236,8 +5232,7 @@ async function initialize() {
   trayMenu();
   await hostStartupTiming.phaseAsync('document', () => window!.loadURL(hostDocumentUrl));
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
-  restoreWindowBounds(window, initialWindow.bounds);
-  trackWindowWorkArea(window, screen);
+  if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   hostStartupTiming.phase('discovery', () => manager.discover());
   hostStartupTiming.count('appletCount', manager.items.size);
   hostStartupTiming.phase('defaults', () => {
