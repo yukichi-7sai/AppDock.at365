@@ -10,6 +10,52 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   const command = (id) => host.locator(`[data-shortcut-command="fixture.triggers.${id}"]`);
   const chip = host.getByTestId('command-provider-filter');
   const clear = commandList.getByRole('button', { name: '絞り込みを解除', exact: true });
+  const category = commandList.getByRole('combobox', { name: 'カテゴリで絞り込み', exact: true });
+  const search = commandList.getByRole('searchbox');
+  await category.selectOption('category:カテゴリ検証');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 2);
+  await search.fill('new');
+  assert.equal(await command('new').count(), 1);
+  assert.equal(await command('one').count(), 0);
+  await search.fill('');
+  await status.selectOption('assigned');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 1);
+  await host.getByTestId('command-provider:fixture.triggers.one').click();
+  assert.equal(await category.inputValue(), 'category:カテゴリ検証');
+  await command('one').locator('.binding-input-filter').first().click();
+  assert.equal(await category.inputValue(), 'category:カテゴリ検証');
+  await status.selectOption('unassigned');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 0);
+  await clear.click();
+  assert.equal(await category.inputValue(), 'all');
+  await category.selectOption('category:');
+  await search.fill('fixture.triggers.two');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 1);
+  await clear.click();
+  await search.fill('カテゴリ検証');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 2);
+  await clear.click();
+  await category.selectOption('category:カテゴリ検証');
+  await host.getByTestId('command-trigger-filter:gestures').click();
+  assert.equal(await category.inputValue(), 'category:カテゴリ検証');
+  await host.screenshot({ path: path.join(profile, 'command-category-wide.png') });
+  const originalViewport = host.viewportSize();
+  await host.setViewportSize({ width: 760, height: 650 });
+  await category.scrollIntoViewIfNeeded();
+  assert(await category.isVisible());
+  assert(await status.isVisible());
+  await host.screenshot({ path: path.join(profile, 'command-category-narrow.png') });
+  if (originalViewport) await host.setViewportSize(originalViewport);
+  await clear.click();
+  assert.equal(await category.inputValue(), 'all');
+  assert.equal(
+    await host.getByTestId('command-trigger-filter:gestures').getAttribute('aria-pressed'),
+    'true',
+  );
+  assert.deepEqual(await saved(), baseline);
+  checks.push(
+    'command categories combine with search, assignment state, provider, input and kind filters; uncategorized and category search work; clear restores all without saving',
+  );
   await status.selectOption('assigned');
   await host.getByTestId('command-provider:fixture.triggers.one').click();
   assert.equal(await status.inputValue(), 'assigned');

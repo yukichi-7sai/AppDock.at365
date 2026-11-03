@@ -463,6 +463,12 @@
     width: 125px;
     padding-inline: 8px;
   }
+  .settings-panel .command-triggers-editor .command-shortcut-search {
+    flex-basis: 100%;
+  }
+  .settings-panel .command-triggers-editor .command-shortcut-tools .shortcut-status-filter {
+    width: calc((100% - 8px) / 2);
+  }
   .settings-panel .tray-workspace {
     grid-template-columns: minmax(0, 1fr);
   }

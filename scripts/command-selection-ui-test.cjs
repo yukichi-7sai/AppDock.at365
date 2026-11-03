@@ -206,6 +206,60 @@ async function inspectLayout(dialog, name) {
       'appdock.settings.open',
     );
     assert.equal((await snapshot()).overlay.active, false);
+    const repeatSearch = dialog.getByRole('combobox', { name: 'コマンドを検索' });
+    await repeatSearch.fill('appdock.');
+    const optionIds = await dialog
+      .locator('[role=option]')
+      .evaluateAll((options) => options.map((option) => option.dataset.commandId));
+    const selectedId = () =>
+      dialog.locator('[role=option][aria-selected=true]').getAttribute('data-command-id');
+    await repeatSearch.focus();
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.up('ArrowDown');
+    assert.equal(await selectedId(), optionIds[2]);
+    await host.keyboard.down('ArrowUp');
+    await host.keyboard.down('ArrowUp');
+    await host.keyboard.up('ArrowUp');
+    assert.equal(await selectedId(), optionIds[0]);
+    await repeatSearch.evaluate((input) => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }),
+      );
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          repeat: true,
+          isComposing: true,
+          bubbles: true,
+        }),
+      );
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          repeat: true,
+          ctrlKey: true,
+          bubbles: true,
+        }),
+      );
+    });
+    assert(await dialog.isVisible());
+    assert.equal(await selectedId(), optionIds[0]);
+    const results = dialog.getByRole('listbox');
+    await results.press('Home');
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.up('ArrowDown');
+    assert.equal(await selectedId(), optionIds[2]);
+    await results.press('End');
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.down('ArrowDown');
+    await host.keyboard.up('ArrowDown');
+    assert.equal(await selectedId(), optionIds.at(-1));
+    assert.deepEqual(await saved(), baseline);
+    checks.push(
+      'repeated up/down navigate from search and results, stop at bounds, and preserve IME, modified keys and repeated Enter guards',
+    );
     const divider = dialog.getByRole('separator', { name: '提供元一覧の幅を変更' });
     const width = async () => Number(await divider.getAttribute('aria-valuenow'));
     assert.equal(await width(), 170);
@@ -271,7 +325,10 @@ async function inspectLayout(dialog, name) {
     await dialog.getByRole('button', { name: /^Selection fixture/ }).click();
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('日本語 説明');
     assert.equal(await dialog.locator('[role=option]').count(), 1);
-    assert.match(await dialog.getByRole('button', { name: /^Selection fixture/ }).innerText(), /1$/);
+    assert.match(
+      await dialog.getByRole('button', { name: /^Selection fixture/ }).innerText(),
+      /1$/,
+    );
     assert.match(await dialog.getByRole('button', { name: /^AppDock/ }).innerText(), /0$/);
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('');
     await dialog.getByRole('button', { name: /^すべて/ }).click();
@@ -390,7 +447,10 @@ async function inspectLayout(dialog, name) {
     await stack.waitFor({ state: 'hidden' });
     assert.equal((await saved()).customCommands.items[0].category, '画像');
     await host.getByRole('button', { name: 'Selection stackを編集', exact: true }).click();
-    assert.equal(await stack.getByRole('textbox', { name: 'カテゴリ（任意）', exact: true }).inputValue(), '画像');
+    assert.equal(
+      await stack.getByRole('textbox', { name: 'カテゴリ（任意）', exact: true }).inputValue(),
+      '画像',
+    );
     await stack.getByTestId('stack-add-command').click();
     dialog = selectionDialog(host);
     await dialog

@@ -20,6 +20,7 @@ import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { Icon } from '../../shared/ui-icons';
 import { CommandBindingList, type BindingEdit } from '../settings-ui/CommandBindingList';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
+import { CommandCategoryFilter } from '../settings-ui/CommandCategoryFilter';
 import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { CommandTargetFilter } from '../settings-ui/CommandSettingsNavigation';
 import { CommandProviderFilter } from '../settings-ui/CommandProviderFilter';
@@ -160,6 +161,7 @@ export function CommandTriggersEditor({
     }
   }, [tab]);
   const [kinds, setKinds] = useState<readonly CommandTriggerKind[]>(commandTriggerKinds);
+  const [category, setCategory] = useState('all');
   const [error, setError] = useState('');
   const lastStatuses = useRef(statuses);
   useEffect(() => {
@@ -240,6 +242,7 @@ export function CommandTriggersEditor({
   const terms = filters.filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
     if (!kinds.length) return false;
+    if (category !== 'all' && (command.category?.trim() ?? '') !== category.slice(9)) return false;
     if (!filters.inputFilter) {
       if (filters.target && command.id !== filters.target.id) return false;
       if (filters.provider && command.extensionId !== filters.provider.id) return false;
@@ -254,6 +257,7 @@ export function CommandTriggersEditor({
       command.title,
       command.id,
       command.extension,
+      command.category,
       ...assigned.map((row) => `${inputLabel(row)} ${conditionLabel(row, command)}`),
     ]
       .join(' ')
@@ -284,6 +288,14 @@ export function CommandTriggersEditor({
         setFilter={filters.setFilter}
         setStatusFilter={filters.setStatusFilter}
         showRegistrationErrors
+        searchFilters={
+          <CommandCategoryFilter
+            commands={catalog}
+            className="shortcut-status-filter"
+            value={category}
+            onChange={setCategory}
+          />
+        }
         inputFilter={
           filters.inputFilter && {
             ...filters.inputFilter,
@@ -292,10 +304,14 @@ export function CommandTriggersEditor({
         }
         clearInputFilter={filters.clearInput}
         hasAdditionalFilters={
-          kinds.length !== commandTriggerKinds.length || !!filters.provider || !!filters.target
+          kinds.length !== commandTriggerKinds.length ||
+          category !== 'all' ||
+          !!filters.provider ||
+          !!filters.target
         }
         clearAdditionalFilters={() => {
           setKinds(commandTriggerKinds);
+          setCategory('all');
           filters.clearProvider();
           filters.clearTarget?.();
         }}

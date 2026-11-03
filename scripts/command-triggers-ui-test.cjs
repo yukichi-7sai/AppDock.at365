@@ -25,6 +25,7 @@ fs.writeFileSync(
     commands: ['one', 'two', 'new', 'long', 'tail'].map((name) => ({
       id: `fixture.triggers.${name}`,
       title: `Trigger ${name}`,
+      ...(['one', 'new'].includes(name) ? { category: 'カテゴリ検証' } : {}),
       automation: name === 'two',
     })),
   }),
@@ -176,7 +177,10 @@ if (filterConsistencyOnly) {
   initial.touchpadGestures.inputExecutionModes = { 'four.right': 'first' };
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? testHostPath(profile) : null;
 if (portable) {

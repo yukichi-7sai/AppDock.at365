@@ -18,6 +18,7 @@ import { SettingsInput } from './SettingsInput';
 import { SettingsButton } from './SettingsButton';
 import { SettingsListCount } from './SettingsListCount';
 import { FilterSelect } from './FilterSelect';
+import { CommandCategoryFilter } from './CommandCategoryFilter';
 import './command-selection-dialog.css';
 
 const noPins: string[] = [];
@@ -71,13 +72,6 @@ export function CommandSelectionDialog({
     return () => observer.disconnect();
   }, []);
   const catalog = useMemo(() => commandSelectionCatalog(commands, pins), [commands, pins]);
-  const categories = useMemo(
-    () =>
-      [...new Set(catalog.map((entry) => entry.category).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b, 'ja'),
-      ),
-    [catalog],
-  );
   const matching = useMemo(
     () =>
       filterCommandSelection(
@@ -161,7 +155,7 @@ export function CommandSelectionDialog({
       composing.current ||
       event.nativeEvent.isComposing ||
       event.nativeEvent.keyCode === 229 ||
-      event.repeat ||
+      (event.repeat && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') ||
       event.ctrlKey ||
       event.altKey ||
       event.metaKey ||
@@ -260,28 +254,15 @@ export function CommandSelectionDialog({
             onKeyDown={navigate}
           />
         </div>
-        <FilterSelect
+        <CommandCategoryFilter
+          commands={catalog}
           className="command-selection-category"
-          aria-label={t('settings.commandSelection.category')}
           value={category}
-          onChange={(event) => {
-            setCategory(event.target.value);
+          onChange={(value) => {
+            setCategory(value);
             setSelectedId(undefined);
           }}
-        >
-          <option value="all">{t('settings.commandSelection.allCategories')}</option>
-          <option value="category:">{t('settings.commandSelection.uncategorized')}</option>
-          {categories.map((value) => (
-            <option key={value} value={`category:${value}`}>
-              {value}
-            </option>
-          ))}
-          {category !== 'all' &&
-            category !== 'category:' &&
-            !categories.includes(category.slice(9)) && (
-              <option value={category}>{category.slice(9)}</option>
-            )}
-        </FilterSelect>
+        />
         <span aria-live="polite">
           <SettingsListCount visible={filtered.length} total={catalog.length} />
         </span>

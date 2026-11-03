@@ -2944,6 +2944,12 @@ summary {
   align-items: stretch;
   gap: 12px;
 }
+.command-triggers-editor .command-shortcut-tools {
+  flex-wrap: wrap;
+}
+.command-triggers-editor .command-shortcut-search {
+  min-width: min(220px, 100%);
+}
 .command-provider-filter {
   display: inline-flex;
   width: fit-content;

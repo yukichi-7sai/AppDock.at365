@@ -19,6 +19,7 @@ export function CommandBindingToolbar({
   showRegistrationErrors = false,
   children,
   filters,
+  searchFilters,
   hasAdditionalFilters = false,
   clearAdditionalFilters,
   inputFilter,
@@ -35,6 +36,7 @@ export function CommandBindingToolbar({
   showRegistrationErrors?: boolean;
   children?: ReactNode;
   filters?: ReactNode;
+  searchFilters?: ReactNode;
   hasAdditionalFilters?: boolean;
   clearAdditionalFilters?(): void;
   inputFilter?: BindingInputFilter | null;
@@ -60,6 +62,7 @@ export function CommandBindingToolbar({
             onChange={(event) => setFilter(event.target.value)}
           />
         </div>
+        {searchFilters}
         <FilterSelect
           className="shortcut-status-filter"
           aria-label={translate('settings.commandBindingToolbar.filter', { inputName: inputName })}
