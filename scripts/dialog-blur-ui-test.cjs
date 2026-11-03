@@ -354,9 +354,13 @@ async function closePalette(p, background = false) {
       await host.locator('main').evaluate((el) => getComputedStyle(el).filter),
       'blur(2px)',
     );
-    assert.equal(
-      await p.locator('.modal-backdrop').evaluate((el) => getComputedStyle(el).backgroundColor),
-      'rgba(0, 0, 0, 0)',
+    assert(
+      await p.evaluate(() =>
+        document
+          .elementsFromPoint(5, 5)
+          .every((el) => getComputedStyle(el).backgroundColor === 'rgba(0, 0, 0, 0)'),
+      ),
+      'the palette leaves the underlying page visible outside the card',
     );
     await until(async () => {
       const area = await host.locator('main').boundingBox();

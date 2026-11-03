@@ -1,12 +1,12 @@
 :root {
   font-family: 'Segoe UI', sans-serif;
   color: var(--text);
-  background: transparent;
 }
 * {
   box-sizing: border-box;
 }
-html,
+/* Keep the underlying page visible even when the shared :root theme loads last. */
+html:root,
 body,
 #root {
   margin: 0;
