@@ -66,6 +66,8 @@ GitHubの匿名APIへ実通信するテストは作成・実行しません。�
 
 ## 設定・トリガーの主な担当
 
+`scripts/input-palette-resize-ui-test.cjs [固定EXE]`は、隔離した実パレットのハンドルをOSマウスでドラッグし、元のeditor HWNDと前面ウィンドウの維持、ガイドON/OFF、最小サイズ・作業領域・仮想一覧、種類別の初期幅の既定値・最小値・整数検証・Enter/Escape、サイズ復元と閉じた後の設定幅への初期化、ドラッグで設定値を変えないこと、設定の保存・実再起動を確認する。OSキーは試験専用PID・HWND・editorの一致と限定リストを確認してから送る。実InputHostによる捕捉・表示・確定・取消を使うが、Windows履歴・クリップボード書込み・最終貼り付けはfixtureに置き換え、入力本文は隔離editorへ直接反映する。一般アプリへの実貼り付けや手動操作の証拠とは区別する。`--prototype`は設定接続前のガイド切替だけをfixtureで切り替える。
+
 `scripts/input-palette-phase1-ui-test.cjs <固定EXE>`は、パレットの表示件数の確定・取消・不正値・再起動保持と、実パレットからテキストライブラリーの定型文グループへの移動を確認する。表示とhost制御の追加検査ではnative境界をfixtureへ差し替え、PageUp/Down・Home/End、数字と項目IDの対応、左右切替時の入力先・候補順・選択・スクロール保持、旧画面操作の拒否、無効履歴からの復帰、明暗と広狭幅を確認する。個人のクリップボードは変更しない。`InputTests --input-palette <InputHost.dll>`は隔離した入力欄を使い、OSへキーを送らない捕捉handler試験で数字列/テンキー、長押しと解放、未存在番号、初回表示前/切替待ち、修飾キー・対象変更を確認する。実Windows履歴と実貼り付けは既存の`input-palette-notepad-test.cjs`が担当し、このfixtureの成功から実利用確認を推定しない。
 
 `scripts/command-triggers-ui-test.cjs [固定EXE] --usability-only`は、共通の`command-trigger-usability-checks.cjs`でコマンド列のキーボード追加・条件編集・取消時のフォーカス復帰、論理900 × 620での横スクロールと追従中の提供元・追加ボタンへの到達、空結果とJSON切替の保存不変を確認する。提供元の3段表示は代表画像で確認し、DOMの段数やCSSの実装を固定する検査にはしない。

@@ -52,6 +52,9 @@ function change(value, pageId, alternate = false) {
     next.host.textPaletteHistory = alternate;
     next.host.textPaletteRows = alternate ? 11 : 4;
     next.host.clipboardPaletteRows = alternate ? 3 : 12;
+    next.host.textPaletteWidth = alternate ? 420 : 560;
+    next.host.clipboardPaletteWidth = alternate ? 350 : 480;
+    next.host.paletteShowGuide = alternate;
   } else if (pageId === 'notifications') {
     next.host.notificationBannerPosition = alternate ? 'bottom-left' : 'bottom-right';
     next.host.notificationBannerShadow = alternate;

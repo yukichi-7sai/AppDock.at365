@@ -167,6 +167,8 @@ export function parseSettings(value: unknown): Settings {
     if (field.key !== 'language') validateSettingValue(field, value.host[field.key]);
   for (const key of ['textPaletteRows', 'clipboardPaletteRows'])
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidRows'));
+  for (const key of ['textPaletteWidth', 'clipboardPaletteWidth'])
+    if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidWidth'));
   if (!isStartPage(value.host.startPage)) throw Error(hostText('general.startPage.invalid'));
   const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
   const trayCommands =

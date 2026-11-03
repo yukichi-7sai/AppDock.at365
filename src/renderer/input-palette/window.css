@@ -20,6 +20,7 @@ body,
 }
 header,
 footer {
+  position: relative;
   flex: none;
   display: flex;
   align-items: center;
@@ -44,6 +45,31 @@ footer {
   justify-content: center;
   gap: 2px;
   font-size: 11px;
+  padding-right: 28px;
+}
+footer.compact {
+  height: 20px;
+}
+.resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 20px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+}
+.resize-handle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
 }
 footer span,
 header > strong {

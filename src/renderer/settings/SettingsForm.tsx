@@ -13,6 +13,7 @@ import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
 import { DescriptionText } from '../settings-ui/DescriptionText';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
+import { minimumInputPaletteWidth } from '../../shared/input-palette';
 import { AboutSettings } from './AboutSettings';
 import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
@@ -478,6 +479,18 @@ export function SettingsForm({
 
         {category === 'text-palette' && (
           <>
+            <SettingsSection title={t('common.section')}>
+              <SettingRow pageId={category} itemKey="paletteShowGuide">
+                <Toggle
+                  label={t('inputPalette.showGuide')}
+                  checked={settings.host.paletteShowGuide}
+                  disabled={busy}
+                  onChange={(paletteShowGuide) =>
+                    edit({ ...settings, host: { ...settings.host, paletteShowGuide } })
+                  }
+                />
+              </SettingRow>
+            </SettingsSection>
             <SettingsSection
               title={t('inputPalette.title')}
               description={<DescriptionText text={t('inputPalette.description')} />}
@@ -495,6 +508,26 @@ export function SettingsForm({
                   checked={settings.host.textPaletteHistory}
                   onChange={(v) =>
                     edit({ ...settings, host: { ...settings.host, textPaletteHistory: v } })
+                  }
+                />
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="textPaletteWidth">
+                <SettingsInput
+                  aria-label={t('inputPalette.displayWidth')}
+                  data-testid="text-palette-width"
+                  type="number"
+                  min={minimumInputPaletteWidth}
+                  step={1}
+                  disabled={busy}
+                  value={settings.host.textPaletteWidth}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        textPaletteWidth: numberInput(event.target.value),
+                      },
+                    })
                   }
                 />
               </SettingRow>
@@ -530,6 +563,26 @@ export function SettingsForm({
                   </button>
                 </SettingsActions>
               </SettingsField>
+              <SettingRow pageId={category} itemKey="clipboardPaletteWidth">
+                <SettingsInput
+                  aria-label={t('inputPalette.displayWidth')}
+                  data-testid="clipboard-palette-width"
+                  type="number"
+                  min={minimumInputPaletteWidth}
+                  step={1}
+                  disabled={busy}
+                  value={settings.host.clipboardPaletteWidth}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        clipboardPaletteWidth: numberInput(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </SettingRow>
               <SettingRow pageId={category} itemKey="clipboardPaletteRows">
                 <SettingsInput
                   aria-label={t('inputPalette.displayRows')}

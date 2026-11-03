@@ -7,7 +7,11 @@ import type { TextLibraryService } from './text-library-service';
 import type { LibraryEntry } from '../../shared/library-assets';
 import {
   inputPaletteBounds,
+  defaultInputPaletteWidth,
   inputPaletteSelection,
+  inputPaletteResizedBounds,
+  type InputPaletteRectangle,
+  type InputPaletteSize,
   type InputPaletteKind,
   type InputPaletteModel,
 } from '../../shared/input-palette';
@@ -18,6 +22,7 @@ interface PaletteList {
   empty: string;
   selected: number;
   scrollTop: number;
+  size?: InputPaletteSize;
 }
 interface Session extends PaletteList {
   id: string;
@@ -30,6 +35,15 @@ interface Session extends PaletteList {
   switching: boolean;
   captureView?: (top: number) => void;
   ready?: () => void;
+  resizing?: {
+    x: number;
+    y: number;
+    bounds: InputPaletteRectangle;
+    area: InputPaletteRectangle;
+    zoom: number;
+  };
+  guide: boolean;
+  bounds?: InputPaletteRectangle;
 }
 export type PaletteFailure = 'open' | 'read' | 'send' | 'modifiers' | 'unconfirmed' | 'denied';
 export class InputPaletteHost {
@@ -49,6 +63,8 @@ export class InputPaletteHost {
     private displayRows: (kind: InputPaletteKind) => number,
     private manageSnippets: () => Promise<void>,
     private report: (stage: PaletteFailure, session: Pick<Session, 'id' | 'kind'>) => void,
+    private showGuide: () => boolean = () => true,
+    private displayWidth: (kind: InputPaletteKind) => number = () => defaultInputPaletteWidth,
   ) {
     ipcMain.on('input-palette:connect', this.connect);
     ipcMain.on('input-palette:choose', this.click);
@@ -56,6 +72,7 @@ export class InputPaletteHost {
     ipcMain.on('input-palette:manage', this.manage);
     ipcMain.on('input-palette:scroll', this.scroll);
     ipcMain.on('input-palette:view-state', this.viewState);
+    ipcMain.on('input-palette:resize', this.resize);
   }
   private connect = (e: IpcMainEvent) => {
     if (!this.trusted(e)) return;
@@ -80,6 +97,8 @@ export class InputPaletteHost {
       keys: hostText('inputPalette.keys'),
       keyHelp: hostText('inputPalette.keyHelp'),
       manage: hostText('inputPalette.manage'),
+      guide: s.guide,
+      resize: hostText('inputPalette.resize'),
       empty: s.empty,
     });
   }
@@ -88,6 +107,63 @@ export class InputPaletteHost {
     if (s && s.id === session && s.view === view && this.trusted(e)) {
       s.ready?.();
     }
+  };
+  private resize = (
+    e: IpcMainEvent,
+    session: string,
+    view: number,
+    phase: string,
+    x: number,
+    y: number,
+  ) => {
+    const s = this.active,
+      win = this.window;
+    if (
+      !s ||
+      !win ||
+      s.id !== session ||
+      s.view !== view ||
+      s.switching ||
+      this.presented !== session ||
+      !this.trusted(e) ||
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    )
+      return;
+    if (phase === 'start') {
+      const actual = win.getBounds();
+      // Use requested dimensions for deltas; Windows can round getBounds up at fractional DPI.
+      const bounds = {
+        ...actual,
+        width: s.bounds?.width ?? actual.width,
+        height: s.bounds?.height ?? actual.height,
+      };
+      s.resizing = {
+        x,
+        y,
+        bounds,
+        area: screen.getDisplayMatching(bounds).workArea,
+        zoom: win.webContents.getZoomFactor(),
+      };
+      return;
+    }
+    if (!s.resizing || (phase !== 'move' && phase !== 'end')) return;
+    const drag = s.resizing;
+    const bounds = inputPaletteResizedBounds(
+      drag.bounds,
+      drag.area,
+      {
+        width: drag.bounds.width + (x - drag.x) * drag.zoom,
+        height: drag.bounds.height + (y - drag.y) * drag.zoom,
+      },
+      s.guide,
+    );
+    if (bounds.width !== s.bounds?.width || bounds.height !== s.bounds?.height) {
+      win.setBounds(bounds);
+      s.bounds = bounds;
+      s.size = { width: bounds.width, height: bounds.height };
+    }
+    if (phase === 'end') s.resizing = undefined;
   };
   private trusted(e: IpcMainEvent) {
     return (
@@ -238,6 +314,7 @@ export class InputPaletteHost {
       scrollTop: 0,
       lists: {},
       switching: false,
+      guide: this.showGuide(),
       pasteEpoch: this.pasteEpoch,
     };
     this.active = s;
@@ -300,6 +377,7 @@ export class InputPaletteHost {
       ),
       selected: 0,
       scrollTop: 0,
+      size: undefined,
       entries: list.rows.map((row) => ({
         item: row.id,
         name:
@@ -320,6 +398,7 @@ export class InputPaletteHost {
   private async switchPalette(s: Session) {
     if (s.switching) return;
     s.switching = true;
+    s.resizing = undefined;
     const kind = s.kind === 'snippets' ? 'history' : 'snippets';
     try {
       // Scroll events can arrive after a native key notice. Capture the rendered view before switching.
@@ -330,6 +409,7 @@ export class InputPaletteHost {
         empty: s.empty,
         selected: s.selected,
         scrollTop: s.scrollTop,
+        size: s.size,
       };
       // Invalidate clicks/scrolls queued by the previous view, while retaining the captured editor.
       s.view++;
@@ -342,6 +422,7 @@ export class InputPaletteHost {
               empty: hostText('inputPalette.empty'),
               selected: 0,
               scrollTop: 0,
+              size: undefined,
             });
       if (this.active !== s) return;
       if (!list) {
@@ -364,7 +445,16 @@ export class InputPaletteHost {
     const point = s.anchor!,
       area = screen.getDisplayNearestPoint(point).workArea;
     const win = this.surface();
-    win.setBounds(inputPaletteBounds(point, area, s.entries.length, this.displayRows(s.kind)));
+    s.bounds = inputPaletteBounds(
+      point,
+      area,
+      s.entries.length,
+      this.displayRows(s.kind),
+      s.guide,
+      s.size,
+      this.displayWidth(s.kind),
+    );
+    win.setBounds(s.bounds);
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const rendered = new Promise<void>((resolve, reject) => {
       s.ready = resolve;
@@ -428,6 +518,7 @@ export class InputPaletteHost {
   }
   private choose(s: Session, index: number) {
     if (this.active !== s) return;
+    s.resizing = undefined;
     this.confirmations.set(s.id, s);
     const claim = this.input.paletteRequest<boolean>('confirm', { session: s.id }).then(
       (ok) => ({ ok }),
@@ -501,6 +592,7 @@ export class InputPaletteHost {
   }
   private end(s: Session, notify = true) {
     if (this.active !== s) return;
+    s.resizing = undefined;
     this.active = undefined;
     s.ready?.();
     s.captureView?.(s.scrollTop);
@@ -523,5 +615,6 @@ export class InputPaletteHost {
     ipcMain.removeListener('input-palette:manage', this.manage);
     ipcMain.removeListener('input-palette:scroll', this.scroll);
     ipcMain.removeListener('input-palette:view-state', this.viewState);
+    ipcMain.removeListener('input-palette:resize', this.resize);
   }
 }

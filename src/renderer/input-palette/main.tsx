@@ -22,6 +22,19 @@ function Palette() {
   const [selected, select] = useState(0),
     [top, scroll] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState(0);
+  const drag = useRef<{
+    pointer: number;
+    session: string;
+    view: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const finishResize = () => {
+    const value = drag.current;
+    drag.current = null;
+    if (value) window.inputPalette.resize(value.session, value.view, 'end', value.x, value.y);
+  };
   const reveal = (index: number) => {
     const el = list.current;
     if (!el) return;
@@ -55,6 +68,18 @@ function Palette() {
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
+    const update = () => setViewport(el.clientHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      finishResize();
+    };
+  }, [model]);
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
     if (restored.current !== model) {
       restored.current = model;
       el.scrollTop = model?.scrollTop ?? 0;
@@ -65,7 +90,7 @@ function Palette() {
   }, [selected, model]);
   if (!model) return null;
   const start = Math.max(0, Math.floor(top / rowHeight) - 1);
-  const count = Math.ceil(window.innerHeight / rowHeight) + 2;
+  const count = Math.ceil(viewport / rowHeight) + 2;
   return (
     <>
       <header data-palette-session={model.session}>
@@ -119,9 +144,55 @@ function Palette() {
           </div>
         )}
       </div>
-      <footer>
-        <span title={model.keys}>{model.keys}</span>
-        <span title={model.keyHelp}>{model.keyHelp}</span>
+      <footer className={model.guide ? undefined : 'compact'}>
+        {model.guide && (
+          <>
+            <span title={model.keys}>{model.keys}</span>
+            <span title={model.keyHelp}>{model.keyHelp}</span>
+          </>
+        )}
+        <button
+          key={model.session + ':' + model.view}
+          className="resize-handle"
+          type="button"
+          tabIndex={-1}
+          title={model.resize}
+          aria-label={model.resize}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = {
+              pointer: e.pointerId,
+              session: model.session,
+              view: model.view,
+              x: e.clientX,
+              y: e.clientY,
+            };
+            window.inputPalette.resize(model.session, model.view, 'start', e.clientX, e.clientY);
+          }}
+          onPointerMove={(e) => {
+            const value = drag.current;
+            if (!value || value.pointer !== e.pointerId) return;
+            value.x = e.clientX;
+            value.y = e.clientY;
+            window.inputPalette.resize(value.session, value.view, 'move', value.x, value.y);
+          }}
+          onPointerUp={(e) => {
+            if (drag.current?.pointer !== e.pointerId) return;
+            drag.current.x = e.clientX;
+            drag.current.y = e.clientY;
+            finishResize();
+            if (e.currentTarget.hasPointerCapture(e.pointerId))
+              e.currentTarget.releasePointerCapture(e.pointerId);
+          }}
+          onPointerCancel={finishResize}
+          onLostPointerCapture={finishResize}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M5 13 13 5M10 13l3-3" />
+          </svg>
+        </button>
       </footer>
     </>
   );

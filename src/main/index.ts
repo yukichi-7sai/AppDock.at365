@@ -5341,6 +5341,11 @@ async function initialize() {
           stage.toUpperCase(),
         message: hostText(`inputPalette.error.${stage}`),
       }),
+    () => settings.value.host.paletteShowGuide,
+    (kind) =>
+      kind === 'snippets'
+        ? settings.value.host.textPaletteWidth
+        : settings.value.host.clipboardPaletteWidth,
   );
   gestures.inputPalette = inputPalette;
   await hostStartupTiming.phaseAsync('indicator', () => gestureIndicatorHost!.initialize());

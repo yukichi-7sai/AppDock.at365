@@ -1,7 +1,11 @@
 import { localizedMetadata } from './translation-metadata';
 import type { HostSettings, SettingDefinition } from './contracts';
 import { hostText } from './i18n';
-import { defaultInputPaletteRows } from './input-palette';
+import {
+  defaultInputPaletteRows,
+  defaultInputPaletteWidth,
+  minimumInputPaletteWidth,
+} from './input-palette';
 import { notificationBannerPositions } from './notifications';
 import { defaultHostLanguage, hostLanguages, hostLanguageName } from './host-language';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
@@ -143,6 +147,14 @@ const definitions = localizedMetadata(() => ({
     automation: true,
     generateCommands: [...switches],
   },
+  paletteShowGuide: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.showGuide'),
+    description: hostText('inputPalette.showGuideHint'),
+    type: 'boolean',
+    default: true,
+    automation: false,
+  },
   textPaletteHistory: {
     pageId: 'text-palette',
     title: hostText('inputPalette.history'),
@@ -168,6 +180,26 @@ const definitions = localizedMetadata(() => ({
     type: 'number',
     default: defaultInputPaletteRows,
     minimum: 1,
+    step: 1,
+    automation: false,
+  },
+  textPaletteWidth: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.displayWidth'),
+    description: hostText('inputPalette.displayWidthHint'),
+    type: 'number',
+    default: defaultInputPaletteWidth,
+    minimum: minimumInputPaletteWidth,
+    step: 1,
+    automation: false,
+  },
+  clipboardPaletteWidth: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.displayWidth'),
+    description: hostText('inputPalette.displayWidthHint'),
+    type: 'number',
+    default: defaultInputPaletteWidth,
+    minimum: minimumInputPaletteWidth,
     step: 1,
     automation: false,
   },

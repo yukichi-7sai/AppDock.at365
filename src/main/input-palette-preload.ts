@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { InputPaletteApi } from '../shared/input-palette';
 
 const api: InputPaletteApi = {
+  resize: (session, view, phase, x, y) =>
+    ipcRenderer.send('input-palette:resize', session, view, phase, x, y),
   ready: (session, view) => ipcRenderer.send('input-palette:ready', session, view),
   models: (callback) => {
     ipcRenderer.on('input-palette:model', (_e, model) => callback(model));
