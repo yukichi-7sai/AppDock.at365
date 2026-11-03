@@ -1,7 +1,8 @@
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const { assertKeyboardFocus } = require('./ui-usability-helper.cjs');
 
-module.exports = async ({ host, command, row, checks }) => {
+module.exports = async ({ host, command, row, checks, profile }) => {
   const dialog = host.getByTestId('settings-dialog');
   const cancel = async () => {
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -49,7 +50,7 @@ module.exports = async ({ host, command, row, checks }) => {
   }
   checks.push('input filters identify each trigger kind and clear back to the initiating control');
 
-  await host.setViewportSize({ width: 700, height: 760 });
+  await host.setViewportSize({ width: 900, height: 620 });
   const body = host.locator('.settings-body');
   const bar = host.getByRole('region', { name: 'コマンド一覧を横にスクロール', exact: true });
   await row('shortcuts', 'long-12').locator('.binding-input-filter').scrollIntoViewIfNeeded();
@@ -97,6 +98,8 @@ module.exports = async ({ host, command, row, checks }) => {
   const longAdd = host.getByTestId('binding-add:fixture.triggers.long:gestures');
   await command('fixture.triggers.long').locator('.command-title').hover();
   await longAdd.click({ trial: true });
+  await host.getByTestId('command-provider:fixture.triggers.long').click({ trial: true });
+  await host.screenshot({ path: path.join(profile, 'command-provider-sticky.png') });
   const position = await body.evaluate((element) => ({
     top: element.scrollTop,
     left: element.scrollLeft,

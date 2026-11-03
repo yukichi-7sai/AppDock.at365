@@ -65,7 +65,10 @@ settings.touchpadGestures.bindings = [
   { ...row, id: 'touch-off', gesture: 'four.tap', enabled: false },
 ];
 require('../out/main/shared/settings-schema').parseSettings(settings);
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -266,10 +269,17 @@ async function jump(id) {
       .locator(`[data-shortcut-command="${target}"] [data-trigger-kind]`)
       .allTextContents();
     assert(inputs.every((input) => listInputs.includes(input)));
-    await dock.getByTestId('command-provider-filter-clear').click();
+    await dock.locator(`[data-shortcut-command="${target}"] .binding-input-filter`).first().click();
+    await dock.getByTestId(`command-provider:${target}`).click();
+    assert.equal(await dock.getByTestId('command-provider-filter').count(), 3);
+    assert.equal(await dock.locator('[data-shortcut-command]').count(), 1);
+    await dock.locator('[data-filter-kind="command"]').getByRole('button').click();
+    assert.equal(await dock.locator('[data-filter-kind="input"]').count(), 1);
+    assert.equal(await dock.locator('[data-filter-kind="provider"]').count(), 1);
+    await dock.getByRole('button', { name: '絞り込みを解除', exact: true }).click();
     await dock.getByTestId('command-provider-filter').waitFor({ state: 'hidden' });
     checks.push(
-      'method OFF/ON updates open palette; targeted zero results has no alert; keyboard bolt opens exact command list; filter clears',
+      'method OFF/ON updates open palette; targeted zero results has no alert; keyboard bolt opens exact command list; command/provider/input targets combine and clear independently',
     );
     await open('fixture.palette.short');
     await jump('fixture.palette.short');

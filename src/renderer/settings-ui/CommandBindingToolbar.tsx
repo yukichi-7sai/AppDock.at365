@@ -85,23 +85,25 @@ export function CommandBindingToolbar({
         className="command-shortcut-summary"
         leading={filters}
         filter={
-          inputFilter ? (
-            <CommandProviderFilter
-              label={
-                inputKind === 'trigger'
-                  ? translate('settings.commandTriggers.trigger')
-                  : inputKind === 'gesture'
-                    ? translate('settings.commandBindingToolbar.gesture')
-                    : translate('settings.commandBindingToolbar.key')
-              }
-              title={inputFilter.label}
-              onClear={clearInputFilter}
-            >
-              {inputFilter.content}
-            </CommandProviderFilter>
-          ) : (
-            children
-          )
+          <>
+            {children}
+            {inputFilter && (
+              <CommandProviderFilter
+                kind="input"
+                label={
+                  inputKind === 'trigger'
+                    ? translate('settings.commandTriggers.trigger')
+                    : inputKind === 'gesture'
+                      ? translate('settings.commandBindingToolbar.gesture')
+                      : translate('settings.commandBindingToolbar.key')
+                }
+                title={inputFilter.label}
+                onClear={clearInputFilter}
+              >
+                {inputFilter.content}
+              </CommandProviderFilter>
+            )}
+          </>
         }
         actions={
           <>

@@ -2635,12 +2635,16 @@ summary {
   overflow-wrap: anywhere;
 }
 .command-provider-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex: 0 1 auto;
-  min-width: 32px;
-  max-width: 104px;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: 0;
+  min-height: 24px;
+  max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   padding: 2px 6px;
   border: 1px solid var(--border);
@@ -2649,6 +2653,15 @@ summary {
   color: var(--text);
   font-size: 11px;
   line-height: 1.4;
+}
+.command-provider-badge-icon {
+  display: inline-flex;
+  flex: none;
+}
+.command-provider-badge-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .command-provider-badge[aria-pressed='true'] {
   background: var(--accent-soft);
@@ -2659,6 +2672,9 @@ summary {
 }
 .command-binding-table .binding-command-summary > .command-id {
   margin-top: 2px;
+}
+.command-binding-table .binding-command-summary > .command-provider-badge {
+  margin-top: 4px;
 }
 .applet-shortcut-add {
   flex: none;
@@ -2856,7 +2872,7 @@ summary {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   column-gap: 12px;
 }
 .binding-command-follow .binding-command-summary > .applet-shortcut-command {
@@ -2867,14 +2883,20 @@ summary {
   grid-column: 1;
   grid-row: 2;
 }
-.binding-command-follow .binding-command-summary > small:not(.command-id) {
+.binding-command-follow .binding-command-summary > .command-provider-badge {
   grid-column: 1;
   grid-row: 3;
+  justify-self: start;
+  align-self: start;
+}
+.binding-command-follow .binding-command-summary > small:not(.command-id) {
+  grid-column: 1;
+  grid-row: 4;
   align-self: start;
 }
 .binding-command-follow .binding-command-summary > .binding-add-options {
   grid-column: 2;
-  grid-row: 1 / span 3;
+  grid-row: 1 / span 4;
   flex-direction: column;
   gap: 4px;
   margin-top: 0;
@@ -2960,16 +2982,35 @@ summary {
   gap: 6px;
   max-width: 100%;
   margin: 0;
-  padding: 3px 5px 3px 10px;
+  padding: 1px 5px 1px 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
   border-radius: 18px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 12px;
+  line-height: 1.4;
 }
 .command-provider-filter > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
-  overflow-wrap: anywhere;
+}
+.command-provider-filter-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.command-provider-filter-label,
+.command-provider-filter .binding-trigger-mark > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-provider-filter :is(.binding-trigger-display, .binding-trigger-mark) {
+  min-width: 0;
 }
 .command-provider-filter strong {
   color: inherit;
@@ -2982,6 +3023,7 @@ summary {
   flex: none;
   width: 24px;
   height: 24px;
+  min-height: 24px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -3016,6 +3058,10 @@ summary {
 }
 .command-list-summary-main > span {
   flex: none;
+}
+.command-triggers-editor .command-list-summary-main:not(:empty) {
+  flex-basis: min(240px, 100%);
+  max-width: 100%;
 }
 .command-list-summary-main .command-provider-filter {
   min-width: 0;

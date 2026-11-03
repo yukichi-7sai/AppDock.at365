@@ -17,7 +17,7 @@ import { externalShortcutScope, keybindingConditionLabel } from '../../shared/ke
 import { gestureConditionLabel } from '../../shared/gestures';
 import { CommandTriggerMark } from '../settings-ui/CommandTriggerMark';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
-import { Icon } from '../../shared/ui-icons';
+import { Icon, type IconName } from '../../shared/ui-icons';
 import { CommandBindingList, type BindingEdit } from '../settings-ui/CommandBindingList';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
 import { CommandCategoryFilter } from '../settings-ui/CommandCategoryFilter';
@@ -145,6 +145,11 @@ export function CommandTriggersEditor({
   const { t } = useHostTranslation();
   const controls = useSettingsControls();
   const filters = useBindingCommandFilter(provider, clearProvider);
+  const providerIcons = new Map<string, IconName>(
+    applets.map((applet) => [applet.id, applet.icon ?? 'extensions']),
+  );
+  const providerIcon = (id: string | null | undefined): IconName =>
+    id === null ? 'home' : (providerIcons.get(id ?? '') ?? 'extensions');
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (provider?.request !== undefined || filters.target?.request !== undefined) {
@@ -243,10 +248,8 @@ export function CommandTriggersEditor({
   const visible = catalog.filter((command) => {
     if (!kinds.length) return false;
     if (category !== 'all' && (command.category?.trim() ?? '') !== category.slice(9)) return false;
-    if (!filters.inputFilter) {
-      if (filters.target && command.id !== filters.target.id) return false;
-      if (filters.provider && command.extensionId !== filters.provider.id) return false;
-    }
+    if (filters.target && command.id !== filters.target.id) return false;
+    if (filters.provider && command.extensionId !== filters.provider.id) return false;
     const assigned = rows.filter((row) => row.command === command.id);
     if (
       filters.inputFilter &&
@@ -344,18 +347,21 @@ export function CommandTriggersEditor({
           </div>
         }
       >
-        {filters.target ? (
-          <CommandTargetFilter />
-        ) : (
-          filters.provider && (
-            <CommandProviderFilter title={filters.provider.title} onClear={filters.clearProvider} />
-          )
+        {filters.target && <CommandTargetFilter />}
+        {filters.provider && (
+          <CommandProviderFilter
+            kind="provider"
+            title={filters.provider.title}
+            icon={providerIcon(filters.provider.id)}
+            onClear={filters.clearProvider}
+          />
         )}
       </CommandBindingToolbar>
       <CommandBindingList<CommandTriggerBinding>
         commands={visible}
         bindings={rows}
         showProvider
+        providerIcon={providerIcon}
         showNavigation={false}
         separateConditions
         triggerStackActions

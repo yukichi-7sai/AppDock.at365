@@ -2497,7 +2497,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     name: a.name,
     displayName: a.displayName,
     description: id === 'applets' || page.kind === 'applet' ? a.description : undefined,
-    icon: page.kind === 'applet' ? a.icon : undefined,
+    icon: id === 'command-triggers' || page.kind === 'applet' ? a.icon : undefined,
     tagline: id === 'applets' || page.kind === 'applet' ? a.tagline : undefined,
     minimumHostVersion: page.kind === 'applet' ? a.minimumHostVersion : undefined,
     version: id === 'about' || id === 'applets' || page.kind === 'applet' ? a.version : '',

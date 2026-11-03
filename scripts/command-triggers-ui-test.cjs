@@ -19,6 +19,7 @@ fs.writeFileSync(
     apiVersion: 1,
     id: 'fixture.triggers',
     name: 'Trigger fixture',
+    icon: 'clock',
     version: '1.0.0',
     runtime: 'node',
     entry: 'index.js',
@@ -42,6 +43,7 @@ const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 const lockKeysOnly = process.argv.includes('--lock-keys-only');
 const filterConsistencyOnly = process.argv.includes('--filter-consistency-only');
+const usabilityOnly = process.argv.includes('--usability-only');
 const tabResetOnly = process.argv.includes('--tab-reset-only');
 const enablementOnly = process.argv.includes('--enablement-only');
 if (bindingEditorsOnly) {
@@ -51,6 +53,7 @@ if (bindingEditorsOnly) {
 }
 const source = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 initial.host.hardwareAcceleration = false;
+initial.host.checkUpdatesOnStartup = false;
 initial.extensions['fixture.triggers'] = { enabled: true, settings: {} };
 if (featureSettingsOnly || tabResetOnly) {
   delete initial.commandTriggerOptions;
@@ -147,6 +150,22 @@ if (inheritanceOnly) {
   initial.touchpadGestures.executionMode = 'first';
 }
 if (filterConsistencyOnly) {
+  const other = path.join(profile, 'extensions', 'fixture.other');
+  fs.mkdirSync(other, { recursive: true });
+  fs.writeFileSync(
+    path.join(other, 'extension.json'),
+    JSON.stringify({
+      apiVersion: 1,
+      id: 'fixture.other',
+      name: '長い名前のフィルター検証用Applet'.repeat(5),
+      version: '1.0.0',
+      runtime: 'node',
+      entry: 'index.js',
+      commands: [{ id: 'fixture.other.one', title: 'Other trigger', category: 'カテゴリ検証' }],
+    }),
+  );
+  fs.writeFileSync(path.join(other, 'index.js'), 'exports.activate = async () => {};');
+  initial.extensions['fixture.other'] = { enabled: false, settings: {} };
   const gestureWhen = { ...common.when, processes: [] };
   initial.keybindings = [
     { ...common, id: 'filter-key-one', key: 'Ctrl+F8' },
@@ -175,6 +194,18 @@ if (filterConsistencyOnly) {
   initial.keybindingOptions.inputExecutionModes = { 'Ctrl+F8': 'first' };
   initial.gestures.inputExecutionModes = { 'move-up': 'first' };
   initial.touchpadGestures.inputExecutionModes = { 'four.right': 'first' };
+  for (const bindings of [
+    initial.keybindings,
+    initial.gestures.bindings,
+    initial.touchpadGestures.bindings,
+  ]) {
+    bindings.push({
+      ...bindings[0],
+      id: 'other-input',
+      command: 'fixture.other.one',
+      enabled: false,
+    });
+  }
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
 fs.writeFileSync(
@@ -260,6 +291,7 @@ const recordSuccess = () => {
         bindingEditorsOnly,
         lockKeysOnly,
         filterConsistencyOnly,
+        usabilityOnly,
         tabResetOnly,
         enablementOnly,
         source: source ? path.resolve(source) : 'development build',
@@ -341,7 +373,28 @@ const recordSuccess = () => {
       recordSuccess();
       return;
     }
+    if (usabilityOnly) {
+      await open();
+      await require('./command-trigger-usability-checks.cjs')({
+        host,
+        command,
+        row,
+        checks,
+        profile,
+      });
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
     if (filterConsistencyOnly) {
+      await require('./command-filter-combination-checks.cjs')({
+        host,
+        open,
+        saved,
+        row,
+        checks,
+        profile,
+      });
       await require('./trigger-list-filter-checks.cjs')({
         host,
         open,
@@ -493,7 +546,9 @@ const recordSuccess = () => {
     const beforeTabs = await saved();
     const commandList = host.getByTestId('command-triggers-list');
     await commandList.locator('input[type=search]').fill('fixture.triggers');
-    await commandList.locator('select').selectOption('assigned');
+    await commandList
+      .getByRole('combobox', { name: 'トリガーの絞り込み', exact: true })
+      .selectOption('assigned');
     await host.getByTestId('command-trigger-filter:touchpad-gestures').click();
     const body = host.locator('.settings-body');
     const position = await body.evaluate((element) => {
@@ -517,7 +572,12 @@ const recordSuccess = () => {
     }
     await clickTab('commands');
     assert.equal(await commandList.locator('input[type=search]').inputValue(), 'fixture.triggers');
-    assert.equal(await commandList.locator('select').inputValue(), 'assigned');
+    assert.equal(
+      await commandList
+        .getByRole('combobox', { name: 'トリガーの絞り込み', exact: true })
+        .inputValue(),
+      'assigned',
+    );
     assert.equal(
       await host
         .getByTestId('command-trigger-filter:touchpad-gestures')
@@ -587,7 +647,13 @@ const recordSuccess = () => {
     checks.push(
       'single mixed catalog / unassigned commands / overlapping IDs / original pages retained / display does not rewrite storage',
     );
-    await require('./command-trigger-usability-checks.cjs')({ host, command, row, checks });
+    await require('./command-trigger-usability-checks.cjs')({
+      host,
+      command,
+      row,
+      checks,
+      profile,
+    });
     const search = host.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true });
     const assignmentFilter = host.getByLabel('トリガーの絞り込み', { exact: true });
     await assignmentFilter.selectOption('unassigned');
@@ -647,7 +713,7 @@ const recordSuccess = () => {
     assert.equal(await command('fixture.triggers.new').count(), 0);
     await host.getByRole('button', { name: '絞り込みを解除', exact: true }).click();
     checks.push(
-      'multiple trigger kinds persist while temporary input/provider filters replace each other / no types yields zero rows / clear restores defaults',
+      'multiple trigger kinds persist while input/provider filters combine / no types yields zero rows / clear restores defaults',
     );
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
       await command('fixture.triggers.new').locator('.command-title').hover();

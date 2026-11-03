@@ -7,6 +7,7 @@ import { SettingsDescriptionIcon } from './SettingsHintIcon';
 import { CommandProviderBadge } from './CommandProviderBadge';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
+import type { IconName } from '../../shared/ui-icons';
 import type { BindingInputFilter, BindingProviderFilter } from './useBindingCommandFilter';
 import { useCommandListScroll } from './CommandListScroll';
 import {
@@ -35,6 +36,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   onInputFilter,
   selectedProvider,
   onProviderFilter,
+  providerIcon,
   conditionLabel,
   newBinding,
   applyBinding,
@@ -67,6 +69,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   onInputFilter?(input: BindingInputFilter, trigger: HTMLButtonElement): void;
   selectedProvider?: string | null;
   onProviderFilter?(provider: BindingProviderFilter, trigger: HTMLButtonElement): void;
+  providerIcon?(id: string | null | undefined): IconName;
   conditionLabel(row: R, command: UiCommand): string;
   newBinding(command: UiCommand): R;
   applyBinding(row: R, original?: R): void;
@@ -333,13 +336,6 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                       >
                         <div className="applet-shortcut-command">
                           <div className="binding-command-heading">
-                            {showProvider && (
-                              <CommandProviderBadge
-                                command={command}
-                                selected={selectedProvider}
-                                onSelect={onProviderFilter}
-                              />
-                            )}
                             <strong className="command-title">{command.title}</strong>
                             <SettingsDescriptionIcon
                               title={command.title}
@@ -362,6 +358,14 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                           )}
                         </div>
                         <small className="command-id">{command.id}</small>
+                        {showProvider && (
+                          <CommandProviderBadge
+                            command={command}
+                            icon={providerIcon?.(command.extensionId)}
+                            selected={selectedProvider}
+                            onSelect={onProviderFilter}
+                          />
+                        )}
                         {!command.available && (
                           <small>{translate('settings.commandBindingList.unavailable')}</small>
                         )}

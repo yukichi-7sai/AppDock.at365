@@ -64,6 +64,10 @@ GitHubの匿名APIへ実通信するテストは作成・実行しません。�
 
 ## 設定・トリガーの主な担当
 
+`scripts/command-triggers-ui-test.cjs [固定EXE] --usability-only`は、共通の`command-trigger-usability-checks.cjs`でコマンド列のキーボード追加・条件編集・取消時のフォーカス復帰、論理900 × 620での横スクロールと追従中の提供元・追加ボタンへの到達、空結果とJSON切替の保存不変を確認する。提供元の3段表示は代表画像で確認し、DOMの段数やCSSの実装を固定する検査にはしない。
+
+`scripts/command-triggers-ui-test.cjs [固定EXE] --filter-consistency-only`は、提供元と入力の併用・同種だけの差し替え、文字検索/カテゴリ/状態/種類の保持、個別解除とフォーカス復帰、空の結果、保存値とApplet有効状態の不変を確認する。`command-filter-combination-checks.cjs`へ操作をまとめ、宣言アイコンと代替アイコン、長い名前の明暗・狭幅表示は測定値と代表画像で確認する。表示幅はDPIスケーリング後の論理ピクセルとして扱い、標準条件は1720 × 1000と900 × 620、AppDock倍率100%とする。DPI倍率を再現するための追加CSSズームは掛けない。対象コマンドとの併用・個別解除は`command-palette-ui-test.cjs`で確認する。
+
 `tests/host-page-settings.test.cjs`は、本体7ページの共有／端末専用の保存・既定値省略・既存値の引き継ぎ・2端末の独立・共有への反映と取消後の再開・保存失敗時の原子的復旧を確認する。通知・更新の公開設定APIは`tests/settings-service-targets.test.cjs`、画面からの切り替え・JSON・取消・再起動後の保持・共通ツールバーは`scripts/device-settings-ui-test.cjs [固定EXE]`を使う。同スクリプトは一般の起動3項目の常時端末専用と、Appletの既存切り替え・停止中の編集・自己設定も確認する。
 
 `tests/start-page.test.cjs`はページ候補の実効表示先・安定ID・JSON/リセット・待機と戻り先・明示移動の優先を担当する。`scripts/start-page-ui-test.cjs [固定EXE]`は隔離した固定/動的/設定由来のlocal/remoteページで、設定の保存・通常起動・再起動の復元・利用不可時の選択保持・起動待ち/読み込み中の移動取消・非表示/最小化/トレイ起動・広幅/狭幅の操作を確認する。実アカウントや認証情報は使用しない。

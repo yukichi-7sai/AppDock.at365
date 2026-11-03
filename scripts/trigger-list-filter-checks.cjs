@@ -13,13 +13,13 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   const category = commandList.getByRole('combobox', { name: 'カテゴリで絞り込み', exact: true });
   const search = commandList.getByRole('searchbox');
   await category.selectOption('category:カテゴリ検証');
-  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 2);
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 3);
   await search.fill('new');
   assert.equal(await command('new').count(), 1);
   assert.equal(await command('one').count(), 0);
   await search.fill('');
   await status.selectOption('assigned');
-  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 1);
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 2);
   await host.getByTestId('command-provider:fixture.triggers.one').click();
   assert.equal(await category.inputValue(), 'category:カテゴリ検証');
   await command('one').locator('.binding-input-filter').first().click();
@@ -33,7 +33,7 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   assert.equal(await commandList.locator('[data-shortcut-command]').count(), 1);
   await clear.click();
   await search.fill('カテゴリ検証');
-  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 2);
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 3);
   await clear.click();
   await category.selectOption('category:カテゴリ検証');
   await host.getByTestId('command-trigger-filter:gestures').click();
