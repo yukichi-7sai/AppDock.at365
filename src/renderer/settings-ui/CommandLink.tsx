@@ -104,7 +104,7 @@ export function CommandLink({ commandId }: { commandId: string }) {
           });
       }}
     >
-      <Icon name="command" size={14} />
+      <Icon name="search" size={14} />
       <span>{command.title}</span>
     </button>
   );

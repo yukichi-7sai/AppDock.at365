@@ -70,8 +70,8 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   file: (
     <>
-      <path d="M14 2H5v20h14V7Z" />
-      <path d="M14 2v5h5M8 12h8m-8 4h8" />
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <path d="M7.5 8h9m-9 4h9m-9 4h6" />
     </>
   ),
   link: (
