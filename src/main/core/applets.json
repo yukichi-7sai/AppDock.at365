@@ -1,0 +1,12 @@
+{
+  "applets": [
+    "yukichi-7sai/Applet.ChatCodex.at365",
+    "yukichi-7sai/Applet.Gmail.at365",
+    "yukichi-7sai/Applet.Profile.at365",
+    "yukichi-7sai/Applet.WallpaperSlideshow.at365",
+    "yukichi-7sai/Applet.Watch.at365",
+    "yukichi-7sai/Applet.WebApplet.at365",
+    "yukichi-7sai/Applet.WebBrowserTools.at365",
+    "yukichi-7sai/Applet.WindowsTools.at365"
+  ]
+}

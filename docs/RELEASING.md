@@ -19,7 +19,7 @@
 3. 全同梱Appletのorigin・GitHub main・既存タグ・公開Releaseを読み取ります。同梱manifestの版が公開済みなら、当該タグの公開配布物のID/版を確認してskipと記録します。無関係なrepoやWebAppletのサイト項目は公開対象にしません。
 4. 未公開の各Appletについて、そのrepoの指示・既存検証を確認し、cleanな対象commit/main、ノート、manifest/feedのID/版/最低ホスト版、ZIP全収録ファイルのsize/hashを検証します。同梱の`updateZipSha256`と元update.zip、bundle中の各ファイルとの一致を必須とし、同梱版をそのまま使います。再発行でhashや内容が変われば本体Prepareへ戻します。同梱だけでApplet版を増やしません。
 5. 未公開本体と未公開Appletの下書き/全asset照合を完了してから順番に公開します。各Appletは下記の個別Release手順を使い、既存の一致するdraftは不足assetだけを追加して再利用します。既存の公開済みassetには`--clobber`を使わず、タグを移動しません。
-6. 本体はVerify、各Appletは匿名feed/ZIP取得とsize/hash、実`PortableUpdates.check()`の個別/一括結果（同梱版がavailable/installable）まで確認します。repoごとに公開/検証/整理/skipを記録します。新版が必要とする本体版を先に公開し、Appletが本体更新を待つ関係も確認します。実インストールやdeployは別です。
+6. 本体はVerify、各Appletは公開feed/ZIPの匿名ダウンロードとsize/hash、実`PortableUpdates.check()`の個別/一括結果（同梱版がavailable/installable）まで確認します。GitHub RESTのRelease情報は認証済みCLIで読み、更新確認にも取得済みの応答を渡します。匿名のAPI枠を消費しない手順を使います。repoごとに公開/検証/整理/skipを記録します。新版が必要とする本体版を先に公開し、Appletが本体更新を待つ関係も確認します。実インストールやdeployは別です。
 7. 本機能公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。この整理はリリース作業の継続承認済み手順です。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
 
 この工程は製品の起動・通常publishで自動実行する処理ではありません。複数repoの公開は一括トランザクションではないため、一部の公開/検証が失敗しても他repoの公開成功を取り消したり隠したりしません。

@@ -16,7 +16,7 @@ const execute = promisify(execFile);
 const fs = physicalFs.promises;
 const { createReadStream } = physicalFs;
 const limit = 512 * 1024 * 1024;
-type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface UpdateTarget {
   id: string;
   name: string;
@@ -126,6 +126,46 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
     throw Error(hostText('services.portableUpdates.invalidPayload'));
   return value;
 }
+type ReleaseAssets = { name: string; browser_download_url: string }[];
+
+export async function readUpdateJson(location: string, fetcher: Fetcher, signal?: AbortSignal) {
+  return json(await readBounded(location, 1024 * 1024, fetcher, signal));
+}
+
+export async function readGithubRelease(
+  repository: string,
+  tag: string | undefined,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+) {
+  const endpoint = tag ? `tags/${encodeURIComponent(tag)}` : 'latest';
+  try {
+    const release = await readUpdateJson(
+      `https://api.github.com/repos/${repository}/releases/${endpoint}`,
+      fetcher,
+      signal,
+    );
+    if (release.draft || release.prerelease)
+      throw Error(hostText('services.portableUpdates.stableReleaseRequired'));
+    return release as { tag_name: string; published_at: string; assets: ReleaseAssets };
+  } catch (error) {
+    if (error instanceof UpdateHttpError && error.status === 404 && !tag) return undefined;
+    throw error;
+  }
+}
+
+export async function readGithubFeed(
+  assets: ReleaseAssets,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+  expected?: Pick<UpdateTarget, 'id' | 'kind'>,
+) {
+  const info = assets?.find((a) => a.name === 'update.json');
+  if (!info || !/^https:\/\//i.test(info.browser_download_url))
+    throw Error(hostText('services.portableUpdates.feedMissing'));
+  return readPackageFeed(info.browser_download_url, assets, fetcher, signal, expected);
+}
+
 async function resolveFeedSource(
   source: string,
   fetcher: Fetcher,
@@ -134,39 +174,29 @@ async function resolveFeedSource(
 ) {
   validateUpdateSource(source);
   let location = source;
-  let assets: { name: string; browser_download_url: string }[] | undefined;
   const github =
     source.match(/^github:(.+)$/i) ??
     source.match(
       /^https:\/\/github\.com\/([^/]+\/[^/]+)(?:\/releases(?:\/latest|\/tag\/([^/]+))?\/?)?$/i,
     );
   if (github) {
-    const endpoint = github[2] ? `tags/${encodeURIComponent(github[2])}` : 'latest';
-    let metadata: Buffer;
-    try {
-      metadata = await readBounded(
-        `https://api.github.com/repos/${github[1]}/releases/${endpoint}`,
-        1024 * 1024,
-        fetcher,
-        signal,
-      );
-    } catch (error) {
-      if (error instanceof UpdateHttpError && error.status === 404 && !github[2])
-        throw new UnpublishedRelease();
-      throw error;
-    }
-    const release = json(metadata);
-    if (release.draft || release.prerelease)
-      throw Error(hostText('services.portableUpdates.stableReleaseRequired'));
-    assets = release.assets;
-    const info = assets?.find((a) => a.name === 'update.json');
-    if (!info || !/^https:\/\//i.test(info.browser_download_url))
-      throw Error(hostText('services.portableUpdates.feedMissing'));
-    location = info.browser_download_url;
+    const release = await readGithubRelease(github[1], github[2], fetcher, signal);
+    if (!release) throw new UnpublishedRelease();
+    return readGithubFeed(release.assets, fetcher, signal, expected);
   } else if (/^https?:/i.test(source)) {
     if (source.endsWith('/')) location = new URL('update.json', source).href;
   } else if ((await fs.stat(source)).isDirectory()) location = path.join(source, 'update.json');
-  const raw = json(await readBounded(location, 1024 * 1024, fetcher, signal));
+  return readPackageFeed(location, undefined, fetcher, signal, expected);
+}
+
+async function readPackageFeed(
+  location: string,
+  assets: ReleaseAssets | undefined,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+  expected?: Pick<UpdateTarget, 'id' | 'kind'>,
+) {
+  const raw = await readUpdateJson(location, fetcher, signal);
   if (
     !expected &&
     (typeof raw?.id !== 'string' ||

@@ -320,16 +320,9 @@ function createRelease(
       validate(true);
       assert.equal(release.draft, false);
       assert.ok(tagRef, 'Published tag is missing');
-      const latestResponse = await fetch(
-        `https://api.github.com/repos/${plan.repo}/releases/latest`,
-        { signal: AbortSignal.timeout(30000) },
-      );
-      assert.equal(latestResponse.status, 200);
-      assert.equal(
-        (await latestResponse.json()).id,
-        release.id,
-        'Public latest points to another release',
-      );
+      const latestPath = `repos/${plan.repo}/releases/latest`;
+      const latest = api(latestPath);
+      assert.equal(latest.id, release.id, 'Public latest points to another release');
       for (const expected of plan.assets) {
         const url = `https://github.com/${plan.repo}/releases/download/${plan.tag}/${expected.name}`;
         const response = await fetch(url, { signal: AbortSignal.timeout(300000) });
@@ -350,6 +343,12 @@ function createRelease(
         path.join(root, 'out/main/shared/settings-schema.js'),
       );
       const updater = new PortableUpdates({
+        // Reuse authenticated metadata. The feed and assets are still public downloads.
+        fetcher: async (url, init) => {
+          if (new URL(url).hostname !== 'api.github.com') return fetch(url, init);
+          assert.equal(url, `https://api.github.com/${latestPath}`);
+          return Response.json(latest);
+        },
         targets: () => [
           {
             id: 'host',

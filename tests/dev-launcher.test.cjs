@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-test('local launcher preserves success, policy failure and native crash status without retrying', () => {
+test('local launcher preserves success, policy failure and native crash status without retrying', (t) => {
   const root = path.resolve(__dirname, '..');
   const folder = fs.mkdtempSync(path.join(root, '.artifacts/dev-launcher-'));
   fs.mkdirSync(path.join(folder, '.tools'));
@@ -13,7 +13,9 @@ test('local launcher preserves success, policy failure and native crash status w
     path.join(folder, '.tools/environment.bat'),
     '@echo off\r\nset "APPDOCK_NODE_DIR=%~dp0"\r\nset "APPDOCK_PNPM_DIR=%~dp0"\r\n',
   );
-  fs.writeFileSync(path.join(folder, '.tools/node.exe'), 'existence-check-only');
+  const placeholder = path.join(folder, '.tools/node.exe');
+  fs.writeFileSync(placeholder, 'existence-check-only');
+  t.after(() => fs.unlinkSync(placeholder));
   const checks = [];
   for (const code of [0, 1, -1073741571]) {
     fs.writeFileSync(

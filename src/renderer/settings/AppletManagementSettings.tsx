@@ -5,6 +5,8 @@ import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ExtensionSnapshot, UpdateState } from '../../shared/contracts';
+import type { CatalogRelease } from '../../shared/applet-catalog';
+import { AppletCatalogTable } from './AppletCatalogTable';
 import type { AppletPackagePlan, AppletPackagePreviewResult } from '../../shared/applet-packages';
 import { Icon, type IconName } from '../../shared/ui-icons';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
@@ -64,10 +66,18 @@ function startupTooltip(applet: ExtensionSnapshot, t: HostTranslator) {
     ...(timing.outcome === 'error' ? [t('settings.appletManagementSettings.startupPartial')] : []),
   ].join('\n');
 }
-function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
+function InstallDialog({
+  invoke,
+  close,
+  release,
+}: {
+  invoke: Invoke;
+  close(): void;
+  release?: CatalogRelease;
+}) {
   const { t: translate } = useHostTranslation();
   const errorId = useId();
-  const [source, setSource] = useState('');
+  const [source, setSource] = useState(release?.source ?? '');
   const [choosing, setChoosing] = useState(false);
   const [checking, setChecking] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -101,7 +111,7 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
       cancelWhilePending={checking}
       onApply={async () => {
         // Read the current field at the explicit action, including a pending blur commit.
-        const location = input.current?.value ?? source;
+        const location = release?.source ?? input.current?.value ?? source;
         setSource(location);
         previewActive.current = true;
         setChecking(true);
@@ -117,6 +127,8 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
             return;
           }
           currentPlan.current = result.planId;
+          if (release && (result.id !== release.id || result.version !== release.version))
+            throw Error(translate('settings.appletCatalog.changed'));
           setChecking(false);
           await applyPackage(invoke, result.planId);
           currentPlan.current = undefined;
@@ -134,9 +146,13 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
         <>
           <SettingsField
             title={translate('settings.appletManagementSettings.source')}
-            description={translate('settings.appletManagementSettings.location')}
+            description={
+              release
+                ? `${release.displayName} · ${release.version}`
+                : translate('settings.appletManagementSettings.location')
+            }
             error={error}
-            hint={translate('settings.appletManagementSettings.locationHint')}
+            hint={release ? undefined : translate('settings.appletManagementSettings.locationHint')}
           >
             <div className="applet-install-source">
               <SettingsInput
@@ -146,36 +162,39 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
                 aria-invalid={!!error}
                 value={source}
                 disabled={choosing}
+                readOnly={!!release}
                 commitOn="blur-or-enter"
                 data-initial-focus
                 placeholder={translate('settings.appletManagementSettings.locationPlaceholder')}
                 onChange={(event) => setSource(event.target.value)}
               />
-              <button
-                type="button"
-                className="settings-list-icon"
-                title={translate('settings.appletManagementSettings.selectFolder')}
-                aria-label={translate('settings.appletManagementSettings.selectFolder')}
-                disabled={choosing}
-                onClick={() => {
-                  setChoosing(true);
-                  void invoke('chooseAppletInstallDirectory')
-                    .then((result) => {
-                      if (!active.current) return;
-                      if (result.error) setError(result.error);
-                      else if (result.path) setSource(result.path);
-                    })
-                    .catch((reason) => {
-                      if (active.current)
-                        setError(reason instanceof Error ? reason.message : String(reason));
-                    })
-                    .finally(() => {
-                      if (active.current) setChoosing(false);
-                    });
-                }}
-              >
-                <Icon name="folder" />
-              </button>
+              {!release && (
+                <button
+                  type="button"
+                  className="settings-list-icon"
+                  title={translate('settings.appletManagementSettings.selectFolder')}
+                  aria-label={translate('settings.appletManagementSettings.selectFolder')}
+                  disabled={choosing}
+                  onClick={() => {
+                    setChoosing(true);
+                    void invoke('chooseAppletInstallDirectory')
+                      .then((result) => {
+                        if (!active.current) return;
+                        if (result.error) setError(result.error);
+                        else if (result.path) setSource(result.path);
+                      })
+                      .catch((reason) => {
+                        if (active.current)
+                          setError(reason instanceof Error ? reason.message : String(reason));
+                      })
+                      .finally(() => {
+                        if (active.current) setChoosing(false);
+                      });
+                  }}
+                >
+                  <Icon name="folder" />
+                </button>
+              )}
             </div>
           </SettingsField>
         </>
@@ -198,7 +217,7 @@ export function AppletManagementSettings({
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState('');
   const [error, setError] = useState('');
-  const [install, setInstall] = useState(false);
+  const [install, setInstall] = useState<CatalogRelease | 'manual'>();
   const [order, setOrder] = useState(false);
   const [removal, setRemoval] = useState<AppletPackagePlan>();
   const running = useRef(false);
@@ -298,7 +317,7 @@ export function AppletManagementSettings({
                 <SettingsListAddButton
                   label={translate('settings.appletManagementSettings.install')}
                   disabled={busy || !management?.packagesAvailable}
-                  onClick={() => setInstall(true)}
+                  onClick={() => setInstall('manual')}
                 />
                 <button
                   type="button"
@@ -548,7 +567,20 @@ export function AppletManagementSettings({
           )}
         </tbody>
       </SettingsListLayout>
-      {install && <InstallDialog invoke={invoke} close={() => setInstall(false)} />}
+      <AppletCatalogTable
+        applets={applets}
+        query={query}
+        disabled={busy || !management?.packagesAvailable}
+        invoke={invoke}
+        onInstall={setInstall}
+      />
+      {install && (
+        <InstallDialog
+          invoke={invoke}
+          release={install === 'manual' ? undefined : install}
+          close={() => setInstall(undefined)}
+        />
+      )}
       {order && (
         <SettingsOrderDialog
           title={translate('settings.appletManagementSettings.displayOrder')}

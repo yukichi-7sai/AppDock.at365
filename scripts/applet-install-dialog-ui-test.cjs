@@ -220,6 +220,61 @@ const same = (a, b) => {
     assert.equal(applied.filter((c) => c.name === 'prepareAppletInstall').length, 2);
     assert.equal(applied.filter((c) => c.name === 'applyAppletPackage').length, 2);
     checks.push('one-button-validates-then-applies-and-retries-local-errors-without-losing-input');
+    const catalogRow = page.locator('[data-catalog-repository="owner/Fixture"]');
+    const retry = page.getByRole('button', { name: '取得できなかった情報を再取得' });
+    assert.equal(await page.getByText(/owner\/UnresolvedFixture/).count(), 0);
+    await retry.click();
+    await retry.waitFor({ state: 'hidden' });
+    await catalogRow.waitFor();
+    assert.equal(await catalogRow.locator('time').count(), 2);
+    assert.equal(
+      await catalogRow.locator('td').nth(1).locator('time').getAttribute('datetime'),
+      '2026-05-01T00:00:00Z',
+    );
+    assert.equal(
+      await catalogRow.locator('td').nth(2).locator('.version-current').innerText(),
+      '2.0.0',
+    );
+    assert(
+      await page
+        .locator('[data-catalog-repository="owner/Unpublished"]')
+        .getByRole('button', { name: 'インストール', exact: true })
+        .isDisabled(),
+    );
+    const search = page.getByRole('searchbox');
+    await search.fill('公開版の概要');
+    await catalogRow.waitFor();
+    await search.fill('fixture.install');
+    assert.equal(await page.locator('[data-catalog-repository]').count(), 1);
+    await page.evaluate(() => {
+      window.installCalls = [];
+      window.previewVersion = '2.0.0';
+    });
+    await catalogRow.getByRole('button', { name: 'インストール', exact: true }).click();
+    assert(await source.evaluate((el) => el.readOnly));
+    assert.equal(await source.inputValue(), 'https://github.com/owner/Fixture/releases/tag/v1.0.0');
+    assert.deepEqual(await page.evaluate(() => window.installCalls), []);
+    await apply.click();
+    await dialog.getByRole('alert').filter({ hasText: '一覧の内容と異なります' }).waitFor();
+    await until(() =>
+      page.evaluate(() => window.installCalls.some((c) => c.name === 'discardAppletPackage')),
+    );
+    assert(
+      !(await page.evaluate(() => window.installCalls)).some(
+        (c) => c.name === 'applyAppletPackage',
+      ),
+    );
+    await page.evaluate(() => {
+      window.previewVersion = '1.0.0';
+    });
+    await apply.click();
+    await dialog.waitFor({ state: 'hidden' });
+    assert(
+      (await page.evaluate(() => window.installCalls)).some((c) => c.name === 'applyAppletPackage'),
+    );
+    checks.push(
+      'catalog-dates-search-unpublished-and-explicit-pinned-install-rejects-changed-plan',
+    );
     assert.deepEqual(errors, []);
     result.ok = true;
   } catch (error) {

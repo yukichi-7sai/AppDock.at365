@@ -10,8 +10,34 @@ fixture.installCalls = [];
 fixture.installFailure = '配布元のURLまたはフォルダーを入力してください。';
 fixture.installDelay = false;
 fixture.applyFailure = '';
+let catalogReads = 0;
 const invoke = async (name: string, args: unknown[] = []) => {
   fixture.installCalls.push({ name, args });
+  if (name === 'listAppletCatalog') {
+    const release = {
+      id: 'fixture.install',
+      displayName: 'Fixture',
+      version: '1.0.0',
+      date: '2026-05-01T00:00:00Z',
+      source: 'https://github.com/owner/Fixture/releases/tag/v1.0.0',
+      description: '公開版の概要',
+    };
+    return [
+      ...(++catalogReads === 1
+        ? [{ repository: 'owner/UnresolvedFixture', release: 'error', development: 'error' }]
+        : []),
+      {
+        repository: 'owner/Fixture',
+        release,
+        development: { ...release, version: '2.0.0', date: '2026-06-02T00:00:00Z' },
+      },
+      {
+        repository: 'owner/Unpublished',
+        release: 'unpublished',
+        development: { ...release, id: 'fixture.unpublished', displayName: 'Unpublished' },
+      },
+    ];
+  }
   if (name === 'prepareAppletInstall') {
     if (fixture.installDelay)
       await new Promise<void>((resolve) => {
@@ -22,7 +48,7 @@ const invoke = async (name: string, args: unknown[] = []) => {
       planId: 'fixture-plan',
       id: 'fixture.install',
       name: 'Fixture',
-      version: '1.0.0',
+      version: fixture.previewVersion ?? '1.0.0',
       operation: 'install',
     };
   }

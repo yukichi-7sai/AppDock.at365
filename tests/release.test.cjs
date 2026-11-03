@@ -346,7 +346,7 @@ test('remote retention starts only after public downloads and application update
   assert.equal(deletes().length, 0);
   let badDownload = true;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.endsWith('/latest')) return Response.json({ id: 42 });
+    assert.equal(new URL(url).hostname, 'github.com', 'only public asset downloads use fetch');
     const file = path.join(getPublishDirectory(root), url.split('/').at(-1));
     return new Response(badDownload ? 'corrupt' : fs.readFileSync(file));
   });
@@ -358,7 +358,14 @@ test('remote retention starts only after public downloads and application update
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   fs.writeFileSync(
     updaterPath,
-    `exports.PortableUpdates = class { async check() { return { results: [{ status: 'available', latestVersion: '1.2.3', installable: true }] }; } };`,
+    `exports.PortableUpdates = class {
+      constructor(options) { this.fetcher = options.fetcher; }
+      async check() {
+        const response = await this.fetcher('https://api.github.com/repos/yukichi-7sai/AppDock.at365/releases/latest');
+        const latest = await response.json();
+        return { results: [{ status: 'available', latestVersion: latest.tag_name.slice(1), installable: latest.id === 42 }] };
+      }
+    };`,
   );
   fs.writeFileSync(settingsPath, 'exports.createDefaultSettings = () => ({ updates: {} });');
   badDownload = false;

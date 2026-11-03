@@ -48,7 +48,11 @@ GUI試験は直列に実行します。共通実行場所はランナーPIDで�
 
 Windows Firewallの通常のプログラム規則はEXEのフルパスに対応するため、この固定パスを利用するネットワークの範囲で一度許可すれば、テストごとに別パスの許可を増やさずに済みます。テストはFirewallの設定・通知を変更しません。新しい端末、別checkout、初めて使うネットワークプロファイルでは別途許可が必要になる場合があります。
 
-配置場所そのものを試す`smoke.cjs`の配布物モード、`notification-portable-test.cjs`、`tray-identity-portable-test.cjs`、`portable-updates-ui-test.cjs`、`update-result-banner-portable-test.cjs`、`settings-sync-ui-test.cjs`、`launch-settings-ui-test.cjs`、`update-filesystem-test.cjs`、スターターZIPの展開試験は、検査する配布先・移動先・更新対象を専用に複製します。これらのコピーと変更前に作られたコピーは、[既存の整理手順](../DEVELOPMENT.md#固定配布物の実行用コピー)に従い、成功・終了を確認したものだけ整理します。
+配置場所そのものを試すスモーク試験、導入・更新・移動、スターターZIPの展開などでは、検査する配布先・移動先・更新対象を専用に複製できます。結果と診断資料を保存し、子プロセス・再起動後の本体・更新helperの終了を確認したら、成功・失敗にかかわらず[専用コピーの整理手順](../DEVELOPMENT.md#固定配布物の実行用コピー)を実行します。
+
+### GitHubのAPIを使う機能の試験
+
+GitHubの匿名APIへ実通信するテストは作成・実行しません。リポジトリやReleaseを読む機能は、単体試験では注入したfetch、GUI試験ではローカルfixtureの応答を使います。上限到達・未公開・通信失敗・再取得もfixtureで再現します。管理画面を開く操作、起動時の更新確認、再起動した子プロセスからの間接通信も対象です。想定外の外部URLはローカルで拒否し、実通信へのフォールバックを設けません。通常の検証に個人トークンは不要です。
 
 ## 整理するときの確認
 

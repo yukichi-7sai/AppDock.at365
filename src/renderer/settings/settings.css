@@ -668,16 +668,25 @@ pre.ai-preview-result {
 .ai-connection-dialog .settings-dialog-body {
   flex: 1;
 }
-.applet-management-table td:first-child:not([colspan]) {
+.applet-catalog {
+  margin-top: 24px;
+}
+.applet-catalog h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.applet-catalog-table td:nth-child(3) {
+  min-width: 156px;
+}
+:is(.applet-management-table, .applet-catalog-table) td:first-child:not([colspan]) {
   width: 30%;
   min-width: 150px;
   white-space: normal;
 }
-.applet-management-table td:nth-child(2) {
+:is(.applet-management-table, .applet-catalog-table) td:nth-child(2) {
   min-width: 156px;
 }
-.applet-management-table small,
-.applet-management-table time {
+:is(.applet-management-table, .applet-catalog-table) :is(small, time) {
   display: block;
   margin-top: 5px;
   white-space: normal;

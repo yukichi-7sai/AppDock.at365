@@ -168,6 +168,7 @@ import { activeCommandTriggers, commandTriggerEnablement } from '../shared/comma
 import { settingsPageCommands } from '../shared/settings-navigation';
 import { updateCommands } from '../shared/update-commands';
 import { AppletManagement } from './core/applet-management';
+import { AppletCatalog } from './core/applet-catalog';
 import {
   appletManagementCommands,
   managedApplets,
@@ -638,6 +639,11 @@ const settingsReads = new SettingsReadScope();
 const parentApplets = () => settingsReads.once('parents', () => manager.snapshot());
 const allApplets = () =>
   settingsReads.once('applets', () => [...parentApplets(), ...(pageCollections?.snapshot() ?? [])]);
+// Opening settings in an isolated GUI test must never consume the user's GitHub quota.
+const appletCatalog = new AppletCatalog(
+  app.getVersion(),
+  testDirectory || smoke ? async () => Response.error() : undefined,
+);
 const appletManagement = new AppletManagement({
   settings,
   applets: allApplets,
@@ -2763,6 +2769,7 @@ function settingsPageActions(
     actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
   }
   if (page.id === 'applets') {
+    actions.listAppletCatalog = () => appletCatalog.list();
     actions.openAppletDiscoveryLogs = async () => {
       await flushSettingsInputs();
       await navigation.navigate('logs', undefined, '');
