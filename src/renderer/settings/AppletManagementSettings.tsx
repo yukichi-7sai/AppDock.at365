@@ -18,12 +18,13 @@ import { SettingsField } from '../settings-ui/SettingsSections';
 import {
   ListIcon,
   SettingsListLayout,
-  SettingsListAddButton,
+  SettingsListToolbar,
+  SettingsListToolbarActions,
 } from '../settings-ui/SettingsListTable';
+import { SettingsListFilters } from '../settings-ui/SettingsListFilters';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { CommandListSummary } from '../settings-ui/CommandListScroll';
 import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
 import { SettingsHintIcon, SettingsDescriptionIcon } from '../settings-ui/SettingsHintIcon';
 import {
@@ -289,49 +290,40 @@ export function AppletManagementSettings({
         actionsAlign="start"
         commandListScroll
         toolbar={
-          <>
-            <div className="command-shortcut-tools">
-              <div className="command-shortcut-search">
-                <span aria-hidden="true">
-                  <Icon name="search" size={18} />
-                </span>
-                <SettingsInput
-                  type="search"
-                  aria-label={translate('settings.appletManagementSettings.search')}
-                  placeholder={translate('settings.appletManagementSettings.searchPlaceholder')}
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </div>
-            </div>
-            <CommandListSummary className="command-shortcut-summary" actions={null}>
-              <SettingsListCount visible={visible.length} total={applets.length} />
-            </CommandListSummary>
-          </>
+          <SettingsListToolbar
+            controls={
+              <SettingsListFilters
+                search={query}
+                onSearch={setQuery}
+                searchLabel={translate('settings.appletManagementSettings.search')}
+                searchPlaceholder={translate('settings.appletManagementSettings.searchPlaceholder')}
+              />
+            }
+            actions={
+              <SettingsListToolbarActions
+                addLabel={translate('settings.appletManagementSettings.install')}
+                addDisabled={busy || !management?.packagesAvailable}
+                onAdd={() => setInstall('manual')}
+                orderLabel={translate('settings.appletManagementSettings.order')}
+                orderDisabled={busy || applets.length < 2}
+                onOrder={() => setOrder(true)}
+              />
+            }
+            trailingActions={
+              query ? (
+                <button type="button" className="text-button" onClick={() => setQuery('')}>
+                  {translate('settings.commandBindingToolbar.clear')}
+                </button>
+              ) : undefined
+            }
+          >
+            <SettingsListCount visible={visible.length} total={applets.length} />
+          </SettingsListToolbar>
         }
       >
         <thead>
           <tr>
-            <th>
-              <span className="settings-list-heading">
-                {translate('settings.appletManagementSettings.name')}
-                <SettingsListAddButton
-                  label={translate('settings.appletManagementSettings.install')}
-                  disabled={busy || !management?.packagesAvailable}
-                  onClick={() => setInstall('manual')}
-                />
-                <button
-                  type="button"
-                  className="settings-list-icon"
-                  aria-label={translate('settings.appletManagementSettings.order')}
-                  title={translate('settings.appletManagementSettings.displayOrder')}
-                  disabled={busy || applets.length < 2}
-                  onClick={() => setOrder(true)}
-                >
-                  <ListIcon kind="order" />
-                </button>
-              </span>
-            </th>
+            <th>{translate('settings.appletManagementSettings.name')}</th>
             <th>
               <span className="settings-list-heading">
                 {translate('settings.appletManagementSettings.version')}

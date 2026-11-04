@@ -58,30 +58,6 @@ export function ListIcon({
     </svg>
   );
 }
-export function SettingsListAddButton({
-  label,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick(): void;
-}) {
-  return (
-    <button
-      type="button"
-      className="settings-list-icon settings-list-add applet-shortcut-add"
-      data-dialog-focus-fallback
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      ＋
-    </button>
-  );
-}
-
 /** Shared filters, list actions and a single result count above a settings table. */
 export function SettingsListToolbar({
   controls,

@@ -70,7 +70,7 @@ module.exports = async ({
           assert.equal(await order.count(), 1, title + ' has one order action');
           assert.equal(
             await host
-              .locator(title === 'Applet管理' ? 'thead' : '.settings-list-toolbar')
+              .locator('.settings-list-toolbar')
               .getByRole('button', { name: /並べ替え/ })
               .count(),
             1,

@@ -741,7 +741,7 @@
   "settings.appletManagementSettings.logs": "ログ",
   "settings.appletManagementSettings.settingsAndLogs": "{{displayName}}の設定とログ",
   "settings.appletManagementSettings.empty": "Appletを追加しましょう",
-  "settings.appletManagementSettings.emptyHint": "「Applet名」の横の＋からインストールできます。",
+  "settings.appletManagementSettings.emptyHint": "一覧上部の「追加」からインストールできます。",
   "settings.appletManagementSettings.noMatches": "該当するAppletはありません。",
   "settings.appletManagementSettings.noMatchesHint": "検索する名前やIDを変えてください。",
   "settings.appletManagementSettings.uninstallHint": "このAppletの配置フォルダー内のファイルを削除します。設定と保存データは残ります。AppDockを再起動します。",

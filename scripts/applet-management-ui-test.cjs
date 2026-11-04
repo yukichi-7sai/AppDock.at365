@@ -13,6 +13,32 @@ const output = path.join(root, '.artifacts', `applet-management-ui-${Date.now()}
 const profile = path.join(output, 'profile'),
   local = path.join(profile, 'local');
 fs.mkdirSync(path.join(profile, 'extensions'), { recursive: true });
+fs.mkdirSync(local, { recursive: true });
+// This management test uses local package fixtures, never the public GitHub catalog.
+const fetchedAt = Date.now();
+fs.writeFileSync(
+  path.join(local, 'applet-catalog-cache.json'),
+  JSON.stringify({
+    schemaVersion: 1,
+    repositories: Object.fromEntries(
+      require('../resources/configs/applets.json').applets.map((repository, index) => [
+        repository,
+        {
+          release: { fetchedAt, value: 'unpublished' },
+          development: {
+            fetchedAt,
+            value: {
+              id: `fixture.catalog.${index}`,
+              displayName: `Offline catalog ${index}`,
+              version: '0.0.0',
+              date: new Date(fetchedAt).toISOString(),
+            },
+          },
+        },
+      ]),
+    ),
+  }),
+);
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 Object.assign(settings.host, {
   soundEnabled: false,
@@ -131,8 +157,10 @@ settings.extensions['fixture.install'] = {
   enabled: false,
   settings: { text: 'retained after reinstall' },
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-fs.mkdirSync(path.join(profile, 'data'));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 fs.writeFileSync(path.join(profile, 'data/keep.txt'), 'retained');
 const packageFolder = path.join(output, 'package');
 fs.mkdirSync(packageFolder);
@@ -325,6 +353,31 @@ async function until(fn, name) {
     await search.fill('');
     await until(async () => (await ids()).length === 3, 'clear search while focused');
     checks.push('search-filters-and-clears-while-focused');
+    const toolbar = page.locator('.applet-management > .settings-list .settings-list-toolbar');
+    const count = toolbar.locator('.command-list-summary-count');
+    const beforeFilter = (await page.evaluate(() => window.dock.snapshot())).settings.value;
+    await search.fill('WebApplet');
+    await until(async () => (await count.innerText()) === '1 / 3 件', 'filtered Applet count');
+    await page.screenshot({ path: path.join(output, 'management-filtered.png') });
+    await toolbar.getByRole('button', { name: 'Appletを並べ替え', exact: true }).click();
+    const filteredOrder = page.locator('.settings-order-dialog');
+    await filteredOrder.waitFor();
+    assert.equal(await filteredOrder.locator('[data-order-id]').count(), 3);
+    await filteredOrder.press('Escape');
+    await filteredOrder.waitFor({ state: 'hidden' });
+    await search.fill('not-an-installed-applet');
+    await until(async () => (await count.innerText()) === '0 / 3 件', 'empty Applet search');
+    await toolbar.getByRole('button', { name: '絞り込みを解除', exact: true }).click();
+    await until(async () => (await ids()).length === 3, 'toolbar clears Applet search');
+    assert.equal(await search.inputValue(), '');
+    assert.equal(await count.innerText(), '3 / 3 件');
+    assert.deepEqual(
+      (await page.evaluate(() => window.dock.snapshot())).settings.value,
+      beforeFilter,
+    );
+    checks.push(
+      'toolbar search count and clear preserve settings; filtered reorder still includes all installed Applets',
+    );
     const presentation = await row('test.a').evaluate((element) => {
       const cells = element.querySelectorAll('td');
       const name = element.querySelector('.applet-management-name');
@@ -367,21 +420,31 @@ async function until(fn, name) {
       ['再起動', 'アンインストール'],
     );
     assert(presentation.actions.every((button) => button.icon && !button.text));
-    assert.equal(
-      await page.locator('.applet-management thead .applet-shortcut-add').getAttribute('title'),
-      'Appletをインストール',
-    );
+    const add = toolbar.getByRole('button', { name: 'Appletをインストール', exact: true });
+    assert.equal(await add.count(), 1);
+    if (await add.isEnabled()) {
+      const beforeAdd = (await page.evaluate(() => window.dock.snapshot())).settings.value;
+      await add.focus();
+      await add.press('Enter');
+      const installDialog = page.getByRole('dialog');
+      await installDialog.waitFor();
+      await installDialog.press('Escape');
+      await installDialog.waitFor({ state: 'hidden' });
+      assert(await add.evaluate((button) => button === document.activeElement));
+      assert.deepEqual(
+        (await page.evaluate(() => window.dock.snapshot())).settings.value,
+        beforeAdd,
+      );
+      checks.push('toolbar addition opens by keyboard, cancels without saving and restores focus');
+    } else {
+      assert(!executable, 'published host permits Applet installation');
+      checks.push('development host retains the disabled install action');
+    }
     const searchStyle = await page
       .locator('.applet-management .command-shortcut-search')
       .evaluate((element) => {
         const s = getComputedStyle(element);
         return [s.borderRadius, s.borderColor, s.backgroundColor, s.padding];
-      });
-    const orderStyle = await page
-      .getByRole('button', { name: 'Appletを並べ替え', exact: true })
-      .evaluate((element) => {
-        const s = getComputedStyle(element);
-        return [s.width, s.height, s.borderRadius, s.backgroundColor];
       });
     checks.push('compact-icon-columns-name-and-version-layout');
     await page.getByRole('button', { name: 'すべてのAppletの更新を確認', exact: true }).click();
@@ -432,10 +495,7 @@ async function until(fn, name) {
       searchStyle,
     );
     assert.equal(await page.locator('.command-list-toolbar .shortcut-order-open').count(), 0);
-    assert.deepEqual(orderStyle.slice(0, 2), ['32px', '32px']);
-    checks.push(
-      'toolbar search matches command settings; Applet header order stays 32px and shortcut filter has no order action',
-    );
+    checks.push('toolbar search matches command settings and shortcut filter has no order action');
     assert.deepEqual(
       await page
         .locator('[data-shortcut-command]')
@@ -501,7 +561,10 @@ async function until(fn, name) {
     await logs.getByRole('button', { name: 'Appletの絞り込みを解除', exact: true }).click();
     await until(async () => {
       const model = await logs.evaluate(async () => await window.dock.pages.get());
-      return model.content.filters.source === '' && model.content.filters.level === 'all';
+      return (
+        model.content.filters.source === '' &&
+        model.content.filters.level === logModel.content.filters.level
+      );
     }, 'clear log source with adjacent close icon');
     checks.push('log-source-clear-icon');
     checks.push('individual-settings-and-source-filtered-common-log');
