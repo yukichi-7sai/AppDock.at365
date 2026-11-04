@@ -1,12 +1,20 @@
 {
   "name": "appdock-at365",
-  "version": "0.140.0",
+  "version": "0.142.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
   "license": "MIT",
   "main": "out/main/main/bootstrap.js",
   "imports": {
+    "#accent-colors": {
+      "browser": "./src/renderer/accent-color-source.ts",
+      "default": "./out/main/main/core/accent-color-source.js"
+    },
+    "#accent-color-defaults": {
+      "browser": "./src/renderer/accent-color-defaults.ts",
+      "default": "./out/main/main/core/accent-color-defaults.js"
+    },
     "#theme-defaults": {
       "browser": "./src/renderer/theme-defaults.ts",
       "default": "./out/main/main/core/theme-defaults.js"

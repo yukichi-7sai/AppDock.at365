@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "defaultId": "mint",
+  "customLabel": "カスタム",
+  "presets": [
+    {
+      "id": "mint",
+      "label": "ミント",
+      "light": { "accent": "#217a65", "soft": "#e1f3ec" },
+      "dark": { "accent": "#7ce1c5", "soft": "#243b37" }
+    },
+    {
+      "id": "alice-blue",
+      "label": "アリス",
+      "light": { "accent": "#245f9e", "soft": "#f0f8ff" },
+      "dark": { "accent": "#acd5ff", "soft": "#20364d" }
+    },
+    {
+      "id": "lavender",
+      "label": "ワンダーランド",
+      "light": { "accent": "#6d48a6", "soft": "#f3edff" },
+      "dark": { "accent": "#c8adf4", "soft": "#352c46" }
+    },
+    {
+      "id": "rose",
+      "label": "マジカント",
+      "light": { "accent": "#a53666", "soft": "#ffedf4" },
+      "dark": { "accent": "#f2a6c6", "soft": "#452b38" }
+    },
+    {
+      "id": "amber",
+      "label": "クッキー",
+      "light": { "accent": "#865600", "soft": "#fff5dc" },
+      "dark": { "accent": "#f2c66a", "soft": "#40351f" }
+    },
+    {
+      "id": "sky-blue",
+      "label": "スカイブルー",
+      "hidden": true,
+      "light": { "accent": "#036a91", "soft": "#e5f6ff" },
+      "dark": { "accent": "#75d6f5", "soft": "#173b48" }
+    }
+  ]
+}

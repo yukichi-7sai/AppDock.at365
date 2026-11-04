@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { hostResources } from './host-translation-source';
 import { themeColors } from './theme-source';
+import { accentColorCatalog } from './accent-color-source';
 import type { IpcMain, WebContents } from 'electron';
 import {
   defaultAccentColor,
@@ -50,6 +51,7 @@ export function configureAppearance(
         throw Error(hostText('services.appearanceHost.unauthorizedSurface'));
       return hostResources;
     }
+    if (request === 'accent-colors') return accentColorCatalog;
     return appearanceSnapshot();
   });
 }

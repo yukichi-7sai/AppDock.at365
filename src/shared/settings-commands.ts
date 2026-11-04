@@ -1,7 +1,6 @@
 import { hostText } from './i18n';
 import { isSettingAccessible } from './setting-access';
 import type { AppletCommand, SettingDefinition } from './contracts';
-import { hostSettingDefinitions } from './host-settings';
 export { hostSettingDefinitions } from './host-settings';
 
 export function generatedSettingCommands(

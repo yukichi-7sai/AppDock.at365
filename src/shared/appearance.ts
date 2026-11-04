@@ -1,37 +1,31 @@
 import { defaultTheme } from '#theme-defaults';
+import { accentColorCatalog } from '#accent-colors';
+import { defaultAccentColors } from '#accent-color-defaults';
+import type { AccentColorCatalog } from './accent-color';
+export { isAccentColor, isAccentHex } from './accent-color';
 import type { ThemeColors } from './theme';
 
 /** Canonical accent palettes for every trusted local presentation surface. */
-export const accentPalettes = [
-  { id: 'mint', title: 'ミント', light: ['#217a65', '#e1f3ec'], dark: ['#7ce1c5', '#243b37'] },
-  {
-    id: 'alice-blue',
-    title: 'アリス',
-    light: ['#245f9e', '#f0f8ff'],
-    dark: ['#acd5ff', '#20364d'],
+export const allAccentPalettes = accentColorCatalog.presets.map((preset) => ({
+  id: preset.id,
+  title: preset.label,
+  hidden: preset.hidden === true,
+  light: [preset.light.accent, preset.light.soft] as const,
+  dark: [preset.dark.accent, preset.dark.soft] as const,
+  autoContrast: {
+    light: preset.light.autoContrast === true,
+    dark: preset.dark.autoContrast === true,
   },
-  {
-    id: 'lavender',
-    title: 'ラベンダー',
-    light: ['#6d48a6', '#f3edff'],
-    dark: ['#c8adf4', '#352c46'],
-  },
-  { id: 'rose', title: 'マジカル', light: ['#a53666', '#ffedf4'], dark: ['#f2a6c6', '#452b38'] },
-  { id: 'amber', title: 'クッキー', light: ['#865600', '#fff5dc'], dark: ['#f2c66a', '#40351f'] },
-] as const;
-/** Retained for saved settings; no longer offered as a new palette. */
-export const legacyAccentPalette = {
-  id: 'sky-blue',
-  title: 'スカイブルー',
-  light: ['#036a91', '#e5f6ff'],
-  dark: ['#75d6f5', '#173b48'],
-} as const;
+}));
+export const accentPalettes = allAccentPalettes.filter((preset) => !preset.hidden);
 export const accentChoices = [
   ...accentPalettes.map(({ id, title }) => ({ id, title })),
-  { id: 'custom', title: 'カスタム' },
-] as const;
-export type AccentColor = (typeof accentPalettes)[number]['id'] | 'sky-blue' | 'custom';
-export const defaultAccentColor: AccentColor = 'mint';
+  { id: 'custom', title: accentColorCatalog.customLabel },
+];
+export type AccentColor = string;
+export const defaultAccentColor: AccentColor = accentColorCatalog.defaultId;
+const paletteById = new Map(allAccentPalettes.map((preset) => [preset.id, preset]));
+export const defaultAccentPalette = paletteById.get(defaultAccentColor)!;
 /** Placeholder text remains distinct from entered values on every registered local UI. */
 export const placeholderCss = `
 :root :is(input, textarea)::placeholder {
@@ -74,20 +68,14 @@ export interface CustomAccentColors {
   dark: string;
   light: string;
 }
+// Keep omitted saved custom colors stable even when the external catalog is reordered or replaced.
+const builtInDefault = defaultAccentColors.presets.find(
+  (preset) => preset.id === defaultAccentColors.defaultId,
+)!;
 export const defaultCustomAccent: Readonly<CustomAccentColors> = {
-  dark: accentPalettes[0].light[0],
-  light: accentPalettes[0].light[1],
+  dark: builtInDefault.light.accent,
+  light: builtInDefault.light.soft,
 };
-export function isAccentHex(value: unknown): value is string {
-  return typeof value === 'string' && /^#[a-f\d]{6}$/i.test(value);
-}
-export function isAccentColor(value: unknown): value is AccentColor {
-  return (
-    value === 'custom' ||
-    value === legacyAccentPalette.id ||
-    accentPalettes.some((palette) => palette.id === value)
-  );
-}
 export interface AppearanceSnapshot {
   language?: string;
   overlayBackground?: 'blur' | 'transparent' | 'translucent';
@@ -101,6 +89,7 @@ export interface AppearanceSnapshot {
   colors: { accent: string; soft: string; text: string; hover: string };
 }
 export interface AppearanceApi {
+  accentColors(): Promise<AccentColorCatalog>;
   translations(): Promise<Record<string, Record<string, string>>>;
   snapshot(): Promise<AppearanceSnapshot>;
   onChanged(callback: (appearance: AppearanceSnapshot) => void): () => void;
@@ -120,29 +109,30 @@ export function resolveAppearance(
   const resolvedTheme = { ...theme, onError: readableText(theme.error) };
   if (palette === 'custom') {
     // Keep the saved pair intact. Resolve readable tones only for presentation.
-    const soft = toward(custom[dark ? 'dark' : 'light'], dark ? '#000000' : '#ffffff', (color) =>
-      dark ? luminance(color) <= 0.025 : luminance(color) >= 0.8,
-    );
-    const accent = toward(
-      custom[dark ? 'light' : 'dark'],
-      dark ? '#ffffff' : '#000000',
-      (color) =>
-        contrast(color, soft) >= 4.5 &&
-        [theme.background, theme.panel, theme.raised].every((base) => contrast(color, base) >= 4.5),
-    );
-    const text = contrast(accent, '#000000') >= contrast(accent, '#ffffff') ? '#000000' : '#ffffff';
-    const hover = toward(
-      mix(accent, text === '#000000' ? '#ffffff' : '#000000', 0.12),
-      text === '#000000' ? '#ffffff' : '#000000',
-      (color) => contrast(color, text) >= 4.5,
-    );
-    return { revision, palette, dark, theme: resolvedTheme, colors: { accent, soft, text, hover } };
+    return {
+      revision,
+      palette,
+      dark,
+      theme: resolvedTheme,
+      colors: correctAccentColors(
+        custom[dark ? 'light' : 'dark'],
+        custom[dark ? 'dark' : 'light'],
+        dark,
+        theme,
+      ),
+    };
   }
-  const definition =
-    palette === legacyAccentPalette.id
-      ? legacyAccentPalette
-      : (accentPalettes.find((item) => item.id === palette) ?? accentPalettes[0]);
-  const [accent, soft] = definition[dark ? 'dark' : 'light'];
+  const definition = paletteById.get(palette) ?? defaultAccentPalette;
+  const mode = dark ? 'dark' : 'light';
+  const [accent, soft] = definition[mode];
+  if (definition.autoContrast[mode])
+    return {
+      revision,
+      palette: definition.id,
+      dark,
+      theme: resolvedTheme,
+      colors: correctAccentColors(accent, soft, dark, theme),
+    };
   const text = readableText(accent);
   const hover =
     '#' +
@@ -162,6 +152,29 @@ export function resolveAppearance(
     theme: resolvedTheme,
     colors: { accent, soft, text, hover },
   };
+}
+
+/** Shared by custom colors and opted-in preset tones; source colors are never changed. */
+function correctAccentColors(
+  sourceAccent: string,
+  sourceSoft: string,
+  dark: boolean,
+  theme: ThemeColors,
+): AppearanceSnapshot['colors'] {
+  const soft = toward(sourceSoft, dark ? '#000000' : '#ffffff', (color) =>
+    dark ? luminance(color) <= 0.025 : luminance(color) >= 0.8,
+  );
+  const accent = toward(
+    sourceAccent,
+    dark ? '#ffffff' : '#000000',
+    (color) =>
+      contrast(color, soft) >= 4.5 &&
+      [theme.background, theme.panel, theme.raised].every((base) => contrast(color, base) >= 4.5),
+  );
+  const text = readableText(accent);
+  const target = text === '#000000' ? '#ffffff' : '#000000';
+  const hover = toward(mix(accent, target, 0.12), target, (color) => contrast(color, text) >= 4.5);
+  return { accent, soft, text, hover };
 }
 
 function readableText(background: string): string {

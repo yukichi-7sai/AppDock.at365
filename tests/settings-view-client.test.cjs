@@ -18,9 +18,11 @@ fs.writeFileSync(
       moduleResolution: 'Node16',
       customConditions: [],
       types: ['node'],
-      paths: {
-        '#host-translations': [path.join(root, 'src/main/core/host-translation-source.ts')],
-      },
+      paths: Object.fromEntries(
+        Object.entries(require('../tsconfig.main.json').compilerOptions.paths).map(
+          ([key, values]) => [key, values.map((value) => path.resolve(root, value))],
+        ),
+      ),
       rootDir: path.join(root, 'src'),
       outDir: path.join(output, 'compiled'),
     },
@@ -33,7 +35,7 @@ fs.writeFileSync(
 execFileSync(
   process.execPath,
   [path.join(path.dirname(tsPackage), require(tsPackage).bin.tsc), '-p', config],
-  { cwd: root, windowsHide: true, stdio: 'pipe' },
+  { cwd: root, windowsHide: true, stdio: 'inherit' },
 );
 const { SettingsViewClient } = require(path.join(output, 'compiled/renderer/settings/runtime.js'));
 const { createDefaultSettings } = require(path.join(output, 'compiled/shared/settings-schema.js'));

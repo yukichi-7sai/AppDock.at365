@@ -26,6 +26,10 @@ fs.copyFileSync(
   path.join(root, 'resources/configs/theme.json'),
   path.join(output, 'shared/theme-defaults.json'),
 );
+fs.copyFileSync(
+  path.join(root, 'resources/configs/accent-color.json'),
+  path.join(output, 'shared/accent-color-defaults.json'),
+);
 // Sandboxed Electron preloads support require('electron'), but no local runtime imports.
 // Share one self-contained appearance bridge across local surface preloads.
 const appearance = fs.readFileSync(path.join(output, 'main/appearance-preload.js'), 'utf8');

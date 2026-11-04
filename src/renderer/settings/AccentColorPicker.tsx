@@ -1,14 +1,14 @@
 import { useHostTranslation } from '../HostTranslation';
-import React from 'react';
 import {
   accentChoices,
-  accentPalettes,
-  legacyAccentPalette,
+  allAccentPalettes,
+  defaultAccentPalette,
   type AccentColor,
   type CustomAccentColors,
 } from '../../shared/appearance';
 import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
 import { SettingsField } from '../settings-ui/SettingsSections';
+const paletteById = new Map(allAccentPalettes.map((preset) => [preset.id, preset]));
 export function AccentColorPicker({
   value,
   custom,
@@ -21,11 +21,15 @@ export function AccentColorPicker({
   onCustomChange(tone: keyof CustomAccentColors, color: string): void;
 }) {
   const { t } = useHostTranslation();
+  const current = paletteById.get(value);
   return (
     <>
-      {value === legacyAccentPalette.id && (
+      {current?.hidden && (
+        <p className="muted">{t('appearance.accent.current', { name: current.title })}</p>
+      )}
+      {!current && value !== 'custom' && (
         <p className="muted">
-          {t('appearance.accent.current', { name: t('appearance.accent.palette.sky-blue') })}
+          {t('appearance.accent.unavailable', { id: value, name: defaultAccentPalette.title })}
         </p>
       )}
       <div className="accent-palettes" role="group" aria-label={t('appearance.accent.label')}>
@@ -33,7 +37,7 @@ export function AccentColorPicker({
           const colors =
             palette.id === 'custom'
               ? [custom.dark, custom.light]
-              : accentPalettes.find((p) => p.id === palette.id)!.light;
+              : paletteById.get(palette.id)!.light;
           return (
             <button
               key={palette.id}
@@ -46,7 +50,7 @@ export function AccentColorPicker({
                 <i style={{ background: colors[0] }} />
                 <i style={{ background: colors[1] }} />
               </span>
-              <span>{t(`appearance.accent.palette.${palette.id}`)}</span>
+              <span>{palette.title}</span>
             </button>
           );
         })}

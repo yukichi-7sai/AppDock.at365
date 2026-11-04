@@ -42,6 +42,7 @@ function fixture(t) {
     'translations/host_en.json': '{"key":"English"}',
     'configs/applets.json': '{"applets":["owner/One"]}',
     'configs/nested/default.json': '{"default":true}',
+    'configs/accent-color.json': JSON.stringify(require('../resources/configs/accent-color.json')),
   })) {
     fs.mkdirSync(path.dirname(path.join(source, name)), { recursive: true });
     fs.writeFileSync(path.join(source, name), contents);
@@ -100,6 +101,8 @@ test('host deployment overwrites distributed translations and configs and keeps 
   fs.writeFileSync(path.join(f.base,'configs/custom.json'), '{"custom":true}');
   fs.writeFileSync(path.join(f.source,'configs/theme.json'), JSON.stringify(require('../resources/configs/theme.json')));
   fs.writeFileSync(path.join(f.base,'configs/theme.json'), '{"edited":true}');
+  fs.writeFileSync(path.join(f.source,'configs/accent-color.json'), JSON.stringify(require('../resources/configs/accent-color.json')));
+  fs.writeFileSync(path.join(f.base,'configs/accent-color.json'), '{"edited":true}');
   ok(['--deploy-host', f.source, f.base]);
   for (const file of ['host.json', 'host_en.json'])
     assert.equal(fs.readFileSync(path.join(folder, file), 'utf8'), fs.readFileSync(path.join(resources, file), 'utf8'));
@@ -107,11 +110,14 @@ test('host deployment overwrites distributed translations and configs and keeps 
   assert.equal(fs.readFileSync(path.join(f.base,'configs/applets.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/applets.json'), 'utf8'));
   assert.equal(fs.readFileSync(path.join(f.base,'configs/custom.json'), 'utf8'), '{"custom":true}');
   assert.equal(fs.readFileSync(path.join(f.base,'configs/theme.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/theme.json'), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(f.base,'configs/accent-color.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/accent-color.json'), 'utf8'));
   assert.ok(f.plan().some(item => item.id === 'translations/host.json' && item.kind === 'host-resource'));
   // Files no longer shipped are unbundled too, and must not be pruned.
   fs.unlinkSync(path.join(resources, 'host_en.json'));
+  fs.unlinkSync(path.join(f.source, 'configs/theme.json'));
   ok(['--deploy-host', f.source, f.base]);
   assert.equal(fs.readFileSync(path.join(folder,'host_en.json'), 'utf8'), '{"key":"English"}');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.base,'configs/theme.json'))), require('../resources/configs/theme.json'));
   f.preserved();
 });
 test('host packaging rejects a bundled runtime in a new helper and preserves the existing feed', (t) => {
@@ -163,6 +169,7 @@ test('folder host update adds/removes managed assets in the existing transaction
   fs.writeFileSync(path.join(f.base, 'configs/applets.json'), '{"applets":[]}');
   fs.writeFileSync(path.join(f.base, 'configs/custom.json'), '{"custom":true}');
   fs.writeFileSync(path.join(f.base, 'dxil.dll'), 'old DLL');
+  fs.writeFileSync(path.join(f.base, 'configs/accent-color.json'), '{"edited":true}');
   const items = f.plan();
   assert(items.some((i) => i.id === 'resources' && i.operation === 'install'));
   assert(items.some((i) => i.id === 'dxil.dll' && i.operation === 'uninstall'));
@@ -194,7 +201,7 @@ test('folder host update adds/removes managed assets in the existing transaction
   const translation = readTranslationFiles(path.join(f.base, 'translations'), path.join(f.base, 'translations/host.json'));
   assert.deepEqual(translation.ja, { description: '[setting:command-triggers]' });
   assert.equal(translation.fr.description, 'Custom');
-  for (const file of ['translations/host.json', 'configs/applets.json', 'configs/nested/default.json'])
+  for (const file of ['translations/host.json', 'configs/applets.json', 'configs/nested/default.json', 'configs/accent-color.json'])
     assert.equal(digest(path.join(f.base, file)), digest(path.join(f.source, file)));
   assert.equal(fs.readFileSync(path.join(f.base, 'configs/custom.json'), 'utf8'), '{"custom":true}');
   f.preserved();

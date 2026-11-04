@@ -16,6 +16,8 @@
 
 発行・更新では `translations/` と `configs/` の同梱ファイルを内容ごと上書きし、編集内容をマージしない。今回の配布に含まれない追加ファイルはそのまま残す。前の配布にだけ含まれたファイルも未同梱ファイルとして保持する。フォルダー全体の削除・交換は行わない。通常起動では上書きせず、手動編集は次の発行・更新まで有効。Appletカタログは `configs/applets.json` を管理ページ表示時に読み込む。
 
+この更新方針は`configs/applets.json`・`theme.json`・`accent-color.json`と、今後追加するすべての同梱構成ファイルへ共通に適用する。ファイルごとの編集保持・自動マージの例外は設けない。
+
 `appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、`translations`、`configs`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布元に一覧外のファイルやリンクがあれば発行・更新準備を拒否する。
 
 `update.zip`は本体フォルダーの内容だけを格納する。feedはschemaVersion=1、kind=host、id=host、payload.format=zip。SHA256と配布サイズを従来どおり照合する。圧縮ファイルは512MiB、展開済み本体は1GiB、ファイル数は10,000件を上限とする。Appletの既存512MiB上限は変えない。

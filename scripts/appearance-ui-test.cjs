@@ -10,8 +10,6 @@ const { freePort, inspect, electronExpression } = require('./electron-main-helpe
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { waitForHost } = require('./settings-host-helper.cjs');
 const { accentPalettes, resolveAppearance } = require('../out/main/shared/appearance');
-const { getHostTranslator } = require('../out/main/shared/i18n');
-const translate = getHostTranslator('ja');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'appearance-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
@@ -374,7 +372,7 @@ async function assertRibbonReadability(rail, id, dark) {
       for (const palette of accentPalettes) {
         await host
           .getByRole('button', {
-            name: translate('appearance.accent.palette.' + palette.id),
+            name: palette.title,
             exact: true,
           })
           .click();

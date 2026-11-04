@@ -5,8 +5,8 @@ import { defaultHostLanguage, validHostLanguageCode } from './host-language';
 import { hostText } from './i18n';
 import { prepareSettingsLookups } from './settings-lookups';
 import { parseMcpRoster } from './mcp-client';
-import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
-import { defaultAccentColor, defaultCustomAccent, isAccentColor, isAccentHex } from './appearance';
+import { minimumZoomFactor, maximumZoomFactor } from './display-zoom';
+import { isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseShellProviders } from './shell';
@@ -164,7 +164,9 @@ export function parseSettings(value: unknown): Settings {
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
     throw new Error(hostText('settings.settings-schema.trayDoubleClick'));
   for (const field of hostSettingDefinitions)
-    if (field.key !== 'language') validateSettingValue(field, value.host[field.key]);
+    // Language and accent IDs are validated above, including unavailable saved selections.
+    if (field.key !== 'language' && field.key !== 'accentColor')
+      validateSettingValue(field, value.host[field.key]);
   for (const key of ['textPaletteRows', 'clipboardPaletteRows'])
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidRows'));
   for (const key of ['textPaletteWidth', 'clipboardPaletteWidth'])

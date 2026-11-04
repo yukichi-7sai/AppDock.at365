@@ -7,7 +7,6 @@ import {
   hostPageSettingsPaths,
   deviceOnlyHostKeys,
   isHostPageSettingsId,
-  updateSettingKeys,
 } from './host-page-settings';
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { commandTriggerSettingDefinitions } from './command-trigger-options';
@@ -468,7 +467,6 @@ export const appletCommonDescriptions = localizedMetadata(() => ({
   display: hostText('settings.settings-catalog.appletDisplay'),
   startupDelaySeconds: hostText('settings.settings-catalog.appletDelay'),
 }));
-const updateKeys = updateSettingKeys;
 
 const item = (
   pageId: string,
@@ -528,10 +526,7 @@ export function settingsCatalog(
                   ]
                 : id === 'appearance' && key === 'accentColor'
                   ? [
-                      ...accentChoices.flatMap((p) => [
-                        p.id,
-                        t(`appearance.accent.palette.${p.id}`),
-                      ]),
+                      ...accentChoices.flatMap((p) => [p.id, p.title]),
                       t('appearance.accent.dark'),
                       t('appearance.accent.light'),
                       'HEX',

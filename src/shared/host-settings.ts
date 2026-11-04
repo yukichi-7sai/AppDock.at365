@@ -15,7 +15,7 @@ import {
 } from './file-watch-assistance';
 import {
   accentChoices,
-  legacyAccentPalette,
+  allAccentPalettes,
   defaultAccentColor,
   defaultCustomAccent,
 } from './appearance';
@@ -76,7 +76,7 @@ const definitions = localizedMetadata(() => ({
     type: 'select',
     default: defaultAccentColor,
     automation: true,
-    options: [...accentChoices, legacyAccentPalette].map(({ id, title }) => ({
+    options: [...allAccentPalettes, accentChoices[accentChoices.length - 1]].map(({ id, title }) => ({
       value: id,
       label: title,
     })),

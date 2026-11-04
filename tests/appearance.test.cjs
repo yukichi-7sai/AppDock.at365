@@ -5,9 +5,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const {
-  accentPalettes,
   accentChoices,
-  legacyAccentPalette,
+  allAccentPalettes,
   defaultCustomAccent,
   resolveAppearance,
 } = require('../out/main/shared/appearance');
@@ -98,11 +97,14 @@ test('shadow preferences default on, persist independently and reset only with t
 test('all palettes provide readable accent text, soft selections and filled/hovered controls in both themes', () => {
   assert.deepEqual(
     accentChoices.map((palette) => palette.title),
-    ['ミント', 'アリス', 'ラベンダー', 'マジカル', 'クッキー', 'カスタム'],
+    ['ミント', 'アリス', 'ワンダーランド', 'マジカント', 'クッキー', 'カスタム'],
   );
-  for (const palette of [...accentPalettes, legacyAccentPalette])
+  for (const palette of allAccentPalettes)
     for (const dark of [false, true]) {
       const { colors } = resolveAppearance(palette.id, dark);
+      const [accent, soft] = palette[dark ? 'dark' : 'light'];
+      assert.equal(colors.accent, accent);
+      assert.equal(colors.soft, soft);
       for (const [a, b] of [
         [colors.accent, colors.soft],
         [colors.accent, colors.text],
@@ -150,12 +152,12 @@ test('custom tones keep arbitrary saved pairs intact and resolve readable colors
     '#f0f8ff',
   );
 });
-test('accent selection defaults to mint, validates exact presets, and participates in device settings and partial JSON', () => {
+test('accent selection defaults to mint, validates IDs, and participates in device settings and partial JSON', () => {
   const settings = createDefaultSettings();
   delete settings.host.accentColor;
   assert.equal(parseSettings(settings).host.accentColor, 'mint');
   assert(deviceHostKeys.includes('accentColor'));
-  for (const invalid of ['unknown', '#f0f8ff', null, 5, {}])
+  for (const invalid of ['', 'invalid id', 'constructor', '#f0f8ff', null, 5, {}])
     assert.throws(() =>
       parseSettings({ ...settings, host: { ...settings.host, accentColor: invalid } }),
     );
@@ -238,6 +240,8 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   host.registerAppearance(contents, contents.getURL());
   const event = { sender: contents, senderFrame: contents.mainFrame };
   assert.equal(handler(event).palette, 'mint');
+  assert.deepEqual(handler(event, 'accent-colors'), require('../resources/configs/accent-color.json'));
+  assert.throws(() => handler({ ...event, senderFrame: { url: contents.getURL() } }, 'accent-colors'));
   assert.throws(() => handler({ ...event, senderFrame: { url: contents.getURL() } }));
   assert.throws(() => host.registerAppearance(new EventEmitter(), 'https://example.com/'));
   host.refreshAppearance();
@@ -265,6 +269,7 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   }
   contents.mainFrame.url = 'file:///other.html';
   assert.throws(() => handler(event));
+  assert.throws(() => handler(event, 'accent-colors'));
   const before = sent.length;
   contents.emit('dom-ready');
   palette = 'rose';

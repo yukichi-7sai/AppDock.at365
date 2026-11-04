@@ -27,7 +27,7 @@
 
 色は `#RRGGBB` で指定します。`shadow` と `scrim` は、透明度を付けた `#RRGGBBAA` も使えます。末尾の `AA` は `00` が完全に透明、`FF` が完全に不透明です。
 
-アクセントカラーのプリセットや、基本色から計算する選択背景・ホバー色・前景色などは、このJSONには含めません。
+アクセントカラーのプリセットは別の [resources/configs/accent-color.json](resources/configs/accent-color.json) で指定します。基本色から計算する選択背景・ホバー色・前景色などは、このJSONには含めません。
 
 編集内容はAppDockの再起動で反映されます。更新時は、編集済みでも同梱された `configs/theme.json` が上書きされます。`configs` 内へ追加した、配布に含まれないファイルは残ります。
 
