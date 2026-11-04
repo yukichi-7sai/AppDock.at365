@@ -120,7 +120,7 @@ module.exports = async function ({
             return found;
           },
           // The visible storage filename also happens to be the JSON-mode resource key.
-          Object.keys(require('../src/shared/locales/ja/host.json')).filter(
+          Object.keys(require('../resources/translations/host.json')).filter(
             (key) => key !== 'settings.json',
           ),
         );

@@ -243,7 +243,7 @@ test('unpublished and rate-limit reset survive restart without consuming more re
 
 test('editable external roster is seeded only when absent and reread without a build', async (t) => {
   const base = directory(t),
-    file = path.join(base, 'applets.json'),
+    file = path.join(base, 'configs/applets.json'),
     seed = path.join(base, 'seed.json');
   fs.writeFileSync(seed, JSON.stringify({ applets: ['owner/Clock'] }));
   const f = fixture({ repositories: () => readAppletRoster(file, seed) });

@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 
 type Dictionary = Record<string, string>;
 function readJson(file: string): Record<string, unknown> {
@@ -25,41 +24,7 @@ function translations(file: string, base: Dictionary): Dictionary {
   ) as Dictionary;
 }
 
-function replaceFile(file: string, contents: Buffer | string) {
-  const temporary = file + '.' + randomUUID() + '.tmp';
-  try {
-    fs.writeFileSync(temporary, contents, { flag: 'wx' });
-    fs.renameSync(temporary, file);
-  } finally {
-    fs.rmSync(temporary, { force: true });
-  }
-}
-
-/** Older updaters replace resources; refresh external packs before loading the new host. */
-function refreshTranslations(directory: string, source: string, version: string) {
-  const marker = path.join(directory, '.appdock-version');
-  const files = fs
-    .readdirSync(source, { withFileTypes: true })
-    .filter(
-      (file) => file.isFile() && /^host(?:_[a-z]{2,3}(?:-[a-z0-9]{2,8})*)?\.json$/i.test(file.name),
-    );
-  for (const file of [marker, ...files.map((file) => path.join(directory, file.name))]) {
-    const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-    if (stat && !stat.isFile()) throw Error('Invalid translation destination');
-  }
-  if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') === version) return;
-  for (const file of files)
-    replaceFile(path.join(directory, file.name), fs.readFileSync(path.join(source, file.name)));
-  // Commit only after every distributed pack was replaced; a failed refresh retries next boot.
-  replaceFile(marker, version);
-}
-
-export function readTranslationFiles(
-  directory: string,
-  seed: string,
-  seedEditable = true,
-  version?: string,
-) {
+export function readTranslationFiles(directory: string, seed: string, seedEditable = true) {
   const base = readJson(seed) as Dictionary;
   const resources: Record<string, Dictionary> = { ja: base };
   try {
@@ -67,21 +32,6 @@ export function readTranslationFiles(
     if (stat && !stat.isDirectory()) return resources;
   } catch {
     return resources;
-  }
-  if (version && path.resolve(directory) !== path.dirname(path.resolve(seed))) {
-    try {
-      if (seedEditable) {
-        fs.mkdirSync(directory, { recursive: true });
-        refreshTranslations(directory, path.dirname(seed), version);
-      } else {
-        const marker = path.join(directory, '.appdock-version');
-        if (!fs.lstatSync(marker).isFile() || fs.readFileSync(marker, 'utf8') !== version)
-          throw Error('Translation refresh is incomplete');
-      }
-    } catch {
-      // A read-only install must still display the new distributed text, never stale overrides.
-      directory = path.dirname(seed);
-    }
   }
   const editable = path.join(directory, 'host.json');
   if (path.resolve(editable) !== path.resolve(seed)) {

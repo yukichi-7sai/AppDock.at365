@@ -680,8 +680,21 @@ async function checkSectionTitles() {
     const englishPack = path.join(packDirectory, 'host_en.json');
     if (translationPacksOnly) {
       fs.mkdirSync(packDirectory, { recursive: true });
-      // This fixture edits the current version; upgrade replacement has its own GUI check.
-      fs.writeFileSync(path.join(packDirectory, '.appdock-version'), require('../package.json').version);
+      fs.mkdirSync(path.join(profile, 'local'), { recursive: true });
+      const fetchedAt = Date.now();
+      fs.writeFileSync(path.join(profile, 'local/applet-catalog-cache.json'), JSON.stringify({
+        schemaVersion: 1,
+        repositories: {
+          'fixture/External': {
+            release: { fetchedAt, value: 'unpublished' },
+            development: { fetchedAt, value: {
+              id: 'fixture.external', displayName: 'External fixture', version: '1.0.0',
+              date: new Date(fetchedAt).toISOString(),
+            } },
+          },
+        },
+      }));
+      // Startup preserves local edits; replacement is covered by the updater transaction tests.
       fs.writeFileSync(path.join(packDirectory, 'host.json'), JSON.stringify({ 'appearance.theme.label': '基本の配色' }));
       fs.writeFileSync(englishPack, JSON.stringify({
         'language.label': 'Display language',
@@ -692,6 +705,20 @@ async function checkSectionTitles() {
     }
     await launch();
     if (translationPacksOnly) {
+      await host.getByTestId('settings-nav:applets').click();
+      const roster = path.join(profile, 'configs/applets.json');
+      await until(() => fs.existsSync(roster), 'catalog reads configs/applets.json');
+      assert.equal(
+        fs.readFileSync(roster, 'utf8'),
+        fs.readFileSync(source ? path.join(path.dirname(source), 'configs/applets.json') : path.join(root, 'resources/configs/applets.json'), 'utf8'),
+      );
+      fs.writeFileSync(roster, '{"applets":["fixture/External"]}');
+      await select('表示');
+      await host.getByTestId('settings-nav:applets').click();
+      await host.locator('[data-catalog-repository="fixture/External"]').waitFor();
+      assert.equal(await host.locator('[data-catalog-repository]').count(), 1);
+      assert.equal(fs.existsSync(path.join(profile, 'applets.json')), false);
+      checks.push('Packaged configs/applets.json is loaded and edits are reread without using the old root path');
       await select('表示');
       const control = host.getByTestId('host-language');
       assert.equal(await control.locator('option[value=en]').innerText(), 'English');
@@ -708,6 +735,7 @@ async function checkSectionTitles() {
       await stop();
       await launch();
       await select('Appearance');
+      assert.equal(fs.readFileSync(roster, 'utf8'), '{"applets":["fixture/External"]}');
       assert.equal(await host.getByTestId('host-language').getAttribute('aria-label'), 'Display language');
       const base = JSON.parse(fs.readFileSync(path.join(packDirectory, 'host.json'), 'utf8'));
       assert.equal(base['appearance.theme.label'], '基本の配色');

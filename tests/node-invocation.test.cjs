@@ -24,7 +24,7 @@ test('Node workers share the host translation directory and update language with
   await assert.rejects(peer.request('page.action', {}), /Unsupported fixture page/);
   await peer.request('host.language.changed', {language:'ja'});
   await assert.rejects(peer.request('page.action', {}), {
-    message: require('../src/shared/locales/ja/host.json')['services.nodeWorker.pageActionUnsupported']
+    message: require('../resources/translations/host.json')['services.nodeWorker.pageActionUnsupported']
   });
   assert.equal(fs.existsSync(path.join(dir,'host.json')),false);
 });

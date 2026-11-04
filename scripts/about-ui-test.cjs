@@ -363,7 +363,7 @@ async function until(fn, label) {
     assert.equal(
       await page
         .getByText(
-          require('../src/shared/locales/ja/host.json')['settings.updateSettings.startupHint'],
+          require('../resources/translations/host.json')['settings.updateSettings.startupHint'],
           { exact: true },
         )
         .count(),

@@ -15,6 +15,16 @@ function ok(args) {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   return r.stdout;
 }
+function jobFile(f, items) {
+  const job = path.join(f.stage, 'job.json');
+  fs.writeFileSync(job, JSON.stringify({
+    schemaVersion: 2, operationId: randomUUID(), baseDirectory: f.base,
+    executable: path.join(f.base, 'AppDock.at365.exe'), args: ['--recover', f.base],
+    processIds: [], result: path.join(f.base, 'data/update-result.json'), items,
+  }));
+  fs.writeFileSync(job + '.commit', 'apply');
+  return job;
+}
 function fixture(t) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-folder-fixture-'));
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-update-'));
@@ -27,6 +37,15 @@ function fixture(t) {
   fs.copyFileSync(helper, path.join(source, 'AppDock.at365.exe'));
   fs.writeFileSync(path.join(source, 'resources/app.asar'), 'new resources');
   fs.writeFileSync(path.join(source, 'ffmpeg.dll'), 'new DLL');
+  for (const [name, contents] of Object.entries({
+    'translations/host.json': '{"key":"基本"}',
+    'translations/host_en.json': '{"key":"English"}',
+    'configs/applets.json': '{"applets":["owner/One"]}',
+    'configs/nested/default.json': '{"default":true}',
+  })) {
+    fs.mkdirSync(path.dirname(path.join(source, name)), { recursive: true });
+    fs.writeFileSync(path.join(source, name), contents);
+  }
   ok(['--pack', 'host', source, '2.0.0', path.join(stage, 'feed')]);
   fs.copyFileSync(helper, path.join(base, 'AppDock.at365.exe'));
   for (const name of [
@@ -68,23 +87,28 @@ test('folder host packs ZIP and deploys program files while preserving user data
   assert(!fs.existsSync(path.join(f.base, 'resources/obsolete.dll')));
   f.preserved();
 });
-test('host deployment overwrites complete distributed translation files and keeps unrelated languages', t => {
+test('host deployment overwrites distributed translations and configs and keeps unbundled files', t => {
   const f = fixture(t);
-  const resources = path.join(f.source, 'resources/translations');
-  fs.mkdirSync(resources);
-  fs.writeFileSync(path.join(resources,'host.json'), '{"key":"基本"}');
-  fs.writeFileSync(path.join(resources,'host_en.json'), '{"key":"English"}');
+  const resources = path.join(f.source, 'translations');
   ok(['--deploy-host', f.source, f.base]);
   const folder = path.join(f.base,'translations');
   assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host.json'))).key, '基本');
   fs.writeFileSync(path.join(folder,'host_en.json'), '{"key":"Old","obsolete":"remove"}');
   fs.writeFileSync(path.join(folder,'host.json'), '{"key":"編集","obsolete":"remove"}');
   fs.writeFileSync(path.join(folder,'host_fr.json'), '{"key":"Custom"}');
+  fs.writeFileSync(path.join(f.base,'configs/applets.json'), '{"applets":[]}');
+  fs.writeFileSync(path.join(f.base,'configs/custom.json'), '{"custom":true}');
   ok(['--deploy-host', f.source, f.base]);
   for (const file of ['host.json', 'host_en.json'])
     assert.equal(fs.readFileSync(path.join(folder, file), 'utf8'), fs.readFileSync(path.join(resources, file), 'utf8'));
   assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host_fr.json'))).key, 'Custom');
-  assert.ok(!f.plan().some(item => path.basename(item.destination) === 'translations'));
+  assert.equal(fs.readFileSync(path.join(f.base,'configs/applets.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/applets.json'), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(f.base,'configs/custom.json'), 'utf8'), '{"custom":true}');
+  assert.ok(f.plan().some(item => item.id === 'translations/host.json' && item.kind === 'host-resource'));
+  // Files no longer shipped are unbundled too, and must not be pruned.
+  fs.unlinkSync(path.join(resources, 'host_en.json'));
+  ok(['--deploy-host', f.source, f.base]);
+  assert.equal(fs.readFileSync(path.join(folder,'host_en.json'), 'utf8'), '{"key":"English"}');
   f.preserved();
 });
 test('host packaging rejects a bundled runtime in a new helper and preserves the existing feed', (t) => {
@@ -113,28 +137,28 @@ test('host packaging rejects a bundled runtime in a new helper and preserves the
   assert.match(stale.stderr, /CoreCLR\.dll/);
   assert.deepEqual(hashes(), original);
 });
-test('folder deployment seeds a new editable Applet roster and preserves edits on redeploy and self-update', (t) => {
+test('manual replacement accepts an old layout and does not import the old root roster', (t) => {
   const f = fixture(t);
-  const seed = path.join(f.source, 'resources', 'applets.json');
-  const sidecar = path.join(f.base, 'applets.json');
-  fs.writeFileSync(seed, '{"applets":["owner/One"]}');
+  fs.writeFileSync(path.join(f.base, 'applets.json'), '{"applets":["owner/Old"]}');
+  fs.mkdirSync(path.join(f.base, 'translations'));
+  fs.writeFileSync(path.join(f.base, 'translations/host.json'), '{"old":true}');
+  fs.writeFileSync(path.join(f.base, 'translations/host_fr.json'), '{"key":"Custom"}');
   ok(['--deploy-host', f.source, f.base]);
-  assert.equal(fs.readFileSync(sidecar, 'utf8'), fs.readFileSync(seed, 'utf8'));
-  fs.writeFileSync(sidecar, '{"applets":[]}');
-  fs.writeFileSync(path.join(f.source, 'applets.json'), '{"applets":["owner/Two"]}');
-  ok(['--deploy-host', f.source, f.base]);
-  assert.equal(fs.readFileSync(sidecar, 'utf8'), '{"applets":[]}');
-  fs.unlinkSync(path.join(f.source, 'applets.json'));
-  assert(!f.plan().some((item) => item.destination === sidecar));
+  assert.equal(fs.readFileSync(path.join(f.base, 'configs/applets.json'), 'utf8'), fs.readFileSync(path.join(f.source, 'configs/applets.json'), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(f.base, 'translations/host.json'), 'utf8'), fs.readFileSync(path.join(f.source, 'translations/host.json'), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(f.base, 'translations/host_fr.json'), 'utf8'), '{"key":"Custom"}');
   fs.writeFileSync(path.join(f.source, 'unrelated.json'), '{}');
   assert.notEqual(run(['--deploy-host', f.source, f.base]).status, 0);
 });
 test('folder host update adds/removes managed assets in the existing transaction', (t) => {
   const f = fixture(t);
-  fs.mkdirSync(path.join(f.source, 'resources/translations'));
-  fs.writeFileSync(path.join(f.source, 'resources/translations/host.json'), '{"description":"[setting:command-triggers]"}');
+  fs.writeFileSync(path.join(f.source, 'translations/host.json'), '{"description":"[setting:command-triggers]"}');
   fs.mkdirSync(path.join(f.base, 'translations'));
   fs.writeFileSync(path.join(f.base, 'translations/host.json'), '{"description":"旧説明","obsolete":"remove"}');
+  fs.writeFileSync(path.join(f.base, 'translations/host_fr.json'), '{"description":"Custom"}');
+  fs.mkdirSync(path.join(f.base, 'configs'));
+  fs.writeFileSync(path.join(f.base, 'configs/applets.json'), '{"applets":[]}');
+  fs.writeFileSync(path.join(f.base, 'configs/custom.json'), '{"custom":true}');
   fs.writeFileSync(path.join(f.base, 'dxil.dll'), 'old DLL');
   const items = f.plan();
   assert(items.some((i) => i.id === 'resources' && i.operation === 'install'));
@@ -164,9 +188,12 @@ test('folder host update adds/removes managed assets in the existing transaction
     ['host'],
   );
   const { readTranslationFiles } = require('../out/main/main/core/translation-files');
-  const translation = readTranslationFiles(path.join(f.base, 'translations'), path.join(f.base, 'resources/translations/host.json'), true, '2.0.0');
+  const translation = readTranslationFiles(path.join(f.base, 'translations'), path.join(f.base, 'translations/host.json'));
   assert.deepEqual(translation.ja, { description: '[setting:command-triggers]' });
-  assert.equal(fs.readFileSync(path.join(f.base, 'translations/host.json'), 'utf8'), fs.readFileSync(path.join(f.base, 'resources/translations/host.json'), 'utf8'));
+  assert.equal(translation.fr.description, 'Custom');
+  for (const file of ['translations/host.json', 'configs/applets.json', 'configs/nested/default.json'])
+    assert.equal(digest(path.join(f.base, file)), digest(path.join(f.source, file)));
+  assert.equal(fs.readFileSync(path.join(f.base, 'configs/custom.json'), 'utf8'), '{"custom":true}');
   f.preserved();
 });
 test('folder host rejects protected paths, unexpected files, and changed versions before handoff', (t) => {
@@ -188,6 +215,12 @@ test('folder host recovery rolls back interrupted installs and retains committed
     const operationId = randomUUID();
     fs.mkdirSync(path.join(f.base, 'resources'));
     fs.writeFileSync(path.join(f.base, 'resources/app.asar'), 'old resources');
+    fs.mkdirSync(path.join(f.base, 'translations'));
+    fs.mkdirSync(path.join(f.base, 'configs'));
+    fs.writeFileSync(path.join(f.base, 'translations/host.json'), 'edited translation');
+    fs.writeFileSync(path.join(f.base, 'translations/host_fr.json'), 'custom language');
+    fs.writeFileSync(path.join(f.base, 'configs/applets.json'), 'edited roster');
+    fs.writeFileSync(path.join(f.base, 'configs/custom.json'), 'custom config');
     const items = f.plan();
     const transaction = path.join(
       f.base,
@@ -203,6 +236,7 @@ test('folder host recovery rolls back interrupted installs and retains committed
       fs.mkdirSync(path.dirname(swap.next), { recursive: true });
       fs.cpSync(swap.item.source, swap.next, { recursive: true });
       if (swap.item.operation === 'update') fs.renameSync(swap.item.destination, swap.backup);
+      fs.mkdirSync(path.dirname(swap.item.destination), { recursive: true });
       fs.renameSync(swap.next, swap.item.destination);
     }
     fs.writeFileSync(
@@ -221,6 +255,59 @@ test('folder host recovery rolls back interrupted installs and retains committed
       committed ? 'new resources' : 'old resources',
     );
     assert(!fs.existsSync(path.join(f.base, 'data/update-transaction.json')));
+    for (const [file, original] of [['translations/host.json', 'edited translation'], ['configs/applets.json', 'edited roster']])
+      assert.equal(fs.readFileSync(path.join(f.base, file), 'utf8'), committed ? fs.readFileSync(path.join(f.source, file), 'utf8') : original);
+    assert.equal(fs.readFileSync(path.join(f.base, 'translations/host_fr.json'), 'utf8'), 'custom language');
+    assert.equal(fs.readFileSync(path.join(f.base, 'configs/custom.json'), 'utf8'), 'custom config');
+    assert.equal(fs.existsSync(path.join(f.base, 'configs/nested/default.json')), committed);
     f.preserved();
   }
+});
+
+test('resource planning rejects file/directory collisions and target junctions before changing the host', t => {
+  for (const collision of ['file', 'directory', 'junction']) {
+    const f = fixture(t);
+    const config = path.join(f.base, 'configs');
+    if (collision === 'file') {
+      fs.mkdirSync(config);
+      fs.writeFileSync(path.join(config, 'nested'), 'preserve');
+    } else if (collision === 'directory') fs.mkdirSync(path.join(config, 'applets.json'), { recursive: true });
+    else {
+      const outside = path.join(f.stage, 'outside'); fs.mkdirSync(outside);
+      fs.symlinkSync(outside, config, 'junction');
+    }
+    assert.notEqual(run(['--plan-host', f.source, f.base, '2.0.0']).status, 0);
+    assert.notEqual(run(['--deploy-host', f.source, f.base]).status, 0);
+    assert(!fs.existsSync(path.join(f.base, 'ffmpeg.dll')));
+    f.preserved();
+  }
+});
+
+test('resource apply rejects traversal, protected destinations, directory replacement and deletion', t => {
+  const f = fixture(t);
+  const items = f.plan();
+  const resource = items.find(item => item.id === 'configs/applets.json');
+  for (const change of [
+    { id: 'configs/../settings.json', destination: path.join(f.base, 'settings.json') },
+    { id: 'data/settings.json', destination: path.join(f.base, 'data/settings.json') },
+    { destination: path.join(f.base, 'settings.json') },
+    { kind: 'host-directory', id: 'configs', destination: path.join(f.base, 'configs') },
+    { operation: 'uninstall', source: '', sha256: null },
+  ]) {
+    assert.notEqual(run(['--apply', jobFile(f, items.map(item => item === resource ? { ...item, ...change } : item))]).status, 0);
+    assert(!fs.existsSync(path.join(f.base, 'ffmpeg.dll')));
+    f.preserved();
+  }
+});
+
+test('resource edits made after planning prevent update without overwriting the new edit', t => {
+  const f = fixture(t);
+  ok(['--deploy-host', f.source, f.base]);
+  const items = f.plan();
+  const roster = path.join(f.base, 'configs/applets.json');
+  fs.writeFileSync(roster, '{"applets":["owner/Changed"]}');
+  assert.notEqual(run(['--apply', jobFile(f, items)]).status, 0);
+  assert.equal(fs.readFileSync(roster, 'utf8'), '{"applets":["owner/Changed"]}');
+  assert(!fs.existsSync(path.join(f.base, 'data/update-transaction.json')));
+  f.preserved();
 });

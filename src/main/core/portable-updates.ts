@@ -744,7 +744,7 @@ export class PortableUpdates {
             {
               windowsHide: true,
               timeout: 120000,
-              maxBuffer: 1024 * 1024,
+              maxBuffer: 16 * 1024 * 1024,
               signal,
             },
           );

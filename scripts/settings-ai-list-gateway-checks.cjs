@@ -2,7 +2,7 @@ const assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path'),
   { randomUUID } = require('node:crypto');
-const text = require('../src/shared/locales/ja/host.json');
+const text = require('../resources/translations/host.json');
 
 module.exports = async ({ page, client, profile, local, checks, tool, value, until }) => {
   const tools = JSON.stringify((await client.listTools()).tools);

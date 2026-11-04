@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import type { ExtensionManifest } from '../../shared/contracts';
 import { AppletCatalogCache, fresh, type Cached, type ReleaseValue } from './applet-catalog-cache';
 import type { AppletCatalogEntry, CatalogRelease } from '../../shared/applet-catalog';
@@ -21,6 +22,7 @@ export function readAppletRoster(file: string, seed: string): string[] {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || file === seed) throw error;
     try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.copyFileSync(seed, file, fs.constants.COPYFILE_EXCL);
     } catch (copyError) {
       const code = (copyError as NodeJS.ErrnoException).code;

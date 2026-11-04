@@ -8,21 +8,21 @@
 
 配置先のルートにある`AppDock.at365.exe`を維持し、プログラムを別のサブフォルダーへ移動しない。共有設定は`data/settings.json`、端末別設定は`data/settings-<端末名>.json`、Storageは`data/storage/`へ保存する。`extensions/`と配置パスから決まるLOCALAPPDATAのPC専用rootは維持する。旧配置の設定・UI状態・Storageを読み込んだりコピーしたりする移行は行わない。保存先の詳細は[設定同期](settings-sync.md)を参照する。
 
-手動で配置する場合はAppDockを完全終了し、本体一式を同じ配置先へコピーします。設定・data・extensionsと編集済みの`applets.json`は保持します。
+手動で配置する場合はAppDockを完全終了し、本体一式を同じ配置先へコピーします。`translations/` と `configs/` はフォルダーを削除せず、同名ファイルを上書きコピーします。未同梱ファイルと設定・data・extensionsは保持します。旧配置から新配置への切り替えは手動置き換えのみ対応し、旧版の自己更新からの移行は行いません。旧ルートの `applets.json` は新配置では参照せず、配布された `configs/applets.json` を使用します。
 
 ## 配布物と所有範囲
 
-本体の翻訳は `translations/host.json` を基本に、同じフォルダーの追加言語を重ねる。更新ZIPの `resources/translations/` を正本とし、発行時と更新後の初回起動で同梱ファイルをEXE隣へ上書きする。適用済み版は `translations/.appdock-version` に記録する。翻訳フォルダー全体を交換する更新項目は追加せず、既存の `resources` 交換と起動時の反映を使う。[翻訳ファイルの仕様](localization.md)を参照。
+リポジトリでは `resources/translations/` に翻訳JSON、`resources/configs/` に `applets.json` などの構成JSONを置く。配布物・更新ZIPでは `translations/` と `configs/` をEXEの隣へ配置し、Electronの `resources/` 内には入れない。翻訳は `translations/host.json` を基本に、同じフォルダーの追加言語を重ねる。[翻訳ファイルの仕様](localization.md)を参照。
 
-Appletカタログの編集用ファイルはEXEの隣の `applets.json`。通常発行では未配置の場合だけ作成し、スターターにも同梱する。更新ZIPには外部ファイル `resources/applets.json` として初期値を収録する。ZIPの新規展開や旧版からの更新では、管理ページを初めて開いたときにEXEの隣へ初期値を複製する。配置先が読み取り専用なら初期値を参照する。編集用ファイルは本体交換の対象外で、再発行・更新・再配置後も編集を保持する。
+発行・更新では `translations/` と `configs/` の同梱ファイルを内容ごと上書きし、編集内容をマージしない。今回の配布に含まれない追加ファイルはそのまま残す。前の配布にだけ含まれたファイルも未同梱ファイルとして保持する。フォルダー全体の削除・交換は行わない。通常起動では上書きせず、手動編集は次の発行・更新まで有効。Appletカタログは `configs/applets.json` を管理ページ表示時に読み込む。
 
-`appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布フォルダーに一覧外のファイルやリンクがあれば発行・更新準備を拒否する。
+`appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、`translations`、`configs`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布元に一覧外のファイルやリンクがあれば発行・更新準備を拒否する。
 
 `update.zip`は本体フォルダーの内容だけを格納する。feedはschemaVersion=1、kind=host、id=host、payload.format=zip。SHA256と配布サイズを従来どおり照合する。圧縮ファイルは512MiB、展開済み本体は1GiB、ファイル数は10,000件を上限とする。Appletの既存512MiB上限は変えない。
 
 ## 自己更新と配置
 
-新しい本体一覧と既存の一覧から、EXE、その他のルートファイル、resources/localesの交換計画を作る。追加はinstall、交換はupdate、不要になった既存の本体項目はuninstallとして既存のパッケージトランザクションへ渡す。本体とAppletの一括更新も同じjournalで扱い、終了確認・変更前/後のハッシュ・範囲・リンク検証を維持する。設定などが混在する配置ルート全体を交換しない。
+新しい本体一覧と既存の一覧から、EXE、その他のルートファイル、resources/localesの交換計画を作る。`translations` と `configs` は新版に含まれるファイルだけを `host-resource` として列挙し、追加をinstall、上書きをupdateとして既存のパッケージトランザクションへ渡す。この2フォルダーにはuninstallやフォルダー全体の交換を認めない。それ以外の不要になった本体項目はuninstallとする。本体とAppletの一括更新も同じjournalで扱い、終了確認・変更前/後のハッシュ・範囲・リンク検証を維持する。設定などが混在する配置ルート全体を交換しない。
 
 自己更新では交換前後の本体をjournalに対応する一時領域へ保持し、commit前の中断は元へ戻す。commit後は新しい版を検証して後片付けする。復旧対象の検証に失敗した場合はjournalを残す。EXEやresources自体が欠けて本体を起動できない中断では、journalに記録された専用TEMPのhelperから`--recover <配置先> <PC専用root>`を実行する。詳細は[更新と復旧](updates.md)を参照する。
 

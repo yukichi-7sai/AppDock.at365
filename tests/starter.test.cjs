@@ -72,11 +72,12 @@ test(
     const hostFolder = path.join(getPublishDirectory(host), 'win-unpacked');
     fs.mkdirSync(path.join(hostFolder, 'resources'), { recursive: true });
     fs.writeFileSync(path.join(hostFolder, 'resources/app.asar'), 'fixture');
-    fs.mkdirSync(path.join(hostFolder, 'resources/translations'));
-    fs.writeFileSync(path.join(hostFolder, 'resources/translations/host.json'), '{"language.label":"表示言語"}');
-    fs.writeFileSync(path.join(hostFolder, 'resources/translations/host_en.json'), '{"language.label":"Display language"}');
+    fs.mkdirSync(path.join(hostFolder, 'translations'));
+    fs.mkdirSync(path.join(hostFolder, 'configs'));
+    fs.writeFileSync(path.join(hostFolder, 'translations/host.json'), '{"language.label":"表示言語"}');
+    fs.writeFileSync(path.join(hostFolder, 'translations/host_en.json'), '{"language.label":"Display language"}');
     fs.writeFileSync(
-      path.join(hostFolder, 'resources/applets.json'),
+      path.join(hostFolder, 'configs/applets.json'),
       '{"applets":["owner/External"]}',
     );
     const exe = path.join(hostFolder, 'AppDock.at365.exe');
@@ -152,7 +153,7 @@ test(
     const bundle = JSON.parse(fs.readFileSync(path.join(extracted, 'bundle.json')));
     assert.equal(JSON.parse(fs.readFileSync(path.join(extracted, 'translations/host.json')))['language.label'], '表示言語');
     assert.equal(JSON.parse(fs.readFileSync(path.join(extracted, 'translations/host_en.json')))['language.label'], 'Display language');
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(extracted, 'applets.json'))), {
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(extracted, 'configs/applets.json'))), {
       applets: ['owner/External'],
     });
     assert.deepEqual(bundle.applets.map((item) => item.id).sort(), ['fixture.applet']);

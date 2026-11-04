@@ -24,7 +24,8 @@ internal static partial class Program
     }
     private static void ValidatePackageSwaps(string baseDirectory, string executable, string operationId, List<Swap> swaps)
     {
-        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count is 0 or > 550)
+        // Up to 10,000 archive files plus the existing host/Applet transaction entries.
+        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count is 0 or > 10550)
             throw new IOException("パッケージ処理の本体・対象数が正しくありません。");
         NoLinks(baseDirectory); NoLinks(executable);
         var transactionRoot = TransactionRoot(baseDirectory, operationId); NoLinks(transactionRoot);
@@ -42,8 +43,15 @@ internal static partial class Program
             }
             else if (item.Kind is "host-file" or "host-directory")
             {
-                if (!IsHostEntry(item.Id) || HostKind(item.Id) != item.Kind ||
+                if (!IsHostEntry(item.Id) || ResourceDirectory(item.Id) || HostKind(item.Id) != item.Kind ||
                     !Same(item.Destination, Path.Combine(baseDirectory, item.Id))) throw new IOException("本体ファイルの配置先が不正です。");
+            }
+            else if (item.Kind == "host-resource")
+            {
+                ResourceName(item.Id);
+                if (operation == "uninstall" || !Same(item.Destination, Path.Combine(baseDirectory, item.Id)))
+                    throw new IOException("本体リソースの操作が不正です。");
+                ResourceTarget(item.Destination);
             }
             else if (item.Kind != "applet" || item.Id == "appdock.default-shell" ||
                 !Regex.IsMatch(item.Id, "^[a-z0-9][a-z0-9.-]{0,100}$") ||

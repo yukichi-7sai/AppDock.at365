@@ -1,5 +1,5 @@
 import { createInstance } from 'i18next';
-import type japanese from './locales/ja/host.json';
+import type japanese from '../../resources/translations/host.json';
 import { hostResources } from '#host-translations';
 import {
   defaultHostLanguage,

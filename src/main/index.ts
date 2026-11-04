@@ -710,8 +710,15 @@ const allApplets = () =>
 const appletCatalog = new AppletCatalog(app.getVersion(), {
   repositories: () =>
     readAppletRoster(
-      path.join(baseDirectory, 'applets.json'),
-      path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'applets.json'),
+      path.join(
+        !app.isPackaged && !testDirectory && !(smoke && smokeDirectory)
+          ? path.join(app.getAppPath(), 'resources')
+          : baseDirectory,
+        'configs/applets.json',
+      ),
+      app.isPackaged
+        ? path.join(path.dirname(process.execPath), 'configs/applets.json')
+        : path.join(app.getAppPath(), 'resources/configs/applets.json'),
     ),
   file: path.join(dataDirectory, 'applet-catalog-cache.json'),
   fetcher: testDirectory || smoke ? async () => Response.error() : undefined,

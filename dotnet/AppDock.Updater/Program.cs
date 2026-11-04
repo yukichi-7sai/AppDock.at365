@@ -118,6 +118,7 @@ internal static partial class Program
     private static void Move(string source, string destination, string kind)
     {
         NoLinks(source); NoLinks(destination);
+        if (kind == "host-resource") Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         if (FileItem(kind)) File.Move(source, destination); else Directory.Move(source, destination);
     }
     private static void Delete(string location, string kind)

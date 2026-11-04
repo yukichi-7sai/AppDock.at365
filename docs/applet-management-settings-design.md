@@ -81,7 +81,7 @@ Applet単位の状態変更中は対象行の競合する操作を無効にす�
 
 ### 未インストールのApplet
 
-導入済み表の下に、EXEの隣の [applets.json](../applets.json) の `applets` 配列にあるGitHubリポジトリを並べる。`owner/repository` の追加・削除は次に管理ページを開いたときに反映する。通信前に導入済みmanifestの `updateRepository` と照合し、停止・無効も含めて除外する。更新元のない旧manifestは過去に取得した同じリポジトリのApplet IDで照合する。両方の情報がない初回だけは取得後のIDで判定する。上の検索欄で両方の表を絞り込める。
+導入済み表の下に、EXE隣の `configs/applets.json`（ソースは [applets.json](../resources/configs/applets.json)）の `applets` 配列にあるGitHubリポジトリを並べる。`owner/repository` の追加・削除は次に管理ページを開いたときに反映し、次の発行・更新で同梱内容へ上書きする。通信前に導入済みmanifestの `updateRepository` と照合し、停止・無効も含めて除外する。更新元のない旧manifestは過去に取得した同じリポジトリのApplet IDで照合する。両方の情報がない初回だけは取得後のIDで判定する。上の検索欄で両方の表を絞り込める。
 
 「公開版・公開日」は最新の正式Releaseの公開日時と同じタグの `extension.json` を使う。「開発版・更新日」は既定ブランチの先頭コミットの記録日時と、そのSHAの `extension.json` を使う。日付は利用端末の現地日付で表示する。公開版がない場合も開発版を表示する。通信失敗は未公開と区別し、IDを照合できなかった候補は表示せず、「取得できなかった情報を再取得」から再試行できる。
 

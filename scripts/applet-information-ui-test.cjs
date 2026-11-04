@@ -223,7 +223,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     );
     assert.equal(
       await page
-        .getByText(require('../src/shared/locales/ja/host.json')['settings.appletDescription'], {
+        .getByText(require('../resources/translations/host.json')['settings.appletDescription'], {
           exact: true,
         })
         .count(),

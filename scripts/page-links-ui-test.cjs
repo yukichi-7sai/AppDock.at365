@@ -7,20 +7,6 @@ const { overlayPage } = require('./shell-overlay-helper.cjs');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const root = path.resolve(__dirname, '..');
 const profile = fs.mkdtempSync(path.join(root, '.artifacts', 'page-links-ui-'));
-const upgradeTranslations = process.argv.includes('--upgrade-translations');
-if (upgradeTranslations) {
-  assert(process.argv[2] && !process.argv[2].startsWith('--'), 'A fixed EXE is required');
-  fs.mkdirSync(path.join(profile, 'translations'));
-  fs.writeFileSync(
-    path.join(profile, 'translations/host.json'),
-    JSON.stringify({
-      'settings.settingsPageLayout.customCommands':
-        'よく使う操作をコマンドとして登録し、実行内容や外部への公開を設定します。',
-      'obsolete.fixture': '旧版にしかない項目',
-    }),
-  );
-  fs.writeFileSync(path.join(profile, 'translations/.appdock-version'), '0.131.0');
-}
 const owner = 'fixture.page-links';
 const fixture = path.join(profile, 'extensions', owner);
 fs.mkdirSync(fixture, { recursive: true });
@@ -161,20 +147,6 @@ let host, dock;
   try {
     host = await launch(profile, process.argv[2]);
     dock = host.main;
-    if (upgradeTranslations) {
-      assert.equal(
-        hash(path.join(profile, 'translations/host.json')),
-        hash(path.join(path.dirname(process.argv[2]), 'resources/translations/host.json')),
-        'Existing translations must be replaced by the distributed version',
-      );
-      assert.equal(
-        fs.readFileSync(path.join(profile, 'translations/.appdock-version'), 'utf8'),
-        require('../package.json').version,
-      );
-      report(
-        'Existing external translations are fully refreshed before the new host reads descriptions',
-      );
-    }
     await host.app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock://host/index.html'),

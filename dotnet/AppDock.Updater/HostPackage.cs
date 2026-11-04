@@ -4,7 +4,6 @@ using System.Text.Json;
 internal static partial class Program
 {
     private const string HostManifest = "appdock-host.json";
-    private const string AppletRoster = "applets.json";
     private const long HostLimit = 1024L * 1024 * 1024;
     // Only program-owned top-level entries may be exchanged. User data and Applets
     // never enter the transaction, even if a downloaded manifest lists them.
@@ -15,12 +14,26 @@ internal static partial class Program
         "snapshot_blob.bin", "v8_context_snapshot.bin", "vk_swiftshader_icd.json",
         "vk_swiftshader.dll", "vulkan-1.dll"
     };
-    private static bool FileItem(string kind) => kind is "host" or "host-file";
+    private static bool FileItem(string kind) => kind is "host" or "host-file" or "host-resource";
+    private static bool ResourceDirectory(string name) => name is "translations" or "configs";
+    private static void ResourceName(string name)
+    {
+        SafeName(name);
+        if (!name.Contains('/') || !ResourceDirectory(name.Split('/')[0]))
+            throw new IOException("本体リソースの配置先が不正です。");
+    }
+    private static void ResourceTarget(string file)
+    {
+        NoLinks(file);
+        if (Directory.Exists(file)) throw new IOException("本体リソースの配置先がファイルではありません。");
+        for (var parent = Path.GetDirectoryName(file); !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
+            if (File.Exists(parent)) throw new IOException("本体リソースの親フォルダーにファイルがあります。");
+    }
     private static string HostKind(string name) => name == "AppDock.at365.exe" ? "host" :
-        HostFiles.Contains(name) ? "host-file" : name is "resources" or "locales" ? "host-directory" :
+        HostFiles.Contains(name) ? "host-file" : name is "resources" or "locales" || ResourceDirectory(name) ? "host-directory" :
         throw new IOException("本体に含められないファイル・フォルダーです。");
-    private static bool IsHostEntry(string name) => HostFiles.Contains(name) || name is "resources" or "locales";
-    private static List<string> ReadHostPackage(string directory, string? version = null, bool exact = false, bool allowEditableFiles = false)
+    private static bool IsHostEntry(string name) => HostFiles.Contains(name) || name is "resources" or "locales" || ResourceDirectory(name);
+    private static List<string> ReadHostPackage(string directory, string? version = null, bool exact = false)
     {
         NoLinks(directory);
         var manifest = Path.Combine(directory, HostManifest); NoLinks(manifest);
@@ -38,16 +51,6 @@ internal static partial class Program
         if (exact)
         {
             var actual = Directory.EnumerateFileSystemEntries(directory).Select(p => Path.GetFileName(p)).ToHashSet(StringComparer.Ordinal);
-            if (allowEditableFiles && actual.Remove(AppletRoster))
-            {
-                var roster = Path.Combine(directory, AppletRoster); NoLinks(roster);
-                if (!File.Exists(roster)) throw new IOException("Applet一覧のファイル形式が一致しません。");
-            }
-            if (allowEditableFiles && actual.Remove("translations"))
-            {
-                var directoryPath = Path.Combine(directory, "translations"); NoLinks(directoryPath);
-                if (!Directory.Exists(directoryPath)) throw new IOException("翻訳フォルダーの形式が一致しません。");
-            }
             if (!actual.SetEquals(entries)) throw new IOException("本体の一覧と配布フォルダーの内容が一致しません。");
             foreach (var name in entries)
             {
@@ -99,6 +102,21 @@ internal static partial class Program
         foreach (var name in next.Union(previous, StringComparer.Ordinal).Order(StringComparer.Ordinal))
         {
             var kind = HostKind(name); var target = Path.Combine(destination, name); NoLinks(target);
+            if (ResourceDirectory(name))
+            {
+                // Only files shipped by this version are replaced. Additional files stay untouched.
+                if (File.Exists(target)) throw new IOException("本体リソースの配置先がフォルダーではありません。");
+                if (!next.Contains(name)) continue;
+                foreach (var file in Files(Path.Combine(source, name), HostLimit).Order(StringComparer.Ordinal))
+                {
+                    var relative = Path.GetRelativePath(source, file).Replace('\\', '/'); ResourceName(relative);
+                    var installed = Path.Combine(destination, relative); ResourceTarget(installed);
+                    var exists = File.Exists(installed);
+                    items.Add(new("host-resource", relative, version, file, installed, Hash(file),
+                        exists ? "update" : "install", exists ? Hash(installed) : null));
+                }
+                continue;
+            }
             var present = Exists(target, kind);
             if ((FileItem(kind) ? Directory.Exists(target) : File.Exists(target)) ||
                 (!previous.Contains(name) && (present || File.Exists(target) || Directory.Exists(target))))
@@ -116,29 +134,24 @@ internal static partial class Program
     private static void DeployHost(string source, string destination)
     {
         source = Full(source); destination = Full(destination); NoLinks(source); NoLinks(destination);
-        var entries = ReadHostPackage(source, exact: true, allowEditableFiles: true);
+        var entries = ReadHostPackage(source, exact: true);
         if (Same(source, destination) || Within(source, destination) || Within(destination, source)) throw new IOException("配布元と配置先が重複しています。");
         if (!Directory.Exists(destination)) throw new IOException("配置先フォルダーがありません。");
-        var roster = Path.Combine(destination, AppletRoster); NoLinks(roster);
-        var translations = Path.Combine(destination, "translations");
-        NoLinks(translations);
-        if (File.Exists(translations)) throw new IOException("翻訳の配置先の形式が一致しません。");
-        var translationSource = Path.Combine(source, "resources", "translations");
-        var translationFiles = Directory.Exists(translationSource) ? Files(translationSource, HostLimit) : [];
-        foreach (var file in translationFiles)
-        {
-            var target = Path.Combine(translations, Path.GetRelativePath(translationSource, file));
-            NoLinks(target);
-            if (Directory.Exists(target)) throw new IOException("翻訳の配置先の形式が一致しません。");
-        }
-        if (Directory.Exists(roster)) throw new IOException("Applet一覧の配置先にフォルダーがあります。");
         var previous = File.Exists(Path.Combine(destination, HostManifest)) ? ReadHostPackage(destination) : new List<string>();
         // Inspect every destination first; do not follow links while copying or pruning.
         foreach (var name in entries.Union(previous))
         {
             var target = Path.Combine(destination, name); NoLinks(target);
             if (FileItem(HostKind(name)) ? Directory.Exists(target) : File.Exists(target)) throw new IOException("配置先の形式が一致しません。");
-            if (Directory.Exists(target)) _ = Files(target, HostLimit);
+            if (ResourceDirectory(name))
+            {
+                if (!entries.Contains(name)) continue;
+                foreach (var file in Files(Path.Combine(source, name), HostLimit))
+                {
+                    ResourceTarget(Path.Combine(destination, Path.GetRelativePath(source, file)));
+                }
+            }
+            else if (Directory.Exists(target)) _ = Files(target, HostLimit);
         }
         foreach (var name in entries.Where(n => n != HostManifest))
         {
@@ -151,27 +164,16 @@ internal static partial class Program
                 {
                     var relative = Path.GetRelativePath(origin, file); var installed = Path.Combine(target, relative);
                     Directory.CreateDirectory(Path.GetDirectoryName(installed)!); File.Copy(file, installed, true);
+                    if (Hash(file) != Hash(installed)) throw new IOException("配置した本体リソースのハッシュが一致しません。");
                 }
                 var keep = files.Select(f => Path.GetRelativePath(origin, f)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                foreach (var file in Files(target, HostLimit)) if (!keep.Contains(Path.GetRelativePath(target, file))) File.Delete(file);
+                if (!ResourceDirectory(name))
+                    foreach (var file in Files(target, HostLimit)) if (!keep.Contains(Path.GetRelativePath(target, file))) File.Delete(file);
             }
             var kind = HostKind(name);
-            if ((FileItem(kind) ? Hash(origin) != Hash(target) : TreeHash(origin, HostLimit) != TreeHash(target, HostLimit))) throw new IOException("配置した本体のハッシュが一致しません。");
+            if (!ResourceDirectory(name) && (FileItem(kind) ? Hash(origin) != Hash(target) : TreeHash(origin, HostLimit) != TreeHash(target, HostLimit))) throw new IOException("配置した本体のハッシュが一致しません。");
         }
-        foreach (var obsolete in previous.Except(entries)) Delete(Path.Combine(destination, obsolete), HostKind(obsolete));
-        // This editable sidecar is seeded once and stays outside host update transactions.
-        if (!File.Exists(roster))
-        {
-            var seed = Path.Combine(source, AppletRoster);
-            if (!File.Exists(seed)) seed = Path.Combine(source, "resources", AppletRoster);
-            if (File.Exists(seed)) File.Copy(seed, roster, false);
-        }
-        foreach (var file in translationFiles)
-        {
-            var target = Path.Combine(translations, Path.GetRelativePath(translationSource, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, true);
-        }
+        foreach (var obsolete in previous.Except(entries).Where(n => !ResourceDirectory(n))) Delete(Path.Combine(destination, obsolete), HostKind(obsolete));
         File.Copy(Path.Combine(source, HostManifest), Path.Combine(destination, HostManifest), true);
     }
 }

@@ -42,7 +42,7 @@
 | [settings-schema.ts](../src/shared/settings-schema.ts)、[setting-definitions.ts](../src/shared/setting-definitions.ts)                                                            | 既存の通常項目検証・既定値補完で2項目を扱う。独立したMCP専用parserを増やさない                              |
 | [host-page-settings.ts](../src/shared/host-page-settings.ts)、[device-settings.ts](../src/main/core/device-settings.ts)、[settings-storage.ts](../src/shared/settings-storage.ts) | 一般ページの共有/PC専用投影・合成・既定値省略へ接続できることを確認。起動3項目の常時PC専用扱いを変えない    |
 | [SettingsForm.tsx](../src/renderer/settings/SettingsForm.tsx)                                                                                                                     | 一般の「設定ファイル」付近へ共通SettingsSection/Field/入力部品で2項目を追加。独自の保存やエラー欄を作らない |
-| [settings-catalog.ts](../src/shared/settings-catalog.ts)、[日本語文言](../src/shared/locales/ja/host.json)                                                                        | 検索、表示文言、設定アンカーを追加。部分JSON・MCPの公開メタデータ・リセットへ同じキーを接続                 |
+| [settings-catalog.ts](../src/shared/settings-catalog.ts)、[日本語文言](../resources/translations/host.json)                                                                        | 検索、表示文言、設定アンカーを追加。部分JSON・MCPの公開メタデータ・リセットへ同じキーを接続                 |
 
 ## 組み込みの順序
 

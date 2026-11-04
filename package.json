@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.137.2",
+  "version": "0.138.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -61,16 +61,10 @@
     },
     "files": [
       "out/**/*",
-      "!out/main/shared/locales/**/*",
       "assets/icon.png",
       "package.json"
     ],
     "extraResources": [
-      { "from": "src/shared/locales/ja/host.json", "to": "translations/host.json" },
-      {
-        "from": "applets.json",
-        "to": "applets.json"
-      },
       {
         "from": ".artifacts/updater/AppDock.Updater.exe",
         "to": "updater/AppDock.Updater.exe"
@@ -87,6 +81,10 @@
         "from": "out/shells",
         "to": "shells"
       }
+    ],
+    "extraFiles": [
+      { "from": "resources/translations", "to": "translations", "filter": ["**/*.json"] },
+      { "from": "resources/configs", "to": "configs", "filter": ["**/*.json"] }
     ],
     "win": {
       "target": [
