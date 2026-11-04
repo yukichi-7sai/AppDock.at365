@@ -1,14 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ShellOverlayApi, RibbonGroupModel } from '../shared/overlays';
-const api: ShellOverlayApi = {
+import type { RibbonOverlayApi, RibbonGroupModel } from '../shared/overlays';
+const api: RibbonOverlayApi = {
   asset: (id) => ipcRenderer.invoke('overlay:asset', id),
-  getSettings: () => ipcRenderer.invoke('overlay:getSettings'),
-  onSettingsChanged: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on('overlay:settingsChanged', handler);
-    return () => ipcRenderer.removeListener('overlay:settingsChanged', handler);
-  },
-  executeCommand: (id) => ipcRenderer.invoke('overlay:executeCommand', id),
+
   connect: () => ipcRenderer.invoke('overlay:connect'),
   ready: (session, options) => ipcRenderer.invoke('overlay:ready', session, options),
   act: (action) => ipcRenderer.invoke('overlay:act', action),

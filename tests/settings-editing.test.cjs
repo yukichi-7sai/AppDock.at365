@@ -250,23 +250,18 @@ test('field merge preserves unrelated external updates, detects same-field confl
   );
   assert.throws(() => mergeSettingsInput(a, { ...a, items: [NaN] }, a), /不正/);
 });
-test('settings is host owned and retired assignments remain inert compatibility data', () => {
-  const { shellRegions, parseShellProviders, isShellRegion } = require('../out/main/shared/shell');
-  assert.equal(isShellRegion('page.settings'), false);
-  assert.equal(shellRegions.length, 5);
-  assert.equal(isShellRegion('overlay.command-palette'), false);
-  assert.equal(isShellRegion('page.image-library'), false);
+test('retired Shell-only commands retain an unavailable marker', () => {
   const { parseDeclaredCommands } = require('../out/main/shared/extension-commands');
-  const requirement = { region: 'page.settings', state: 'visible' };
-  assert.deepEqual(
-    parseDeclaredCommands('legacy.shell', [
-      { id: 'legacy.shell.action', title: 'Legacy', shellRequirement: requirement },
-    ])[0].shellRequirement,
-    requirement,
-  );
-  assert.deepEqual(parseShellProviders({ shellProviders: { 'page.settings': 'legacy.shell' } }), {
-    'page.settings': 'legacy.shell',
-  });
+  const commands = parseDeclaredCommands('legacy.shell', [
+    {
+      id: 'legacy.shell.action',
+      title: 'Legacy',
+      shellRequirement: { region: 'ribbon', state: 'visible' },
+    },
+    { id: 'legacy.shell.normal', title: 'Normal' },
+  ]);
+  assert.equal(commands[0].retiredShellCommand, true);
+  assert.equal(commands[1].retiredShellCommand, undefined);
 });
 
 test('all JSON pages round-trip only selected ranges; unknown owners, leaves and order survive', () => {

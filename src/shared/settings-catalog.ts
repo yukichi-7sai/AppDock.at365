@@ -22,7 +22,6 @@ import { collectionRecord } from './page-collections';
 import { touchpadGestureTypes } from './touchpad-gestures';
 import { accentChoices } from './appearance';
 import { defaultAppletEnabled } from './applet-state';
-import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
 import type { ExtensionSnapshot, Settings, SettingDefinition } from './contracts';
 import { createDefaultSettings, parseSettings } from './settings-schema';
@@ -434,14 +433,6 @@ function hostRows(
       t(title),
       t(description),
     ]),
-    ...(pageId === 'appearance'
-      ? shellRegions.map(({ id }): [string, string] => [
-          'shellProviders.' + id,
-          t('appearance.shell.label', {
-            region: t(`appearance.shell.region.${id}`),
-          }),
-        ])
-      : []),
   ];
   for (const field of hostSettingDefinitions.filter((field) => field.pageId === pageId))
     if (!field.catalogKey && !rows.some((row) => row[0] === field.key))

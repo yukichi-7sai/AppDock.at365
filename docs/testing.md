@@ -86,7 +86,7 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 `scripts/command-palette-ui-test.cjs [固定EXE]`は、検索0件、3方式の有効割り当てと全体OFFの即時反映、稲妻からの対象ID指定・解除・再移動、停止中・未割り当ての非実行、明暗・広幅/狭幅を確認する。寸法と折り返し位置は測定値・代表画像を記録して変更時に確認する。タッチパッドのnative呼出し境界は隔離プロセス内でstub化し、F13〜F24の登録・送信やWindowsのタッチパッド設定変更を行わない。条件・表示順・保存値の不変とナビゲーション拒否は`command-triggers.test.cjs`・`command-palette.test.cjs`が担当する。
 
-設定の選択は`scripts/command-selection-ui-test.cjs [固定EXE]`へ集約し、トレイ・リボン・スタックの確定/取消、親の入力とフォーカス、候補除外、お気に入り、停止中の非実行、IME、狭幅/明暗、外部削除と再起動を確認する。検索・所有元・非表示/削除済みの除外・1万件超の候補は`tests/command-selection.test.cjs`が担当する。旧選択パレットの成功検査は廃止し、不正要求の拒否はパレット単体回帰と`shell-overlay-ui-test.cjs`へ残す。
+設定の選択は`scripts/command-selection-ui-test.cjs [固定EXE]`へ集約し、トレイ・リボン・スタックの確定/取消、親の入力とフォーカス、候補除外、お気に入り、停止中の非実行、IME、狭幅/明暗、外部削除と再起動を確認する。検索・所有元・非表示/削除済みの除外・1万件超の候補は`tests/command-selection.test.cjs`が担当する。旧選択パレットの成功検査は廃止し、不正要求の拒否はパレット単体回帰と`workspace-ui-test.cjs`へ残す。
 
 `command-stacks-ui-test.cjs`のキー入力セットアップは画面の特殊キーピッカーを使う。キー記録のnative受付は`shortcut-native-capture-ui-test.cjs`が担当し、スタック回帰では準備状態を表さない表示だけを待って合成keydownを送らない。パレットGUIの起動待ちは`startupReady`を条件とする。
 
@@ -96,7 +96,7 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 `tests/mcp-events.test.cjs`は期限予約の空待機・購読期限・更新/解除・再送の前倒し・再起動・MCP停止と復帰後の再予約を模擬時刻で検査する。種類OFFの購読保持・待機破棄、送信中の取消、暗号化保存、署名、認証とプロトコルの既存試験も維持する。
 
-`scripts/command-links-ui-test.cjs [固定EXE]`はタグ・未知参照・エスケープ、初期対象の可視性、明示実行、フォーカス、設定入力・エラー値の保持と一覧ダイアログ、WindowsToolsの停止中リンクを確認する。`scripts/shell-overlay-ui-test.cjs [固定EXE]`は本体パレットのIME・Tab・ピン・旧選択要求の拒否、下のAppletの入力とフォーカス、Shellからの独立、1回のクラッシュ復旧と再失敗の打切りを担当する。
+`scripts/command-links-ui-test.cjs [固定EXE]`はタグ・未知参照・エスケープ、初期対象の可視性、明示実行、フォーカス、設定入力・エラー値の保持と一覧ダイアログ、WindowsToolsの停止中リンクを確認する。`scripts/workspace-ui-test.cjs [固定EXE]`は旧Shell設定からの起動、通常Appletとの分離、タイトルバーのパレット操作と再起動保存を確認する。パレットの再利用・1回の復旧・再失敗打切りはoverlay-host.test.cjsで確認する。
 
 | 試験                                                                                                                         | 主な契約                                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

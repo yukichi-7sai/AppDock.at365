@@ -7,7 +7,7 @@ module.exports = async function resetModeChecks(context) {
   const layout = async () =>
     (await host.evaluate(() => window.dock.snapshot())).settings.value.ribbon;
   const item = async (id) =>
-    (await rail.evaluate(() => window.appdockShell.get())).items.find((item) => item.id === id);
+    (await rail.evaluate(() => window.appdockRibbon.get())).items.find((item) => item.id === id);
   const edit = async (id) => {
     await page
       .locator(`[data-ribbon-setting="${id}"]`)
@@ -102,10 +102,10 @@ module.exports = async function resetModeChecks(context) {
 
   const id = 'ribbon-display-mode';
   const setMode = async (mode) => {
-    if ((await rail.evaluate(() => window.appdockShell.get())).displayMode !== mode)
+    if ((await rail.evaluate(() => window.appdockRibbon.get())).displayMode !== mode)
       await rail.locator(`[data-ribbon-id="${id}"]`).click();
     await until(
-      async () => (await rail.evaluate(() => window.appdockShell.get())).displayMode === mode,
+      async () => (await rail.evaluate(() => window.appdockRibbon.get())).displayMode === mode,
       'mode active',
     );
   };

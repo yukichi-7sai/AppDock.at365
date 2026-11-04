@@ -155,7 +155,7 @@ const checks = [],
 const cacheChecks = [];
 let app, host, rail;
 async function resetCacheProbe() {
-  await rail.evaluate(() => window.appdockShell.get());
+  await rail.evaluate(() => window.appdockRibbon.get());
   await app.evaluate(({ app }) => {
     const load = process
       .getBuiltinModule('module')
@@ -193,7 +193,7 @@ async function resetCacheProbe() {
               changedKeys: Object.keys(args[0]).filter(
                 (key) => JSON.stringify(before.settings[key]) !== JSON.stringify(args[0][key]),
               ),
-              shellChanged: before.shell !== args[1],
+              contextChanged: before.context !== args[1],
             });
         }
         return value;
@@ -206,12 +206,6 @@ async function resetCacheProbe() {
 async function checkCacheProbe(operation, catalogBuilds = 0) {
   const counts = await app.evaluate(() => globalThis.ribbonCacheProbe);
   assert.deepEqual(counts, { projections: 1, catalogBuilds }, operation);
-  if (catalogBuilds)
-    assert.deepEqual(
-      await app.evaluate(() => globalThis.ribbonCacheProbeTraces),
-      [{ settingsChanged: false, changedKeys: [], shellChanged: true }],
-      'flyout visibility changes the Shell requirement key without changing settings',
-    );
   cacheChecks.push({ operation, ...counts });
 }
 const until = async (fn, label) => {
@@ -359,7 +353,7 @@ async function launch() {
     await launch();
     await until(
       async () =>
-        (await rail.evaluate(() => window.appdockShell.get())).items.some(
+        (await rail.evaluate(() => window.appdockRibbon.get())).items.some(
           (i) => i.id === 'page:fixture.ribbon-dotnet:main' && i.badge?.text === '7',
         ),
       '.NET badge ready',
@@ -413,7 +407,7 @@ async function launch() {
     const closedPositions = await positions();
     await resetCacheProbe();
     let flyout = await openTemporary();
-    await checkCacheProbe('temporary expand', 1);
+    await checkCacheProbe('temporary expand');
     await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',
@@ -529,7 +523,7 @@ async function launch() {
       );
       await until(() => flyout.isClosed(), 'resize cancels overlay');
       flyout = await openTemporary();
-      await rail.evaluate(() => window.appdockShell.invalidateAnchor());
+      await rail.evaluate(() => window.appdockRibbon.invalidateAnchor());
       await until(() => flyout.isClosed(), 'scroll invalidation cancels overlay');
       flyout = await openTemporary();
       await host.evaluate(() => window.dock.navigate(null));

@@ -35,8 +35,8 @@ fs.copyFileSync(
 const appearance = fs.readFileSync(path.join(output, 'main/appearance-preload.js'), 'utf8');
 for (const name of [
   'preload',
-  'shell-preload',
-  'shell-bar-preload',
+  'ribbon-preload',
+  'window-bar-preload',
   'overlay-preload',
   'command-palette-preload',
   'notification-surface-preload',

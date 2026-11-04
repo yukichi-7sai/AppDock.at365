@@ -15,30 +15,7 @@ function fixture(t) {
     timers = new Map();
   let timerId = 0,
     requestId = 0;
-  const provider = {
-    id: 'fixture.shell',
-    version: '1.0.0',
-    generation: 'first',
-    folder: 'fixture',
-    enabled: true,
-    shell: { views: { ribbon: 'index.html' } },
-  };
-  const failed = [],
-    errors = [];
-  const registry = {
-    observe() {},
-    touch() {},
-    retry() {},
-    fail(...args) {
-      failed.push(args);
-    },
-    resolve: () => ({ provider }),
-    usable: (_, binding) =>
-      provider.enabled &&
-      binding.provider === provider.id &&
-      binding.version === provider.version &&
-      binding.generation === provider.generation,
-  };
+  const errors = [];
   const window = Object.assign(new EventEmitter(), {
     webContents: Object.assign(new EventEmitter(), {
       getZoomFactor: () => 1,
@@ -60,7 +37,7 @@ function fixture(t) {
       },
     },
   });
-  const createShellView = () => {
+  const createLocalView = () => {
     const wc = Object.assign(new EventEmitter(), {
       closed: false,
       url: 'file:///host/command-palette/index.html',
@@ -110,8 +87,8 @@ function fixture(t) {
               },
               webContents: { getFocusedWebContents: () => window.webContents },
             }
-          : id === './shell-view'
-            ? { createShellView, createLocalView: createShellView }
+          : id === './local-view'
+            ? { createLocalView }
             : actualRequire(id),
       setTimeout: (fn) => {
         const id = ++timerId;
@@ -125,12 +102,10 @@ function fixture(t) {
   const host = new module.exports.OverlayHost({
     window,
     preload: 'preload',
+    uiFolder: 'host',
+    ribbonReady: () => true,
     palette: { folder: 'host', entry: 'command-palette/index.html', preload: 'palette-preload' },
-    registry,
-    providers: () => [provider],
     route: () => 'settings',
-    execute: async () => {},
-    settings: () => ({}),
     changed() {},
     failed(message) {
       errors.push(message);
@@ -164,8 +139,6 @@ function fixture(t) {
   return {
     host,
     views,
-    provider,
-    failed,
     errors,
     window,
     timers,
@@ -207,7 +180,7 @@ test('reusable palettes keep one hidden renderer, rotate sessions and reject old
   assert(view.webContents.closed);
 });
 
-test('Shell changes, disable and retry do not replace the fixed palette or its cached view', (t) => {
+test('Unrelated Applet changes and refresh do not replace the fixed palette or its cached view', (t) => {
   const f = fixture(t);
   let session = f.session();
   f.host.open(session);
@@ -218,16 +191,14 @@ test('Shell changes, disable and retry do not replace the fixed palette or its c
   f.host.open(session);
   f.ready(f.views[0]);
   session.cancel('done');
-  f.provider.generation = 'second';
   f.host.refresh();
   assert.equal(f.views[0].webContents.closed, false);
   session = f.session();
   f.host.open(session);
   f.ready(f.views[0]);
   session.cancel('done');
-  f.provider.enabled = false;
   f.host.refresh();
-  f.host.retry();
+  f.host.refresh();
   assert.equal(f.views.length, 1);
   assert.equal(f.views[0].webContents.closed, false);
 });
@@ -242,13 +213,12 @@ test('a hidden renderer crash is retired without opening an overlay', (t) => {
   view.webContents.emit('render-process-gone');
   assert(view.webContents.closed);
   assert.equal(f.host.active, false);
-  assert.equal(f.failed.length, 0);
   assert.equal(f.errors.length, 0);
   f.host.open(f.session());
   assert.equal(f.views.length, 2);
 });
 
-test('palette failure recovers once and repeated failure cancels and reports without a Shell failure', async (t) => {
+test('palette failure recovers once and repeated failure cancels and reports once', async (t) => {
   const f = fixture(t),
     session = f.session();
   f.host.open(session);
@@ -262,12 +232,11 @@ test('palette failure recovers once and repeated failure cancels and reports wit
   assert.deepEqual(await session.result, { status: 'cancelled', reason: 'palette-unavailable' });
   assert.equal(f.host.active, false);
   assert.equal(f.errors.length, 1);
-  assert.equal(f.failed.length, 0);
   f.host.open(f.session());
   assert.equal(f.views.length, 3);
 });
 
-test('owner reload destroys cached palette and palette bridge denies foreign Shell frames', (t) => {
+test('owner reload destroys cached palette and palette bridge denies foreign frames', (t) => {
   const f = fixture(t),
     session = f.session();
   f.host.open(session);

@@ -101,7 +101,10 @@ exports.activate=async(context)=>{
 `,
 );
 settings.extensions[fixtureId] = { enabled: true, settings: {} };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const local = path.join(profile, 'local'),
   configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
@@ -434,7 +437,10 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal((await call(client, 'appdock_get_info')).writable, false);
     const activationFile = path.join(fixtureRoot, 'activations.txt');
     const beforeRestart = fs.readFileSync(activationFile, 'utf8');
-    const settingsBeforeRestart = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
+    const settingsBeforeRestart = fs.readFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      'utf8',
+    );
     assert.equal((await manage(fixtureId, 'restart')).completion, 'lifecycleApplied');
     assert.notEqual(fs.readFileSync(activationFile, 'utf8'), beforeRestart);
     assert.equal(
@@ -443,8 +449,8 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await manage(fixtureId, 'disable');
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions[fixtureId]
-        .enabled,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')))
+        .extensions[fixtureId].enabled,
       false,
     );
     const stoppedActivations = fs.readFileSync(activationFile, 'utf8');
@@ -503,9 +509,9 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await manage(webId, 'disable');
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).webApplets.items.find(
-        (a) => a.id === webId,
-      ).enabled,
+      JSON.parse(
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+      ).webApplets.items.find((a) => a.id === webId).enabled,
       false,
     );
     assert.equal(
@@ -526,9 +532,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       if (id === 'appdock.logs.open')
         await page.getByRole('textbox', { name: 'ログを検索' }).waitFor({ state: 'visible' });
       if (id === 'appdock.updates.open')
-        await page
-          .getByRole('region', { name: 'AppDockについて' })
-          .waitFor({ state: 'visible' });
+        await page.getByRole('region', { name: 'AppDockについて' }).waitFor({ state: 'visible' });
     }
     await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });
     await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
@@ -581,7 +585,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         s.browser
           .contexts()
           .flatMap((c) => c.pages())
-          .find((p) => p.url().includes('/shells/default/index.html')),
+          .find((p) => p.url().includes('/renderer/workspace/index.html')),
       'Default Shell',
     );
     await shell.getByRole('button', { name: 'ログ', exact: true }).click();
@@ -662,9 +666,15 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing grant',
     );
-    const settingsBytes = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
+    const settingsBytes = fs.readFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      'utf8',
+    );
     assert.equal((await editShortcuts(additions, { dryRun: true })).completion, 'validated');
-    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), settingsBytes);
+    assert.equal(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+      settingsBytes,
+    );
     await editShortcuts(additions);
     await page.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
     const shortcutSearch = page.getByRole('searchbox', {
@@ -793,7 +803,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           s.browser
             .contexts()
             .flatMap((c) => c.pages())
-            .find((p) => p.url().includes('/shells/default/index.html')),
+            .find((p) => p.url().includes('/renderer/workspace/index.html')),
         'Default Shell',
       ),
       client,
@@ -981,7 +991,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         s.browser
           .contexts()
           .flatMap((c) => c.pages())
-          .find((p) => p.url().includes('/shells/default/index.html')),
+          .find((p) => p.url().includes('/renderer/workspace/index.html')),
       'restored Default Shell',
     );
     await restoredShell

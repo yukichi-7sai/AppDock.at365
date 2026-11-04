@@ -8,7 +8,7 @@ export interface SettingsOrderItem {
   description?: string;
 }
 
-/** Shell-neutral ordering UI. Persistence and conflict checks belong to the caller. */
+/** Reusable ordering UI. Persistence and conflict checks belong to the caller. */
 export function SettingsOrderDialog({
   title,
   listLabel,

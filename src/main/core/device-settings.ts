@@ -36,7 +36,6 @@ import {
 
 export const deviceHostKeys = [
   ...hostSettingDefinitions.map((field) => field.key),
-  'shellProviders',
   'startAtLogon',
   'runAsAdministrator',
 ] as const;
@@ -325,7 +324,6 @@ export function combineSettings(
     if (!result.extensions[owner] && !local?.useLocalSettings) continue;
     const entry = (result.extensions[owner] ??= { enabled: defaultAppletEnabled, settings: {} });
     entry.enabled = local?.enabled ?? defaultAppletEnabled;
-    if (owner === 'appdock.default-shell') entry.enabled = true;
     if (local?.useLocalSettings) {
       for (const key of appletCommonKeys()) delete entry[key];
       delete entry.pages;
@@ -349,7 +347,10 @@ export function initializeHostPageSettings(
 ): DeviceSettings {
   if (hostPageSettingsIds.every((pageId) => device.hostPages?.[pageId])) return device;
   const legacyHost = legacyShared && omitSettingDefaults(device.host, createDefaultSettings().host);
-  const legacy = legacyShared && { ...legacyShared, host: { ...legacyShared.host, ...device.host } };
+  const legacy = legacyShared && {
+    ...legacyShared,
+    host: { ...legacyShared.host, ...device.host },
+  };
   const result = structuredClone(device);
   result.hostPages ??= {};
   for (const pageId of hostPageSettingsIds) {

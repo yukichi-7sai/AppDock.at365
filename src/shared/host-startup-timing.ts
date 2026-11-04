@@ -11,7 +11,6 @@ export const hostStartupPhases = [
   'document',
   'discovery',
   'defaults',
-  'shells',
   'hotkeys',
   'indicator',
   'gestures',

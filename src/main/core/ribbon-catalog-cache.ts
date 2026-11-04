@@ -6,7 +6,7 @@ export class RibbonCatalogCache {
   private revision = 0;
   private cached?: {
     settings: Settings;
-    shell: string;
+    context: string;
     value: { applets: ExtensionSnapshot[]; commands: UiCommand[]; revision: number };
   };
   constructor(
@@ -16,11 +16,12 @@ export class RibbonCatalogCache {
   invalidate() {
     this.cached = undefined;
   }
-  get(settings: Settings, shell: string) {
-    if (this.cached?.settings === settings && this.cached.shell === shell) return this.cached.value;
+  get(settings: Settings, context: string) {
+    if (this.cached?.settings === settings && this.cached.context === context)
+      return this.cached.value;
     const applets = this.applets();
     const value = { applets, commands: this.commands(applets), revision: ++this.revision };
-    this.cached = { settings, shell, value };
+    this.cached = { settings, context, value };
     return value;
   }
 }

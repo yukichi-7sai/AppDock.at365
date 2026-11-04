@@ -98,7 +98,10 @@ for (const [id, enabled] of [
   fs.writeFileSync(path.join(installed, 'obsolete.dll'), 'old');
   settings.extensions[id] = { enabled, settings: { preserved: 'user-data' }, updateSource: source };
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings, null, 2));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings, null, 2),
+);
 fs.mkdirSync(path.join(profile, 'data/web-accounts'), { recursive: true });
 fs.writeFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'login-fixture');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -246,7 +249,7 @@ async function verifyRestartGesture(inspectPort, label) {
   }
 }
 async function surfaceRenderer(inspectPort, file, expression, selector) {
-  const target = `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().endsWith('/shells/default/' + ${JSON.stringify(file)}))`;
+  const target = `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().endsWith('/renderer/workspace/' + ${JSON.stringify(file)}))`;
   for (let i = 0; i < 150; i++) {
     const ready = await inspect(
       inspectPort,
@@ -464,10 +467,7 @@ async function restarted(inspectPort, predicate, previousPid) {
         snapshot.extensions.find((e) => e.id === 'appdock.dotnet-demo')?.state === 'running',
     );
     assert.equal(updated.extensions.find((e) => e.id === 'test.disabled').enabled, false);
-    assert.equal(
-      updated.extensions.find((e) => e.id === 'appdock.default-shell').version,
-      hostVersion,
-    );
+    assert(!updated.extensions.some((e) => e.id === 'appdock.default-shell'));
     const combined = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(combined.ok, true);
     assert.deepEqual(combined.updated.map((item) => item.id).sort(), [

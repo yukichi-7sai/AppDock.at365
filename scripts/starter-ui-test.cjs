@@ -56,7 +56,10 @@ initial.keybindingDefaultsInitialized = bundle.applets
     );
   })
   .map((applet) => applet.id);
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 assert.equal(
   createHash('sha256')
     .update(fs.readFileSync(path.join(profile, 'AppDock.at365.exe')))
@@ -142,12 +145,7 @@ async function about(page) {
     );
     const external = s.extensions.filter((e) => e.sourceKind !== 'builtin');
     const builtin = s.extensions.filter((e) => e.sourceKind === 'builtin');
-    assert.deepEqual(
-      builtin.map((e) => e.id),
-      ['appdock.default-shell'],
-    );
-    assert.equal(builtin[0].state, 'running');
-    assert.ok(!builtin[0].error, builtin[0].error);
+    assert.deepEqual(builtin, []);
     assert.deepEqual(external.map((e) => e.id).sort(), bundle.applets.map((a) => a.id).sort());
     for (const a of bundle.applets) {
       const e = s.extensions.find((e) => e.id === a.id);
@@ -158,7 +156,9 @@ async function about(page) {
     }
     await about(page);
     await page.screenshot({ path: path.join(profile, 'starter-applets.png') });
-    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+    const saved = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    );
     const defaults = require('../out/main/shared/settings-schema.js').createDefaultSettings();
     assert.equal(
       saved.updates?.hostSource ?? defaults.updates.hostSource,

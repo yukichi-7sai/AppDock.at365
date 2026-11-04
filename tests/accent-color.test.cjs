@@ -83,12 +83,12 @@ test('autoContrast is optional and preserves independent boolean values for each
   for (const light of [undefined, false, true])
     for (const dark of [undefined, false, true]) {
       const value = structuredClone(defaults);
+      delete value.presets[0].light.autoContrast;
+      delete value.presets[0].dark.autoContrast;
       if (light !== undefined) value.presets[0].light.autoContrast = light;
       if (dark !== undefined) value.presets[0].dark.autoContrast = dark;
       assert.deepEqual(normalizeAccentColors(value, defaults), value);
     }
-  for (const preset of defaults.presets)
-    for (const mode of ['light', 'dark']) assert.equal(preset[mode].autoContrast, undefined);
 });
 
 test('opted-in preset tones share custom correction and preserve raw colors, IDs and disabled modes', (t) => {
@@ -142,8 +142,10 @@ test('opted-in preset tones share custom correction and preserve raw colors, IDs
         if (tone.autoContrast) {
           const custom = dark ? { dark: tone.soft, light: tone.accent } : { dark: tone.accent, light: tone.soft };
           assert.deepEqual(result.colors, resolveAppearance('custom', dark, 19, custom, theme).colors);
-          assert.notEqual(result.colors.accent, tone.accent);
-          assert.notEqual(result.colors.soft, tone.soft);
+          if (preset.id.startsWith('contrast-')) {
+            assert.notEqual(result.colors.accent, tone.accent);
+            assert.notEqual(result.colors.soft, tone.soft);
+          }
           assert(dark ? luminance(result.colors.soft) <= 0.025 : luminance(result.colors.soft) >= 0.8);
           for (const background of [result.colors.soft, theme.background, theme.panel, theme.raised])
             assert(contrast(result.colors.accent, background) >= 4.5);

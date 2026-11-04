@@ -180,7 +180,6 @@ test('Storage API separates computers and owners, shares only explicit scope and
       undefined,
       undefined,
       undefined,
-      undefined,
       shared,
       undefined,
       undefined,

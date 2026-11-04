@@ -28,9 +28,6 @@ public static class AppletSession
                         await applet.ActivateAsync(context, active.Token);
                         Volatile.Write(ref activated, true);
                         return context.Contributions;
-                    case "shell.changed":
-                        if (context is not null) await context.ChangeShellAsync(parameters);
-                        return null;
                     case "notifications.changed":
                         if (context is not null) await context.ChangeNotificationPolicyAsync();
                         return null;

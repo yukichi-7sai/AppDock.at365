@@ -90,7 +90,7 @@ export class CommandContexts {
       throw Error(hostText('services.commandContexts.invocationExpired'));
     if (entry.valid && !entry.valid()) {
       entry.controller.abort();
-      throw Error(hostText('services.commandContexts.shellTargetExpired'));
+      throw Error(hostText('services.commandContexts.targetExpired'));
     }
     return {
       signal: entry.controller.signal,

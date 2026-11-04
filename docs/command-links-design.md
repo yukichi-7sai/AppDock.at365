@@ -6,7 +6,7 @@
 
 設定の説明から関連コマンドを確認できるようにする。虫眼鏡アイコンと現在のコマンド名からなる共通リンクを設け、クリックすると実行用コマンドパレットを対象コマンドの選択状態で開く。説明文には `[command:コマンドID]` を埋め込めるようにする。パレットの描画は本体の固定UIへ移し、Shellの差し替え対象から外す。
 
-保存・入力は[設定基盤](settings-foundation.md)、画面構成は[共通UI指針](settings-ui-guidelines.md)、パレットの描画・寿命・復旧は[共通オーバーレイ](shell-overlays.md)を正本とする。
+保存・入力は[設定基盤](settings-foundation.md)、画面構成は[共通UI指針](settings-ui-guidelines.md)、パレットの描画・寿命・復旧は[共通オーバーレイ](workspace-overlays.md)を正本とする。
 
 ## 1. 対象と境界
 
@@ -184,19 +184,9 @@ openCommandPalette({
 
 本体renderer専用の `SettingsPageApi` 境界を維持し、Applet runtimeやMCPの `commands.execute` の権限を広げない。説明中の参照は別Applet・ホストのIDも指定できるが、それだけで実行権限を与えない。自身のコマンドを直接実行する既存 `settingActions` の所有者制限は変更しない。
 
-### Shellから切り離す範囲
+### 本体UIへの統合
 
-| 対象 | 方針 |
-| --- | --- |
-| `shellRegions` / 設定の「Shellの変更」 | `overlay.command-palette` を公開・選択対象から外す。残る対象はタイトルバー・リボン・ステータスバー・通知バナー・デスクトップ通知の5領域 |
-| manifestの旧 `shell.views["overlay.command-palette"]` | 既存の廃止領域と同じく受理して不活性にする。形式・相対パスの安全性の検証は保ち、UIを読み込まず、Viewを起動しない。これだけを宣言したAppletでも、無関係なコマンド・設定を停止させない |
-| 保存済み `host.shellProviders["overlay.command-palette"]` | 既存の廃止領域と同様に値を保持して不活性にする。自動削除・別キーへの移動・Default Shellへの書換えを行わない |
-| Shell状態・MCPのShell選択schema | 現在の `shellRegions` から導出する5領域だけを表示・編集対象にする。廃止キーを新しく編集する入口は作らない |
-| Default Shellのmanifest・配布物 | パレットのviews宣言と専用描画を除く。一時リボングループのoverlay描画は必要範囲で保持する |
-| `ShellOverlayApi` / `overlay-preload.ts` | Shell由来の一時リボングループに必要な契約だけを残す。パレットの描画モデルと操作は本体用APIへ分離する |
-| Shellの実行条件・ready監視 | 旧領域を満たすためにAppletを起動・待機しない。旧領域の `shellRequirement` を持つコマンドは廃止領域の理由で利用不可とし、条件を外して実行可能にしない。manifest読込で無関係なコマンドまで拒否しないよう、宣言検証も合わせて変更する |
-
-現行の `LegacyShellRegion` / `isRetiredShellRegion` / `shellView` の仕組みを拡張し、旧キーの扱いを新しい独自移行処理として作らない。保存JSONの他のShell指定・未知キーの保持も既存契約に従う。公開仕様の廃止に当たるため、実装時には破壊的変更として本体のマイナー版を更新する。
+Shell差し替え機構は廃止している。旧設定・旧宣言と専用コマンドの扱いは[本体画面構成](workspace-ui.md)を正本とする。パレットと一時グループは本体内部のbridgeで描画する。
 
 ## 6. 検索・メタデータ・保存
 
@@ -230,13 +220,13 @@ Appletとホストの起動中に動くこと、設定変更の反映時期、�
 | --- | --- | --- |
 | 1 | 新規 `command-text.ts` と既存のコマンドID検証 | タグ・エスケープ・プレーンテキスト投影を共有できる |
 | 2 | `overlays.ts`、`command-palette.ts`、本体rendererへのパレット移設・専用preload・ビルド登録 | 初期対象を正確に選択し、実行パレットを本体固定UIで保つ |
-| 3 | `overlay-host.ts`、`shell.ts`、Default Shellのmanifestと残るoverlay、Shell設定・条件・MCP投影 | 5領域への整理と旧指定の不活性保持、Shellから独立した寿命・復旧を確認する |
+| 3 | overlay-host.ts、本体workspace renderer | 旧Shell指定の無視と、本体パレットの独立した寿命・復旧を確認する |
 | 4 | `settings-page.ts`、本体 `index.ts`、設定runtime・ページの参照投影 | 入力確定・要求検証・取消・エラーが既存経路へ接続される |
 | 5 | 共通 `CommandLink` / `CommandText`、Applet情報・設定・一覧編集の説明 | タグから同じ部品を使い、キーボード・フォーカス・折り返しが動く |
 | 6 | `ui-icons.tsx`、検索カタログと管理一覧、翻訳JSON | 虫眼鏡による対象表示の案内、名前変更・検索・非対話表示がそろう |
 | 7 | WindowsToolsのmanifestと関連文書 | 最初の適用例から対象コマンドを確認でき、既存設定値・動作を保つ |
 
-共通契約の実装時に [Applet API](extensions.md)、[設定基盤](settings-foundation.md)、[共通オーバーレイ](shell-overlays.md)、[Shell基盤](shell-foundation.md)、[Shell API](shell-api.md)、[利用案内](usage.md)へ対応仕様を反映する。親の共通作業ルールと本体AGENTSのShell対象・責務に関する入口も整合を確認する。
+共通契約の実装時に [Applet API](extensions.md)、[設定基盤](settings-foundation.md)、[共通オーバーレイ](workspace-overlays.md)、[Shell基盤](workspace-ui.md)、[Shell API](ribbon-ui.md)、[利用案内](usage.md)へ対応仕様を反映する。親の共通作業ルールと本体AGENTSのShell対象・責務に関する入口も整合を確認する。
 
 新しい設定キー・保存ファイル・外部実行APIは追加しない。パレットのShell差し替え契約を廃止するため、本体の実装・発行時は直前の発行版からマイナー番号を1つ増やしてパッチを0にする。WindowsToolsの版は、その時点の自身の差分から[共通手順](development-workflow.md)で判定する。
 

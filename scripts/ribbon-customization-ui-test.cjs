@@ -311,14 +311,12 @@ async function colorGeometry() {
           .createRequire(app.getAppPath() + '/package.json');
         return {
           version: app.getVersion(),
-          defaultShellVersion: JSON.parse(
-            read('fs').readFileSync(
-              read('path').join(app.getAppPath(), 'out/shells/default/extension.json'),
-            ),
-          ).version,
+          workspace: read('fs').existsSync(
+            read('path').join(app.getAppPath(), 'out/renderer/workspace/index.html'),
+          ),
         };
       });
-      assert.equal(runtime.version, runtime.defaultShellVersion);
+      assert.equal(runtime.version, require('../package.json').version);
       await app.close();
       app = undefined;
       const result = {
@@ -622,16 +620,15 @@ async function colorGeometry() {
         .getBuiltinModule('module')
         .createRequire(app.getAppPath() + '/package.json');
       const bytes = read('fs').readFileSync(
-        read('path').join(app.getAppPath(), 'out/shells/default/extension.json'),
+        read('path').join(app.getAppPath(), 'out/renderer/workspace/index.html'),
       );
       return {
         version: app.getVersion(),
-        defaultShellVersion: JSON.parse(bytes).version,
-        shellManifestSha256: read('crypto').createHash('sha256').update(bytes).digest('hex'),
+        workspaceSha256: read('crypto').createHash('sha256').update(bytes).digest('hex'),
         windowSize: BrowserWindow.getAllWindows()[0].getSize(),
       };
     });
-    assert.equal(runtime.version, runtime.defaultShellVersion);
+    assert.equal(runtime.version, require('../package.json').version);
     await app.close();
     app = undefined;
     const result = {
@@ -768,7 +765,7 @@ async function commandChecks() {
   await until(() => executions() === 3, 'temporary command');
   await until(
     async () =>
-      !(await rail.evaluate(() => window.appdockShell.get())).items.find(
+      !(await rail.evaluate(() => window.appdockRibbon.get())).items.find(
         (i) => i.id === 'group:colored',
       )?.expanded,
     'temporary popup closed',
@@ -793,7 +790,7 @@ async function commandChecks() {
       r.rightClickCommand === 'fixture.ribbon-action.run',
   );
   await until(
-    async () => (await rail.evaluate(() => window.appdockShell.get())).contextActionEnabled,
+    async () => (await rail.evaluate(() => window.appdockRibbon.get())).contextActionEnabled,
     'restored provider',
   );
   await rail.locator('.activity-rail').click({ button: 'right', position: { x: 2, y: 2 } });
@@ -814,13 +811,13 @@ async function commandChecks() {
   });
   await until(
     async () =>
-      (await rail.evaluate(() => window.appdockShell.get())).contextActionEnabled === false,
+      (await rail.evaluate(() => window.appdockRibbon.get())).contextActionEnabled === false,
     'stopped command disabled',
   );
   const denied = await rail.evaluate(async () => {
-    const m = await window.appdockShell.get();
+    const m = await window.appdockRibbon.get();
     try {
-      await window.appdockShell.invoke({
+      await window.appdockRibbon.invoke({
         epoch: m.epoch,
         actionId: m.contextActionId,
         requestId: crypto.randomUUID(),

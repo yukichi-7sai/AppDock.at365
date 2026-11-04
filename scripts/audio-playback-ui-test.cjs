@@ -119,7 +119,6 @@ let child,
       globalThis.audioFixture={req, events:[], active:0, peak:0, errors:[], windows:0};
       const f=globalThis.audioFixture, q=req('./out/main/main/core/audio-service').audioPlayback;
       f.version=e.app.getVersion();
-      f.shellVersion=req('./out/shells/default/extension.json').version;
       const original=q.player;
       q.player=async r=>{
         f.active++; f.peak=Math.max(f.peak,f.active); f.events.push('start');
@@ -131,12 +130,8 @@ let child,
       return true;
     })()`,
     );
-    const versions = await inspect(
-      port,
-      '({host:audioFixture.version,shell:audioFixture.shellVersion})',
-    );
+    const versions = await inspect(port, '({host:audioFixture.version})');
     assert.equal(versions.host, require('../package.json').version);
-    assert.equal(versions.shell, versions.host);
     fs.writeFileSync(path.join(profile, 'versions.json'), JSON.stringify(versions, null, 2));
     const command = (action) =>
       inspect(

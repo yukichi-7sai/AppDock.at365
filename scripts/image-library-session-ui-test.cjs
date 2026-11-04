@@ -73,7 +73,10 @@ settings.imageLibrary = {
     { id: 'missing', name: '読取待ち', images: [{ file: 'missing.png' }] },
   ],
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -214,7 +217,6 @@ const observations = [];
     observations.push({
       phase: 'checkbox',
       alerts: await page.locator('.library-status [role=alert]').allTextContents(),
-      shell: (await host.evaluate(() => window.dock.snapshot())).shellRegions,
     });
     checks.push(
       'checkbox selection and subsequent selection commands remain usable without a modal',
@@ -572,9 +574,7 @@ const observations = [];
         {
           passed: true,
           portable: !!portable,
-          runtimeShell: (await host.evaluate(() => window.dock.snapshot())).extensions.find(
-            (e) => e.id === 'appdock.default-shell',
-          )?.version,
+          version: (await host.evaluate(() => window.dock.snapshot())).version,
           sha256: portable ? hash(portable) : null,
           checks,
           observations,

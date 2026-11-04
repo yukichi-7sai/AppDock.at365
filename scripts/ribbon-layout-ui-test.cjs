@@ -10,7 +10,10 @@ settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
 fs.mkdirSync(profile, { recursive: true });
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 fs.cpSync(
   path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'),
   path.join(profile, 'extensions', 'Applet.Gmail.at365'),
@@ -40,7 +43,7 @@ const ribbonIds = (group) =>
     .evaluateAll((elements) => elements.map((element) => element.dataset.ribbonId));
 const save = async () => {
   await settleSettings(dock);
-  const revision = await rail.evaluate(async () => (await window.appdockShell.get()).revision);
+  const revision = await rail.evaluate(async () => (await window.appdockRibbon.get()).revision);
   await rail.waitForFunction(
     (r) => Number(document.querySelector('.activity-rail')?.dataset.revision) >= r,
     revision,
@@ -61,7 +64,7 @@ async function launch() {
     rail = app
       .context()
       .pages()
-      .find((p) => p.url().includes('/shells/default/index.html'));
+      .find((p) => p.url().includes('/renderer/workspace/index.html'));
     return !!rail;
   }, 'Shell page');
   await rail.locator('[data-ribbon-id="image-library"]').waitFor();
@@ -227,9 +230,14 @@ async function launch() {
 
     await app.close();
     app = null;
-    const restartSettings = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+    const restartSettings = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    );
     restartSettings.extensions['at365.gmail'].enabled = false;
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(restartSettings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(restartSettings),
+    );
     await launch();
     assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));
@@ -287,7 +295,7 @@ async function launch() {
         path.join(profile, 'shell-failure.json'),
         JSON.stringify(
           await rail.evaluate(async () => ({
-            view: await window.appdockShell.get(),
+            view: await window.appdockRibbon.get(),
             html: document.body.innerHTML,
           })),
           null,

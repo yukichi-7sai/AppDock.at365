@@ -10,7 +10,7 @@ AppDock 0.131.0以降では、同じ説明文に`[page:ページID]`・`[setting
 
 保存型のコマンド種類は`custom-commands` capabilityとmanifestの`customCommandTypes`で宣言し、Nodeの`context.customCommands.register(typeId, handler)`、.NET/nativeの`context.CustomCommands.RegisterAsync`へ登録します。configは保存値の複製、実行には取消と元callerを保持します。[カスタムコマンド契約](custom-commands-design.md)を参照してください。
 
-Shell Appletは、通常のコマンド・設定・ページとShell描画を同じAppletで提供できます。`shell` capabilityと`shell.views`による領域単位の宣言、自己設定の購読、描画からの自己コマンド実行は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください。全領域の実装は不要です。
+本体画面のShell差し替えは廃止しています。通常Appletはコマンド・設定・ページ・通知APIを使用します。
 
 Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作APIを利用できます。宣言・PC専用許可・再入制約・既存自己設定APIの互換性は[AppDock共通操作API](appdock-api.md)を参照してください。
 
@@ -342,11 +342,11 @@ MCPの[固定設定API](settings-api.md)は宣言済みobject-listの行操作�
 
 公開先をAPIごとのcallers宣言から判定し、Applet専用入力APIを提供します。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
 
-Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ページ本文は[本体のページ表示](host-pages.md)を使い、Shell Appletの自己設定/自己コマンドAPIとは分離する。
+ページ本文は[本体のページ表示](host-pages.md)を使います。
 
 ## 種類指定通知API
 
-登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップと本体の通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
+登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、本体のバナー・デスクトップと本体の通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
 
 最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを起動中の履歴へ保持します。
 
@@ -408,15 +408,11 @@ if (result.status === 'accepted')
 
 通知先はbanner/desktop/windowsの複数選択に対応します。Windowsへの配送を必要とするAppletはminimumHostVersion:0.32.0以上を指定してください。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
 
-本体targets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命と区別します。
+本体targets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命と区別します。
 
-## Shellの採用状態と専用コマンド
+## 廃止したShell API
 
-最低ホスト版は0.34.0。shell capabilityと自Appletの対象領域宣言を必要とします。Nodeはcontext.shell.getState()/onChanged(handler)、.NETはcontext.Shell.GetStateAsync()/OnChanged(handler)、RPCはhost.shell.getStateとホスト発shell.changedです。購読を登録してから初回取得し、古い表示revisionを無視します。初回取得後に通知を受け取り、activate中もViewやreadyを待ちません。状態はprimary・表示revisionと、自分が提供する領域だけのconfigured/resolved/bound/ready/visible/reasonです。他の提供元ID・全設定・パスを返しません。外部操作許可は不要で、能力と本人の稼働世代を検査します。
-
-manifestのcommands[]に任意のshellRequirement: { region: "ribbon", state: "visible" }を指定できます。stateはresolvedまたはvisible、1コマンドに1領域です。resolvedは現在の解決先、visibleは現在のreadyかつ実表示・操作可能なViewで判定します。モーダルで操作を止めている領域もvisible条件を満たしません。activateOnExecute:trueとの併用は拒否します。省略は従来どおりで、自己設定変更や生成された設定コマンドへ条件を自動付与しません。
-
-runtime登録・動的置換はmanifestの条件を解除できず、別名も同じ条件です。available/disabledReasonとExtensionManager.executeの直前検査を共用し、UI・キー・トレイ・MCP・他Applet経由を揃えます。IDを書き換えたり、別Appletへ転送したり、実行のために割り当てや有効状態を変更したりしません。取得後の状態変化では実行を拒否します。型付きViewの一時操作を新設した契約ではなく、任意DOM/JavaScript/renderer RPCは追加しません。詳細は[領域別割り当て](shell-foundation.md)。
+Shellの描画差し替え・採用状態APIは提供しません。旧manifestのshell宣言は無視し、shellRequirement付きコマンドは実行不可です。通常コマンド・設定・ページは維持します。[本体の画面構成](workspace-ui.md)を参照してください。
 
 native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.OutputEncoding=new UTF8Encoding(false)をConsole.In/Out取得前に設定し、wire用stdoutを確保して通常ログはstderrへ出してください。UTF-8の状態理由をWindows既定の文字コードで読むとJSONの引用符まで破損するため、ASCIIのみのfixture成功を文字コード契約の検証に代用しません。
 

@@ -21,7 +21,7 @@ import { HostCommandSession } from './core/host-command-session';
 import { validRepository } from '../shared/versions';
 import { isDialogNavigationShortcut } from '../shared/commands';
 import { webAccountSettingsTargets } from './core/settings-web-account-target';
-import { startupShellIds, StartupUiBarrier } from './core/startup';
+import { StartupUiBarrier } from './core/startup';
 import { takeUpdateStartupSignal } from './core/update-startup-signal';
 import { physicalFs } from './core/physical-fs';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
@@ -54,15 +54,13 @@ import { executionAuthorized, type ExecutionPermission } from './core/execution-
 import { processCommandType } from '../shared/process-launch';
 import { ProcessLaunchService, ProcessLaunchError, processLaunchSpec } from './core/process-launch';
 import { McpClientService, type McpActor } from './core/mcp-client';
-import { ShellProviderRegistry } from './core/shell-provider-registry';
 import { isDeepStrictEqual } from 'node:util';
-import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { SettingsPageDefinition, SettingsResetScope } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
 import type { AppletPackagePreviewResult } from '../shared/applet-packages';
-import { ShellHost } from './core/shell-host';
-import { ShellBarHost } from './core/shell-bar-host';
+import { RibbonHost } from './core/ribbon-host';
+import { WindowBarHost } from './core/window-bar-host';
 import { WindowBars } from './core/window-bars';
 import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
@@ -91,7 +89,6 @@ import { pageLinkIds, pageLinkKey, validPageLinkTarget } from '../shared/descrip
 import { pageReferences } from '../shared/page-links';
 import { hostDescriptionTexts } from '../shared/settings-descriptions';
 import { RibbonCatalogCache } from './core/ribbon-catalog-cache';
-import { defaultShellId } from '../shared/shell';
 import { NativeInput } from './core/native-input';
 import {
   app,
@@ -320,12 +317,7 @@ if (locked)
       ...(smoke && smokeDirectory ? ['--smoke-test', `--smoke-dir=${baseDirectory}`] : []),
     ],
   );
-const deviceManifestRoots = () => [
-  path.join(baseDirectory, 'extensions'),
-  app.isPackaged
-    ? path.join(process.resourcesPath, 'shells')
-    : path.join(app.getAppPath(), 'out', 'shells'),
-];
+const deviceManifestRoots = () => [path.join(baseDirectory, 'extensions')];
 const deviceCollections = () => readDeviceCollections(deviceManifestRoots());
 const settings = new DeviceSettingsStore(
   path.join(sharedDirectory, 'settings.json'),
@@ -392,16 +384,7 @@ configureAppearance(
     notificationDesktopShadow: settings.value.host.notificationDesktopShadow,
   }),
   ipcMain,
-  [
-    'appdock://host/',
-    pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href,
-    pathToFileURL(
-      path.join(
-        app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'out'),
-        'shells/default',
-      ) + path.sep,
-    ).href,
-  ],
+  ['appdock://host/', pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href],
 );
 function applyAudioPlaybackSettings() {
   const enabled = settings.value.host.soundEnabled;
@@ -411,12 +394,7 @@ function applyAudioPlaybackSettings() {
 applyAudioPlaybackSettings();
 let window: BrowserWindow | null = null;
 let primaryWindowCreated = false;
-let shellRegistry: ShellProviderRegistry | undefined;
-const startupUi = new StartupUiBarrier(() =>
-  ['titlebar', 'ribbon', 'statusbar'].every((region) =>
-    shellRegistry?.snapshot().regions.some((r) => r.region === region && r.ready),
-  ),
-);
+const startupUi = new StartupUiBarrier(() => !!ribbonHost?.isReady && !!windowBarHost?.isReady);
 const updateStartupSignal = takeUpdateStartupSignal();
 function notifyUpdatedWindowShown() {
   if (!updateStartupSignal.pending) return;
@@ -424,8 +402,6 @@ function notifyUpdatedWindowShown() {
     !quitting && !!window && !window.isDestroyed() && window.isVisible() && startupUi.ready,
   );
 }
-const shellStateSent = new Map<string, string>();
-let lastShellRevision = -1;
 let lastHistoryAvailability = '';
 let notificationBanner: NotificationSurfaceHost | undefined;
 let notificationDesktop: NotificationDesktopHost | undefined;
@@ -477,8 +453,8 @@ async function flushSettingsInputs() {
     window!.webContents.send('dock:flushSettingsInputs', id);
   });
 }
-let shellHost: ShellHost | undefined;
-let shellBarHost: ShellBarHost | undefined;
+let ribbonHost: RibbonHost | undefined;
+let windowBarHost: WindowBarHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
 let hostPages: HostPages | undefined;
@@ -501,11 +477,8 @@ let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
 let ribbonHover: RibbonHover | undefined;
 function ribbonDisplayMode() {
-  return safeShell
-    ? 'compact'
-    : (ribbonHover?.displayMode ?? ribbonState?.displayMode ?? 'compact');
+  return ribbonHover?.displayMode ?? ribbonState?.displayMode ?? 'compact';
 }
-const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(
   () => changed(),
   async () => {
@@ -594,23 +567,10 @@ const ribbonCatalog = new RibbonCatalogCache(
 );
 let ribbonImageRevision = 0;
 function ribbonInputs() {
-  // Command availability depends on Shell requirements and both history directions.
-  const shell =
-    JSON.stringify(
-      shellRegistry
-        ?.snapshot()
-        .regions.map((region) => [
-          region.region,
-          region.resolvedProvider,
-          region.boundProvider,
-          region.ready,
-          region.visible,
-        ]),
-    ) ?? '';
-  return ribbonCatalog.get(settings.value, shell + JSON.stringify(navigation.history.availability));
+  return ribbonCatalog.get(settings.value, JSON.stringify(navigation.history.availability));
 }
 const presentation = new UiPresentation({
-  settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
+  settings: () => settings.value,
   applets: () => ribbonInputs().applets,
   commands: () => ribbonInputs().commands,
   version: () => `${ribbonInputs().revision}:${ribbonImageRevision}`,
@@ -626,9 +586,8 @@ const presentation = new UiPresentation({
     ribbonState.set(id, !ribbonState.isExpanded(id));
   },
   displayMode: ribbonDisplayMode,
-  toggleDisplayMode: safeShell
-    ? undefined
-    : () => setRibbonDisplayMode(ribbonDisplayMode() === 'compact' ? 'expanded' : 'compact'),
+  toggleDisplayMode: () =>
+    setRibbonDisplayMode(ribbonDisplayMode() === 'compact' ? 'expanded' : 'compact'),
   badge: (id) => {
     if (id !== 'notifications') return ribbonBadges.get(id);
     const count = notificationService?.activeCount ?? 0;
@@ -636,7 +595,7 @@ const presentation = new UiPresentation({
   },
 });
 function setRibbonDisplayMode(mode: import('../shared/ribbon').RibbonDisplayMode) {
-  if (safeShell || !ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
+  if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
   if (settings.value.host.ribbonExpandOnHover) {
     const value = prepareSettings({
       ...settings.value,
@@ -1596,7 +1555,7 @@ const operationApi = new AppDockApi({
     'ui.assets.get': async (params) => presentation.getAsset(params.id),
     'ui.actions.invoke': async (params, id, context) => ({
       result: await presentation.invoke(
-        params as unknown as import('../shared/shell').UiActionRequest,
+        params as unknown as import('../shared/workspace-ui').UiActionRequest,
         id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp',
         async (action) => {
           if (!externalUiPermissions(id).execute)
@@ -1705,36 +1664,13 @@ const changed = () => {
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
     notificationWindows?.refresh();
-    shellHost?.refresh();
-    shellBarHost?.refresh();
+    ribbonHost?.refresh();
+    windowBarHost?.refresh();
     hostPages?.refresh();
     settingsPageHost?.refresh();
     overlayHost?.refresh();
-    shellRegistry?.touch();
-    if (shellRegistry && manager)
-      for (const e of manager.items.values()) {
-        if (
-          !['starting', 'running'].includes(e.state) ||
-          !e.shellStateRequested ||
-          !e.manifest.capabilities?.includes('shell') ||
-          !e.peer ||
-          e.peer.closed
-        )
-          continue;
-        const state = shellRegistry.ownState(e.manifest.id);
-        const signature = e.runtimeSession + ':' + JSON.stringify(state);
-        if (shellStateSent.get(e.manifest.id) !== signature) {
-          shellStateSent.set(e.manifest.id, signature);
-          e.peer.send({ jsonrpc: '2.0', method: 'shell.changed', params: state });
-        }
-      }
-    const shellRevision = shellRegistry?.snapshot().revision;
     const historyAvailability = JSON.stringify(navigation.history.availability);
-    if (
-      (shellRevision !== undefined && shellRevision !== lastShellRevision) ||
-      historyAvailability !== lastHistoryAvailability
-    ) {
-      lastShellRevision = shellRevision ?? -1;
+    if (historyAvailability !== lastHistoryAvailability) {
       lastHistoryAvailability = historyAvailability;
       void syncHotKeys();
       trayMenu();
@@ -1897,14 +1833,6 @@ function quitHost(restart = false) {
   }
   quitting = true;
   app.quit();
-}
-function executeShellCommand(provider: string, command: string) {
-  const applet = manager
-    .snapshot()
-    .find((p) => p.id === provider && p.enabled && p.state === 'running');
-  if (!applet?.commands.some((c) => c.id === command && c.available))
-    throw Error('Command is not available from this Shell Applet');
-  return executeCommand(command);
 }
 const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[number]>();
 let commandReferenceCache:
@@ -2355,13 +2283,6 @@ function snapshotCore(): HostSnapshot {
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
     navigationHistory: navigation.history.availability,
-    shellRegions: shellRegistry?.snapshot(),
-    shell: shellHost?.status ?? {
-      selected: defaultShellId,
-      active: null,
-      error: null,
-      safeMode: safeShell,
-    },
     appletApi: {
       permissions: appletApiAccess.get(),
       error: appletApiAccess.error,
@@ -2743,7 +2664,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
               default: setting.default,
             }))
         : undefined,
-    shell: id === 'appearance' ? a.shell : undefined,
     updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
   });
   const applets = allApplets();
@@ -2816,11 +2736,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     };
   }
 
-  if (id === 'appearance')
-    return {
-      applets: applets.filter((a) => a.shell).map(summary),
-      shellRegions: shellRegistry?.snapshot(),
-    };
+  if (id === 'appearance') return {};
   if (id === 'general')
     return {
       startPages: startPageOptions(settings.value, applets),
@@ -3073,7 +2989,6 @@ function settingsPageActions(
       return {
         ...plan,
         siteCount: allApplets().filter((p) => p.collection?.owner === a.id).length,
-        shell: shellRegions.some(({ id }) => settings.value.host.shellProviders?.[id] === a.id),
       };
     };
     actions.discardAppletPackage = async ([id]) => updater.discardPackagePlan(id, owner);
@@ -3269,11 +3184,6 @@ function settingsPageActions(
       if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
-    };
-  if (page.id === 'appearance')
-    actions.retryShellRegion = async ([region]) => {
-      if (!isShellRegion(region)) throw Error(hostText('settings.index.invalidRegion'));
-      await retryShell(region);
     };
   if (page.id === 'ai') {
     actions.aiSaveConnection = async ([draft, original, key, keyRevision]) =>
@@ -3706,28 +3616,6 @@ function settingsPageActions(
     ]),
   );
 }
-async function retryShell(region?: ShellRegion) {
-  if (!shellRegistry) return;
-  const regions = region ? [region] : shellRegions.map((r) => r.id);
-  shellRegistry.retry(region);
-  for (const id of new Set([
-    defaultShellId,
-    ...regions.map((r) => (safeShell ? defaultShellId : shellRegistry!.configured(r))),
-  ])) {
-    const e = manager.items.get(id);
-    if (
-      e?.state === 'error' &&
-      (e.manifest.sourceKind === 'builtin' || appletEnabled(settings.value, id))
-    )
-      await manager.restart(id);
-  }
-  if (!region || region === 'ribbon') shellHost?.retry();
-  if (!region || region === 'titlebar' || region === 'statusbar') shellBarHost?.retry(region);
-  if (!region || region === 'ribbon') overlayHost?.retry(region);
-  if (!region || region === 'notification.banner') notificationBanner?.retry();
-  if (!region || region === 'notification.desktop') notificationDesktop?.retry();
-  changed();
-}
 function registerIpc() {
   const updateTarget = (id?: string) => {
     if (id === undefined)
@@ -3931,7 +3819,7 @@ function registerIpc() {
     if (typeof id !== 'string') throw Error('Invalid settings connection');
     settingsPageHost?.close(id);
   });
-  handle('dock:focusShell', (edge) => shellHost?.focus(edge));
+  handle('dock:focusRibbon', (edge) => ribbonHost?.focus(edge));
   handle('dock:hostUiRendered', () => {
     if (uiReady && !quitting) {
       hostStartupTiming.mark('renderer');
@@ -3939,18 +3827,17 @@ function registerIpc() {
       notifyUpdatedWindowShown();
     }
   });
-  handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));
-  handle('dock:focusBar', (region, edge) => shellBarHost?.focus(region, edge));
+  handle('dock:barViewport', (region, bounds) => windowBarHost?.viewport(region, bounds));
+  handle('dock:focusBar', (region, edge) => windowBarHost?.focus(region, edge));
   handle('dock:navigate', (route: string | null, restore?: true) =>
     restore === true && route !== null ? navigation.restore(route) : navigation.navigate(route),
   );
-  handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
+  handle('dock:ribbonViewport', (bounds) => ribbonHost?.viewport(bounds));
   handle('dock:overlayViewport', (bounds) => overlayHost?.viewport(bounds));
   handle('dock:pages:open', (request) => hostPages!.open(request));
   handle('dock:pages:get', (id) => hostPages!.get(id));
   handle('dock:pages:act', (action) => hostPages!.act(action));
   handle('dock:pages:close', (id) => hostPages?.close(id));
-  handle('dock:retryShell', () => retryShell());
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error(hostText('services.index.notReady'));
     appletApiAccess.set(permissions);
@@ -4220,21 +4107,10 @@ async function initialize() {
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
-    startAllowed: (id) =>
-      startupAppletsReleased ||
-      startupShellIds(
-        manager.shellProviders(),
-        settings.value.host.shellProviders ?? {},
-        safeShell,
-      ).has(id),
+    startAllowed: () => startupAppletsReleased,
     reservedCustomTypeIds: () => customCommands.hostTypeIds(),
     hostVersion: app.getVersion(),
     roots: [external],
-    builtinRoots: [
-      app.isPackaged
-        ? path.join(process.resourcesPath, 'shells')
-        : path.join(app.getAppPath(), 'out', 'shells'),
-    ],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(__dirname, 'node-worker.js'),
@@ -4255,7 +4131,6 @@ async function initialize() {
         ),
       settingsCommands,
       () => typedNotifications,
-      (id) => shellRegistry?.ownState(id),
       () => pageCollections,
       ribbonBadges,
       paths.shared,
@@ -4287,22 +4162,6 @@ async function initialize() {
     ),
     log: log.write,
   });
-  shellRegistry = new ShellProviderRegistry({
-    assignments: () => settings.value.host.shellProviders ?? {},
-    providers: () => manager.shellProviders(),
-    safeMode: safeShell,
-    changed,
-    blocked: (region) =>
-      !(
-        overlayHost?.kind === 'command-palette' &&
-        ['ribbon', 'titlebar', 'statusbar'].includes(region)
-      ) &&
-      region !== 'notification.desktop' &&
-      !(region === 'ribbon' && overlayHost?.kind === 'ribbon-group') &&
-      !!overlayHost?.active,
-  });
-  manager.shellRequirement = (id, requirement) => shellRegistry!.requirement(id, requirement);
-  manager.shellExecution = (id, requirement) => shellRegistry!.lease(id, requirement);
   updater = new PortableUpdates({
     targets: (): UpdateTarget[] => [
       {
@@ -4758,7 +4617,6 @@ async function initialize() {
   }
   hostModalLayer = new HostModalLayer(window, () => {
     ribbonHover?.refresh();
-    shellRegistry?.touch();
     void gestures?.refresh();
   });
   window.webContents.on('before-input-event', (event, input) => {
@@ -4845,6 +4703,7 @@ async function initialize() {
       log.write('error', 'notifications', hostText('services.index.windowsNotificationFailed')),
   });
   notificationBanner = new NotificationSurfaceHost({
+    uiFolder: path.join(app.getAppPath(), 'out/renderer/workspace'),
     window,
     position: () => settings.value.host.notificationBannerPosition,
     preload: path.join(__dirname, 'notification-surface-preload.js'),
@@ -4852,11 +4711,7 @@ async function initialize() {
       notificationService,
       () => nativeTheme.shouldUseDarkColors,
     ),
-    providers: () => manager.shellProviders(),
-    registry: shellRegistry!,
     ready: () => startupReady && !quitting,
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    execute: executeShellCommand,
     openCenter: () => executeCommand('appdock.notifications.open'),
     layer: () => overlayHost?.layout(),
     failed: (message, unavailable) => {
@@ -4870,24 +4725,22 @@ async function initialize() {
     },
   });
   notificationDesktop = new NotificationDesktopHost({
+    uiFolder: path.join(app.getAppPath(), 'out/renderer/workspace'),
     service: notificationService,
     parent: window,
     availability: notificationAvailability,
     preload: path.join(__dirname, 'notification-surface-preload.js'),
     dark: () => nativeTheme.shouldUseDarkColors,
     tray: () => tray ?? undefined,
-    providers: () => manager.shellProviders(),
-    registry: shellRegistry!,
     ready: () => startupReady && !quitting,
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    execute: executeShellCommand,
     openCenter: () => executeCommand('appdock.notifications.open'),
     failed: (message) => log.write('error', 'notifications', message),
   });
-  shellBarHost = new ShellBarHost({
+  windowBarHost = new WindowBarHost({
+    changed,
+    uiFolder: path.join(app.getAppPath(), 'out/renderer/workspace'),
     window,
-    preload: path.join(__dirname, 'shell-bar-preload.js'),
-    registry: shellRegistry!,
+    preload: path.join(__dirname, 'window-bar-preload.js'),
     enabled: (region) => region !== 'statusbar' || settings.value.host.showStatusBar,
 
     ready: () => uiReady && !quitting,
@@ -4946,8 +4799,6 @@ async function initialize() {
         applyWindowAction(operation);
       },
     }),
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    execute: executeShellCommand,
     shortcut: async (key) => {
       if (!window?.isFocused() || keyboardRecording()) return;
       const normalized = normalizeShortcut(key);
@@ -4958,12 +4809,12 @@ async function initialize() {
       overlayHost?.layout();
     },
     failed: (region, message, unavailable) => {
-      log.write('error', 'shell-bar', `${region}: ${message}`);
+      log.write('error', 'window-bar', `${region}: ${message}`);
       if (unavailable)
         void dialog
           .showMessageBox(window!, {
             type: 'error',
-            title: 'Default Shell',
+            title: 'AppDock',
             message,
             buttons: [
               hostText('services.index.retry'),
@@ -4973,7 +4824,7 @@ async function initialize() {
             defaultId: 0,
           })
           .then((result) => {
-            if (result.response === 0) void retryShell(region);
+            if (result.response === 0) windowBarHost?.retry(region);
             else if (result.response === 1) navigation.navigate('logs');
             else quitHost();
           });
@@ -4981,7 +4832,8 @@ async function initialize() {
   });
   window.on('maximize', changed);
   window.on('unmaximize', changed);
-  shellHost = new ShellHost({
+  ribbonHost = new RibbonHost({
+    uiFolder: path.join(app.getAppPath(), 'out/renderer/workspace'),
     window,
     pointer: (inside) => ribbonHover?.pointer(inside),
     hoverChanged: () => ribbonHover?.refresh(),
@@ -4989,7 +4841,7 @@ async function initialize() {
       overlayHost?.layout();
     },
 
-    preload: path.join(__dirname, 'shell-preload.js'),
+    preload: path.join(__dirname, 'ribbon-preload.js'),
     ui: presentation,
     openGroup: (id, anchor, viewport) =>
       overlayHost?.open(
@@ -5010,22 +4862,15 @@ async function initialize() {
         ),
       ),
     invalidateAnchor: () => overlayHost?.cancelRibbon(),
-    execute: executeShellCommand,
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    providers: () => manager.shellProviders(),
-    selected: () => shellRegistry!.configured('ribbon'),
-    registry: shellRegistry!,
-    safeMode: safeShell,
     ready: () => uiReady && !quitting,
-    failureFile: path.join(dataDirectory, 'shell-failures.json'),
     changed,
-    log: (message) => log.write('error', 'shell', message),
+    log: (message) => log.write('error', 'ribbon', message),
     failed: (message, retry) => {
-      log.write('error', 'shell', message);
+      log.write('error', 'ribbon', message);
       void dialog
         .showMessageBox(window!, {
           type: 'error',
-          title: 'Default Shell',
+          title: 'AppDock',
           message: hostText('services.index.ribbonStartFailed'),
           detail: message,
           buttons: [
@@ -5037,8 +4882,6 @@ async function initialize() {
         })
         .then(async (result) => {
           if (result.response === 0) {
-            const p = manager.items.get(defaultShellId);
-            if (p?.state === 'error') await manager.restart(defaultShellId);
             retry();
           } else if (result.response === 1) navigation.navigate('logs');
           else quitHost();
@@ -5069,8 +4912,10 @@ async function initialize() {
     },
   });
   overlayHost = new OverlayHost({
+    ribbonReady: () => !!ribbonHost?.isReady,
+    uiFolder: path.join(app.getAppPath(), 'out/renderer/workspace'),
     ribbonPointer: (point) =>
-      ribbonHover?.pointer(!!point && !!shellHost?.containsContentPoint(point)),
+      ribbonHover?.pointer(!!point && !!ribbonHost?.containsContentPoint(point)),
     asset: (id) => presentation.getAsset(id),
     window,
     preload: path.join(__dirname, 'overlay-preload.js'),
@@ -5079,12 +4924,8 @@ async function initialize() {
       entry: 'command-palette/index.html',
       preload: path.join(__dirname, 'command-palette-preload.js'),
     },
-    providers: () => manager.shellProviders(),
-    registry: shellRegistry!,
     route: () => navigation.state.route,
-    execute: executeShellCommand,
     shortcut: dispatchDialogShortcut,
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
     changed: () => {
       if (window && !window.isDestroyed())
         window.webContents.send('dock:overlayState', {
@@ -5109,14 +4950,14 @@ async function initialize() {
     },
   });
   ribbonHover = new RibbonHover({
-    enabled: () => !safeShell && settings.value.host.ribbonExpandOnHover,
+    enabled: () => settings.value.host.ribbonExpandOnHover,
     canExpand: () => overlayHost?.kind !== 'ribbon-group',
     available: () =>
       !!window &&
       !window.isDestroyed() &&
       window.isVisible() &&
       !window.isMinimized() &&
-      !!shellHost?.hoverBounds &&
+      !!ribbonHost?.hoverBounds &&
       !quitting &&
       !hostModalLayer?.isActive &&
       overlayHost?.kind !== 'command-palette',
@@ -5124,7 +4965,7 @@ async function initialize() {
       if (!window || window.isDestroyed()) return false;
       const point = screen.getCursorScreenPoint(),
         origin = window.getContentBounds();
-      return !!shellHost?.containsContentPoint({ x: point.x - origin.x, y: point.y - origin.y });
+      return !!ribbonHost?.containsContentPoint({ x: point.x - origin.x, y: point.y - origin.y });
     },
     manualMode: () => ribbonState?.displayMode ?? 'compact',
     changed,
@@ -5479,7 +5320,9 @@ async function initialize() {
     )
       settings.save(migrated, settings.revision);
   });
-  await hostStartupTiming.phaseAsync('shells', () => manager.reconcile());
+  // Built-in UI starts independently of Applet workers.
+  ribbonHost?.refresh();
+  windowBarHost?.refresh();
   await hostStartupTiming.phaseAsync('hotkeys', () => syncHotKeys());
   gestureIndicatorHost = new GestureIndicatorHost({
     url: pathToFileURL(path.join(app.getAppPath(), 'out/renderer/gesture-indicator.html')).href,
@@ -5812,14 +5655,14 @@ async function runSmoke() {
       return {bridge: !!window.dock, nodeExposed: typeof window.require !== 'undefined', rows: document.querySelectorAll('button').length,
         pins: saved.settings.value.pinnedCommands, paletteKeys: saved.settings.value.shortcuts['appdock.commands.search'], imageLoaded};
     })()`);
-    const shellRows = await Promise.all(
+    const surfaceRows = await Promise.all(
       window!.contentView.children
         .filter((view) => view instanceof WebContentsView)
         .map((view) =>
           view.webContents.executeJavaScript(`document.querySelectorAll('button').length`),
         ),
     );
-    result.rows += shellRows.reduce((total, count) => total + count, 0);
+    result.rows += surfaceRows.reduce((total, count) => total + count, 0);
     if (result.nodeExposed || !result.bridge || result.rows < 5)
       throw new Error('Preload / React check failed');
     if (!result.imageLoaded || result.paletteKeys[0] !== 'Ctrl+P' || result.pins.length !== 2)
@@ -5908,8 +5751,8 @@ app.on('before-quit', (event) => {
   notificationSounds.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();
-  shellHost?.dispose();
-  shellBarHost?.dispose();
+  ribbonHost?.dispose();
+  windowBarHost?.dispose();
   overlayHost?.dispose();
   hostPages?.dispose();
   releaseRendererImages();

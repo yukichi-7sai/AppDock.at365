@@ -4,18 +4,7 @@ const { settingsPage, waitForHost } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { overlayPage, closingAction } = require('./shell-overlay-helper.cjs');
 
-module.exports = async ({
-  host,
-  state,
-  save,
-  assign,
-  launch,
-  close,
-  main,
-  capture,
-  barPage,
-  checks,
-}) => {
+module.exports = async ({ host, state, save, launch, close, main, capture, barPage, checks }) => {
   const command = (id) => host().evaluate((id) => window.dock.executeCommand(id), id);
   const open = async () => {
     await command('appdock.settings.statusbar.open');
@@ -29,12 +18,10 @@ module.exports = async ({
       host(),
       async (visible) => {
         const snapshot = await window.dock.snapshot();
-        const bar = snapshot.shellRegions.regions.find((bar) => bar.region === 'statusbar');
         const slot = document.querySelector('.shell-bar-slot[data-region="statusbar"]');
         const bottom = document.querySelector('.shell > main').getBoundingClientRect().bottom;
         return (
           snapshot.settings.value.host.showStatusBar === visible &&
-          bar.visible === visible &&
           !!slot === visible &&
           (visible ? bottom < innerHeight : Math.abs(bottom - innerHeight) < 1)
         );
@@ -145,13 +132,6 @@ module.exports = async ({
   assert.equal(saved.gestures.enabled, false);
   checks.push('page reset restores on and preserves unrelated settings');
 
-  await assign({ statusbar: 'fixture.bars-b' });
-  await waitForHost(host(), async () => {
-    const current = (await window.dock.snapshot()).shellRegions.regions.find(
-      (bar) => bar.region === 'statusbar',
-    );
-    return current.boundProvider === 'fixture.bars-b' && current.ready && current.visible;
-  });
   status = await barPage(host(), 'statusbar');
   original = await connection(status);
   await save({ theme: 'dark' });
@@ -163,7 +143,6 @@ module.exports = async ({
   await command('appdock.settings.showStatusBar.toggle');
   await shown(false);
   assert.equal(await nativeVisible(original.sessionId), false);
-  assert.equal((await state('statusbar')).configuredProvider, 'fixture.bars-b');
   await capture('hidden-dark-narrow');
   await command('appdock.settings.showStatusBar.toggle');
   await shown(true);
@@ -175,22 +154,6 @@ module.exports = async ({
   await status.keyboard.press('Control+p');
   await closingAction((await overlayPage(host())).keyboard.press('Escape'));
   checks.push(
-    'custom Shell hides and reappears with its assignment/session; dark narrow UI and palette shortcut remain usable',
-  );
-
-  await command('appdock.settings.showStatusBar.off');
-  await shown(false);
-  await host().evaluate(() => window.dock.toggleExtension('fixture.bars-b', false));
-  await waitForHost(host(), async () => {
-    const current = (await window.dock.snapshot()).shellRegions.regions.find(
-      (bar) => bar.region === 'statusbar',
-    );
-    return current.boundProvider === 'appdock.default-shell' && current.ready && !current.visible;
-  });
-  await command('appdock.settings.showStatusBar.on');
-  await shown(true);
-  assert.equal((await state('statusbar')).configuredProvider, 'fixture.bars-b');
-  checks.push(
-    'provider disable while hidden falls back without flashing; showing retains saved provider selection',
+    'host bar hides and reappears with its session; dark narrow UI and palette shortcut remain usable',
   );
 };

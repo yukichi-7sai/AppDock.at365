@@ -1,5 +1,25 @@
 # 検証記録
 
+## 2026-11-04 Shell整理のコミット前照合
+
+- 利用者から動作確認完了と、今回のShell整理のコミット依頼を受領した。個別の手動確認項目は指定されていないため、実装時に記録した未確認範囲は維持する。
+- 最終入力1,046ファイルと成功21コマンドのログSHA256、発行物101ファイル・更新ZIPが実装終了時の証跡と一致した。build元・発行先・共用runtime・ZIPの収録内容も一致した。保存されたfixture 79ファイルは記録と一致し、終了確認後に整理した83実行ファイルは削除済みだった。型検査・build・単体1,644件と最終overlay確認、固定EXEの10試験54群を再利用する。
+- 対象は本体・SDK/RuntimeのShell廃止、renderer統合、関連試験・文書。今回の追記は検証文書のみで、動作確認済み0.144.0の製品・試験・依存・発行物は変更せず、追加回帰・版更新・再発行は行わない。既知のSDK Contracts.cs末尾空行も変更しない。
+- 対象差分、再利用判定、stage/commit treeと作業ファイルの照合を`.artifacts/commit-validation-shell-removal-20261104/`へ記録する。ローカルコミットを対象とし、push・Release・実利用先deployは行わない。
+
+## 2026-11-04 Shell差し替え機能を廃止して本体rendererへ統合（0.144.0）
+
+- cleanなmain `475193a26586e46146c8f992253fc1990b9478e1`で通常環境の`pull --ff-only`が更新不要であることを確認して着手。旧Default Shellの画面を`src/renderer/workspace`、`ui/notifications`を`src/renderer/notifications`へ移し、本体のViteビルドとASARへ統合した。リボン・タイトルバー・ステータスバーのnative View、パレットの独立View、デスクトップ通知の独立Windowは表示順・フォーカス制御のため維持した。
+- Shell provider選択・設定・状態管理・自動復旧・組込Default Shell登録・専用buildを廃止した。Nodeの`context.shell`、`host.shell.getState`/`shell.changed`、.NETのShell公開契約も除去。設定UI・公開設定API・MCPからShell選択を外した。旧保存値とmanifestのShell宣言は無視し、`shellRequirement`付きの旧コマンドとaliasは実行不可にする。通常のAppletのコマンド・ページ・通知・個別設定は保持する。
+- 本体は設定・公開API削除により0.143.0→0.144.0、SDK/Runtimeは0.29.0→0.30.0へ更新した。Assembly/FileVersionは既存の0.10.0.0を維持。WallpaperSlideshow等の兄弟repoと未変更Appletの版・発行物は変更していない。
+- 型検査、本体/.NET/fixtureのbuild、単体回帰1,644件が成功した。最終整形後の型検査と、obsoleteなfixture参照を整理したoverlay回帰5件も成功。固定依存照合を通し、lockfileとツールの固定を維持した。発行前レビューでは起動順、保存互換、API境界、native surfaceのURL/main frame/session照合、キャッシュ・復旧、配布除外、必要な試験を確認した。旧provider専用経路・試験・文書を整理し、残る発行阻害事項なし。
+- ソース版でworkspace・リボンhover・desktop通知の計17群が成功。固定EXEではworkspace、Node/.NET/nativeページ、desktop通知、通知センター、リボングループ、コマンドリンク、hover、通知ベル、ステータスバー表示、タイトルバー操作の10試験・計54群が成功した。旧Shell設定での起動、旧API不在と旧コマンド拒否、通常Applet連携、明暗、再起動後の保存、通知の操作・履歴・重複排除・抑止・破棄、パレットのキャッシュ・focus、native Viewの境界、タイトルバーの最小化/最大化/復元/閉じるを確認した。Windowsの実カーソルを使うhoverとタイトルバーdragも隔離Windowで確認し、固定EXEの明暗画像を目視確認した。
+- 初回の型検査・回帰では廃止契約の参照と、既存アクセントJSON変更後の古い期待値を検出した。試験を現行契約へ合わせ、最終回帰は失敗0。固定EXE通知センターではランチャーの非表示起動と旧storage保存先を試験側で修正し、明示的な本体表示・共通storage helperで成功した。リボングループの一時展開ではShell状態によるcatalog再構築が不要になったため、実測どおりcatalogBuilds=0/projections=1を検証する。各失敗・診断ログは保持し、後続成功と区別している。
+- `publish.bat`終了0で`A:\40.ARTIFACT\AppDock.at365`へ発行した。管理101ファイルのbuild元・発行先・共用テストruntime・更新ZIPのSHA256一致、feed/manifest/実行版0.144.0、ASAR内のworkspaceと旧Shell payload不在を照合した。更新ZIP SHA256は`b70c3407014df6ecb617863daf88c6e51af78b7c6aee17715cf306a91f8f05a1`、EXEは`7a6b913f571911536d1838be780bb4dd7e687594026d5b243f610ab42174e324`。発行先に旧Shellの空ディレクトリだけが残る場合も、旧ファイルは存在せず配布対象ではない。
+- 証跡は`.artifacts/workspace-ui-20261104/`。`inputs-final.json`と`tested-inputs.json`の1,046入力を照合し、発行後の製品・依存・build定義変更は0。後続変更はGUI試験3ファイルで、影響する試験は修正後に成功し、最終整形は意味を変えていない。`commands-summary.json`に成功21コマンドの引数・終了コード・ログSHA256・profileを記録した。時刻は保存ログの更新時刻で、元の正確なプロセス開始終了時刻を再構成した値ではない。`review.json`、`artifacts-final.json`、`published-hashes.json`と完全ログを保持する。`git diff --check`にはSDK Contracts.cs末尾の空行だけが残り、実行上の問題ではない。
+- 今回の18隔離profileと共用テストhostの実行中プロセス0件を確認し、83個の専用native/.NET実行コピーをSHA256記録後に削除した。`fixtures-before-cleanup.json`・`cleanup.json`に対象を残し、profile・設定・data・結果・画像・manifest・Web fixture・共用runtime・通常build出力は保持した。
+- 通常利用データでの手動確認、全外部Appletの個別互換性、物理キーの登録、実壁紙・実NAS・実クリップボード操作は今回の成功範囲に含めない。コミット・push・GitHub Release・実利用先へのdeployは行っていない。
+
 ## 2026-11-04 ギャラリー分離のコミット前照合
 
 - 利用者から動作確認完了と、本体・WallpaperSlideshow両方のコミット依頼を受領した。個別の手動確認項目は指定されていないため、自動試験の未確認範囲を確認済みへ変更しない。

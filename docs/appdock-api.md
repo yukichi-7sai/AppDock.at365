@@ -145,7 +145,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## 描画モデルAPI
 
-`ui.ribbon.get`、`ui.assets.get`、`ui.actions.invoke`を共通操作カタログへ追加。既存の編集用`ribbon.get`とは独立する。モデル・操作ID・MCP公開範囲・Shell roleは[Shell API](shell-api.md)を参照。
+`ui.ribbon.get`、`ui.assets.get`、`ui.actions.invoke`を共通操作カタログへ追加。既存の編集用`ribbon.get`とは独立する。モデル・操作ID・MCP公開範囲は[リボンの描画](ribbon-ui.md)を参照。
 
 ## TTS読み上げ
 

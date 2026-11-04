@@ -3,8 +3,6 @@ import { useEffect, useState } from 'react';
 import type { SettingsIndexModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { Icon, type IconName } from '../../shared/ui-icons';
-import { defaultShellId } from '../../shared/shell';
-import { appletSettingsPageId } from '../../shared/settings-catalog';
 
 const indexIcons: Partial<Record<string, IconName>> = {
   applets: 'extensions',
@@ -28,9 +26,7 @@ export function SettingsIndex({
   const { t } = useHostTranslation();
   const [query, setQuery] = useState(content.query),
     [selected, setSelected] = useState(-1);
-  const results = content.results.filter(
-    (item) => item.pageId !== appletSettingsPageId(defaultShellId),
-  );
+  const results = content.results;
   useEffect(() => setQuery(content.query), [content.query]);
   useEffect(() => setSelected(-1), [content.query, results.map((r) => r.id).join('\n')]);
   useEffect(() => {
@@ -138,7 +134,7 @@ export function SettingsIndex({
             <h3 className="settings-applet-heading">Applet</h3>
             <div aria-label={t('settings.applets')} data-testid="settings-applet-pages">
               {content.navigation.filter((p) => p.id === 'applets').map(row)}
-              {content.navigation.filter((p) => p.owner && p.owner !== defaultShellId).map(row)}
+              {content.navigation.filter((p) => p.owner).map(row)}
             </div>
           </>
         )}

@@ -22,7 +22,10 @@ settings.extensions['fixture.settings'] = { enabled: false, settings: {} };
 settings.appletOrder = ['fixture.settings', 'fixture.stalled-settings'];
 for (const id of ['fixture.settings-shell', 'fixture.stalled-settings'])
   settings.extensions[id] = { enabled: true, settings: {} };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const fixture = path.join(profile, 'extensions', 'fixture.settings');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(
@@ -55,8 +58,15 @@ fs.writeFileSync(
 );
 fs.writeFileSync(path.join(fixture, 'index.js'), 'module.exports = {};');
 const external = path.join(profile, 'extensions', 'fixture.settings-shell');
-fs.cpSync(path.join(root, 'out/shells/default'), external, { recursive: true });
-const manifest = JSON.parse(fs.readFileSync(path.join(external, 'extension.json')));
+fs.mkdirSync(external, { recursive: true });
+fs.writeFileSync(path.join(external, 'worker.cjs'), 'exports.activate=async()=>{};');
+const manifest = {
+  apiVersion: 1,
+  version: '1.0.0',
+  runtime: 'node',
+  entry: 'worker.cjs',
+  capabilities: ['shell'],
+};
 manifest.id = 'fixture.settings-shell';
 manifest.name = 'Settings shell fixture';
 manifest.minimumHostVersion = '0.33.0';

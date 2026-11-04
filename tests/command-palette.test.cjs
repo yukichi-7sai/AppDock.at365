@@ -1,7 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { CommandPaletteSession } = require('../out/main/main/core/command-palette');
-const { shellView } = require('../out/main/shared/shell');
 function fixture(request = {}, execute, openTriggerSettings) {
   const state = {
     commands: ['a', 'b', 'c'].map((id) => ({ id, title: id, extension: 'test', available: true })),
@@ -137,19 +136,6 @@ test('failure stays open with error; cancel resolves once even during execution'
   await pending;
   assert.equal((await g.session.result).status, 'cancelled');
   assert.equal(g.state.closed, 1);
-});
-test('partial Shell view lookup preserves legacy ribbon and does not require other regions', () => {
-  assert.equal(shellView({ ui: 'old.html' }, 'ribbon'), 'old.html');
-  assert.equal(shellView({ ui: 'old.html', views: { ribbon: 'new.html' } }, 'ribbon'), 'new.html');
-  assert.equal(
-    shellView({ views: { 'overlay.command-palette': 'palette.html' } }, 'ribbon'),
-    undefined,
-  );
-  assert.equal(shellView({ ui: 'old.html' }, 'overlay.command-palette'), undefined);
-  assert.equal(
-    shellView({ views: { 'overlay.command-palette': 'old.html' } }, 'overlay.command-palette'),
-    undefined,
-  );
 });
 
 test('initial command selection is exact, does not execute and permits known unavailable commands', async () => {

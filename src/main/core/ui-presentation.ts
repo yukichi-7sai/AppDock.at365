@@ -5,7 +5,7 @@ import { visibleRibbonItems, type RibbonItem } from '../../shared/applet-pages';
 import { ribbonRoots, ribbonPlacement, ribbonPresentation } from '../../shared/ribbon-layout';
 import { ribbonBadgeView, type RibbonBadge, type RibbonAnchor } from '../../shared/ribbon';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
-import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/shell';
+import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/workspace-ui';
 import type { UiCommand } from '../../shared/commands';
 
 import { NavigationHistory, type NavigationPlace } from './navigation-history';

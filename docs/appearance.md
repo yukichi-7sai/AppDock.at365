@@ -1,6 +1,6 @@
 # 共通配色とアクセントパレット
 
-本体の基本色・明暗テーマの正本は `resources/configs/theme.json`、アクセントのプリセットは `resources/configs/accent-color.json`。共通preloadが本体・Default Shell・登録されたローカルAppletへCSS変数を配布する。`src/renderer/theme.css` は本体の基本スタイルを担い、色値は持たない。派生色の計算は `src/shared/appearance.ts` が所有する。
+本体の基本色・明暗テーマの正本は `resources/configs/theme.json`、アクセントのプリセットは `resources/configs/accent-color.json`。共通preloadが本体・本体renderer・登録されたローカルAppletへCSS変数を配布する。`src/renderer/theme.css` は本体の基本スタイルを担い、色値は持たない。派生色の計算は `src/shared/appearance.ts` が所有する。
 
 ## テーマJSON
 
@@ -159,7 +159,7 @@ snapshotは`{revision,palette,dark,colors:{accent,soft,text,hover},theme}`。rev
 
 ## 共通スクロールバー
 
-本体、設定インデックス、各一覧とダイアログ、Default Shell、通知、登録されたローカルApplet画面には、コマンドトリガーの設定本文を基準にした共通スクロールバーを使う。縦横とも12px、つまみは周囲3pxの余白と8pxの角丸を持ち、矢印ボタンは表示しない。中立色のつまみを明暗テーマに合わせ、アクセントカラーで見た目を変えない。バー本体・トラック・縦横の交差部・つまみ周囲は透明にし、その場所の背景を見せる。つまみの背景色はpadding-box内だけへ描き、透明な境界まで塗りつぶさない。
+本体、設定インデックス、各一覧とダイアログ、本体renderer、通知、登録されたローカルApplet画面には、コマンドトリガーの設定本文を基準にした共通スクロールバーを使う。縦横とも12px、つまみは周囲3pxの余白と8pxの角丸を持ち、矢印ボタンは表示しない。中立色のつまみを明暗テーマに合わせ、アクセントカラーで見た目を変えない。バー本体・トラック・縦横の交差部・つまみ周囲は透明にし、その場所の背景を見せる。つまみの背景色はpadding-box内だけへ描き、透明な境界まで塗りつぶさない。
 
 色の正本は `resources/configs/theme.json` の `scrollbar`。寸法・CSSの正本は`src/shared/appearance.ts`の`scrollbarCss`。`appearance-host.ts`が、既存の配色登録で照合した正確なローカルURLのmain frameへ`dom-ready`ごとに挿入する。再読込後にも適用し、テーマ変更は共通preloadが更新する`data-theme`へ追従する。新しい設定項目や公開APIは追加しない。任意のWebサイト、Webアカウントのリモート本文、リモートiframeには挿入しない。
 

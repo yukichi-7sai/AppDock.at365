@@ -112,18 +112,10 @@ const main = (fn) =>
     settings: {},
     updateSource: `http://127.0.0.1:${server.address().port}/update.json`,
   };
-  const barFolder = path.join(profile, 'extensions/fixture.progress-bar');
-  fs.cpSync(path.join(root, 'out/shells/default'), barFolder, { recursive: true });
-  const barManifest = JSON.parse(fs.readFileSync(path.join(barFolder, 'extension.json')));
-  Object.assign(barManifest, {
-    id: 'fixture.progress-bar',
-    name: 'Progress Shell',
-    minimumHostVersion: '0.64.0',
-    shell: { apiVersion: 1, views: { titlebar: 'bars.html' } },
-  });
-  fs.writeFileSync(path.join(barFolder, 'extension.json'), JSON.stringify(barManifest));
-  settings.extensions[barManifest.id] = { enabled: true, settings: {} };
-  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(
+    require('./test-settings.cjs').file(profile, 'settings.json'),
+    JSON.stringify(settings),
+  );
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   try {
@@ -287,26 +279,6 @@ const main = (fn) =>
           .locator('.update-operation')
           .evaluate((e) => getComputedStyle(e).getPropertyValue('-webkit-app-region')),
         'no-drag',
-      );
-      await page.evaluate(
-        async (provider) => {
-          const s = await window.dock.snapshot();
-          s.settings.value.host.shellProviders.titlebar = provider;
-          await window.dock.saveSettings(s.settings.value, s.settings.revision);
-        },
-        theme === 'dark' ? 'fixture.progress-bar' : 'appdock.default-shell',
-      );
-      await until(
-        () =>
-          page.evaluate(
-            async (provider) => {
-              const s = await window.dock.snapshot();
-              const bar = s.shellRegions.regions.find((r) => r.region === 'titlebar');
-              return bar.boundProvider === provider && bar.ready;
-            },
-            theme === 'dark' ? 'fixture.progress-bar' : 'appdock.default-shell',
-          ),
-        'titlebar changes during download',
       );
       titlebar = await require('./shell-bars-helper.cjs').barPage(page, 'titlebar');
       await titlebar.waitForFunction(

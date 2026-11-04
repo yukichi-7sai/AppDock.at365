@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
-// Track host dialogs without capturing or hiding the independent Shell views.
+// Track host dialogs without capturing or hiding the independent host views.
 window.addEventListener('DOMContentLoaded', () => {
   let state = 'none';
   const update = () => {
@@ -211,15 +211,14 @@ const api: DockApi = {
     ipcRenderer.on('dock:paletteExecuted', handler);
     return () => ipcRenderer.removeListener('dock:paletteExecuted', handler);
   },
-  focusShell: (edge) => ipcRenderer.invoke('dock:focusShell', edge),
-  onShellFocusHost: (callback) => {
+  focusRibbon: (edge) => ipcRenderer.invoke('dock:focusRibbon', edge),
+  onRibbonFocusHost: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, edge: 'before' | 'after') => callback(edge);
-    ipcRenderer.on('dock:shellFocusHost', handler);
-    return () => ipcRenderer.removeListener('dock:shellFocusHost', handler);
+    ipcRenderer.on('dock:ribbonFocusHost', handler);
+    return () => ipcRenderer.removeListener('dock:ribbonFocusHost', handler);
   },
   navigate: (route, restore) => ipcRenderer.invoke('dock:navigate', route, restore),
-  shellViewport: (bounds) => ipcRenderer.invoke('dock:shellViewport', bounds),
-  retryShell: () => ipcRenderer.invoke('dock:retryShell'),
+  ribbonViewport: (bounds) => ipcRenderer.invoke('dock:ribbonViewport', bounds),
   setAppletApiPermissions: (permissions) =>
     ipcRenderer.invoke('dock:appletApiPermissions', permissions),
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
@@ -290,7 +289,7 @@ const api: DockApi = {
   onBarFocusHost: (callback) => {
     const handler = (
       _: Electron.IpcRendererEvent,
-      region: import('../shared/shell-bars').ShellBarRegion,
+      region: import('../shared/window-bars').WindowBarRegion,
       edge: 'before' | 'after',
     ) => callback(region, edge);
     ipcRenderer.on('dock:barFocusHost', handler);

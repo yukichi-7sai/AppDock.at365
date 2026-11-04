@@ -8,7 +8,6 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings } from '../../shared/contracts';
 import type { SettingsPageModel } from '../../shared/settings-page';
-import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
 import { DescriptionText } from '../settings-ui/DescriptionText';
@@ -376,7 +375,8 @@ export function SettingsForm({
                       ...settings,
                       host: {
                         ...settings.host,
-                        overlayBackground: event.target.value as 'blur' | 'transparent' | 'translucent',
+                        overlayBackground: event.target.value as
+                          'blur' | 'transparent' | 'translucent',
                       },
                     })
                   }
@@ -399,84 +399,6 @@ export function SettingsForm({
                   }
                 />
               </SettingRow>
-            </SettingsSection>
-            <SettingsSection title={t('appearance.shell.section')}>
-              {shellRegions.map(({ id }) => {
-                const title = t(`appearance.shell.region.${id}`);
-                const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
-                const candidates = shellProviderCandidates(extensions, id);
-                const state = aux.shellRegions?.regions.find((r) => r.region === id);
-                const name = (provider: string | null | undefined) =>
-                  provider === defaultShellId
-                    ? t('appearance.shell.default')
-                    : (extensions.find((e) => e.id === provider)?.displayName ??
-                      provider ??
-                      t('appearance.shell.notCreated'));
-                return (
-                  <SettingRow
-                    key={id}
-                    pageId={category}
-                    itemKey={'shellProviders.' + id}
-                    description={[
-                      t('appearance.shell.active', {
-                        name: name(state?.boundProvider ?? state?.resolvedProvider),
-                      }),
-                      state?.pendingProvider
-                        ? t('appearance.shell.pending', { name: name(state.pendingProvider) })
-                        : '',
-                      state?.reason ? t('appearance.shell.reason', { reason: state.reason }) : '',
-                    ].join('')}
-                  >
-                    <div className="shell-region-controls">
-                      <select
-                        data-testid={'shell-provider-' + id}
-                        aria-label={t('appearance.shell.label', { region: title })}
-                        value={configured}
-                        disabled={busy}
-                        onChange={(e) => {
-                          const shellProviders = { ...settings.host.shellProviders };
-                          if (e.target.value) shellProviders[id] = e.target.value;
-                          else delete shellProviders[id];
-                          edit({
-                            ...settings,
-                            host: {
-                              ...settings.host,
-                              shellProviders,
-                            },
-                          });
-                        }}
-                      >
-                        <option value={defaultShellId}>
-                          {t('appearance.shell.defaultOption')}
-                        </option>
-                        {configured &&
-                          configured !== defaultShellId &&
-                          !candidates.some((e) => e.id === configured) && (
-                            <option value={configured}>
-                              {t('appearance.shell.unavailable', { name: configured })}
-                            </option>
-                          )}
-                        {candidates.map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.displayName}
-                            {!e.enabled ? t('appearance.shell.disabledSuffix') : ''}
-                          </option>
-                        ))}
-                      </select>
-                      {state?.reason && (
-                        <>
-                          <button
-                            disabled={busy}
-                            onClick={() => void invoke('retryShellRegion', [id])}
-                          >
-                            {t('appearance.shell.retry')}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </SettingRow>
-                );
-              })}
             </SettingsSection>
           </>
         )}

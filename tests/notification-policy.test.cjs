@@ -481,7 +481,7 @@ test('safe in-session kind identity remains without callbacks or private body', 
   assert.equal(fs.existsSync(path.join(f.dir, 'history.json')), false);
 });
 
-test('reserved desktop defaults from 0.30 manifests remain readable while the new Shell region requires its API version', (t) => {
+test('reserved desktop defaults from 0.30 manifests remain readable and retired Shell declarations are ignored', (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-manifest-unit-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{};');
@@ -503,8 +503,8 @@ test('reserved desktop defaults from 0.30 manifests remain readable while the ne
   assert.deepEqual(readManifest(dir).notificationTypes[0].defaultTargets, ['desktop']);
   manifest.shell = { apiVersion: 1, views: { 'notification.desktop': 'notifications.html' } };
   write();
-  assert.throws(() => readManifest(dir), /0.31.1/);
+  assert.equal(readManifest(dir).shell, undefined);
   manifest.minimumHostVersion = '0.31.1';
   write();
-  assert.equal(readManifest(dir).shell.views['notification.desktop'], 'notifications.html');
+  assert.equal(readManifest(dir).shell, undefined);
 });

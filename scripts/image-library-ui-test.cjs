@@ -336,12 +336,9 @@ async function chooseInPicker(file) {
         return {
           sdk: hash('dotnet-host/AppDock.SDK.dll'),
           runtime: hash('dotnet-host/AppDock.Runtime.dll'),
-          shell: JSON.parse(
-            fs.readFileSync(path.join(process.resourcesPath, 'shells/default/extension.json')),
-          ).version,
+          workspace: hash('app.asar/out/renderer/workspace/index.html'),
         };
       });
-      assert.equal(nativePayload.shell, (await snapshot()).version);
     }
     for (const [name, id] of nativeApplets) {
       await until(

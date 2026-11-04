@@ -1,0 +1,148 @@
+@import '../notifications/levels.css';
+:root {
+  font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
+  color: var(--text);
+  background: transparent;
+  --card: var(--panel);
+  --button: var(--raised);
+  --primary: var(--accent);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  background: transparent;
+}
+body {
+  overflow: hidden;
+}
+.notification-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow: auto;
+}
+.notification-card {
+  position: relative;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--notification-accent) 40%, var(--card));
+  border-radius: 12px;
+  background: var(--card);
+  padding: 14px 16px;
+  box-shadow: 0 4px 14px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.notification-card.dismissible {
+  padding-right: 52px;
+}
+:root[data-notification-banner-shadow='off']
+  .notification-lane:not(.desktop-lane)
+  .notification-card,
+:root[data-notification-desktop-shadow='off'] .desktop-lane .notification-card {
+  box-shadow: none;
+}
+.notification-card > .notification-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.notification-copy {
+  flex: 1;
+  min-width: 0;
+}
+.notification-level {
+  display: block;
+  font-size: 11px;
+  color: var(--notification-accent);
+  margin-bottom: 4px;
+}
+.notification-copy strong {
+  display: block;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.notification-copy p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 5px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.notification-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: 55%;
+}
+button {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--button);
+  color: inherit;
+  padding: 7px 10px;
+}
+button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--accent-text);
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.notification-more {
+  align-self: center;
+  flex-shrink: 0;
+}
+.notification-error {
+  background: var(--card);
+  padding: 8px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .notification-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .notification-actions {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.desktop-lane .notification-actions {
+  max-width: 100%;
+}
+
+button.primary:hover:enabled {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}

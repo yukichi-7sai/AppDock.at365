@@ -1,4 +1,5 @@
 const { testHostPath } = require('./copy-host.cjs');
+const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const assert = require('node:assert/strict'),
@@ -134,7 +135,10 @@ fs.writeFileSync(
   JSON.stringify({ ok: true, time: new Date().toISOString(), message: '更新を適用しました。' }),
 );
 
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const portable = process.argv[2] ? testHostPath(profile) : undefined;
 if (portable) {
@@ -144,7 +148,7 @@ if (portable) {
 const originalHistory = fs.readFileSync(path.join(notificationDir, 'history.json'));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-let app, browser, child, host;
+let app, browser, child, host, inspector;
 const checks = [];
 async function until(fn, why) {
   const end = Date.now() + 20000;
@@ -172,12 +176,17 @@ async function launch() {
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
     const port = probe.address().port;
     await new Promise((r) => probe.close(r));
-    child = spawn(portable, ['--test-profile=' + profile, '--remote-debugging-port=' + port], {
-      cwd: profile,
-      env,
-      windowsHide: true,
-      stdio: 'ignore',
-    });
+    inspector = await freePort();
+    child = spawn(
+      portable,
+      ['--test-profile=' + profile, '--remote-debugging-port=' + port, '--inspect=' + inspector],
+      {
+        cwd: profile,
+        env,
+        windowsHide: true,
+        stdio: 'ignore',
+      },
+    );
     browser = await until(async () => {
       try {
         return await chromium.connectOverCDP('http://127.0.0.1:' + port, { timeout: 1000 });
@@ -217,16 +226,21 @@ async function launch() {
     'host and notification fixtures ready',
   );
   await require('./shell-overlay-helper.cjs').startupPage(host);
+  // The fixed-EXE launcher uses windowsHide; banner checks require the main window shown.
+  await host.evaluate(() => window.dock.executeCommand('appdock.open'));
   await host.waitForFunction(
     () => document.querySelector('.shell')?.getAttribute('data-route') === 'settings',
   );
 }
 const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
 const storage = (id, key) => {
-  const f = path.join(profile, 'data/storage', id, key + '.json');
+  const f = require('./test-storage.cjs').file(profile, id, key);
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 };
-const saved = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
+const saved = () =>
+  JSON.parse(
+    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+  );
 async function settingsPage() {
   await host.evaluate(() => window.dock.navigate('settings'));
   const p = await require('./settings-host-helper.cjs').settingsPage(host);
@@ -252,7 +266,7 @@ async function save(p) {
 async function banner() {
   await host.evaluate(() => window.dock.navigate(null));
   const p = await until(
-    () => pages().find((p) => p.url().endsWith('/shells/default/notifications.html')),
+    () => pages().find((p) => p.url().endsWith('/renderer/workspace/notifications.html')),
     'banner',
   );
   return p;
@@ -327,13 +341,13 @@ async function close() {
       'real Node/.NET center-only active notifications retain owned actions and stay out of banner',
     );
     const rail = await until(
-      () => pages().find((p) => p.url().endsWith('/shells/default/index.html')),
+      () => pages().find((p) => p.url().endsWith('/renderer/workspace/index.html')),
       'ribbon',
     );
     const badge = rail.locator('[data-ribbon-id="notifications"] .ribbon-badge');
     const expectBadge = async (count) => {
       await until(async () => {
-        const item = (await rail.evaluate(() => window.appdockShell.get())).items.find(
+        const item = (await rail.evaluate(() => window.appdockRibbon.get())).items.find(
           (i) => i.id === 'notifications',
         );
         return count ? item?.badge?.description === 'アクティブな通知: ' + count : !item?.badge;
@@ -347,8 +361,8 @@ async function close() {
     await expectBadge(3);
     const toggleMode = async () =>
       rail.evaluate(async () => {
-        const m = await window.appdockShell.get();
-        await window.appdockShell.invoke({
+        const m = await window.appdockRibbon.get();
+        await window.appdockRibbon.invoke({
           epoch: m.epoch,
           requestId: crypto.randomUUID(),
           actionId: m.items.find((i) => i.id === 'ribbon-display-mode').actionId,
@@ -497,7 +511,7 @@ async function close() {
     assert.equal((await model()).content.historyCount, 0);
     assert.equal((await model()).content.activeCount, 0);
     const restartRail = await until(
-      () => pages().find((p) => p.url().endsWith('/shells/default/index.html')),
+      () => pages().find((p) => p.url().endsWith('/renderer/workspace/index.html')),
       'restarted ribbon',
     );
     assert.equal(
@@ -515,23 +529,36 @@ async function close() {
     if (!portable) {
       assert.equal(center, host);
       assert(!pages().some((p) => p.url().includes('/fixture.center/')));
-      assert(
-        !(await host.evaluate(() => window.dock.snapshot())).shellRegions.regions.some((r) =>
-          r.region.startsWith('page.'),
-        ),
-      );
+      assert.equal((await host.evaluate(() => window.dock.snapshot())).shellRegions, undefined);
       assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders[
-          'page.notifications'
-        ],
-        'fixture.center',
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders,
+        undefined,
       );
       assert.equal((await model()).content.filters.text, 'Native');
-      checks.push('retired center assignment is preserved without loading a page Shell');
+      checks.push('retired center assignment is ignored without loading a page Shell');
     }
     success = true;
   } catch (e) {
     console.error(e);
+    if (inspector)
+      console.log(
+        'NATIVE',
+        await inspect(
+          inspector,
+          electronExpression +
+            '.BrowserWindow.getAllWindows().map(w=>({visible:w.isVisible(),minimized:w.isMinimized(),bounds:w.getBounds(),views:w.contentView.children.filter(v=>v.webContents).map(v=>({url:v.webContents.getURL(),visible:v.getVisible(),bounds:v.getBounds()}))}))',
+        ),
+      );
+    for (const p of pages().filter((p) => p.url().endsWith('/notifications.html')))
+      console.log(
+        'BANNER-END',
+        await p.evaluate(async () => ({
+          width: innerWidth,
+          height: innerHeight,
+          rect: document.querySelector('strong')?.getBoundingClientRect().toJSON(),
+          error: document.querySelector('[role=alert]')?.textContent,
+        })),
+      );
     for (const p of pages())
       console.error(
         'PAGE',

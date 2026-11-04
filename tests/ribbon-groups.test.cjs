@@ -454,7 +454,6 @@ test('badge Host API resolves actual page/collection ownership, capabilities and
     undefined,
     {},
     undefined,
-    undefined,
     () => ({ entries: () => collections }),
     badges,
   );

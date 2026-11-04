@@ -8,7 +8,6 @@ export interface AppletPackagePlan {
   minimumHostVersion?: string;
   updateSource?: string;
   siteCount?: number;
-  shell?: boolean;
 }
 
 /** Preview failures belong to the install dialog, rather than the settings page. */

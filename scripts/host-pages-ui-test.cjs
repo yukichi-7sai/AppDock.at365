@@ -110,7 +110,10 @@ settings.host.shellProviders = Object.fromEntries(
     'missing.retired-shell',
   ]),
 );
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const images = path.join(profile, 'data/assets/images');
 fs.mkdirSync(images, { recursive: true });
 const original = path.join(images, 'preview.png');
@@ -429,7 +432,7 @@ async function geometry() {
         await geometry();
         await host.screenshot({ path: path.join(profile, `${kind}-${theme}.png`) });
         const state = await host.evaluate(() => window.dock.snapshot());
-        assert(!state.shellRegions.regions.some((r) => r.region.startsWith('page.')));
+        assert.equal(state.shellRegions, undefined);
         assert(
           !app
             .context()
@@ -578,11 +581,8 @@ async function geometry() {
     );
     const final = await host.evaluate(() => window.dock.snapshot());
     assert.equal(final.version, require('../package.json').version);
-    assert.equal(
-      final.extensions.find((a) => a.id === 'appdock.default-shell').version,
-      final.version,
-    );
-    assert.deepEqual(final.settings.value.host.shellProviders, settings.host.shellProviders);
+    assert(!final.extensions.some((a) => a.id === 'appdock.default-shell'));
+    assert.equal(final.settings.value.host.shellProviders, undefined);
     assert.deepEqual(final.settings.value.ribbon.order, settings.ribbon.order);
     assert.deepEqual(final.settings.value.keybindings, settings.keybindings);
     assert.deepEqual(final.settings.value.pinnedCommands, settings.pinnedCommands);

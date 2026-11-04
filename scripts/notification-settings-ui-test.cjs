@@ -97,7 +97,10 @@ initial.notificationPreferences = {
     },
   ],
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const portable = process.argv[2] ? testHostPath(profile) : undefined;
 if (portable) {
@@ -184,7 +187,10 @@ const storage = (id, key) => {
   const f = path.join(profile, 'data/storage', id, key + '.json');
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 };
-const saved = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
+const saved = () =>
+  JSON.parse(
+    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+  );
 async function settingsPage() {
   await host.evaluate(() => window.dock.navigate('settings'));
   const p = await require('./settings-host-helper.cjs').settingsPage(host);
@@ -234,7 +240,7 @@ async function banner() {
   await host.evaluate(() => window.dock.navigate(null));
   await require('./shell-overlay-helper.cjs').startupPage(host);
   const p = await until(
-    () => pages().find((p) => p.url().endsWith('/shells/default/notifications.html')),
+    () => pages().find((p) => p.url().endsWith('/renderer/workspace/notifications.html')),
     'banner',
   );
   return p;
@@ -267,7 +273,10 @@ async function close() {
     await p.getByText('Stopped notice', { exact: true }).waitFor();
     assert.equal(await p.getByRole('switch', { name: /noticeを通知$/ }).count(), 0);
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
-    await p.locator('strong').filter({ hasText: /^not\.installed \/ retained$/ }).waitFor();
+    await p
+      .locator('strong')
+      .filter({ hasText: /^not\.installed \/ retained$/ })
+      .waitFor();
     let dialog = await edit(p, 'Node notice');
     assert.equal(
       await dialog.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
@@ -445,7 +454,10 @@ async function close() {
     );
     await cancel(dialog);
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
-    await p.locator('strong').filter({ hasText: /^not\.installed \/ retained$/ }).waitFor();
+    await p
+      .locator('strong')
+      .filter({ hasText: /^not\.installed \/ retained$/ })
+      .waitFor();
     const historyFile = path.join(profile, 'data/notifications/history.json');
     assert.equal(fs.existsSync(historyFile), false);
     await command('appdock.notifications.open');

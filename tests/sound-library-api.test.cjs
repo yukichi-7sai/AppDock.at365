@@ -28,12 +28,12 @@ Module._load = original;
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const reference = '@library/@assigned/' + 'c'.repeat(64) + '.wav';
 function fixture(sound) {
-  const args = Array(20).fill(undefined);
+  const args = Array(19).fill(undefined);
   args[0] = { value: createDefaultSettings() };
   args[1] = path.resolve('.artifacts/sound-api');
   args[2] = () => {};
   args[3] = () => {};
-  args[19] = sound;
+  args[18] = sound;
   const e = {
     manifest: { id: 'test.sound-library', name: 'Sound', capabilities: ['file-dialog', 'audio'] },
     state: 'running',

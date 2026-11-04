@@ -2,7 +2,7 @@
 
 設定編集許可の統合と、宣言済み単純設定・object-listのMCP既定公開に対応する。設定の探索・Schema・値・行・選択候補・変更は[設定APIの固定6入口](settings-api.md)を使用する。特殊設定のadapterは[拡張設計](mcp-settings-design.md)の後続範囲。
 
-通知、AI共通/接続、TTSと更新の通常値、AI接続/TTS手動ボイス一覧の行操作、Shell選択とApplet共通の有効状態・起動待ち時間・ページ表示先、管理表示順、ジェスチャー共通のブラウザ判定も同じ固定入口で扱う。更新は本体設定と外部Appletごとの更新元に対応する。Shellは共通の領域一覧とview宣言から項目/候補を生成し、領域の増減でもツール定義を変えない。保存の検証を各所有サービスへ委譲し、生成・読み上げ・試験接続・更新実行・暗号化情報の操作は設定変更に含めない。対象ごとの境界と継承/リセットは[設定API](settings-api.md)を参照する。
+通知、AI共通/接続、TTSと更新の通常値、AI接続/TTS手動ボイス一覧の行操作、Applet共通の有効状態・起動待ち時間・ページ表示先、管理表示順、ジェスチャー共通のブラウザ判定も同じ固定入口で扱う。更新は本体設定と外部Appletごとの更新元に対応する。保存の検証を各所有サービスへ委譲し、生成・読み上げ・試験接続・更新実行・暗号化情報の操作は設定変更に含めない。対象ごとの境界と継承/リセットは[設定API](settings-api.md)を参照する。
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
@@ -57,7 +57,7 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 | ui.assets.get | appdock_get_ui_asset | モデル内のassetIdをidへ指定。PNG/WebPのdata URL |
 | ui.actions.invoke | appdock_invoke_ui_action | epoch・requestId・actionId・任意contextId。モデルで公開された操作を実行 |
 
-公開範囲の正本は`appDockOperations`のcallersです。入力APIはApplet専用で、MCPには直接公開しません。描画モデルの詳細は[Shell API](shell-api.md)を参照してください。
+公開範囲の正本は`appDockOperations`のcallersです。入力APIはApplet専用で、MCPには直接公開しません。描画モデルの詳細は[リボンの描画](ribbon-ui.md)を参照してください。
 
 設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象はhostSettingDefinitionsに登録された単純設定です。現在のキー・型はsettings.getSchemaで取得します。主な例を示します。
 
@@ -404,7 +404,7 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 
 input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しません。Appletが明示公開するコマンドからの呼出しは全Applet共通の許可で実行できます。[公開先と許可](appdock-api.md)を参照してください。
 
-Shell専用コマンドに宣言された`shellRequirement`も共通最終実行経路で検査します。automationの公開宣言・PC専用権限に加えて対象領域の解決先/可視状態が必要で、一覧取得後の切替では実行を拒否します。未採用でも条件を省略した自己設定コマンドは従来どおりです。詳細は[Applet API](extensions.md#shellの採用状態と専用コマンド)。
+旧shellRequirement付きコマンドは一覧で利用不可にし、共通の最終実行経路でも拒否します。[Applet API](extensions.md#廃止したshell-api)を参照してください。
 
 ## TTS読み上げ
 
@@ -429,7 +429,7 @@ networkHostnames: string[];          // 省略時 []、追加の接続先ホス�
 
 新規操作は本体設定UI専用の`setConnectionScope { scope }`、`setNetworkHostnames { hostnames }`、`copyToken`、`copyEndpoint { endpoint }`、`retryStart`。copyEndpointは現在稼働中のendpointまたはnetworkEndpointsに含むURLだけをmainでコピーする。既存`configure { enabled, allowWrite, port }`へscopeを混ぜず、古い設定画面や操作許可画面からのconfigureでnetworkがlocalへ戻る事故を防ぐ。専用操作は指定されたフィールドだけを更新し、無関係なallow*を上書きしない。既存busyガードで操作を直列化する。
 
-追加操作は`dock:automation`と、既存Shell設定ページの`codex`用action許可一覧へ接続する。`permissions`ページの許可一覧へは追加しない。Settings HostとDefault Shellに別の実装を持たせず、同じAutomationServiceを呼ぶ。公開操作カタログ、MCP、Applet、WebApplet、外部Webページからは呼べないことを確認する。
+追加操作は`dock:automation`と、本体設定ページの`codex`用action許可一覧へ接続する。`permissions`ページの許可一覧へは追加しない。Settings Hostとrendererで実装を重複させず、同じAutomationServiceを呼ぶ。公開操作カタログ、MCP、Applet、WebApplet、外部Webページからは呼べないことを確認する。
 
 ### 4.1 接続範囲
 
@@ -507,7 +507,7 @@ networkHostnamesの変更は保存後に検査規則を差し替える。bind変
 - ネットワーク設定欄に「接続トークンをコピー」を置く。既存tokenがないときは無効。押下時だけmainでクリップボードへ書き、IPC応答は成功・失敗だけ。トークンを画面、DOM、AutomationState、ログ、通知へ返さない。コピー先がOSクリップボードであることをボタン付近に明記する。共有クリップボード履歴を変更・削除せず、時間差のクリップボード消去も行わない。
 - 「接続テスト」は「このPC内の接続テスト」と表記し、LAN到達性や接続元アプリの対応を判定しない。停止エラーには「接続を再試行」を用意する。
 
-トークンコピーは既存の「状態では秘密値を返さない」契約を保った明示操作として追加する。Electron clipboardへの書込みをmain側で注入し、AutomationServiceが返すReplyへ秘密値を入れない。既存の本体Window/mainFrame/URL検査とShell設定ページの操作検査を通す。MCPの`ui.actions.invoke`や公開ツールへコピー操作を露出しない。
+トークンコピーは既存の「状態では秘密値を返さない」契約を保った明示操作として追加する。Electron clipboardへの書込みをmain側で注入し、AutomationServiceが返すReplyへ秘密値を入れない。既存の本体Window/mainFrame/URL検査と本体設定ページの操作検査を通す。MCPの`ui.actions.invoke`や公開ツールへコピー操作を露出しない。
 
 外部クライアントへ渡す情報はStreamable HTTP、`http://<AppDock-PCのIPv4または許可済みホスト名>:<port>/mcp`、Bearer tokenの3点。例の秘密値は`<token>`とし、実値を文書へ書かない。接続元とAppDock双方のルーティング／ファイアウォールで到達可能であることが前提。
 

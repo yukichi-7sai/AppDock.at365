@@ -35,7 +35,7 @@ async function geometry() {
       w.webContents.getURL().startsWith('appdock://host/index.html'),
     );
     const view = w.contentView.children.find((v) =>
-      v.webContents?.getURL().endsWith('/shells/default/index.html'),
+      v.webContents?.getURL().endsWith('/renderer/workspace/index.html'),
     );
     const origin = w.getContentBounds(),
       b = view.getBounds();
@@ -146,7 +146,8 @@ async function start() {
           .context()
           .pages()
           .find(
-            (p) => p !== rail && p.url().endsWith('/shells/default/index.html') && !p.isClosed(),
+            (p) =>
+              p !== rail && p.url().endsWith('/renderer/workspace/index.html') && !p.isClosed(),
           ),
       'group surface',
     );
@@ -168,7 +169,8 @@ async function start() {
           .context()
           .pages()
           .find(
-            (p) => p !== rail && p.url().endsWith('/shells/default/index.html') && !p.isClosed(),
+            (p) =>
+              p !== rail && p.url().endsWith('/renderer/workspace/index.html') && !p.isClosed(),
           ),
       'keyboard group',
     );

@@ -362,7 +362,7 @@ async function assertRibbonReadability(rail, id, dark) {
     await host.getByLabel('テーマ', { exact: true }).selectOption('dark');
     await settleSettings(host);
     await assertRibbonReadability(
-      context.pages().find((p) => /\/shells\/default\/index\.html$/.test(p.url())),
+      context.pages().find((p) => /\/renderer\/workspace\/index\.html$/.test(p.url())),
       'sky-blue',
       true,
     );
@@ -381,7 +381,7 @@ async function assertRibbonReadability(rail, id, dark) {
         assert.equal(await host.locator('.accent-palettes [aria-pressed="true"]').count(), 1);
         const shells = context
           .pages()
-          .filter((p) => /\/shells\/default\/(index|bars)\.html$/.test(p.url()));
+          .filter((p) => /\/renderer\/workspace\/(index|bars)\.html$/.test(p.url()));
         for (const shell of shells) await assertColors(shell, palette.id, dark);
         const rail = shells.find((p) => p.url().endsWith('/index.html'));
         await assertRibbonReadability(rail, palette.id, dark);
@@ -448,7 +448,7 @@ async function assertRibbonReadability(rail, id, dark) {
         .pages()
         .filter((p) => /appdock:\/\/host\/|\/(main|bars)\.html$/.test(p.url())))
         await assertColors(page, 'custom', dark, custom);
-      const rail = context.pages().find((p) => /\/shells\/default\/index\.html$/.test(p.url()));
+      const rail = context.pages().find((p) => /\/renderer\/workspace\/index\.html$/.test(p.url()));
       await assertColors(rail, 'custom', dark, custom);
       await assertRibbonReadability(rail, 'custom', dark);
       await host.screenshot({ path: path.join(profile, `custom-${dark ? 'dark' : 'light'}.png`) });

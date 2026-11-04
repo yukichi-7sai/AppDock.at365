@@ -1,6 +1,6 @@
 import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
-import { NotificationDismissButton } from '../../../ui/notifications/DismissButton';
+import { NotificationDismissButton } from '../notifications/DismissButton';
 import { useEffect, useRef, useState } from 'react';
 import type { HostPageModel } from '../../shared/host-pages';
 import type {

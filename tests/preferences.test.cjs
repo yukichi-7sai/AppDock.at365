@@ -45,7 +45,6 @@ test('legacy settings gain Ctrl+P and pins without creating a host profile', () 
     trayDoubleClickCommand: null,
     ribbonExpandOnHover: false,
     hardwareAcceleration: false,
-    shellProviders: {},
     startAtLogon: false,
     runAsAdministrator: false,
   });

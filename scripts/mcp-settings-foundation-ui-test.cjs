@@ -56,7 +56,10 @@ Object.assign(settings.tts, {
   manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
 });
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -138,7 +141,6 @@ fs.writeFileSync(
   path.join(fixture, 'index.cjs'),
   `exports.activate=async context=>{context.commands.register('${fixtureId}.run','Run',async()=>{});await context.settings.setOptions('monitor',[{value:'primary',label:'Primary'},{value:'secondary',label:'Secondary'}]);};`,
 );
-require('./settings-shell-gateway-checks.cjs').install(root, profile);
 require('./settings-applet-common-gateway-checks.cjs').install(profile);
 require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
@@ -344,16 +346,6 @@ async function main() {
     value,
     until,
   });
-  await require('./settings-shell-gateway-checks.cjs')({
-    page,
-    client,
-    profile,
-    local,
-    checks,
-    tool,
-    value,
-    until,
-  });
   await require('./settings-applet-common-gateway-checks.cjs')({
     page,
     client,
@@ -429,8 +421,9 @@ async function main() {
   await dialog.getByLabel('Bearer token', { exact: true }).fill('PRIVATE_CREDENTIAL_FIXTURE');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(async () => (await page.getByRole('dialog').count()) === 0, 'local credential saved');
-  const secretId = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).mcpServers
-    .items[0].id;
+  const secretId = JSON.parse(
+    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+  ).mcpServers.items[0].id;
   const detail = await value('appdock_mcp_get_server_settings', { serverId: secretId });
   for (const hidden of ['PRIVATE_CREDENTIAL_FIXTURE', 'tokenConfigured', 'environmentNames'])
     assert.equal(JSON.stringify(detail).includes(hidden), false);

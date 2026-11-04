@@ -146,10 +146,7 @@ async function appearance() {
       .count(),
     0,
   );
-  assert.deepEqual(await host.locator('.settings-section h2').allTextContents(), [
-    '共通',
-    'Shellの変更',
-  ]);
+  assert.deepEqual(await host.locator('.settings-section h2').allTextContents(), ['共通']);
   const common = host.getByRole('region', { name: '共通', exact: true });
   const visible = (await snapshot()).settings.value.host.showHints;
   assert.equal(
@@ -161,21 +158,7 @@ async function appearance() {
     visible ? 1 : 0,
   );
   assert.equal(await common.locator('.settings-hint-trigger').count(), visible ? 4 : 0);
-  assert.equal(
-    await host
-      .getByRole('region', { name: 'Shellの変更', exact: true })
-      .locator('.settings-field-label p')
-      .count(),
-    require('../out/main/shared/shell').shellRegions.length,
-  );
-  assert.equal(
-    await host
-      .getByRole('region', { name: 'Shellの変更', exact: true })
-      .locator('.settings-hint-trigger')
-      .count(),
-    0,
-    'empty catalog hints do not produce icons',
-  );
+  assert.equal(await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(), 0);
   return common;
 }
 async function checkSectionTitles() {
@@ -196,13 +179,6 @@ async function checkSectionTitles() {
       layoutSamples.push({ theme, width, page, ...row });
       assert(Math.abs(row.left - row.controlLeft) <= 1, `${page}/${row.name} aligned left`);
     }
-  };
-  const checkShellDescriptions = async () => {
-    const card = host.getByRole('region', { name: 'Shellの変更', exact: true });
-    const descriptions = await card.locator('.settings-field-label > p').allTextContents();
-    assert.equal(descriptions.length, require('../out/main/shared/shell').shellRegions.length);
-    assert(descriptions.every((text) => text.startsWith('使用先: ')));
-    assert.equal(await card.locator('.shell-region-controls > p.muted').count(), 0);
   };
   for (const theme of ['light', 'dark']) {
     await host.evaluate(async (theme) => {
@@ -238,19 +214,25 @@ async function checkSectionTitles() {
         await select(title);
         await checkToggles(theme, width, title);
         if (title === '表示') {
-          await checkShellDescriptions();
+          assert.equal(
+            await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(),
+            0,
+          );
           const hintToggle = host.getByRole('switch', { name: 'ヒントの表示', exact: true });
           const initialHints = (await snapshot()).settings.value.host.showHints;
           for (const expected of [!initialHints, initialHints]) {
             await hintToggle.click();
             await settleSettings(host);
             assert.equal((await snapshot()).settings.value.host.showHints, expected);
-            await checkShellDescriptions();
+            assert.equal(
+              await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(),
+              0,
+            );
             await checkToggles(theme, width, '表示/' + expected);
           }
           await host.screenshot({ path: path.join(profile, `layout-${theme}-${width}.png`) });
           checks.push(
-            `${theme}/${width}: standalone toggles align left and persist ON/OFF; Shell descriptions survive hints ON/OFF`,
+            `${theme}/${width}: standalone toggles align left and persist ON/OFF; removed Shell controls remain absent with hints ON/OFF`,
           );
         }
         const read = async (state) => {
@@ -682,26 +664,40 @@ async function checkSectionTitles() {
       fs.mkdirSync(packDirectory, { recursive: true });
       fs.mkdirSync(path.join(profile, 'local'), { recursive: true });
       const fetchedAt = Date.now();
-      fs.writeFileSync(path.join(profile, 'local/applet-catalog-cache.json'), JSON.stringify({
-        schemaVersion: 1,
-        repositories: {
-          'fixture/External': {
-            release: { fetchedAt, value: 'unpublished' },
-            development: { fetchedAt, value: {
-              id: 'fixture.external', displayName: 'External fixture', version: '1.0.0',
-              date: new Date(fetchedAt).toISOString(),
-            } },
+      fs.writeFileSync(
+        path.join(profile, 'local/applet-catalog-cache.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          repositories: {
+            'fixture/External': {
+              release: { fetchedAt, value: 'unpublished' },
+              development: {
+                fetchedAt,
+                value: {
+                  id: 'fixture.external',
+                  displayName: 'External fixture',
+                  version: '1.0.0',
+                  date: new Date(fetchedAt).toISOString(),
+                },
+              },
+            },
           },
-        },
-      }));
+        }),
+      );
       // Startup preserves local edits; replacement is covered by the updater transaction tests.
-      fs.writeFileSync(path.join(packDirectory, 'host.json'), JSON.stringify({ 'appearance.theme.label': '基本の配色' }));
-      fs.writeFileSync(englishPack, JSON.stringify({
-        'language.label': 'Display language',
-        'pages.appearance.title': 'Appearance',
-        'settings.settings-navigation.shortcuts': 'Keyboard shortcuts',
-        'services.updaterWindow.title': 'Updating AppDock',
-      }));
+      fs.writeFileSync(
+        path.join(packDirectory, 'host.json'),
+        JSON.stringify({ 'appearance.theme.label': '基本の配色' }),
+      );
+      fs.writeFileSync(
+        englishPack,
+        JSON.stringify({
+          'language.label': 'Display language',
+          'pages.appearance.title': 'Appearance',
+          'settings.settings-navigation.shortcuts': 'Keyboard shortcuts',
+          'services.updaterWindow.title': 'Updating AppDock',
+        }),
+      );
     }
     await launch();
     if (translationPacksOnly) {
@@ -710,7 +706,12 @@ async function checkSectionTitles() {
       await until(() => fs.existsSync(roster), 'catalog reads configs/applets.json');
       assert.equal(
         fs.readFileSync(roster, 'utf8'),
-        fs.readFileSync(source ? path.join(path.dirname(source), 'configs/applets.json') : path.join(root, 'resources/configs/applets.json'), 'utf8'),
+        fs.readFileSync(
+          source
+            ? path.join(path.dirname(source), 'configs/applets.json')
+            : path.join(root, 'resources/configs/applets.json'),
+          'utf8',
+        ),
       );
       fs.writeFileSync(roster, '{"applets":["fixture/External"]}');
       await select('表示');
@@ -718,17 +719,27 @@ async function checkSectionTitles() {
       await host.locator('[data-catalog-repository="fixture/External"]').waitFor();
       assert.equal(await host.locator('[data-catalog-repository]').count(), 1);
       assert.equal(fs.existsSync(path.join(profile, 'applets.json')), false);
-      checks.push('Packaged configs/applets.json is loaded and edits are reread without using the old root path');
+      checks.push(
+        'Packaged configs/applets.json is loaded and edits are reread without using the old root path',
+      );
       await select('表示');
       const control = host.getByTestId('host-language');
       assert.equal(await control.locator('option[value=en]').innerText(), 'English');
       await control.selectOption('en');
-      await until(async () => (await control.getAttribute('aria-label')) === 'Display language', 'language selection');
+      await until(
+        async () => (await control.getAttribute('aria-label')) === 'Display language',
+        'language selection',
+      );
       await host.getByRole('heading', { name: 'Appearance', exact: true }).waitFor();
-      await host.locator('.settings-categories').getByRole('button', { name: 'Keyboard shortcuts', exact: true }).waitFor();
+      await host
+        .locator('.settings-categories')
+        .getByRole('button', { name: 'Keyboard shortcuts', exact: true })
+        .waitFor();
       assert.equal(await control.inputValue(), 'en');
-      const progress = await inspect(inspector,
-        `process.getBuiltinModule('module').createRequire((${electronExpression}).app.getAppPath() + '/package.json')('./out/main/shared/i18n').updaterWindowMessages()`);
+      const progress = await inspect(
+        inspector,
+        `process.getBuiltinModule('module').createRequire((${electronExpression}).app.getAppPath() + '/package.json')('./out/main/shared/i18n').updaterWindowMessages()`,
+      );
       assert.equal(progress.title, 'Updating AppDock');
       assert.equal(progress.waiting, 'AppDockの終了を待っています…');
       await host.screenshot({ path: path.join(profile, 'translations-en.png') });
@@ -736,22 +747,35 @@ async function checkSectionTitles() {
       await launch();
       await select('Appearance');
       assert.equal(fs.readFileSync(roster, 'utf8'), '{"applets":["fixture/External"]}');
-      assert.equal(await host.getByTestId('host-language').getAttribute('aria-label'), 'Display language');
+      assert.equal(
+        await host.getByTestId('host-language').getAttribute('aria-label'),
+        'Display language',
+      );
       const base = JSON.parse(fs.readFileSync(path.join(packDirectory, 'host.json'), 'utf8'));
       assert.equal(base['appearance.theme.label'], '基本の配色');
-      await host.getByRole('combobox', { name: base['appearance.theme.label'], exact: true }).waitFor();
+      await host
+        .getByRole('combobox', { name: base['appearance.theme.label'], exact: true })
+        .waitFor();
       await stop();
       fs.renameSync(englishPack, englishPack + '.disabled');
       await launch();
       await select('表示');
       assert.equal(await host.getByTestId('host-language').inputValue(), 'en');
-      assert.equal(await host.getByTestId('host-language').locator('option[value=en]').isDisabled(), true);
+      assert.equal(
+        await host.getByTestId('host-language').locator('option[value=en]').isDisabled(),
+        true,
+      );
       assert.equal((await snapshot()).settings.value.host.language, 'en');
       await host.screenshot({ path: path.join(profile, 'translations-missing.png') });
       await host.getByTestId('host-language').selectOption('ja');
-      await until(async () => (await snapshot()).settings.value.host.language === 'ja', 'reset missing language');
+      await until(
+        async () => (await snapshot()).settings.value.host.language === 'ja',
+        'reset missing language',
+      );
       assert.deepEqual(errors, []);
-      checks.push('Partial pack discovery, live catalog and form switch, fallback, restart and removed pack');
+      checks.push(
+        'Partial pack discovery, live catalog and form switch, fallback, restart and removed pack',
+      );
       success = true;
       return;
     }
@@ -1447,7 +1471,10 @@ async function checkSectionTitles() {
     await stop();
     const shared = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile)));
     assert.equal(shared.host.showHints, false);
-    const deviceFile = require('./test-settings.cjs').file(profile, 'settings-' + require('node:os').hostname() + '.json');
+    const deviceFile = require('./test-settings.cjs').file(
+      profile,
+      'settings-' + require('node:os').hostname() + '.json',
+    );
     const device = JSON.parse(fs.readFileSync(deviceFile));
     assert.deepEqual(device.hostPages.appearance, { useLocalSettings: false });
     await launch();

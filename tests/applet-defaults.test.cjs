@@ -120,7 +120,7 @@ test('unconfigured Applets start immediately or after their delay; saved OFF nev
   });
   manager.discover();
   assert.equal(manager.snapshot().find((a) => a.id === 'fixture.direct').enabled, true);
-  assert.equal(manager.shellProviders().find((a) => a.id === 'fixture.delayed').enabled, true);
+  assert.equal(manager.snapshot().find((a) => a.id === 'fixture.delayed').enabled, true);
   await manager.reconcile();
   assert.equal(manager.items.get('fixture.direct').state, 'running');
   assert.equal(manager.items.get('fixture.delayed').state, 'waiting');

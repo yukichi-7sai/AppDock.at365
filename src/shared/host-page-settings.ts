@@ -30,7 +30,7 @@ export const updateSettingKeys = [
   'allowSameVersion',
 ] as const;
 const paths: Record<HostPageSettingsId, string[][]> = {
-  appearance: [['host', 'shellProviders']],
+  appearance: [],
   general: [],
   'text-palette': [],
   notifications: [['notificationPreferences']],

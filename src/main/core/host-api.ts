@@ -52,7 +52,6 @@ export function createHostApi(
     save: (value, revision) => settings.save(value, revision),
   }),
   typedNotifications?: () => TypedNotifications | undefined,
-  shellState?: (id: string) => import('../../shared/shell').OwnShellState | undefined,
   collectionHost?: () => import('./page-collections').PageCollectionManager,
   ribbonBadges?: import('./ribbon-badges').RibbonBadges,
   sharedDataRoot = path.join(dataRoot, 'shared'),
@@ -329,12 +328,6 @@ export function createHostApi(
         if (method === 'host.pages.hide') hideAppletPage(pageKey(id, page.id));
         else disposeAppletPage(pageKey(id, page.id));
         return null;
-      }
-      case 'host.shell.getState': {
-        requireCapability('shell');
-        if (!shellState) throw Error(hostText('services.hostApi.shellNotReady'));
-        e.shellStateRequested = true;
-        return shellState(id);
       }
       case 'host.appdock.call':
         if (!appdockCall) throw Error(hostText('services.hostApi.appdockApiNotReady'));

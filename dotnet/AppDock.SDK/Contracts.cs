@@ -12,7 +12,6 @@ public interface IPanelActionHandler
 public interface IExtensionContext
 {
     string ExtensionId { get; }
-    IShellService Shell => throw new NotSupportedException("Shell state requires AppDock 0.34.0 or later.");
     IAppDockService AppDock => throw new NotSupportedException("AppDock operations require AppDock 0.26.36 or later.");
     ICommandService Commands { get; }
     ICustomCommandService CustomCommands => throw new NotSupportedException("Custom commands require AppDock 0.60.0 or later.");
@@ -128,10 +127,3 @@ public sealed record PanelAction(string Title, string Command)
 }
 public sealed record SettingOption(string Label, string Value);
 
-public interface IShellService
-{
-    Task<OwnShellState> GetStateAsync(CancellationToken cancellationToken = default);
-    IDisposable OnChanged(Func<OwnShellState, CancellationToken, Task> handler);
-}
-public sealed record OwnShellRegionState(string Region, bool Configured, bool Resolved, bool Bound, bool Ready, bool Visible, string? Reason);
-public sealed record OwnShellState(string ContextId, long Revision, IReadOnlyList<OwnShellRegionState> Regions);

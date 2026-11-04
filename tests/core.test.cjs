@@ -48,52 +48,33 @@ test('action presentation requires a host that understands it while old declarat
     assert.deepEqual(read().settingActions, manifest.settingActions);
   }
 });
-test('Shell manifest uses trusted discovery origin, requires capability and confines its entry', (t) => {
+test('retired Shell declarations cannot change discovery origin or load their UI', (t) => {
   const dir = temporary(t);
   fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{}');
-  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html>');
   const manifest = {
     apiVersion: 1,
     id: 'appdock.default-shell',
-    name: 'Default Shell',
+    name: 'Legacy',
     version: '1.0.0',
     runtime: 'node',
     entry: 'worker.cjs',
-    capabilities: ['shell'],
-    shell: { apiVersion: 1, ui: 'index.html' },
+    capabilities: ['shell', 'settings'],
+    shell: { apiVersion: 1, ui: '../missing.html' },
     sourceKind: 'builtin',
   };
   const write = () => fs.writeFileSync(path.join(dir, 'extension.json'), JSON.stringify(manifest));
   write();
   assert.throws(() => readManifest(dir), /Reserved/);
-  assert.equal(readManifest(dir, 'builtin').sourceKind, 'builtin');
-  manifest.id = 'fixture.shell';
+  manifest.id = 'fixture.legacy';
+  manifest.commands = [{ id: 'fixture.legacy.run', title: 'Run' }];
   write();
-  assert.equal(readManifest(dir).sourceKind, 'external');
-  manifest.capabilities = [];
-  write();
-  assert.throws(() => readManifest(dir), /Invalid Shell/);
-  manifest.capabilities = ['shell'];
-  manifest.shell.apiVersion = 2;
-  write();
-  assert.throws(() => readManifest(dir), /Invalid Shell/);
-  manifest.shell.apiVersion = 1;
-  manifest.shell = { apiVersion: 1, views: { 'overlay.command-palette': 'index.html' } };
-  manifest.commands = [{ id: 'fixture.shell.run', title: 'Run' }];
-  write();
-  assert.equal(readManifest(dir).commands[0].id, 'fixture.shell.run');
-  assert.equal(readManifest(dir).shell.ui, undefined);
-  manifest.shell.views['overlay.command-palette'] = '../outside.html';
-  write();
-  assert.throws(() => readManifest(dir));
-  manifest.shell = { apiVersion: 1, views: {} };
-  write();
-  assert.throws(() => readManifest(dir), /Invalid Shell/);
-  manifest.shell = { apiVersion: 1 };
-  manifest.shell.ui = '../outside.html';
-  write();
-  assert.throws(() => readManifest(dir));
+  const parsed = readManifest(dir);
+  assert.equal(parsed.sourceKind, 'external');
+  assert.equal(parsed.shell, undefined);
+  assert.deepEqual(parsed.capabilities, ['settings']);
+  assert.equal(parsed.commands[0].id, 'fixture.legacy.run');
 });
+
 test('settings create beside selected executable directory, persist and reject stale revisions', (t) => {
   const file = path.join(temporary(t), 'settings.json');
   const store = new SettingsStore(file);

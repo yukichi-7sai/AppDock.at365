@@ -1,5 +1,5 @@
 @import './logs.css';
-@import '../../../ui/notifications/levels.css';
+@import '../notifications/levels.css';
 .notification-center {
   height: 100%;
   display: flex;

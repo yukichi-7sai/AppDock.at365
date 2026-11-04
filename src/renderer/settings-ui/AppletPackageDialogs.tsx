@@ -51,7 +51,6 @@ export function AppletUninstallDialog({
       {!!plan.siteCount && (
         <p>{t('settings.appletManagementSettings.sitesHint', { count: plan.siteCount })}</p>
       )}
-      {plan.shell && <p>{t('settings.appletManagementSettings.shellFallback')}</p>}
     </SettingsDialog>
   );
 }

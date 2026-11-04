@@ -451,8 +451,7 @@
     flex-wrap: wrap;
     gap: 12px;
   }
-  .settings-panel .setting-row > :is(input, select, textarea),
-  .settings-panel .shell-region-controls {
+  .settings-panel .setting-row > :is(input, select, textarea) {
     width: 100%;
     max-width: none;
   }
@@ -545,27 +544,12 @@
   }
 }
 
-.shell-region-controls {
-  width: 100%;
-  flex-shrink: 0;
-}
-
 .settings-surface .settings-panel:has(> .settings-sections),
 .settings-surface .settings-panel:has(> .settings-layout > .settings-sections) {
   border: 0;
   border-radius: 0;
   background: transparent;
   padding: 0 4px 20px 0;
-}
-.settings-field-control .shell-region-controls {
-  width: 100%;
-}
-.shell-region-controls select {
-  width: 100%;
-  max-width: 100%;
-}
-.shell-region-controls p {
-  overflow-wrap: anywhere;
 }
 .about-installed-version {
   display: flex;
@@ -616,9 +600,6 @@
   margin-top: 16px;
 }
 @media (max-width: 900px) {
-  .shell-region-controls {
-    width: 100%;
-  }
 }
 pre.ai-preview-result {
   white-space: pre-wrap;

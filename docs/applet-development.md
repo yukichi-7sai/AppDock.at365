@@ -4,7 +4,7 @@ GitHubで配布するAppletは `extension.json` の `updateRepository` に `owne
 
 ローカル画面のアクセント色はホストの[共通配色](appearance.md)を参照する。CSS変数を自動提供するため、Applet内にパレットや`--accent`の固定値を追加しない。警告やエラー等の意味を持つ色は分離する。
 
-リボンなどのShell領域を自作したい場合は、通常Appletに`shell` capabilityと担当領域の`shell.views`を追加します。Shell Appletは通常のコマンド・設定・ページも併用でき、未実装の領域はDefault Shellが担当します。宣言例と自己設定/コマンドの利用は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください（minimumHostVersion 0.26.41）。
+本体のリボン・バー・通知の描画差し替えは提供しません。通常Appletは公開されたコマンド・設定・ページ・通知APIを使用します。
 
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。
 
@@ -165,7 +165,7 @@ Watchは独自のWPFウィンドウで時計を描画し、配置とフォント
 
 ## 6. ビルド・配置・検証する
 
-ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で有効です。未保存時の判定は起動・開始待ち・再起動・Shell/コマンドの利用可否・設定画面で共用し、保存済みのOFFを上書きしません。他のAppletと重複しないIDを使います。
+ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で有効です。未保存時の判定は起動・開始待ち・再起動・コマンドの利用可否・設定画面で共用し、保存済みのOFFを上書きしません。他のAppletと重複しないIDを使います。
 
 時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)は、native EXEとmanifestを発行し、AppDockの設定を変更しない例です。配置前に対象のAppDockを終了してください。[WebBrowserToolsの開発ガイド](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md)も参照できます。既存Watch等の実行中出力やソースには上書きしません。
 
@@ -237,7 +237,7 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
 
-ログは本体の共通ページを使う。Shell対象と追加条件は[Shell基盤](shell-foundation.md)、本体ページの構成は[本体のページ表示](host-pages.md)を参照する。
+ログは本体の共通ページを使う。本体UIの構成は[本体の画面構成](workspace-ui.md)、本体ページの構成は[本体のページ表示](host-pages.md)を参照する。
 
 ## 通知種類の宣言と設定
 

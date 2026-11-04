@@ -1,5 +1,4 @@
 import { hostText } from '../../shared/i18n';
-import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   BrowserWindow,
   ipcMain,
@@ -9,9 +8,8 @@ import {
   type WebContentsView,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { shellView, type ShellRegion } from '../../shared/shell';
 import type { OverlayController } from './overlay-controller';
-import { createLocalView, createShellView } from './shell-view';
+import { createLocalView } from './local-view';
 
 type Surface = {
   view: WebContentsView;
@@ -20,19 +18,14 @@ type Surface = {
   ready: boolean;
   revision: number;
   timer: ReturnType<typeof setTimeout>;
-  settingsSignature?: string;
 } & (
   | { kind: 'command-palette' }
   | {
       kind: 'ribbon-group';
-      region: 'ribbon';
-      provider: string;
-      version: string;
-      generation?: string;
     }
 );
 
-/** One modal lane; the fixed palette and Shell-owned ribbon groups share native layering. */
+/** One modal lane; the fixed palette and host-owned ribbon groups share native layering. */
 export class OverlayHost {
   private current?: OverlayController;
   private surface?: Surface;
@@ -46,12 +39,10 @@ export class OverlayHost {
     private options: {
       window: BrowserWindow;
       preload: string;
+      uiFolder: string;
+      ribbonReady(): boolean;
       palette: { folder: string; entry: string; preload: string };
-      providers(): ShellProvider[];
-      registry: ShellProviderRegistry;
       route(): string;
-      execute(provider: string, command: string): Promise<unknown>;
-      settings(provider: string): Record<string, unknown>;
       changed(): void;
       failed(message: string): void;
       shortcut?(input: Electron.Input): boolean;
@@ -67,7 +58,6 @@ export class OverlayHost {
         const s = this.bound(event, kind);
         return {
           sessionId: s.session,
-          ...(s.kind === 'ribbon-group' ? { providerAppletId: s.provider } : {}),
           snapshot: this.current!.snapshot(),
         };
       });
@@ -93,16 +83,6 @@ export class OverlayHost {
         return this.current!.act(action);
       });
     }
-    ipcMain.handle('overlay:executeCommand', (event, command) => {
-      const s = this.bound(event, 'ribbon-group');
-      if (!s.ready || s.kind !== 'ribbon-group') throw Error('Overlay is not ready');
-      return options.execute(s.provider, command);
-    });
-    ipcMain.handle('overlay:getSettings', (event) => {
-      const s = this.bound(event, 'ribbon-group');
-      if (s.kind !== 'ribbon-group') throw Error('Invalid overlay');
-      return options.settings(s.provider);
-    });
     ipcMain.handle('overlay:asset', (event, id) => {
       this.bound(event, 'ribbon-group');
       return options.asset?.(id);
@@ -120,7 +100,7 @@ export class OverlayHost {
     options.window.once('closed', () => this.dispose());
   }
   private usable(s: Surface) {
-    return s.kind === 'command-palette' || this.options.registry.usable('ribbon', s);
+    return s.kind === 'command-palette' || this.options.ribbonReady();
   }
   private bound(event: IpcMainInvokeEvent, kind: Surface['kind']) {
     const s = this.surface;
@@ -203,9 +183,6 @@ export class OverlayHost {
   cancelRibbon(reason = 'source-changed') {
     if (this.kind === 'ribbon-group') this.cancel(reason);
   }
-  retry(region?: ShellRegion) {
-    this.options.registry.retry(region ?? 'ribbon');
-  }
   private present() {
     const controller = this.current;
     if (!controller) return;
@@ -239,24 +216,17 @@ export class OverlayHost {
           timer: undefined!,
         };
       } else {
-        const provider = this.options
-          .providers()
-          .find((p) => p.id === this.options.registry.region('ribbon').boundProvider);
-        if (!provider) {
+        if (!this.options.ribbonReady()) {
           this.cancel('ribbon-unavailable');
           return;
         }
-        const { view, url } = createShellView(
-          provider.folder,
-          shellView(provider.shell, 'ribbon')!,
+        const { view, url } = createLocalView(
+          this.options.uiFolder,
+          'index.html',
           this.options.preload,
         );
         s = {
           kind: 'ribbon-group',
-          region: 'ribbon',
-          provider: provider.id,
-          version: provider.version,
-          generation: provider.generation,
           view,
           url,
           session: randomUUID(),
@@ -301,8 +271,6 @@ export class OverlayHost {
     }
     if ((s && s !== this.surface) || !this.current) return;
     const palette = this.current.kind === 'command-palette';
-    if (!palette && s?.kind === 'ribbon-group')
-      this.options.registry.fail('ribbon', s.provider, s.version);
     this.closeSurface();
     if (palette && this.paletteRecoveries++ === 0) {
       this.present();
@@ -316,7 +284,6 @@ export class OverlayHost {
     this.surface = undefined;
     if (!s) return;
     clearTimeout(s.timer);
-    if (s.kind === 'ribbon-group') this.options.registry.touch();
     if (
       reuse &&
       s.kind === 'command-palette' &&
@@ -359,7 +326,6 @@ export class OverlayHost {
       });
     } else {
       s.view.setBounds({ x: 0, y: 0, width: Math.max(1, width), height: Math.max(1, height) });
-      this.options.registry.touch();
     }
     s.view.webContents.setZoomFactor(zoom);
     s.view.setVisible(true);
@@ -378,13 +344,6 @@ export class OverlayHost {
     }
     const model = this.current.snapshot();
     if (!this.current || this.surface !== s) return;
-    if (s.kind === 'ribbon-group') {
-      const signature = JSON.stringify(this.options.settings(s.provider));
-      if (s.ready && s.settingsSignature !== signature) {
-        s.settingsSignature = signature;
-        s.view.webContents.send('overlay:settingsChanged');
-      }
-    }
     if (s.ready && s.revision !== model.revision) {
       s.revision = model.revision;
       s.view.webContents.send(
@@ -402,7 +361,6 @@ export class OverlayHost {
     this.cached = undefined;
     for (const prefix of ['palette', 'overlay'])
       for (const name of ['connect', 'ready', 'act']) ipcMain.removeHandler(`${prefix}:${name}`);
-    for (const name of ['executeCommand', 'getSettings', 'asset'])
-      ipcMain.removeHandler(`overlay:${name}`);
+    for (const name of ['asset']) ipcMain.removeHandler(`overlay:${name}`);
   }
 }

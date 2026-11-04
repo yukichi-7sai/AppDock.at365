@@ -41,7 +41,12 @@ test('overlay background defaults to transparent, persists all choices and rejec
     settings.host.overlayBackground = value;
     assert.equal(parseSettings(settingsStorageValue(settings)).host.overlayBackground, value);
     const page = settingsCatalog([], settings).find((page) => page.id === 'appearance');
-    const applied = applySettingsJson(settings, page, [], JSON.stringify({ host: { overlayBackground: value } }));
+    const applied = applySettingsJson(
+      settings,
+      page,
+      [],
+      JSON.stringify({ host: { overlayBackground: value } }),
+    );
     assert.equal(applied.host.overlayBackground, value);
     assert.equal(resetSettingsPage(applied, page, []).host.overlayBackground, 'transparent');
   }
@@ -95,16 +100,20 @@ test('shadow preferences default on, persist independently and reset only with t
   }
 });
 test('all palettes provide readable accent text, soft selections and filled/hovered controls in both themes', () => {
+  const catalog = require('../resources/configs/accent-color.json');
   assert.deepEqual(
-    accentChoices.map((palette) => palette.title),
-    ['ミント', 'アリス', 'ワンダーランド', 'マジカント', 'クッキー', 'カスタム'],
+    accentChoices.map((p) => p.id),
+    [...catalog.presets.filter((p) => !p.hidden).map((p) => p.id), 'custom'],
   );
   for (const palette of allAccentPalettes)
     for (const dark of [false, true]) {
       const { colors } = resolveAppearance(palette.id, dark);
       const [accent, soft] = palette[dark ? 'dark' : 'light'];
-      assert.equal(colors.accent, accent);
-      assert.equal(colors.soft, soft);
+      const tone = catalog.presets.find((p) => p.id === palette.id)[dark ? 'dark' : 'light'];
+      if (!tone.autoContrast) {
+        assert.equal(colors.accent, accent);
+        assert.equal(colors.soft, soft);
+      }
       for (const [a, b] of [
         [colors.accent, colors.soft],
         [colors.accent, colors.text],
@@ -205,7 +214,10 @@ test('custom and legacy colors round-trip without conversion, validate HEX and e
   assert.equal(parseSettings(next).host.customAccentDark, '#AABBCC');
   next.host.accentColor = 'sky-blue';
   assert.equal(parseSettings(next).host.accentColor, 'sky-blue');
-  assert.equal(resolveAppearance('sky-blue', false).colors.accent, '#036a91');
+  assert.equal(
+    resolveAppearance('sky-blue', false).palette,
+    require('../resources/configs/accent-color.json').defaultId,
+  );
   const definitions = require('../out/main/shared/settings-commands').hostSettingDefinitions;
   assert(
     definitions.find((f) => f.key === 'accentColor').options.some((o) => o.value === 'custom'),
@@ -240,8 +252,13 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   host.registerAppearance(contents, contents.getURL());
   const event = { sender: contents, senderFrame: contents.mainFrame };
   assert.equal(handler(event).palette, 'mint');
-  assert.deepEqual(handler(event, 'accent-colors'), require('../resources/configs/accent-color.json'));
-  assert.throws(() => handler({ ...event, senderFrame: { url: contents.getURL() } }, 'accent-colors'));
+  assert.deepEqual(
+    handler(event, 'accent-colors'),
+    require('../resources/configs/accent-color.json'),
+  );
+  assert.throws(() =>
+    handler({ ...event, senderFrame: { url: contents.getURL() } }, 'accent-colors'),
+  );
   assert.throws(() => handler({ ...event, senderFrame: { url: contents.getURL() } }));
   assert.throws(() => host.registerAppearance(new EventEmitter(), 'https://example.com/'));
   host.refreshAppearance();
@@ -356,18 +373,25 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
     }
   }
   for (const [index, overlayBackground] of ['transparent', 'blur'].entries()) {
-    ipc.emit('appearance:changed', {}, {
-      ...resolveAppearance('mint', false, 7 + index),
-      overlayBackground,
-    });
+    ipc.emit(
+      'appearance:changed',
+      {},
+      {
+        ...resolveAppearance('mint', false, 7 + index),
+        overlayBackground,
+      },
+    );
     assert.equal(root['--appdock-overlay-background'], 'transparent');
     assert.equal(body['--appdock-overlay-background'], 'transparent');
-    assert.equal(root['--appdock-overlay-filter'], overlayBackground === 'blur' ? 'blur(2px)' : 'none');
+    assert.equal(
+      root['--appdock-overlay-filter'],
+      overlayBackground === 'blur' ? 'blur(2px)' : 'none',
+    );
   }
   for (const name of [
     'preload',
-    'shell-preload',
-    'shell-bar-preload',
+    'ribbon-preload',
+    'window-bar-preload',
     'overlay-preload',
     'command-palette-preload',
     'notification-surface-preload',

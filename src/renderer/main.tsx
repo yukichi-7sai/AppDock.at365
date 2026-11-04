@@ -5,7 +5,7 @@ import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/Registe
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { HostPageSlot } from './pages/HostPageSlot';
 import { ImageLibraryDialogProvider } from './ImageLibraryDialogHost';
-import { ShellBarSlot } from './ShellBarSlot';
+import { WindowBarSlot } from './WindowBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import type { SettingsIndexModel } from '../shared/settings-page';
 import { Icon } from './Icon';
@@ -100,7 +100,7 @@ function App() {
   const ribbonSlot = useRef<HTMLDivElement>(null);
   useEffect(
     () =>
-      window.dock.onShellFocusHost((edge) => {
+      window.dock.onRibbonFocusHost((edge) => {
         const selector =
           edge === 'before'
             ? '.shell-bar-slot[data-region="titlebar"]'
@@ -155,7 +155,7 @@ function App() {
     const update = () => {
       const r = ribbonSlot.current?.getBoundingClientRect();
       void window.dock
-        .shellViewport(
+        .ribbonViewport(
           r
             ? {
                 x: Math.round(r.x),
@@ -412,7 +412,7 @@ function App() {
         } as React.CSSProperties
       }
     >
-      <ShellBarSlot region="titlebar" />
+      <WindowBarSlot region="titlebar" />
       <div
         className="shell-ribbon-slot"
         ref={ribbonSlot}
@@ -425,7 +425,7 @@ function App() {
             !!(
               from.compareDocumentPosition(event.currentTarget) & Node.DOCUMENT_POSITION_FOLLOWING
             );
-          void window.dock.focusShell(before ? 'first' : 'last');
+          void window.dock.focusRibbon(before ? 'first' : 'last');
         }}
       />
       <main
@@ -443,14 +443,6 @@ function App() {
               : undefined
         }
       >
-        {snapshot?.shell.error && (
-          <div className="error-banner" role="alert">
-            Shellの起動または切替に失敗しました。
-            <button onClick={() => void action(() => window.dock.retryShell())}>
-              Shellを再試行
-            </button>
-          </div>
-        )}
         {error && (
           <div className="error-banner" role="alert">
             {error}
@@ -545,20 +537,24 @@ function App() {
           </div>
         )}
       </main>
-      {snapshot?.settings.value.host.showStatusBar !== false && <ShellBarSlot region="statusbar" />}
+      {snapshot?.settings.value.host.showStatusBar !== false && (
+        <WindowBarSlot region="statusbar" />
+      )}
     </div>
   );
 }
 createRoot(document.getElementById('root')!).render(
-  <HostTranslationProvider><SettingsControlsProvider api={window.dock}>
-    <RegisteredImagesProvider api={window.dock.imageLibrary}>
-      <ImageLibraryDialogProvider>
-        <App />
-        <ImagePickerHost />
-        <RegisteredImagesProvider api={window.dock.soundLibrary}>
+  <HostTranslationProvider>
+    <SettingsControlsProvider api={window.dock}>
+      <RegisteredImagesProvider api={window.dock.imageLibrary}>
+        <ImageLibraryDialogProvider>
+          <App />
           <ImagePickerHost />
-        </RegisteredImagesProvider>
-      </ImageLibraryDialogProvider>
-    </RegisteredImagesProvider>
-  </SettingsControlsProvider></HostTranslationProvider>,
+          <RegisteredImagesProvider api={window.dock.soundLibrary}>
+            <ImagePickerHost />
+          </RegisteredImagesProvider>
+        </ImageLibraryDialogProvider>
+      </RegisteredImagesProvider>
+    </SettingsControlsProvider>
+  </HostTranslationProvider>,
 );

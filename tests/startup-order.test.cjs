@@ -1,77 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { startupShellIds, StartupUiBarrier } = require('../out/main/main/core/startup');
-const { defaultShellId, shellRegions } = require('../out/main/shared/shell');
-const provider = (id, extra = {}) => ({
-  id,
-  enabled: true,
-  sourceKind: 'external',
-  shell: {
-    apiVersion: 1,
-    views: Object.fromEntries(shellRegions.map((r) => [r.id, 'index.html'])),
-  },
-  ...extra,
-});
-
-test('initial priority deduplicates only enabled configured Shell providers and always includes Default Shell', () => {
-  const providers = [
-    provider('unused'),
-    provider('selected'),
-    provider('disabled', { enabled: false }),
-    provider('regular', { shell: undefined }),
-    provider('partial', { shell: { apiVersion: 1, views: { ribbon: 'ribbon.html' } } }),
-  ];
-  const assignments = {
-    titlebar: 'selected',
-    ribbon: 'selected',
-    statusbar: 'partial',
-    'notification.banner': 'disabled',
-    'notification.desktop': 'regular',
-    'overlay.command-palette': 'missing',
-    'page.settings': 'unused',
-  };
-  const before = structuredClone({ providers, assignments });
-  assert.deepEqual(
-    [...startupShellIds(providers, assignments, false)],
-    [defaultShellId, 'selected'],
-  );
-  assert.deepEqual({ providers, assignments }, before);
-});
-
-test('different current regions can prioritize different workers without adding unselected Shells', () => {
-  const providers = [
-    provider('bars'),
-    provider('ribbon'),
-    provider('notification'),
-    provider('unused'),
-  ];
-  assert.deepEqual(
-    [
-      ...startupShellIds(
-        providers,
-        {
-          titlebar: 'bars',
-          statusbar: 'bars',
-          ribbon: 'ribbon',
-          'notification.desktop': 'notification',
-        },
-        false,
-      ),
-    ],
-    [defaultShellId, 'bars', 'ribbon', 'notification'],
-  );
-});
-
-test('safe mode and no selection keep only Default Shell ahead of the window', () => {
-  const providers = [provider('selected')];
-  assert.deepEqual([...startupShellIds(providers, { ribbon: 'selected' }, true)], [defaultShellId]);
-  assert.deepEqual([...startupShellIds(providers, {}, false)], [defaultShellId]);
-});
-
-test('initial presentation needs both mounted host content and ready Shell views', async () => {
-  let shellsReady = false,
+const { StartupUiBarrier } = require('../out/main/main/core/startup');
+test('initial presentation needs both mounted host content and ready host surfaces', async () => {
+  let surfacesReady = false,
     settled = false;
-  const ui = new StartupUiBarrier(() => shellsReady);
+  const ui = new StartupUiBarrier(() => surfacesReady);
   const pending = ui.wait().then((value) => {
     settled = true;
     return value;
@@ -79,22 +12,22 @@ test('initial presentation needs both mounted host content and ready Shell views
   ui.rendererReady();
   await Promise.resolve();
   assert.equal(settled, false);
-  shellsReady = true;
+  surfacesReady = true;
   ui.check();
   assert.equal(await pending, true);
 });
 
 test('a renderer reload invalidates an old content-ready acknowledgement', async () => {
-  let shellsReady = false,
+  let surfacesReady = false,
     settled = false;
-  const ui = new StartupUiBarrier(() => shellsReady);
+  const ui = new StartupUiBarrier(() => surfacesReady);
   ui.rendererReady();
   ui.resetRenderer();
   const pending = ui.wait().then((value) => {
     settled = true;
     return value;
   });
-  shellsReady = true;
+  surfacesReady = true;
   ui.check();
   await Promise.resolve();
   assert.equal(settled, false);
@@ -121,7 +54,7 @@ test('missing presentation acknowledgement has a bounded wait', async (t) => {
   assert.equal(await pending, false);
 });
 
-test('completed presentation does not keep querying Shell readiness on later UI updates', async () => {
+test('completed presentation does not keep querying surface readiness on later UI updates', async () => {
   let queries = 0;
   const ui = new StartupUiBarrier(() => {
     queries++;

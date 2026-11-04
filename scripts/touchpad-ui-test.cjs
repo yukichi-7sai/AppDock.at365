@@ -40,7 +40,10 @@ settings.notificationPreferences = {
     },
   ],
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const portable = !!process.argv[2],
   executable = portable ? testHostPath(profile) : require('electron'),
   hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
@@ -156,7 +159,7 @@ const checks = [];
       for (const surface of browser
         .contexts()
         .flatMap((context) => context.pages())
-        .filter((page) => page.url().endsWith('/shells/default/notifications.html'))) {
+        .filter((page) => page.url().endsWith('/renderer/workspace/notifications.html'))) {
         const model = await surface.evaluate(() => window.appdockNotifications.connect());
         const matches = model.snapshot.items.filter(
           (item) => item.ownerId === 'errors' && item.body.includes('TOUCHPAD_KEY_CONFLICT'),

@@ -132,10 +132,7 @@ async function dismissAll() {
   const b = await banner();
   if (!b.page || !b.model.items.length) return;
   await until(async () => {
-    const state = (await snapshot()).shellRegions.regions.find(
-      (r) => r.region === 'notification.banner',
-    );
-    return state?.ready && state.visible;
+    return await b.page.getByRole('region').first().isVisible();
   }, 'notification banner ready for dismissal');
   await b.page.evaluate(async () => {
     const c = await window.appdockNotifications.connect();

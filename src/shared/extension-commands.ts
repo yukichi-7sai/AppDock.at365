@@ -1,6 +1,5 @@
 import { hostText } from './i18n';
 import { commandCategory } from './command-category';
-import { isRetiredShellRegion, isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
 import { customDescription } from './custom-commands';
 
@@ -21,18 +20,6 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
       typeof declaration.activateOnExecute !== 'boolean'
     )
       throw new Error(hostText('services.sharedExtensionCommands.invalidActivation'));
-    const requirement = declaration.shellRequirement;
-    if (
-      requirement !== undefined &&
-      (!requirement ||
-        typeof requirement !== 'object' ||
-        Array.isArray(requirement) ||
-        Object.keys(requirement).some((k) => !['region', 'state'].includes(k)) ||
-        (!isShellRegion((requirement as any).region) &&
-          !isRetiredShellRegion((requirement as any).region)) ||
-        !['resolved', 'visible'].includes((requirement as any).state))
-    )
-      throw Error(hostText('services.sharedExtensionCommands.invalidShellRequirement'));
     const aliases = declaration.aliases;
     if (aliases !== undefined) {
       if (!Array.isArray(aliases) || aliases.length > 8)
@@ -50,8 +37,8 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
     }
     return {
       ...command,
-      ...(requirement
-        ? { shellRequirement: requirement as import('./shell').ShellRequirement }
+      ...(Object.hasOwn(declaration, 'shellRequirement')
+        ? { retiredShellCommand: true as const }
         : {}),
       ...(declaration.automation !== undefined
         ? { automation: declaration.automation as boolean }

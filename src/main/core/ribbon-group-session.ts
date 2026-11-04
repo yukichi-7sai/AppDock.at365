@@ -5,7 +5,7 @@ import type { UiPresentation } from './ui-presentation';
 import type { RibbonAnchor } from '../../shared/ribbon';
 import type { OverlayAction, RibbonGroupModel } from '../../shared/overlays';
 
-/** One temporary group, bound to the source Shell and its exact visible membership. */
+/** One temporary group, bound to the source ribbon and its exact visible membership. */
 export class RibbonGroupSession implements OverlayController {
   readonly id = randomUUID();
   readonly kind = 'ribbon-group';

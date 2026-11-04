@@ -10,7 +10,7 @@
 
 本体の共通設定画面は、MCPへ公開していない設定だけに南京錠を表示する。明示非公開・secret/localOnly、公開する定義や所有adapterがない項目が対象。項目ごとのアイコン表示フラグや保存設定は持たず、同じ設定ownerの公開定義から内部メタデータを生成する。MCP連携のON/OFF、接続、変更許可、Appletの稼働、起動・保存の準備状態には依存しない。南京錠は画面からの直接編集を禁止しない。
 
-UIとの対応はownerの`ui`で安定したページID・設定キーを結びつける。通常の本体/Applet設定、Applet共通設定、Shell領域、ジェスチャー共通設定は既存の宣言から生成するため、同じ宣言に追加した項目へ自動で追従する。専用の編集画面は、その保存ownerと既存APIの入力定義へ設定IDを接続する。画面の見出し文字列やDOMの入力形式から公開可否を推測しない。従来の入力・トレイ・リボン・カスタムコマンド編集も、対応する既存APIの定義を使用する。
+UIとの対応はownerの`ui`で安定したページID・設定キーを結びつける。通常の本体/Applet設定、Applet共通設定、ジェスチャー共通設定は既存の宣言から生成するため、同じ宣言に追加した項目へ自動で追従する。専用の編集画面は、その保存ownerと既存APIの入力定義へ設定IDを接続する。画面の見出し文字列やDOMの入力形式から公開可否を推測しない。従来の入力・トレイ・リボン・カスタムコマンド編集も、対応する既存APIの定義を使用する。
 
 公開済みの読み取り専用IDや、認証との結び付きにより変更が制限された公開フィールドにも南京錠を付けない。このマークは公開の有無だけを表し、現在の書込み可否は表さない。行ごとの値・ID、available/writable、itemWritableをアイコン判定のために読み取らない。実際の変更はSchemaと所有サービスが従来どおり拒否できる。説明は共通ポップオーバーで表示し、ヒントOFFでもキーボードから確認できる。新しいMCPツール、操作許可、保存キー/ファイルは追加しない。
 
@@ -20,7 +20,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 
 本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/select/registered-imageは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listとshortcut-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listやregistered-imageも列の値として編集できる。自由JSONと未対応の専用サービスは、adapterを実装する後続範囲。
 
-通知・AI/TTS・MCP接続・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
+通知・AI/TTS・MCP接続・更新の通常設定も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
 | 対象                 | 公開する設定                                                                                             |
 | -------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -34,7 +34,6 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 | 通知種類ごと         | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない               |
 | 本体の更新設定       | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可                             |
 | Appletの更新元       | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外               |
-| Shell選択            | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成                        |
 | Windows起動設定      | サインイン時の登録と管理者起動。PC専用保存と既存のWindows登録トランザクションを使用                      |
 | Applet共通設定       | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成                  |
 | Applet管理順序       | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない                |
@@ -50,7 +49,7 @@ AI接続は所有サービスが必須値を具体的に保存するため、inh
 
 通知の必須通知先・許可された通知先・表示時間の型/範囲・固定寿命を既存の通知編集と同じ検証へ渡す。表示時間は整数またはnull（手動で閉じるまで）で、固定寿命の種類は変更できず、古い上書きのresetだけを受け付ける。指定した上書きだけを解除し、何も残らなければその種類の上書き行を除去する。停止中の提供元も通知設定の保存で起動しない。通知規則や音声継承元の変更はschemaRevisionへ反映する。
 
-本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・MCP公開は同じ登録を使い、保存先は[設定同期](settings-sync.md#本体5ページの保存先選択)のページ別選択に従う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・Shell・トレイ割当は、通常設定の登録へ混ぜない。
+本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・MCP公開は同じ登録を使い、保存先は[設定同期](settings-sync.md#本体5ページの保存先選択)のページ別選択に従う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・トレイ割当は、通常設定の登録へ混ぜない。
 
 Appletのホスト管理共通項目は[src/shared/applet-common-settings.ts](../src/shared/applet-common-settings.ts)のappletCommonSettingDeclarationsへ定義する。boolean/number/string/selectは、この1か所から型、共通設定画面、既定値、入力検証、検索カタログ、部分JSON、共有/PC専用の保存とMCP投影を生成する。通常項目を追加するときにMCP用のフィールド表や外側のツールSchemaを変更する必要はない。公開判定は同じautomation/secret/localOnlyを使用する。fromManifestを指定した項目はApplet側の同名プロパティを既定値に使い、その検証も同じ定義へ接続する。専用の寿命処理・OS操作・認証編集や複雑な入力は、その所有サービスとの接続を実装する。
 
@@ -194,7 +193,7 @@ startupDelaySecondsのappliesはappletStartupScheduleChanged。実行中のworke
 
 ## Applet管理の表示順
 
-kind=list、category=applet-managementで、現在の管理対象パッケージのid/nameを読取り専用の列として返す。組込みDefault Shellとcollectionの子ページは管理行へ含めない。追加・部分編集・削除は提供せず、全行のitemRefを指定するreorderだけを受け付ける。同名でもidとitemRefで区別する。導入・削除はローカルのパッケージ操作を使う。
+kind=list、category=applet-managementで、現在の管理対象パッケージのid/nameを読取り専用の列として返す。collectionの子ページは管理行へ含めない。追加・部分編集・削除は提供せず、全行のitemRefを指定するreorderだけを受け付ける。同名でもidとitemRefで区別する。導入・削除はローカルのパッケージ操作を使う。
 
 既存UIと同じmanagedApplets/reorderManagedAppletsを使い、共有appletOrderの管理対象が占める位置だけを入れ替える。未導入ID、子ページIDと組込みの保存位置・相互順序を保ち、未記録の検出済みIDは通常の順で補う。PC専用の有効状態・設定、起動順、入力割当の実行順、リボン配置を変更しない。提供元の増減はschemaRevisionへ反映し、順序・行・保存状態が変われば古いitemRefとrevisionを拒否する。
 
@@ -242,15 +241,7 @@ read + writeで変更し、execute/sendInput/runProcessesを追加条件にし�
 
 appliesはstartAtLogonがlogonTaskRegistration、runAsAdministratorがnextStartAndLogonTask。effectVerifiedはfalseで、サインインによる実起動や現在のトークン変更を保証しない。値と保存上書きの状態に変更がないsetは保存・OS登録の再同期を行わない。Highest登録の変更等で必要になるUACは既存の同一ユーザー用ヘルパーだけを使い、自動承認しない。取消はCANCELLED、登録等の失敗はAPPLY_FAILED、保存失敗はSAVE_FAILED。復元不能ならLOCAL_ACTION_REQUIREDとなり、以後はローカルの復旧を必要とする。管理者再起動・復旧実行・任意EXE/スクリプトの操作はこの対象へ追加しない。詳細は[Windows起動設定](launch-settings.md)を参照する。
 
-## Shell選択
-
-Shellのfields対象は[src/shared/shell.ts](../src/shared/shell.ts)のshellRegionsを列挙し、領域IDをそのままkeyにする。`notification.banner`等のドットもIDの一部であり、入れ子のパスとして解釈しない。ShellRegion型も同じ一覧から導出する。本体の領域定義を追加・削除しても、MCP専用の項目一覧や外側のツールSchemaは変更せず、現在のSchemaを再取得して利用する。今回新たなShell領域は追加しない。
-
-select候補はDefault Shellと、現在その領域のviewを宣言するApplet。設定画面と同じshellProviderCandidatesを使用し、名前が重なる場合も提供元IDで区別する。停止・無効の提供元も指定できるが、選択によって有効化・起動しない。候補の追加・削除、名前や有効状態の表示変更はschemaRevisionへ反映し、古いSchemaを使う要求や続きを拒否する。
-
-値は保存された指定を返し、実際に描画している提供元とは区別する。候補や領域がなくなっても保存値を消さず、他の領域の編集では保持する。現行の領域だけを読み書きし、未登録・廃止領域の直接指定はNOT_FOUND。現在の候補にない提供元への新しい指定はINVALID_ARGUMENTとし、既存指定はresetでDefault Shellへ戻せる。resetと既定値のsetは、その領域の保存上書きを除去する。
-
-保存は既存UIと同じPC専用settings-<端末名>.jsonへ行い、共有設定・他の端末の指定・Applet固有設定・暗号化情報を変更しない。read + writeを使い、executeやApplet管理の許可は追加条件にしない。dryRunは保存・切替を行わず、保存完了のeffectVerifiedはfalse。appliesはshellProvidersChangedであり、通常の設定変更通知を既存Shell Hostが適用する。バー/リボンのready待ち、開いているオーバーレイの次回適用、通知の寿命保持、領域別フォールバックとsafe-shellは[Shell基盤](shell-foundation.md)に従う。再試行・再起動・有効化の操作は設定APIへ追加しない。
+Shell選択のservice.shellは廃止しています。対象一覧とschemaには公開しません。
 
 ## 変更とリセット
 

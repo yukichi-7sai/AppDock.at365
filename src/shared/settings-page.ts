@@ -111,7 +111,6 @@ export interface SettingsPageAuxiliary {
     voiceListRevision: number;
     jobs: import('./tts').TtsJob[];
   };
-  shellRegions?: import('./shell').ShellRegionsSnapshot;
   notificationTypes?: import('./notification-types').NotificationTypeEntry[];
   applets?: ExtensionSnapshot[];
   commands?: UiCommand[];
@@ -146,7 +145,7 @@ export type SettingsPageOperation =
   | { kind: 'search'; text: string }
   | { kind: 'move'; itemId: string }
   | { kind: 'moved'; requestId: string; pageId: string };
-/** UI selection state lives for the primary context, independently of a Shell View. */
+/** UI selection state lives for the primary context, independently of a native View. */
 export interface SettingsNavigationState {
   query: string;
   provider?: { id: string; page: 'command-triggers'; request: number };

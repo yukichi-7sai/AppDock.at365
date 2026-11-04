@@ -89,26 +89,10 @@ fs.writeFileSync(
   }),
 );
 settings.updates.hostSource = hostFeed;
-for (const [id, views] of [
-  ['fixture.bars-a', { titlebar: 'bars.html', statusbar: 'bars.html' }],
-  ['fixture.bars-b', { statusbar: 'bars.html' }],
-  ['fixture.bars-stalled', { titlebar: 'stalled.html' }],
-]) {
-  const folder = path.join(profile, 'extensions', id);
-  fs.cpSync(path.join(root, 'out/shells/default'), folder, { recursive: true });
-  const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'extension.json')));
-  Object.assign(manifest, {
-    id,
-    name: id,
-    version: '1.0.0',
-    minimumHostVersion: '0.64.0',
-    shell: { apiVersion: 1, views },
-  });
-  fs.writeFileSync(path.join(folder, 'extension.json'), JSON.stringify(manifest));
-  fs.writeFileSync(path.join(folder, 'stalled.html'), '<!doctype html><body>Not ready</body>');
-  settings.extensions[id] = { enabled: true, settings: { fixture: id } };
-}
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const result = { profile, notificationsOnly, visibilityOnly, success: false, checks: [] };
@@ -132,17 +116,13 @@ const main = (fn, arg) =>
         mainPort,
         `(${fn.toString()})(${electronExpression},${JSON.stringify(arg) ?? 'undefined'})`,
       );
-const state = (region) =>
-  host.evaluate(
-    async (region) =>
-      (await window.dock.snapshot()).shellRegions.regions.find((r) => r.region === region),
-    region,
-  );
-const assigned = async (region, provider) =>
-  until(async () => {
-    const current = await state(region);
-    return current.boundProvider === provider && current.ready && current;
-  }, `${region} provider ${provider}`);
+const state = async (region) => ({
+  visible: await (
+    await barPage(host, region)
+  )
+    .locator(region === 'titlebar' ? 'header' : 'footer')
+    .isVisible(),
+});
 const save = (patch) =>
   host.evaluate(async (patch) => {
     const s = await window.dock.snapshot();
@@ -151,12 +131,6 @@ const save = (patch) =>
       s.settings.revision,
     );
   }, patch);
-const assign = async (providers) => {
-  const current = await host.evaluate(
-    async () => (await window.dock.snapshot()).settings.value.host.shellProviders,
-  );
-  await save({ shellProviders: { ...current, ...providers } });
-};
 const capture = async (name) => {
   const image = await main(async ({ BrowserWindow, desktopCapturer }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
@@ -239,7 +213,6 @@ async function close() {
         host: () => host,
         state,
         save,
-        assign,
         launch,
         close,
         main,
@@ -381,12 +354,11 @@ async function close() {
       result.success = true;
       return;
     }
-    const defaultId = 'appdock.default-shell';
     assert.equal(await host.locator('header.titlebar, footer.statusbar').count(), 0);
     assert.equal(await title.evaluate(() => typeof window.dock), 'undefined');
     assert.equal(await status.evaluate(() => typeof require), 'undefined');
     const initialStatus = await status.evaluate(() => window.appdockBar.connect());
-    assert(initialStatus.snapshot.runningApplets >= 3);
+    assert.equal(initialStatus.snapshot.runningApplets, 0);
     await status.getByRole('button', { name: 'AppDockを更新', exact: true }).click();
     if (!portable) {
       await status.getByRole('alert').waitFor();
@@ -530,7 +502,7 @@ async function close() {
     }, 'native titlebar drag moves the window');
     result.drag = { before: drag.before, after };
     result.checks.push(
-      'native minimize/maximize/restore and real Windows mouse dragging through the Shell titlebar',
+      'native minimize/maximize/restore and real Windows mouse dragging through the host titlebar',
     );
     if (process.argv.includes('--controls-only')) {
       await closingAction(title.getByRole('button', { name: '閉じる', exact: true }).click());
@@ -623,124 +595,6 @@ async function close() {
     result.checks.push(
       'light/dark and 900/1280px plus 125% zoom preserve bar bounds and window controls',
     );
-    await host.evaluate(() => window.dock.navigate('settings'));
-    await host.getByTestId('settings-nav:appearance').click();
-    await host.getByLabel('タイトルバーのShell', { exact: true }).selectOption('fixture.bars-a');
-    await assigned('titlebar', 'fixture.bars-a');
-    await assigned('statusbar', defaultId);
-    await host.getByLabel('ステータスバーのShell', { exact: true }).selectOption('fixture.bars-b');
-    await assigned('statusbar', 'fixture.bars-b');
-    title = await barPage(host, 'titlebar');
-    status = await barPage(host, 'statusbar');
-    assert.equal(
-      (await title.evaluate(() => window.appdockBar.getSettings())).fixture,
-      'fixture.bars-a',
-    );
-    const retainedStatus = await status.evaluate(() => window.appdockBar.connect());
-    await title.getByRole('button', { name: 'コマンドを検索' }).click();
-    await closingAction((await overlayPage(host)).keyboard.press('Escape'));
-    await main(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()
-        .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
-        .contentView.children.find((v) =>
-          v.webContents?.getURL().includes('/fixture.bars-a/bars.html'),
-        )
-        .webContents.forcefullyCrashRenderer(),
-    );
-    await assigned('titlebar', defaultId);
-    const recoveredTitle = await barPage(host, 'titlebar');
-    const oldDefaultSession = (await recoveredTitle.evaluate(() => window.appdockBar.connect()))
-      .sessionId;
-    await main(({ dialog, BrowserWindow }) => {
-      globalThis.__barDialogFixture = { original: dialog.showMessageBox, count: 0 };
-      dialog.showMessageBox = (...args) => {
-        if (args.some((arg) => arg?.title === 'Default Shell')) {
-          globalThis.__barDialogFixture.count++;
-          return Promise.resolve({ response: 0, checkboxChecked: false });
-        }
-        return globalThis.__barDialogFixture.original(...args);
-      };
-      const w = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().startsWith('appdock://host/'),
-      );
-      w.contentView.children
-        .find(
-          (v) =>
-            v.webContents?.getURL().includes('/shells/default/bars.html') && v.getBounds().y === 0,
-        )
-        .webContents.forcefullyCrashRenderer();
-    });
-    await until(async () => {
-      try {
-        return (
-          (await (await barPage(host, 'titlebar')).evaluate(() => window.appdockBar.connect()))
-            .sessionId !== oldDefaultSession
-        );
-      } catch {
-        return false;
-      }
-    }, 'Default titlebar native retry');
-    assert.equal(
-      await main(({ dialog }) => {
-        dialog.showMessageBox = globalThis.__barDialogFixture.original;
-        return globalThis.__barDialogFixture.count;
-      }),
-      1,
-    );
-    assert.equal(
-      (await status.evaluate(() => window.appdockBar.connect())).sessionId,
-      retainedStatus.sessionId,
-    );
-    assert.equal((await state('titlebar')).configuredProvider, 'fixture.bars-a');
-    result.checks.push(
-      'settings select independent providers; external public bridge works; renderer failure restores only titlebar and retains status session',
-    );
-    await host.evaluate(() => window.dock.restartExtension('fixture.bars-b'));
-    await assigned('statusbar', 'fixture.bars-b');
-    await host.evaluate(() => window.dock.toggleExtension('fixture.bars-b', false));
-    await assigned('statusbar', defaultId);
-    await host.evaluate(() => window.dock.toggleExtension('fixture.bars-b', true));
-    await assigned('statusbar', 'fixture.bars-b');
-    await assign({ titlebar: 'fixture.bars-b' });
-    await assigned('titlebar', defaultId);
-    assert.match((await state('titlebar')).reason, /提供していません/);
-    await assign({ titlebar: 'fixture.bars-stalled' });
-    await until(
-      async () => (await state('titlebar')).pendingProvider === 'fixture.bars-stalled',
-      'pending title',
-    );
-    assert((await state('titlebar')).ready);
-    await until(
-      async () => /故障/.test((await state('titlebar')).reason),
-      'ready deadline fallback',
-      18000,
-    );
-    await assigned('titlebar', defaultId);
-    result.checks.push(
-      'disable/re-enable/restart, unprovided region and ready deadline retain assignments and recover per region',
-    );
-    await assign({ titlebar: 'fixture.bars-a' });
-    const retry = host
-      .getByLabel('タイトルバーのShell')
-      .locator('..')
-      .getByRole('button', { name: 'この領域を再試行', exact: true });
-    await retry.click();
-    await assigned('titlebar', 'fixture.bars-a');
-    await close();
-    await launch(['--safe-shell']);
-    await assigned('titlebar', defaultId);
-    await assigned('statusbar', defaultId);
-    assert.equal((await state('titlebar')).configuredProvider, 'fixture.bars-a');
-    await close();
-    await launch();
-    await assigned('titlebar', 'fixture.bars-a');
-    await assigned('statusbar', 'fixture.bars-b');
-    result.checks.push(
-      'explicit per-region retry, safe launch and subsequent normal launch preserve saved providers',
-    );
-    title = await barPage(host, 'titlebar');
-    await closingAction(title.getByRole('button', { name: '閉じる', exact: true }).click());
-    await until(() => host.isClosed(), 'close button closes the host window');
     result.success = true;
   } catch (error) {
     result.error = String(error.stack || error);

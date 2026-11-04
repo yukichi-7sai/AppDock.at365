@@ -1,31 +1,13 @@
-import { defaultShellId, shellRegions, shellView } from '../../shared/shell';
-import type { ShellProvider } from './shell-provider-registry';
-
-/** Only configured, enabled providers participate in the initial presentation. */
-export function startupShellIds(
-  providers: readonly ShellProvider[],
-  assignments: Record<string, string>,
-  safeMode: boolean,
-): Set<string> {
-  const ids = new Set([defaultShellId]);
-  if (safeMode) return ids;
-  for (const { id: region } of shellRegions) {
-    const provider = providers.find((p) => p.id === assignments[region]);
-    if (provider?.enabled && shellView(provider.shell, region)) ids.add(provider.id);
-  }
-  return ids;
-}
-
-/** Initial host content and the visible Shell regions have independent readiness signals. */
+/** Initial host content and the visible built-in surfaces have independent readiness signals. */
 export class StartupUiBarrier {
   private rendered = false;
   private cancelled = false;
   private waiting?: Promise<boolean>;
   private resolve?: (ready: boolean) => void;
   private timer?: ReturnType<typeof setTimeout>;
-  constructor(private shellsReady: () => boolean) {}
+  constructor(private surfacesReady: () => boolean) {}
   get ready() {
-    return !this.cancelled && this.rendered && this.shellsReady();
+    return !this.cancelled && this.rendered && this.surfacesReady();
   }
   rendererReady() {
     this.rendered = true;

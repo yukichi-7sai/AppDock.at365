@@ -106,7 +106,7 @@ export class AppletManagement {
     if (applet.sourceKind === 'builtin' && operation !== 'restart')
       throw new AppletManagementError(
         'UNAVAILABLE',
-        hostText('services.appletManagement.defaultShellRequired'),
+        hostText('services.appletManagement.builtinRequired'),
       );
     if (['starting', 'stopping'].includes(applet.state))
       throw new AppletManagementError('BUSY', hostText('services.appletManagement.changing'));

@@ -16,7 +16,7 @@ test('Applet settings navigation only opens the running caller and preserves the
     },
   };
   const options = [{}, path.resolve('.artifacts'), () => {}, () => {}];
-  options[15] = callbacks;
+  options[14] = callbacks;
   const api = createHostApi(...options);
   const caller = { state: 'running', manifest: { id: 'test.own-settings', capabilities: ['ui'] } };
   assert.deepEqual(await api(caller, 'host.ui.openSettings', {}), { accepted: true });
@@ -43,9 +43,9 @@ test('Applet settings navigation only opens the running caller and preserves the
     ['settings', caller.manifest.id],
     ['details', caller.manifest.id],
   ]);
-  options[15] = { openDetails: callbacks.openDetails };
+  options[14] = { openDetails: callbacks.openDetails };
   await assert.rejects(createHostApi(...options)(caller, 'host.ui.openSettings', {}));
   await createHostApi(...options)(caller, 'host.ui.openDetails', {});
-  options[15] = undefined;
+  options[14] = undefined;
   await assert.rejects(createHostApi(...options)(caller, 'host.ui.openSettings', {}));
 });

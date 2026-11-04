@@ -32,16 +32,15 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - PowerShell 5.1用PS1はUTF-8 BOM/CRLF、BATはCP932/CRLFを保つ。File.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATH・認証・実行権限はその環境で確認する。
 - 権限不足の切り分けと再実行は[制限付き実行環境](docs/development-workflow.md#制限付き実行環境)に従う。無関係アプリの停止や、検査・セキュリティ機構の無効化で成功扱いにしない。
 
-## Shellと画面
+## 本体の画面
 
 - 本体の固定文言は[表示言語と翻訳](docs/localization.md)に従い、移行済みの画面では意味のある固定キーと日本語JSONを使う。ユーザー入力・Applet提供文言を翻訳キーにせず、保存IDや列挙値を翻訳しない。文言変更時は表示検査と操作検査への影響を区別する。
 
-- アクセント色は[共通配色](docs/appearance.md)を正本とする。新しい本体/Shell/Appletのローカル画面は共通preloadの配色変数を参照し、画面ごとにパレットや同名変数を定義しない。専用preload追加時は共通配色の同梱・URL登録・明暗テーマの検証も接続する。
+- アクセント色は[共通配色](docs/appearance.md)を正本とする。新しい本体/Appletのローカル画面は共通preloadの配色変数を参照し、画面ごとにパレットや同名変数を定義しない。専用preload追加時は共通配色の同梱・URL登録・明暗テーマの検証も接続する。
 - スクロールバーも共通配色の`scrollbarCss`を正本とし、登録したローカル画面へ共通適用する。個別画面で幅・つまみ・トラック・矢印の見た目を追加せず、必要な方向の非表示やスクロール構造だけを指定する。リモート本文・iframeには適用しない。
 
-- [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell AppletはShell対象領域の描画を所有する。メイン画面の枠組み・画像ライブラリー・通知センター・ログ・設定は本体rendererが共通UI部品で描画し、ページ用Shell機構を設けない。Shell対象は既存5領域に限定し、新しい領域のShell化は個別に依頼された場合だけ行う。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
-- Default Shellは本体repo内で同時ビルドしフォルダー型本体へ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
-- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)の公開契約を使う。本体ページは[本体のページ表示](docs/host-pages.md)に従う。Shell領域を追加する個別依頼ではモデルと操作を定義し、Shell Hostへ内容固有の判断を混ぜない。一般Appletの複数Window/同一領域の同時多重表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
+- [本体の画面構成](docs/workspace-ui.md)に従い、本体は状態・操作・表示寿命と標準UIの描画を所有する。リボン・バー・通知はsrc/renderer/workspace、通知共通部品はsrc/renderer/notificationsへ配置する。Shell差し替え・Default Shell Applet・設定/APIを再導入しない。native Viewの重なり順と独立デスクトップ通知Windowは維持する。
+- [リボン](docs/ribbon-ui.md)、[共通オーバーレイ](docs/workspace-overlays.md)、[本体ページ](docs/host-pages.md)の操作・保存・フォーカス契約を維持する。
 - Applet管理は本体の設定一覧へ集約し、説明・詳細タブを再導入しない。設定・ショートカット・ジェスチャー・ログは共通画面へ移動し、入力設定は提供元ID、ログは解除可能なsourceで絞る。WebApplet本体を含め、collectionの子ページをパッケージ一覧へ含めない。[管理仕様](docs/applet-management-settings-design.md)を参照する。
 - 設定は[設定基盤](docs/settings-foundation.md)の確定後の即時保存を正本とする。文字・数値・URL・JSONは共通入力部品でblur/Enter確定・Escape取消、複数行はShift+Enter改行とし、IME操作を優先する。SettingsInputSessionは受付調整のみ。本体の入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。
 - 関連する複数項目からなる登録の一覧編集は、[一覧形式の設定編集UI](docs/settings-list-editing.md)に従い、AI接続の一覧＋共通ダイアログを基本とする。追加／編集の一時入力はダイアログ内だけに保持し、OKで登録単位に保存する。削除確認・並べ替え・入力確定・フォーカス復帰を揃え、既存機能固有の操作契約は保持する。

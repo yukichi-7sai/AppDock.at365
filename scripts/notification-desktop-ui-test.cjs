@@ -64,29 +64,6 @@ initial.host.hardwareAcceleration = false;
 initial.gestures.enabled = false;
 initial.globalShortcutCommands = [];
 for (const id of Object.values(ids)) initial.extensions[id] = { enabled: true, settings: {} };
-const customId = 'fixture.desktop.shell';
-if (!process.argv[2]) {
-  const folder = path.join(profile, 'extensions', customId);
-  fs.mkdirSync(folder, { recursive: true });
-  fs.cpSync(path.join(root, 'out/shells/default'), folder, { recursive: true });
-  fs.writeFileSync(
-    path.join(folder, 'extension.json'),
-    JSON.stringify({
-      apiVersion: 1,
-      id: customId,
-      name: 'Desktop Shell fixture',
-      version: '1.0.0',
-      minimumHostVersion: '0.31.1',
-      runtime: 'node',
-      entry: 'worker.cjs',
-      capabilities: ['shell'],
-      shell: { apiVersion: 1, views: { 'notification.desktop': 'notifications.html' } },
-    }),
-  );
-  fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate=async()=>{};');
-  initial.host.shellProviders = { 'notification.desktop': customId };
-  initial.extensions[customId] = { enabled: true, settings: {} };
-}
 fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(initial),
@@ -133,7 +110,7 @@ async function surface(kind, provider) {
     for (const p of pages().filter((p) => p.url().endsWith('/notifications.html'))) {
       try {
         const c = await p.evaluate(() => window.appdockNotifications.connect());
-        if (c.snapshot.surface === kind && (!provider || c.providerAppletId === provider)) {
+        if (c.snapshot.surface === kind) {
           p.setDefaultTimeout(12000);
           return p;
         }
@@ -203,7 +180,7 @@ const storage = (id, key) => {
     const focused = await main('electron.BrowserWindow.getFocusedWindow()?.id');
     await command(ids.node + '.publish');
     await command(ids.native + '.publish');
-    let d = await surface('desktop', executable ? 'appdock.default-shell' : customId),
+    let d = await surface('desktop', undefined),
       b = await surface('banner');
     await until(() => main(desktopWindow + '.isVisible()'), 'desktop native visibility');
     assert.equal(await main(desktopWindow + '.isAlwaysOnTop()'), true);
@@ -282,7 +259,7 @@ const storage = (id, key) => {
       () => main(desktopWindow + '?.isVisible() ?? false'),
       'unlock resumes manual notifications',
     );
-    d = await surface('desktop', executable ? 'appdock.default-shell' : customId);
+    d = await surface('desktop', undefined);
     const resumed = (await d.evaluate(() => window.appdockNotifications.connect())).snapshot;
     assert.ok(resumed.items.some((i) => i.title === 'Timed desktop'));
     assert.ok(resumed.items.some((i) => i.id === native.id));
@@ -303,37 +280,6 @@ const storage = (id, key) => {
     checks.push(
       'lock/unlock retains manual IDs and holds timed notices until unlock; real parent full-screen suppression remains independent',
     );
-    if (app) {
-      const before = (
-        await d.evaluate(() => window.appdockNotifications.connect())
-      ).snapshot.items.map((i) => i.id);
-      await app.evaluate(
-        ({ webContents }, customId) =>
-          webContents
-            .getAllWebContents()
-            .find(
-              (w) => w.getURL().includes(customId) && w.getURL().endsWith('/notifications.html'),
-            )
-            .forcefullyCrashRenderer(),
-        customId,
-      );
-      d = await surface('desktop', 'appdock.default-shell');
-      assert.deepEqual(
-        (await d.evaluate(() => window.appdockNotifications.connect())).snapshot.items.map(
-          (i) => i.id,
-        ),
-        before,
-      );
-      assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders[
-          'notification.desktop'
-        ],
-        customId,
-      );
-      checks.push(
-        'a desktop-only public Shell crashes to Default Shell without replacing IDs or the other banner surface',
-      );
-    }
     await d.getByRole('button', { name: /通知センターを開く/ }).click();
     await host.waitForFunction(() =>
       window.dock.snapshot().then((s) => s.navigation.route === 'notifications'),
@@ -438,9 +384,7 @@ const storage = (id, key) => {
           ),
         'recreated query worker released',
       );
-      checks.push(
-        'idle recreation retains failed provider suppression and the original notification IDs',
-      );
+      checks.push('idle recreation retains the original notification IDs');
     }
     success = true;
   } catch (e) {

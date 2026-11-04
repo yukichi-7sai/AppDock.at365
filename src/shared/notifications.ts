@@ -1,4 +1,3 @@
-import type { ShellAppletApi } from './shell';
 export const notificationBannerPositions = [
   'top-center',
   'bottom-center',
@@ -58,10 +57,9 @@ export interface NotificationBannerModel {
   surface?: 'banner' | 'desktop';
   viewport: { width: number; maxHeight: number };
 }
-export interface NotificationBannerApi extends ShellAppletApi {
+export interface NotificationBannerApi {
   connect(): Promise<{
     sessionId: string;
-    providerAppletId: string;
     snapshot: NotificationBannerModel;
   }>;
   ready(sessionId: string): Promise<void>;

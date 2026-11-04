@@ -5,7 +5,7 @@ exports.ribbonPage = async (host) => {
     const page = host
       .context()
       .pages()
-      .find((p) => /\/shells\/default\/index\.html$/.test(p.url()));
+      .find((p) => /\/renderer\/workspace\/index\.html$/.test(p.url()));
     if (page) {
       await page.locator('.activity-rail').waitFor();
       return page;

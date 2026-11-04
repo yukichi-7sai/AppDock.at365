@@ -1,5 +1,4 @@
 import type { UiCommand } from './commands';
-import type { ShellAppletApi } from './shell';
 import { validCommandId } from './command-id';
 
 /** Host-owned content; presentation providers may implement each kind independently. */
@@ -49,11 +48,11 @@ export interface RibbonGroupModel {
     groupId: string;
     title: string;
     anchor: import('./ribbon').RibbonAnchor;
-    parent: import('./shell').RibbonView['items'][number];
+    parent: import('./workspace-ui').RibbonView['items'][number];
     /** Source ribbon rectangle in the same host CSS coordinates as anchor. */
     viewport?: import('./ribbon').RibbonAnchor;
     displayMode?: import('./ribbon').RibbonDisplayMode;
-    items: import('./shell').RibbonView['items'];
+    items: import('./workspace-ui').RibbonView['items'];
   };
 }
 export type OverlayModel = CommandPaletteModel | RibbonGroupModel;
@@ -64,8 +63,8 @@ export type OverlayAction =
   | { id: string; type: 'openTriggerSettings'; commandId: string }
   | { id: string; type: 'togglePin'; commandId: string }
   | { id: string; type: 'movePin'; commandId: string; direction: -1 | 1; visibleIds: string[] };
-export interface ShellOverlayApi extends ShellAppletApi {
-  connect(): Promise<{ sessionId: string; providerAppletId: string; snapshot: RibbonGroupModel }>;
+export interface RibbonOverlayApi {
+  connect(): Promise<{ sessionId: string; snapshot: RibbonGroupModel }>;
   ready(sessionId: string, options?: { reusable?: boolean; modelId?: string }): Promise<void>;
   act(action: OverlayAction): Promise<void>;
   asset(id: string): Promise<{ dataUrl: string }>;

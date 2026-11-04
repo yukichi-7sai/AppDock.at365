@@ -259,7 +259,7 @@ module.exports = async function iconChecks(context) {
   ];
   await rail.locator('[data-ribbon-id="applet:fixture.ribbon-icons:main"] img').waitFor();
   const getItem = async (id) =>
-    (await rail.evaluate(() => window.appdockShell.get())).items.find((item) => item.id === id);
+    (await rail.evaluate(() => window.appdockRibbon.get())).items.find((item) => item.id === id);
   const actions = new Map();
   for (const [id, icon, name] of overrides) {
     const editors = () =>
@@ -332,11 +332,11 @@ module.exports = async function iconChecks(context) {
     await saved(savedIcon);
   }
   const beforeMode = await rail
-    .evaluate(() => window.appdockShell.get())
+    .evaluate(() => window.appdockRibbon.get())
     .then((model) => model.displayMode);
   await rail.locator('[data-ribbon-id="ribbon-display-mode"]').click();
   await until(
-    async () => (await rail.evaluate(() => window.appdockShell.get())).displayMode !== beforeMode,
+    async () => (await rail.evaluate(() => window.appdockRibbon.get())).displayMode !== beforeMode,
     'mode toggled',
   );
   await until(

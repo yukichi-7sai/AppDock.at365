@@ -36,7 +36,6 @@ import {
   getCommandTriggerOptions,
   parseCommandTriggerOptions,
 } from '../../shared/command-trigger-options';
-import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import type { SettingsStore } from './settings';
 import {
   SettingsTargetError,
@@ -142,7 +141,6 @@ export class SettingsServiceTargets {
   targets(): SettingsTarget[] {
     return [
       ...[
-        this.shell(),
         this.updates(),
         this.commandTriggerOptions(),
         ...(this.options.applets?.() ?? [])
@@ -169,55 +167,6 @@ export class SettingsServiceTargets {
         ? [launchSettingsTarget({ ...this.options, launch: this.options.launch })]
         : []),
     ];
-  }
-  private shell(): Target {
-    const providers = this.options.applets?.() ?? [];
-    const fields: Field[] = shellRegions.map(({ id, title }) => ({
-      key: id,
-      title: hostText('appearance.shell.label', { region: title }),
-      type: 'select',
-      default: defaultShellId,
-      options: [
-        { value: defaultShellId, label: hostText('appearance.shell.defaultOption') },
-        ...shellProviderCandidates(providers, id).map((provider) => ({
-          value: provider.id,
-          label:
-            provider.displayName +
-            (provider.enabled ? '' : hostText('appearance.shell.disabledSuffix')),
-        })),
-      ],
-    }));
-    const projectProviders = (value: unknown) =>
-      Object.fromEntries(
-        fields.flatMap(({ key }) =>
-          Object.hasOwn(object(value), key) ? [[key, object(value)[key]]] : [],
-        ),
-      );
-    return {
-      id: 'service.shell',
-      ui: settingsUiFields('appearance', (field) => 'shellProviders.' + field.key),
-      title: hostText('appearance.shell.section'),
-      category: 'shell',
-      fields,
-      stored: () => this.options.settings.storedSettingOverrides('appdock'),
-      rewriteScope: () => this.options.settings.settingScope(['host', 'shellProviders']),
-      context: fields.map(({ key, options }) => ({ key, options })),
-      applies: () => 'shellProvidersChanged',
-      values: (settings) =>
-        Object.fromEntries(
-          fields.map(({ key }) => [key, settings.host.shellProviders?.[key] ?? defaultShellId]),
-        ),
-      overrides: (raw) => projectProviders(raw.shellProviders),
-      replace: (settings, changes, reset) => {
-        const assignments = { ...settings.host.shellProviders, ...changes } as Record<
-          string,
-          string
-        >;
-        for (const key of reset) delete assignments[key];
-        settings.host.shellProviders = assignments;
-        return settings;
-      },
-    };
   }
   private target(spec: Target): SettingsFieldTarget {
     const applies = (key: string) =>

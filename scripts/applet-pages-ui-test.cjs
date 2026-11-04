@@ -59,7 +59,10 @@ const gmail = path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gm
 fs.cpSync(gmail, path.join(profile, 'extensions', 'Applet.Gmail.at365'), { recursive: true });
 settings.extensions['test.pages'] = { enabled: false, settings: {} };
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const checks = [];
 let app, dock, rail;
 const until = async (fn, message) => {
@@ -137,7 +140,7 @@ async function launch() {
     rail = app
       .context()
       .pages()
-      .find((p) => p.url().includes('/shells/default/index.html'));
+      .find((p) => p.url().includes('/renderer/workspace/index.html'));
     return !!rail;
   }, 'Shell renderer');
   await rail.locator('[data-ribbon-id="image-library"]').waitFor();
@@ -461,7 +464,9 @@ async function launch() {
     checks.push(
       'Ribbon visibility/order editing / hidden settings recovery by right click / minimized monitoring',
     );
-    const persisted = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+    const persisted = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    );
     assert.ok(persisted.ribbon.hidden.includes('page:at365.gmail:gmail'));
     assert.ok(
       persisted.ribbon.order.indexOf('page:at365.gmail:gmail') <
@@ -470,10 +475,18 @@ async function launch() {
     await app.close();
     app = null;
     // Install the offline session handler before the persisted Applet starts.
-    const restartSettings = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+    const restartSettings = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    );
     restartSettings.extensions['at365.gmail'].enabled = false;
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(restartSettings));
-    const deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`);
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(restartSettings),
+    );
+    const deviceFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    );
     const deviceSettings = JSON.parse(fs.readFileSync(deviceFile));
     deviceSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(deviceFile, JSON.stringify(deviceSettings));

@@ -2,8 +2,6 @@ import { hostText } from '../../shared/i18n';
 import { effectiveHostLanguage } from '../../shared/host-language';
 import { translationDirectory } from './host-translation-source';
 import { validateAppletCommonValues } from '../../shared/applet-common-settings';
-import { shellView, isRetiredShellRegion, type ShellRequirement } from '../../shared/shell';
-import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts, enterCommand } from './command-contexts';
 import type { InputInvocation } from './command-contexts';
@@ -133,32 +131,10 @@ function readManifest(
   delete m.sourceKind;
   if (m.id === 'appdock.default-shell' && sourceKind !== 'builtin')
     throw Error('Reserved Shell ID');
-  if (m.shell !== undefined) {
-    if (
-      !isObject(m.shell) ||
-      m.shell.apiVersion !== 1 ||
-      (m.shell.ribbonSchemaVersion !== undefined &&
-        ![1, 2, 3].includes(m.shell.ribbonSchemaVersion)) ||
-      (m.shell.ui === undefined &&
-        (!isObject(m.shell.views) || Object.keys(m.shell.views).length === 0)) ||
-      !m.capabilities?.includes('shell')
-    )
-      throw Error('Invalid Shell manifest');
-    if (m.shell.ui !== undefined) {
-      if (typeof m.shell.ui !== 'string' || !/\.html$/i.test(m.shell.ui))
-        throw Error('Invalid Shell UI');
-      contained(folder, m.shell.ui);
-    }
-    if (m.shell.views !== undefined) {
-      if (!isObject(m.shell.views) || Object.keys(m.shell.views).length > 32)
-        throw Error('Invalid Shell views');
-      for (const [kind, ui] of Object.entries(m.shell.views)) {
-        if (!/^[a-z][a-z0-9.-]{0,63}$/.test(kind) || typeof ui !== 'string' || !/\.html$/i.test(ui))
-          throw Error('Invalid Shell view');
-        contained(folder, ui);
-      }
-    }
-  }
+  // Retired Shell declarations must never load a provider document.
+  delete m.shell;
+  if (Array.isArray(m.capabilities))
+    m.capabilities = m.capabilities.filter((c: unknown) => c !== 'shell');
   m.notificationTypes = parseNotificationTypes(m.notificationTypes);
   if (
     m.notificationTypes.length &&
@@ -173,12 +149,6 @@ function readManifest(
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.31.0') < 0)
   )
     throw Error(hostText('services.extensions.notificationCenterVersion'));
-  if (
-    sourceKind !== 'builtin' &&
-    m.shell?.views?.['notification.desktop'] &&
-    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.31.1') < 0)
-  )
-    throw Error(hostText('services.extensions.desktopNotificationVersion'));
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   m.pageCollections = parsePageCollections(m as unknown as ExtensionManifest);
@@ -212,18 +182,6 @@ function readManifest(
   for (const collection of m.pageCollections)
     if (collection.source === 'local') contained(folder, collection.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
-  for (const command of commands ?? []) {
-    const requirement = command.shellRequirement;
-    if (
-      requirement &&
-      (!m.capabilities?.includes('shell') ||
-        (!isRetiredShellRegion(requirement.region) && !shellView(m.shell, requirement.region)) ||
-        command.activateOnExecute ||
-        !m.minimumHostVersion ||
-        compareVersions(m.minimumHostVersion, '0.34.0') < 0)
-    )
-      throw Error(hostText('services.extensions.shellRequirement'));
-  }
   const settingDefinitions = parseSettingDefinitions(m.settings);
   for (const definition of settingDefinitions ?? []) {
     const action = definition.list?.draftAction;
@@ -341,7 +299,6 @@ export interface ExtensionInstance {
   dynamicPages?: import('../../shared/dynamic-pages').DynamicPageDefinition[];
   pageRevision?: number;
   runtimeSession?: string;
-  shellStateRequested?: boolean;
   attention?: boolean;
   manifest: LoadedManifest;
   state: ExtensionSnapshot['state'];
@@ -384,23 +341,6 @@ interface ManagerOptions {
   log: (level: string, source: string, message: string) => void;
 }
 class ExtensionManager extends EventEmitter {
-  shellRequirement: (id: string, requirement?: ShellRequirement) => string | undefined = () =>
-    undefined;
-  shellExecution?: (id: string, requirement?: ShellRequirement) => (() => boolean) | undefined;
-  shellProviders(): ShellProvider[] {
-    return [...this.items.values()].map((e) => ({
-      id: e.manifest.id,
-      version: e.manifest.version,
-      shell: e.manifest.shell,
-      minimumHostVersion: e.manifest.minimumHostVersion,
-      folder: e.manifest.folder,
-      sourceKind: e.manifest.sourceKind,
-      enabled:
-        e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
-      state: e.state,
-      generation: e.runtimeSession,
-    }));
-  }
   builtinRoots: string[];
   readonly executions = new CommandContexts();
   roots: string[];
@@ -536,7 +476,9 @@ class ExtensionManager extends EventEmitter {
       this.shuttingDown ||
       !this.startAllowed(e.manifest.id) ||
       !['stopped', 'waiting'].includes(e.state) ||
-      !e.manifest.commands?.some((command) => command.id === id && command.activateOnExecute)
+      !e.manifest.commands?.some(
+        (command) => command.id === id && command.activateOnExecute && !command.retiredShellCommand,
+      )
     )
       return false;
     try {
@@ -572,11 +514,12 @@ class ExtensionManager extends EventEmitter {
         // Runtime registration (including replace) cannot grant external access.
         automation:
           e.manifest.commands?.some((c) => c.id === command.id && c.automation === true) ?? false,
-        shellRequirement: e.manifest.commands?.find((c) => c.id === command.id)?.shellRequirement,
+        retiredShellCommand: e.manifest.commands?.find((c) => c.id === command.id)
+          ?.retiredShellCommand,
         available: e.state === 'running',
       });
     for (const command of catalog.values()) {
-      const reason = this.shellRequirement(e.manifest.id, command.shellRequirement);
+      const reason = command.retiredShellCommand ? hostText('shell.retired') : undefined;
       if (reason) {
         command.available = false;
         command.disabledReason = reason;
@@ -592,7 +535,7 @@ class ExtensionManager extends EventEmitter {
           ...(target.description !== undefined ? { description: target.description } : {}),
           available: target.available,
           disabledReason: target.disabledReason,
-          shellRequirement: target.shellRequirement,
+          retiredShellCommand: target.retiredShellCommand,
           hidden: true,
         });
       }
@@ -725,7 +668,6 @@ class ExtensionManager extends EventEmitter {
     e.memoryStorage?.clear();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
-    e.shellStateRequested = false;
     e.state = 'starting';
     e.error = null;
     this.emit('changed');
@@ -738,14 +680,21 @@ class ExtensionManager extends EventEmitter {
       const language = effectiveHostLanguage(this.settings.value.host.language);
       let child: ChildProcessWithoutNullStreams;
       if (m.runtime === 'node')
-        child = spawn(this.nodeExecutable, [this.nodeWorker, m.entryPath,
-          '--appdock-translations=' + translationDirectory,
-          '--appdock-language=' + language], {
-          cwd: m.folder,
-          windowsHide: true,
-          env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        child = spawn(
+          this.nodeExecutable,
+          [
+            this.nodeWorker,
+            m.entryPath,
+            '--appdock-translations=' + translationDirectory,
+            '--appdock-language=' + language,
+          ],
+          {
+            cwd: m.folder,
+            windowsHide: true,
+            env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          },
+        );
       else if (m.runtime === 'native') {
         child = spawn(m.entryPath, [], {
           cwd: m.folder,
@@ -949,36 +898,27 @@ class ExtensionManager extends EventEmitter {
     );
     if (running) {
       invocation = enterCommand(id, invocation, running.manifest.id);
-      const reason = this.shellRequirement(
-        running.manifest.id,
-        running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
-      );
+      const reason = running.manifest.commands?.find((c) => c.id === id)?.retiredShellCommand
+        ? hostText('shell.retired')
+        : undefined;
       if (reason) throw Error(reason);
       if (!running.peer || running.peer.closed)
         throw new Error(hostText('services.extensions.disconnected'));
-      const valid = this.shellExecution?.(
-        running.manifest.id,
-        running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
-      );
-      return this.executions.run(
-        running.manifest.id,
-        invocation,
-        (executionId) =>
-          running.peer!.request('command.execute', {
-            id,
-            executionId,
-            ...(invocation?.session
-              ? {
-                  invocation: {
-                    session: invocation.session,
-                    window: invocation.window,
-                    process: invocation.process,
-                    source: invocation.source,
-                  },
-                }
-              : {}),
-          }),
-        valid,
+      return this.executions.run(running.manifest.id, invocation, (executionId) =>
+        running.peer!.request('command.execute', {
+          id,
+          executionId,
+          ...(invocation?.session
+            ? {
+                invocation: {
+                  session: invocation.session,
+                  window: invocation.window,
+                  process: invocation.process,
+                  source: invocation.source,
+                },
+              }
+            : {}),
+        }),
       );
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));

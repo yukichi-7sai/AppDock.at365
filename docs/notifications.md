@@ -1,4 +1,4 @@
-# 通知基盤とShell表示
+# 通知基盤と本体表示
 
 通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別の読み上げON/OFFと、通知全体の声・速度の上書きを定義する。
 
@@ -30,9 +30,9 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 ## 通知種類と設定
 
-登録時の`levels`に使用可能なレベル（`info` / `warning` / `error`）、`defaultLevel`にその中の既定値を指定する。Node/.NETとも発行時に`level`を省略すると既定値を使い、指定する場合は宣言した範囲だけを許可する。本体・Appletの所有者や種類名にかかわらず、Default Shellは通知の実際のレベルで配色する。
+登録時の`levels`に使用可能なレベル（`info` / `warning` / `error`）、`defaultLevel`にその中の既定値を指定する。Node/.NETとも発行時に`level`を省略すると既定値を使い、指定する場合は宣言した範囲だけを許可する。本体・Appletの所有者や種類名にかかわらず、本体rendererは通知の実際のレベルで配色する。
 
-バナー・デスクトップ通知・通知センターは共通のレベル配色を使う。`info`はライトでは白背景・濃い文字・アプリの緑（`#217a65`）、ダークでは暗い背景（`#191f23`）・明るい文字・明るい緑（`#7ce1c5`）を使う。緑は枠のポイント・レベル表示・主要操作へ添える。`warning`は黄系、`error`は赤系を維持し、明暗テーマに合わせて文字の明度を調整する。レベル名も表示し、色だけに意味を依存させない。Windows通知の外観はOS、追加Shellの外観はそのShellが管理する。
+バナー・デスクトップ通知・通知センターは共通のレベル配色を使う。`info`はライトでは白背景・濃い文字・アプリの緑（`#217a65`）、ダークでは暗い背景（`#191f23`）・明るい文字・明るい緑（`#7ce1c5`）を使う。緑は枠のポイント・レベル表示・主要操作へ添える。`warning`は黄系、`error`は赤系を維持し、明暗テーマに合わせて文字の明度を調整する。レベル名も表示し、色だけに意味を依存させない。Windows通知の外観はOS。
 
 種類別の「既定に戻す」ボタンは設けない。通知先・表示時間・読み上げは個別に即時保存する。未指定項目の既定値継承と、既存の保存値は維持する。
 
@@ -81,24 +81,17 @@ TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービス
 
 リボンの通知センターはNotificationServiceのactive件数を共通バッジへ投影する。通知IDごとに1件とし、複数の表示先、通知センターのみ、ロック中の保留を含める。同じIDの更新・検索・センターを開く操作では増減せず、新規発行で増加、閉じる・解消・期限切れ・撤回・発行元停止で減少する。0件は非表示、1〜99件は数値、100件以上は99+。ツールチップ/支援技術向けの説明には実件数を使う。アイコンのみ/名前付き、配置変更、グループの子と親の点表示は共通リボン契約に従う。
 
-バナーとデスクトップのShell提供元はhost.shellProvidersのnotification.banner・notification.desktopで指定する。フォールバックと故障抑止は領域ごとに行い、同じworkerの停止では依存する各領域を失効させる。切替で通知を再発行せず、同じID・期限・操作状態を使う。通知センターは本体rendererで共通描画し、Controllerが検索・ページングを保持する。デスクトップの可視判定は専用Windowに従い、本体を隠しても無効にしない。
+バナー・デスクトップ・通知センターは本体rendererが描画する。Controllerは通知ID・期限・操作状態を保持し、デスクトップの可視判定は専用Windowに従う。本体を隠しても通知を無効にしない。
 
-## Shellの領域とbridge
+## 本体通知の内部bridge
 
-minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言できる。
-
-```json
-{ "notification.banner": "notifications.html" }
-```
-
-専用preloadはDefault Shellと追加Shellの両方にwindow.appdockNotificationsを公開する。通常のwindow.dockとNode APIは渡さない。接続元のWebContents、mainFrame、URLと現sessionを検査する。
+専用preloadは本体の通知Viewにwindow.appdockNotificationsを公開する。通常のwindow.dockとNode APIは渡さない。接続元のWebContents、mainFrame、URLと現sessionを検査する。
 
 1. onChangedを購読し、connectでsessionId/providerAppletId/snapshotを取得する。
 2. themeを適用してsnapshotを描画後、ready(sessionId)を送る。
 3. actへnotificationId/revision/requestId/type:invoke/actionId、またはtype:dismissを渡す。表示中のactive通知だけ操作できる。
 4. resizeで描画した高さをCSS pxで報告する。ホストが最大高さを制限する。
 5. focusHostで本体本文へ戻す。デスクトップ通知では通知Windowのフォーカスを解放する。
-6. getSettings/onSettingsChanged/executeCommandは他のShellと同じ自Applet用契約を使う。executeCommandは自身の登録済みコマンドに限定する。
 
 モデルはschemaVersion:1/contextId:primary/sessionId/revision/dark/items/viewportと任意のsurface:banner/desktop。itemsは発行順。viewportはCSS pxのwidth/maxHeight。古いrevisionを無視する。NotificationSurfaceControllerが表示モデルと操作を持ち、NotificationSurfaceHostはネイティブViewの寿命・ready・位置・復旧だけを管理する。
 
@@ -108,25 +101,25 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 
 「設定 → 通知 → 通知の受け取り方 → バナー」の折りたたみ行に「バナーの表示位置」「バナーの影」を置く。表示位置は中央上・中央下・右上・右下・左上・左下から選び、`host.notificationBannerPosition`に`top-center`（既定）・`bottom-center`・`top-right`・`bottom-right`・`top-left`・`bottom-left`を保存して即時反映する。「デスクトップ通知」も折りたたみ行とし、その下に「デスクトップ通知の影」を置く。
 
-影は`host.notificationBannerShadow`と`host.notificationDesktopShadow`の独立した真偽値で、どちらも既定は`true`。Default Shellの各通知カードへ即時反映し、通知のID・期限・操作・表示位置は維持する。共通appearance通知で各表示先へ値を渡し、追加Shellも同じsnapshotから設定を参照できる。Windows通知はOSの表示に従う。これらの表示位置/影も通知ページの共有／端末専用の選択に従い、公開設定APIへ接続し、通知ページのJSON編集・検索・既定へのリセットに含める。既定値は保存から省略する。ダイアログ/パレットの影は表示ページの別設定とする。
+影は`host.notificationBannerShadow`と`host.notificationDesktopShadow`の独立した真偽値で、どちらも既定は`true`。本体rendererの各通知カードへ即時反映し、通知のID・期限・操作・表示位置は維持する。共通appearance通知で各表示先へ値を渡し。Windows通知はOSの表示に従う。これらの表示位置/影も通知ページの共有／端末専用の選択に従い、公開設定APIへ接続し、通知ページのJSON編集・検索・既定へのリセットに含める。既定値は保存から省略する。ダイアログ/パレットの影は表示ページの別設定とする。
 
 上側はWindow上端、下側は下端から48 CSS px、左右配置は対応する端から16 CSS pxへ、幅最大680 CSS pxの小さなWebContentsViewを重ねる。中央配置は水平中央にそろえる。下側は描画された高さに合わせて上方向へ伸び、通知の発行順は維持する。幅・高さとzoomをDIPへ変換し、ウィンドウを縮めても範囲内へ収める。本文レイアウト、Web/AppletのView、入力、sessionを維持する。ページより上、モーダルパレットより下へ置き、ページの追加とバナー更新の後もモーダルを最後に配置する。独立デスクトップ通知とWindows通知の位置はこの設定に含めない。
 
-Default Shellは最大3カードを通常表示し、超過分を「ほかN件を表示」で展開する。利用可能高さ40%を目安に領域内をスクロールする。新規通知でfocusを奪わず、タイトルバーのベルは通知センターを開く。バナーへフォーカスを移す専用操作は提供しない。バナーを直接操作した後はEscapeとTab境界で本体本文へ戻る。色・アイコン・レベル名を使い、新規通知の読み上げを行う。
+本体rendererは最大3カードを通常表示し、超過分を「ほかN件を表示」で展開する。利用可能高さ40%を目安に領域内をスクロールする。新規通知でfocusを奪わず、タイトルバーのベルは通知センターを開く。バナーへフォーカスを移す専用操作は提供しない。バナーを直接操作した後はEscapeとTab境界で本体本文へ戻る。色・アイコン・レベル名を使い、新規通知の読み上げを行う。
 
-ready期限は10秒。Shell切替先のreadyまでは旧Viewを保持し、同じ通知ID・期限・操作ロックを引き継ぐ。未提供/無効/停止/故障領域はDefault Shellへ戻す。通知領域の同じ提供元・版の故障はプロセス内で記憶し、「Shellを再試行」または新版で再試行する。safe起動はDefault Shellへ固定する。Default Shellも利用不能な場合は最小ネイティブdialogとログを使い、通知を再帰的に発行しない。
+ready期限は10秒。描画不能時はdelivery:failedとログへ記録し、バナーはネイティブdialogへ接続する。通知を再帰発行しない。再起動で画面を再生成する。
 
 ## 独立デスクトップ表示
 
-notification.desktopはminimumHostVersion:0.31.1以上の追加Shellで提供できる。同じwindow.appdockNotificationsとカードを使用し、openCenter()で通常の通知センターへ移動できる。接続/ready/操作は表示先ごとのIPCチャネルとsessionに束縛する。既存NotificationBannerApi/Modelという公開型名は互換のため維持する。
+デスクトップ通知も同じwindow.appdockNotificationsとカードを使用し、openCenter()で本体の通知センターへ移動する。接続/ready/操作を表示先ごとのIPCチャネルとsessionへ束縛する。
 
 NotificationDesktopHostは通知がある間だけ独立Windowと表示可否query workerを作る。本体を隠しても表示し、最後のdesktop対象がなくなると両方を破棄する。showInactiveで新着時のfocusを保ち、カードをクリックした時だけ操作先としてfocus可能。Escapeはdesktopのfocusを解放し、センターを開く操作は本体を表示する。
 
 トレイ座標の画面、取得できなければ本体の画面のworkAreaへ配置する。座標はDIP、幅最大440/高さ最大600または作業領域60%、余白12。トレイがある側の隅を選び、負の画面座標や狭い画面も範囲内へ収める。画面追加/削除/作業領域・scale変更で再計算する。
 
-[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)のACCEPTS_NOTIFICATIONSだけを表示可能とする。desktop表示・読み上げで問い合わせを共用し、最初の対象の発生時と、新しい通知の提示前に確認する。通知可能だったキャッシュだけで新規提示を許可しない。通知不可と分かった後は新しい通知が増えても確認を前倒しせず、表示・待機対象がある間、前回の問い合わせ完了から60秒後に1回だけ次を予約する。通知可能な間も同じ間隔で状態変化を確認する。対象がなくなった場合、本体共通のロック/サスペンド保留中、本体の全画面化による抑制中は予約と問い合わせworkerを停止し、遅れた応答を反映しない。解除後は必要な対象があれば確認を再開する。非表示はdelivery:hiddenで、通知自体はactiveを保ち、通常の通知不可では期限は進む。ロック/サスペンド時の期限保留は前述の規則に従う。問い合わせ失敗はログへ記録し、センターの閲覧を継続する。自動worker再起動を繰り返さず「Shellを再試行」で再問い合わせできる。
+[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)のACCEPTS_NOTIFICATIONSだけを表示可能とする。desktop表示・読み上げで問い合わせを共用し、最初の対象の発生時と、新しい通知の提示前に確認する。通知可能だったキャッシュだけで新規提示を許可しない。通知不可と分かった後は新しい通知が増えても確認を前倒しせず、表示・待機対象がある間、前回の問い合わせ完了から60秒後に1回だけ次を予約する。通知可能な間も同じ間隔で状態変化を確認する。対象がなくなった場合、本体共通のロック/サスペンド保留中、本体の全画面化による抑制中は予約と問い合わせworkerを停止し、遅れた応答を反映しない。解除後は必要な対象があれば確認を再開する。非表示はdelivery:hiddenで、通知自体はactiveを保ち、通常の通知不可では期限は進む。ロック/サスペンド時の期限保留は前述の規則に従う。問い合わせ失敗はログへ記録し、センターの閲覧を継続する。自動worker再起動を繰り返さずAppDockの再起動で再問い合わせする。
 
-Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shellも利用不能なdesktopはdelivery:failedとログを使い、勝手にバナーへ配送しない。バナーのDefault Shell全故障時に使うネイティブdialogをdesktopへ複製しない。
+desktopの描画が利用不能な場合はdelivery:failedとログを使い、別の表示先へ配送しない。
 
 ## 設定画面との境界
 
@@ -136,7 +129,7 @@ Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shel
 
 ## 検証
 
-単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-shell-ui-test.cjsは即時保存とShell復旧を確認する。host-pages-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
+単体回帰はnotification-foundation/policy/routing/services、GUIはnotification-center/desktop/settings-ui-test.cjsとshell-bars-ui-test.cjs --notifications-onlyが担当する。表示先・操作・期限・フォーカスと通常Appletの接続を確認する。実測はVERIFICATIONへ記録する。
 
 ## Windows表示の実装
 

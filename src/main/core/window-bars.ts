@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import type { ShellBarAction, ShellBarModel, ShellBarRegion } from '../../shared/shell-bars';
+import type { WindowBarAction, WindowBarModel, WindowBarRegion } from '../../shared/window-bars';
 
-type Operation = keyof ShellBarModel['actions'];
+type Operation = keyof WindowBarModel['actions'];
 type Receipt = { action: string; promise: Promise<unknown>; completed?: number };
-/** Projects window/update services; no native View or Shell implementation belongs here. */
+/** Projects window/update services; no native View or renderer implementation belongs here. */
 export class WindowBars {
   private ids = new Map<Operation, string>();
-  private revisions = new Map<ShellBarRegion, { signature: string; revision: number }>();
+  private revisions = new Map<WindowBarRegion, { signature: string; revision: number }>();
   private requests = new Map<string, Receipt>();
   constructor(
     private options: {
       state(): Omit<
-        ShellBarModel,
+        WindowBarModel,
         'schemaVersion' | 'contextId' | 'region' | 'revision' | 'actions'
       >;
       history?(): import('../../shared/navigation').HistoryAvailability;
@@ -19,7 +19,7 @@ export class WindowBars {
     },
   ) {}
 
-  snapshot(region: ShellBarRegion): ShellBarModel {
+  snapshot(region: WindowBarRegion): WindowBarModel {
     const state = this.options.state();
     const history = region === 'titlebar' ? this.options.history?.() : undefined;
     const operations: Operation[] =
@@ -39,7 +39,7 @@ export class WindowBars {
             ...(!state.update.busy && !state.update.blocked ? ['update' as const] : []),
             ...(state.update.busy && state.update.cancellable ? ['cancel' as const] : []),
           ];
-    const actions: ShellBarModel['actions'] = {};
+    const actions: WindowBarModel['actions'] = {};
     for (const key of operations) {
       if (!this.ids.has(key)) this.ids.set(key, randomUUID());
       actions[key] = this.ids.get(key)!;
@@ -58,7 +58,7 @@ export class WindowBars {
     };
   }
 
-  invoke(region: ShellBarRegion, session: string, request: ShellBarAction): Promise<unknown> {
+  invoke(region: WindowBarRegion, session: string, request: WindowBarAction): Promise<unknown> {
     if (
       !request ||
       request.sessionId !== session ||

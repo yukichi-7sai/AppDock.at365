@@ -180,7 +180,7 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 全体設定とApplet詳細は同じSettingsPageSession/本体SettingsPage本文を使う。保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
 
-SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.settingsPageを使う。旧page.settingsのShell宣言と保存指定は読込可能だが描画には使用しない。部分JSON・入力キュー・外部競合・検索は[設定基盤](settings-foundation.md)を正本とする。scripts/settings-shell-ui-test.cjs [固定EXE]は本体設定の即時保存・IME・画像・失敗/競合・入力flush・復元を確認する。
+SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.settingsPageを使う。旧page.settingsのShell宣言と保存指定は読込可能だが描画には使用しない。部分JSON・入力キュー・外部競合・検索は[設定基盤](settings-foundation.md)を正本とする。scripts/settings-search-ui-test.cjsと各設定/保存試験は本体設定の入力・検索・保存・競合を確認する。
 
 ## Appletの表示順
 
@@ -191,7 +191,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.
 
 ## コマンドパレットの共用
 
-コマンド検索・トレイの選択・説明文のコマンドリンクは、本体のCommandPaletteSessionと固定パレットrendererを共用します。表示・取消・フォーカス・復旧は[共通オーバーレイ](shell-overlays.md)に従い、Shellの提供元から独立した専用WebContentsViewを使います。
+コマンド検索・トレイの選択・説明文のコマンドリンクは、本体のCommandPaletteSessionと固定パレットrendererを共用します。表示・取消・フォーカス・復旧は[共通オーバーレイ](workspace-overlays.md)に従い、本体の専用WebContentsViewを使います。
 
 ## 割り当て操作UIの共用
 

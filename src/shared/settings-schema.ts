@@ -9,7 +9,6 @@ import { minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
-import { parseShellProviders } from './shell';
 import { parseNotificationPreferences } from './notification-types';
 import {
   parseKeybindings,
@@ -74,12 +73,6 @@ export function parseSettings(value: unknown): Settings {
   // Files may omit default-valued fields. Explicit invalid values still reach validation.
   if (object(value) && value.schemaVersion === 1) {
     const raw = value;
-    if (
-      object(raw.host) &&
-      !Object.hasOwn(raw.host, 'shellProviders') &&
-      Object.hasOwn(raw.host, 'shellProvider')
-    )
-      value = { ...raw, host: { ...raw.host, shellProviders: parseShellProviders(raw.host) } };
     const defaults = createDefaultSettings();
     if (object(raw.ribbon) && Array.isArray(raw.ribbon.groups)) {
       const children = new Set(
@@ -131,7 +124,6 @@ export function parseSettings(value: unknown): Settings {
   for (const key of ['closeToTray', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean')
       throw new Error(hostText('validation.hostBoolean', { key }));
-  const shellProviders = parseShellProviders(value.host);
   const language = value.host.language === undefined ? defaultHostLanguage : value.host.language;
   // A shared profile can select a pack installed only on another PC.
   if (!validHostLanguageCode(language)) throw new Error(hostText('language.invalid'));
@@ -143,6 +135,7 @@ export function parseSettings(value: unknown): Settings {
     throw new Error(hostText('validation.hostBoolean', { key: 'soundEnabled' }));
   const {
     shellProvider: legacyShellProvider,
+    shellProviders: legacyShellProviders,
     notifications: legacyNotifications,
     ...host
   } = value.host;
@@ -295,7 +288,6 @@ export function parseSettings(value: unknown): Settings {
     extensions: value.extensions,
     host: {
       ...host,
-      shellProviders,
       language,
       showHints,
       soundEnabled,

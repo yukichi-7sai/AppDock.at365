@@ -1,5 +1,4 @@
 import { hostText } from '../../shared/i18n';
-import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import { BrowserWindow, screen, type Rectangle, type Tray } from 'electron';
 import { NotificationSurfaceHost } from './notification-surface-host';
 import { NotificationSurfaceController } from './notification-surface-controller';
@@ -23,13 +22,10 @@ export class NotificationDesktopHost {
       parent: BrowserWindow;
       availability: NotificationAvailability;
       preload: string;
+      uiFolder: string;
       dark(): boolean;
       tray(): Tray | undefined;
-      providers(): ShellProvider[];
-      registry: ShellProviderRegistry;
       ready(): boolean;
-      settings(provider: string): Record<string, unknown>;
-      execute(provider: string, command: string): Promise<unknown>;
       openCenter(): Promise<void>;
       failed(message: string): void;
     },
@@ -106,16 +102,13 @@ export class NotificationDesktopHost {
       this.host = new NotificationSurfaceHost({
         window,
         preload: this.options.preload,
+        uiFolder: this.options.uiFolder,
         controller: new NotificationSurfaceController(
           this.options.service,
           this.options.dark,
           'desktop',
         ),
-        providers: this.options.providers,
-        registry: this.options.registry,
         ready: this.options.ready,
-        settings: this.options.settings,
-        execute: this.options.execute,
         layer: () => {},
         failed: (message) => this.options.failed(message),
         openCenter: this.options.openCenter,
@@ -141,7 +134,6 @@ export class NotificationDesktopHost {
     this.host?.refresh();
   }
   retry() {
-    this.options.registry.retry('notification.desktop');
     this.options.availability.retry();
     this.host?.retry();
   }

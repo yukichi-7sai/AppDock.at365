@@ -2,7 +2,6 @@ import { hostText } from '../shared/i18n';
 import { configureHostLanguage } from './core/host-translation-source';
 import { effectiveHostLanguage } from '../shared/host-language';
 import { refreshTranslationMetadata } from '../shared/translation-metadata';
-import type { OwnShellState } from '../shared/shell';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
@@ -45,10 +44,7 @@ export interface NodeExtensionContext {
       badge: import('../shared/ribbon').RibbonBadge,
     ): Promise<unknown>;
   };
-  shell: {
-    getState(): Promise<OwnShellState>;
-    onChanged(handler: (state: OwnShellState) => unknown | Promise<unknown>): () => void;
-  };
+
   appdock: AppDockClient;
   pages: {
     open(id: string): Promise<unknown>;
@@ -151,9 +147,6 @@ const tray: TrayItem[] = [];
 const disposables: (() => void)[] = [];
 let configuration: Record<string, unknown> = {};
 let extension: NodeExtension;
-let shellRevision = -1;
-let shellChanges = Promise.resolve();
-const shellHandlers = new Set<(state: OwnShellState) => unknown | Promise<unknown>>();
 const settingsHandlers = new Set<Handler>();
 const notificationHandlers = new Set<Handler>();
 const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) => {
@@ -181,21 +174,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             }
           },
         },
-        shell: {
-          getState: async () => {
-            const state = (await peer.request('host.shell.getState', {})) as OwnShellState;
-            shellRevision = Math.max(shellRevision, state.revision);
-            return state;
-          },
-          onChanged: (handler) => {
-            shellHandlers.add(handler);
-            const dispose = () => {
-              shellHandlers.delete(handler);
-            };
-            disposables.push(dispose);
-            return dispose;
-          },
-        },
+
         appdock: createAppDockClient((method, params) =>
           peer.request(method, {
             ...(params as object),
@@ -402,17 +381,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
       await extension.onPanelAction(p.id);
-      return null;
-    case 'shell.changed':
-      shellChanges = shellChanges
-        .catch(() => {})
-        .then(async () => {
-          if (p.revision > shellRevision) {
-            shellRevision = p.revision;
-            for (const handler of shellHandlers) await handler(p);
-          }
-        });
-      await shellChanges;
       return null;
     case 'notifications.changed':
       for (const handler of notificationHandlers) await handler();

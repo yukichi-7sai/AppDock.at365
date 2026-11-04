@@ -80,7 +80,10 @@ settings.notificationPreferences.overrides.push({
   typeId: 'available',
   targets: ['banner'],
 });
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const checks = [],
   failures = [];
 let host,
@@ -159,10 +162,7 @@ async function selected(id) {
     }, 'startup');
     assert.equal((await snapshot()).version, require('../package.json').version);
     assert.equal(
-      await inspect(
-        mainPort,
-        "JSON.parse(process.getBuiltinModule('fs').readFileSync(process.resourcesPath+'/shells/default/extension.json','utf8')).version",
-      ),
+      await inspect(mainPort, electronExpression + '.app.getVersion()'),
       require('../package.json').version,
     );
     const baseline = (await snapshot()).settings.value;

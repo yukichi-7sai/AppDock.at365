@@ -1,8 +1,6 @@
 export interface HostSettings {
   language: import('./host-language').HostLanguage;
   /** Input compatibility only; parseSettings removes this key. */
-  shellProvider?: string;
-  shellProviders?: Record<string, string>;
   theme: 'dark' | 'light' | 'system';
   zoomFactor: number;
   accentColor: import('./appearance').AccentColor;
@@ -87,7 +85,8 @@ export interface Command {
   category?: string;
 }
 export interface DeclaredCommand extends Command {
-  shellRequirement?: import('./shell').ShellRequirement;
+  /** Read-only compatibility marker for retired Shell-only commands. */
+  retiredShellCommand?: true;
   automation?: boolean;
   activateOnExecute?: boolean;
   aliases?: string[];
@@ -214,12 +213,6 @@ export interface ExtensionManifest extends Partial<
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
   pageCollections?: import('./page-collections').PageCollectionDefinition[];
   notificationTypes?: import('./notification-types').NotificationTypeDefinition[];
-  shell?: {
-    apiVersion: 1;
-    ribbonSchemaVersion?: 1 | 2 | 3;
-    ui?: string;
-    views?: Record<string, string>;
-  };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;
   id: string;
@@ -278,9 +271,7 @@ export interface LogEntry {
 export interface HostSnapshot {
   navigationHistory: import('./navigation').HistoryAvailability;
   ribbonDisplayMode?: import('./ribbon').RibbonDisplayMode;
-  navigation: import('./shell').NavigationState;
-  shell: import('./shell').ShellStatus;
-  shellRegions?: import('./shell').ShellRegionsSnapshot;
+  navigation: import('./workspace-ui').NavigationState;
   overlay: { active: boolean; kind: string | null };
   appletApi?: {
     permissions: import('./appdock-api').AppletApiPermissions;
@@ -327,16 +318,15 @@ export interface DockApi {
   onSettingsEditingChanged(callback: () => void): () => void;
   pages: import('./host-pages').HostPageApi;
   onLogSourceChanged(callback: (source: string) => void): () => void;
-  focusShell(edge: 'first' | 'last'): Promise<void>;
-  onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
+  focusRibbon(edge: 'first' | 'last'): Promise<void>;
+  onRibbonFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
   navigate(route: string | null, restore?: true): Promise<void>;
-  shellViewport(
+  ribbonViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
   overlayViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
-  retryShell(): Promise<void>;
   setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,
@@ -393,12 +383,12 @@ export interface DockApi {
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   barViewport(
-    region: import('./shell-bars').ShellBarRegion,
-    bounds: import('./shell-bars').ShellBarViewport | null,
+    region: import('./window-bars').WindowBarRegion,
+    bounds: import('./window-bars').WindowBarViewport | null,
   ): Promise<void>;
-  focusBar(region: import('./shell-bars').ShellBarRegion, edge: 'first' | 'last'): Promise<void>;
+  focusBar(region: import('./window-bars').WindowBarRegion, edge: 'first' | 'last'): Promise<void>;
   onBarFocusHost(
-    callback: (region: import('./shell-bars').ShellBarRegion, edge: 'before' | 'after') => void,
+    callback: (region: import('./window-bars').WindowBarRegion, edge: 'before' | 'after') => void,
   ): () => void;
   onChanged(callback: () => void): () => void;
 }

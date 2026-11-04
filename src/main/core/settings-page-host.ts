@@ -10,7 +10,7 @@ import type {
 } from '../../shared/settings-page';
 import type { SettingsPageSession } from './settings-page';
 
-/** One host-owned settings surface, independent of Shell providers and native views. */
+/** One host-owned settings surface, independent of UI providers and native views. */
 export class SettingsPageHost {
   private current?: { id: string; request: SettingsPageRequest; page: SettingsPageSession };
   private opening = 0;

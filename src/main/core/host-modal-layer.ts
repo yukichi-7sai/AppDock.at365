@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron';
 
-/** Tracks body dialogs; independent Shell views retain visibility, order and input. */
+/** Tracks body dialogs; independent host views retain visibility, order and input. */
 export class HostModalLayer {
   private state: 'none' | 'open' | 'confirm' = 'none';
   constructor(
