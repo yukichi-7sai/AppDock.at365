@@ -9,6 +9,7 @@ export interface HostSettings {
   showHints: boolean;
   showStatusBar: boolean;
   ribbonExpandOnHover: boolean;
+  ribbonHoverCollapseDelayMs: number;
   overlayBackground: 'blur' | 'transparent' | 'translucent';
   overlayShadow: boolean;
   soundEnabled: boolean;

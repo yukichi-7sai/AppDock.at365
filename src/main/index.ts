@@ -4952,6 +4952,7 @@ async function initialize() {
   });
   ribbonHover = new RibbonHover({
     enabled: () => settings.value.host.ribbonExpandOnHover,
+    collapseDelayMs: () => settings.value.host.ribbonHoverCollapseDelayMs,
     canExpand: () => overlayHost?.kind !== 'ribbon-group',
     available: () =>
       !!window &&

@@ -309,6 +309,64 @@ async function start() {
     w.focus();
   });
 }
+async function delaySettingsChecks() {
+  const input = host.main.getByRole('spinbutton', {
+    name: '小さくするまでの待ち時間（ms）',
+    exact: true,
+  });
+  const saved = async () => (await state()).settings.value.host.ribbonHoverCollapseDelayMs;
+  assert.equal(await input.inputValue(), '200');
+  await input.fill('750');
+  assert.equal(await saved(), 200, 'typing does not save');
+  await input.press('Escape');
+  assert.equal(await input.inputValue(), '200');
+  await input.fill('2500');
+  await input.press('Enter');
+  await until(async () => (await saved()) === 2500, 'delay committed by Enter');
+  for (const invalid of ['-1', '1.5', '']) {
+    await input.fill(invalid);
+    await input.press('Enter');
+    await until(
+      async () => (await host.main.getByRole('alert').count()) > 0,
+      'invalid delay reported',
+    );
+    assert.equal(await saved(), 2500, 'invalid delay never reaches saved settings');
+    assert.equal(await input.inputValue(), invalid, 'invalid input stays editable');
+    await input.fill('2500');
+    await input.press('Enter');
+    await until(
+      async () => (await host.main.getByRole('alert').count()) === 0,
+      'delay error cleared',
+    );
+  }
+  await input.fill('2500');
+  await input.press('Tab');
+  await move('inside');
+  await mode('expanded');
+  const bounds = await mainBounds();
+  await move('left');
+  await delay(1100);
+  assert.equal((await state()).ribbonDisplayMode, 'expanded', 'poll must not shorten 2500ms delay');
+  assert.deepEqual(await mainBounds(), bounds);
+  await move('inside');
+  await delay(2700);
+  await mode('expanded');
+  await move('left');
+  await mode('compact');
+  await input.fill('0');
+  await input.press('Tab');
+  await until(async () => (await saved()) === 0, 'zero saved by blur');
+  await move('inside');
+  await mode('expanded');
+  await move('body');
+  await mode('compact');
+  await input.fill('200');
+  await input.press('Enter');
+  await until(async () => (await saved()) === 200, 'default restored');
+  checks.push(
+    'delay input defaults to 200ms; Enter/blur save, Escape cancels, invalid values stay unsaved; 2500ms survives polling and re-entry cancels; zero collapses on detection without resizing main',
+  );
+}
 (async () => {
   try {
     await start();
@@ -320,6 +378,7 @@ async function start() {
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await toggle.click();
     await mode('compact');
+    await delaySettingsChecks();
     const compactMain = await mainBounds();
     const before = fs.readFileSync(
       file(profile, `settings-${require('node:os').hostname()}.json`),
@@ -465,6 +524,16 @@ async function start() {
     await mode('compact');
     checks.push('hide clears automatic expansion and show outside ribbon stays compact');
     toggle = await openSettings();
+    const persistedDelay = host.main.getByRole('spinbutton', {
+      name: '小さくするまでの待ち時間（ms）',
+      exact: true,
+    });
+    await persistedDelay.fill('500');
+    await persistedDelay.press('Enter');
+    await until(
+      async () => (await state()).settings.value.host.ribbonHoverCollapseDelayMs === 500,
+      'restart delay saved',
+    );
     await host.resize(1720, 1000);
     await host.main.screenshot({ path: path.join(profile, 'settings-wide.png') });
     await host.resize(900, 620);
@@ -477,6 +546,7 @@ async function start() {
     await move('body');
     await mode('compact');
     assert.equal((await state()).settings.value.host.ribbonExpandOnHover, true);
+    assert.equal((await state()).settings.value.host.ribbonHoverCollapseDelayMs, 500);
     await move('inside');
     await mode('expanded');
     await move('body');
@@ -485,7 +555,7 @@ async function start() {
     await toggle.click();
     await mode('compact');
     checks.push(
-      'setting survives restart; disabling restores remembered compact mode; wide/light and narrow/dark settings captured',
+      'automatic mode and 500ms delay survive restart; disabling restores remembered compact mode; wide/light and narrow/dark settings captured',
     );
     fs.writeFileSync(
       path.join(profile, 'result.json'),

@@ -65,6 +65,7 @@ function change(value, pageId, alternate = false) {
     };
   } else if (pageId === 'ribbon') {
     next.host.ribbonExpandOnHover = !alternate;
+    next.host.ribbonHoverCollapseDelayMs = alternate ? 0 : 2500;
     next.ribbon.rightClickCommand = alternate ? 'appdock.quit' : 'appdock.open';
     next.ribbon.hidden = alternate ? ['settings'] : [];
   } else if (pageId === 'statusbar') {

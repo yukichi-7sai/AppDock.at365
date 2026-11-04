@@ -274,6 +274,47 @@ test('custom accent API validates HEX in dryRun, saves the pair atomically, and 
     (e) => e.code === 'REVISION_CONFLICT',
   );
 });
+test('hover delay is publicly editable with validation, revision and dry-run protection', (t) => {
+  const f = fixture(t);
+  const schema = f.api.call('settings.getSchema').fields.ribbonHoverCollapseDelayMs;
+  assert.equal(schema.type, 'number');
+  assert.equal(f.commands.get().values.ribbonHoverCollapseDelayMs, 200);
+  assert.equal(schema.minimum, 0);
+  const revision = f.commands.revision();
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  for (const value of [-1, 1.5, '500'])
+    assert.throws(
+      () =>
+        f.commands.execute('appdock.settings.update', {
+          changes: { ribbonHoverCollapseDelayMs: value },
+          expectedRevision: revision,
+          dryRun: true,
+        }),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  const dry = f.commands.execute('appdock.settings.update', {
+    changes: { ribbonHoverCollapseDelayMs: 2500 },
+    expectedRevision: revision,
+    dryRun: true,
+  });
+  assert.equal(dry.values.ribbonHoverCollapseDelayMs, 2500);
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  f.commands.execute('appdock.settings.update', {
+    changes: { ribbonHoverCollapseDelayMs: 0 },
+    expectedRevision: revision,
+  });
+  assert.equal(f.settings.value.host.ribbonHoverCollapseDelayMs, 0);
+  assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.ribbonHoverCollapseDelayMs, 0);
+  assert.throws(
+    () =>
+      f.commands.execute('appdock.settings.update', {
+        changes: { ribbonHoverCollapseDelayMs: 500 },
+        expectedRevision: revision,
+      }),
+    { code: 'REVISION_CONFLICT' },
+  );
+});
+
 for (const field of ['soundEnabled', 'showHints'])
   test(`${field} generates public ON/OFF/toggle commands with immediate persisted effects`, async (t) => {
     const f = fixture(t);

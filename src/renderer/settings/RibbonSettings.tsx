@@ -27,7 +27,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
-import { SettingsInput } from '../settings-ui/SettingsInput';
+import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { Toggle } from '../settings-ui/Toggle';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
@@ -491,6 +491,32 @@ export function RibbonSettings({
                 onChange({
                   ...settings,
                   host: { ...settings.host, ribbonExpandOnHover },
+                })
+              }
+            />
+          </SettingsField>
+        </SettingsMcpScope>
+        <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonHoverCollapseDelayMs')}>
+          <SettingsField
+            title={translate('settings.ribbonSettings.collapseDelay')}
+            description={translate('settings.ribbonSettings.collapseDelayDescription')}
+            {...settingAnchor('ribbon', 'ribbonHoverCollapseDelayMs')}
+          >
+            <SettingsInput
+              aria-label={translate('settings.ribbonSettings.collapseDelay')}
+              type="number"
+              min={0}
+              max={Number.MAX_SAFE_INTEGER}
+              step={1}
+              disabled={busy}
+              value={settings.host.ribbonHoverCollapseDelayMs}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  host: {
+                    ...settings.host,
+                    ribbonHoverCollapseDelayMs: numberInput(event.target.value),
+                  },
                 })
               }
             />

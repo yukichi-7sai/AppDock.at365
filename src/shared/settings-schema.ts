@@ -162,6 +162,8 @@ export function parseSettings(value: unknown): Settings {
       validateSettingValue(field, value.host[field.key]);
   for (const key of ['textPaletteRows', 'clipboardPaletteRows'])
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidRows'));
+  if (!Number.isSafeInteger(value.host.ribbonHoverCollapseDelayMs))
+    throw Error(hostText('settings.ribbonSettings.invalidCollapseDelay'));
   for (const key of ['textPaletteWidth', 'clipboardPaletteWidth'])
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidWidth'));
   if (!isStartPage(value.host.startPage)) throw Error(hostText('general.startPage.invalid'));

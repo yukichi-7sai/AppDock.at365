@@ -48,6 +48,17 @@ const definitions = localizedMetadata(
         automation: true,
         generateCommands: [...switches],
       },
+      ribbonHoverCollapseDelayMs: {
+        pageId: 'ribbon',
+        title: hostText('settings.ribbonSettings.collapseDelay'),
+        description: hostText('settings.ribbonSettings.collapseDelayDescription'),
+        type: 'number',
+        default: 200,
+        minimum: 0,
+        maximum: Number.MAX_SAFE_INTEGER,
+        step: 1,
+        automation: true,
+      },
       language: {
         pageId: 'appearance',
         title: hostText('language.label'),
