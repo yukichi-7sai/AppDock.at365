@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-11-05 自己設定移動のコミット・プッシュ前照合
+
+- 利用者からボタンでの実利用が正常に動いたとの確認と、コミット・プッシュ依頼を受領。実装時の1,059入力、完全ログ/終了コード、発行管理101ファイルと更新ZIP/feedを照合し、0.147.2の成功結果を再利用した。
+- 標準回帰182ファイルを棚卸し。現在の関連4ファイル24件を再利用し、変更したmainソースを直接走査する文言検査1ファイル10件を追加実行して成功。残る177ファイルは直前のコミット照合から試験/依存が不変で、差分がpackage版・mainの重複navigate削除・文書だけであることを確認し、既存の成功ログを再利用した。固定EXEの履歴7群、兄弟Appletのボタン/パレットを含む18群と自動更新6群も照合済み。
+- originをfetchし、開始時mainとorigin/mainが`1384d39`で一致することを確認。対象4ファイルの差分レビューで阻害指摘なし。今回の追記は検証文書だけで、製品変更・追加発行・版更新なし。
+- 再利用判定、試験別一覧、追加実行、stage/commit tree、通常push後のリモート照合を`.artifacts/commit-validation-settings-navigation-20261105/`へ記録する。新しいGUI profileや実行物コピーは作成していない。GitHub Release・実利用先への配置は含めない。
+
+## 2026-11-05 Applet自己設定の移動経路統一（0.147.2）
+
+- mainは開始時clean、`pull --ff-only`で`1384d394574a1c1c91efe3cbda1345163bc40d41`の最新状態を確認。WallpaperSlideshow側と合わせて設定ボタンの戻る履歴を修正した。
+- `host.ui.openSettings`は既存の`appdock.settings.applet.<id>.open`を1回実行する経路に集約し、その後の重複したnavigateを削除。入力・応答・ui capability・自身限定の境界、既存コマンドID、保存仕様、SDK/Runtimeは変更していない。
+- 発行前レビューで、共通コマンドによる入力確定/画面移動、戻る/進む、自己設定APIの拒否境界、Appletの非表示時画像解放を確認し、阻害指摘なし。内部の不具合修正として0.147.1から0.147.2へパッチ更新した。
+- `dev.bat run typecheck`、`dev.bat run build`、`navigation-history`/`applet-settings-navigation`/`ui-presentation`/`settings-navigation`のNode回帰24件が成功。WallpaperSlideshowの開発GUIでも実ボタンと実パレットからの設定移動・各1回の戻る/進む・画像と世代保持の解放・設定不変が成功した。
+- `publish.bat`終了0。発行固定EXEで`navigation-history-ui-test.cjs`の7群と、WallpaperSlideshowの発行Web資産GUI18群・自動更新GUI6群が成功。本体の通常ページ/設定項目/検索/停止したAppletの除外/10回履歴/再起動の初期化を確認した。GUIは直列・隔離profile・共用test-runtimeで実施し、実利用の壁紙・設定を使用していない。
+- `A:\40.ARTIFACT\AppDock.at365`のfeed/PE版（0.147.2.0）/ステージ/配布物/ZIP全101ファイルを照合。ZIP SHA256=`6af3b0b6f4178e07a29e154cc74523cc78010744b49eb22f36614e7be87304c0`、175,100,891 bytes。配布EXEと共用試験EXEのSHA256は`ce0747ca96db9b8db4c3b02535326ed7345f4ca2b9e88714f4d7a14862283709`で一致。最初のPE版照合は4桁/3桁表記の差で失敗し、3要素比較へ修正して全照合を再実行した。
+- 証跡は`.artifacts/settings-navigation-20261105/`。本体1,059入力と兄弟repo67入力のSHA256、レビュー、完全ログ/終了コード、配布物ハッシュを記録し、検証後の一致を確認。版変更後の初回formatはpnpmの依存整合検査で停止し、`install --frozen-lockfile`後の実行は成功。lockfileと検査設定は変更していない。
+- 本体GUI証跡は`.artifacts/navigation-history-ui-1793805918221/`。成功した固定EXE方式の最新3件を保持し、プロセス不在・実パス・再解析ポイント・成功記録を確認して旧成功`navigation-history-ui-1793663251673`を1件整理。失敗/未確認フォルダー・共用ランタイムは保持した。
+- 今回の変更と無関係な全標準回帰・実壁紙/実Explorer操作は未実施。ユーザー環境での実利用確認、commit・push・GitHub Release・実利用先への配置は未実施。
+
 ## 2026-11-05 手動リボンサイズ設定のコミット・プッシュ前照合（0.147.1）
 
 - 利用者から使いやすさの確認完了と、コミット・プッシュ依頼を受領。実利用での受入結果を記録し、実NAS同期や複数モニター間の物理DPI往復まで確認済みとはしない。

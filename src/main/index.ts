@@ -4138,7 +4138,6 @@ async function initialize() {
         },
         openSettings: async (id) => {
           await executeCommand(`appdock.settings.applet.${id}.open`);
-          await navigation.navigate('settings', undefined, id, 'settings');
           return { accepted: true };
         },
         failed: (id) =>
