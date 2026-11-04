@@ -43,7 +43,22 @@ test('expanded width preserves old defaults, validates pixels and shares the dis
     assert.throws(() => parseSettings({ schemaVersion: 1, host: { ribbonExpandedWidth: width } }));
 });
 
-test('ribbon width and delay participate in public metadata, search catalog, JSON and page reset', () => {
+test('manual size defaults to expanded and rejects invalid values', () => {
+  assert.equal(parseSettings({ schemaVersion: 1 }).host.ribbonDisplayMode, 'expanded');
+  assert.equal(settingsStorageValue(createDefaultSettings()).host?.ribbonDisplayMode, undefined);
+  for (const mode of ['compact', 'expanded']) {
+    const settings = parseSettings({ schemaVersion: 1, host: { ribbonDisplayMode: mode } });
+    assert.equal(parseSettings(settingsStorageValue(settings)).host.ribbonDisplayMode, mode);
+  }
+  for (const mode of ['large', '', null, true, 1])
+    assert.throws(() => parseSettings({ schemaVersion: 1, host: { ribbonDisplayMode: mode } }));
+});
+
+test('ribbon size, width and delay participate in public metadata, search catalog, JSON and page reset', () => {
+  const size = hostSettingDefinitions.find((field) => field.key === 'ribbonDisplayMode');
+  assert.equal(size.pageId, 'ribbon');
+  assert.equal(size.automation, true);
+  assert.equal(size.default, 'expanded');
   const field = hostSettingDefinitions.find((field) => field.key === 'ribbonHoverCollapseDelayMs');
   assert.equal(field.pageId, 'ribbon');
   assert.equal(field.automation, true);
@@ -59,6 +74,7 @@ test('ribbon width and delay participate in public metadata, search catalog, JSO
   const page = settingsCatalog([], current).find((page) => page.id === 'ribbon');
   assert(JSON.stringify(page).includes('ribbonHoverCollapseDelayMs'));
   assert(JSON.stringify(page).includes('ribbonExpandedWidth'));
+  assert(JSON.stringify(page).includes('ribbonDisplayMode'));
   const edited = parseSettings(
     applySettingsJson(
       current,
@@ -67,6 +83,7 @@ test('ribbon width and delay participate in public metadata, search catalog, JSO
       JSON.stringify({
         host: {
           ribbonExpandOnHover: true,
+          ribbonDisplayMode: 'compact',
           ribbonHoverCollapseDelayMs: 0,
           ribbonExpandedWidth: 280,
         },
@@ -75,10 +92,12 @@ test('ribbon width and delay participate in public metadata, search catalog, JSO
   );
   assert.equal(settingsJsonProjection(edited, page, []).host.ribbonHoverCollapseDelayMs, 0);
   assert.equal(settingsJsonProjection(edited, page, []).host.ribbonExpandedWidth, 280);
+  assert.equal(settingsJsonProjection(edited, page, []).host.ribbonDisplayMode, 'compact');
   const reset = parseSettings(resetSettingsPage(edited, page, []));
   assert.equal(reset.host.ribbonHoverCollapseDelayMs, 200);
   assert.equal(reset.host.ribbonExpandedWidth, 200);
   assert.equal(reset.host.ribbonExpandOnHover, false);
+  assert.equal(reset.host.ribbonDisplayMode, 'expanded');
   assert.equal(reset.host.theme, 'dark');
   assert.deepEqual(settingsJsonProjection(reset, page, []), {});
 });

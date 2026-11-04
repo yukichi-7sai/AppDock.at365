@@ -40,6 +40,18 @@ const switches = ['on', 'off', 'toggle'] as const;
 const definitions = localizedMetadata(
   () =>
     ({
+      ribbonDisplayMode: {
+        pageId: 'ribbon',
+        title: hostText('settings.ribbonSettings.manualSize'),
+        description: hostText('settings.ribbonSettings.manualSizeDescription'),
+        type: 'select',
+        default: 'expanded',
+        options: [
+          { value: 'compact', label: hostText('settings.ribbonSettings.manualSizeSmall') },
+          { value: 'expanded', label: hostText('settings.ribbonSettings.manualSizeLarge') },
+        ],
+        automation: true,
+      },
       ribbonExpandOnHover: {
         pageId: 'ribbon',
         title: hostText('settings.ribbonSettings.expandOnHover'),

@@ -68,7 +68,17 @@ for (const id of ['main', 'other'])
   addEventListener('click',()=>window.clicks++);addEventListener('resize',()=>window.resizes++);</script>`,
   );
 settings.extensions['fixture.hover'] = { enabled: true, settings: {} };
+// Simulate an older installation: no manual-size setting and a compact device UI state.
+delete settings.host.ribbonDisplayMode;
 fs.writeFileSync(file(profile), JSON.stringify(settings));
+const legacyDevice = require('../out/main/main/core/device-settings').initialDeviceSettings(
+  require('node:os').hostname(),
+);
+legacyDevice.uiState = { ribbon: { schemaVersion: 1, expanded: {}, displayMode: 'compact' } };
+fs.writeFileSync(
+  file(profile, `settings-${require('node:os').hostname()}.json`),
+  JSON.stringify(legacyDevice),
+);
 const checks = [];
 let host, rail, original;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -478,30 +488,60 @@ async function widthSettingsChecks() {
   try {
     await start();
     await move('body');
-    await mode('compact');
-    await rail.locator('[data-ribbon-id="ribbon-display-mode"]').click();
     await mode('expanded');
+    assert.equal((await state()).settings.value.host.ribbonDisplayMode, 'expanded');
     let toggle = await openSettings();
+    let manualSize = host.main.getByRole('combobox', { name: '手動時の大きさ', exact: true });
+    assert.equal(await manualSize.inputValue(), 'expanded');
+    await manualSize.selectOption('compact');
+    await mode('compact');
+    await host.close();
+    host = undefined;
+    await start();
+    await move('body');
+    await mode('compact');
+    assert.equal((await state()).settings.value.host.ribbonDisplayMode, 'compact');
+    toggle = await openSettings();
+    manualSize = host.main.getByRole('combobox', { name: '手動時の大きさ', exact: true });
+    await manualSize.selectOption('expanded');
+    await mode('expanded');
     assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await toggle.click();
     await mode('compact');
+    await manualSize.selectOption('compact');
+    await until(
+      async () => (await state()).settings.value.host.ribbonDisplayMode === 'compact',
+      'manual preference saved during automatic mode',
+    );
+    assert.equal((await state()).settings.value.host.ribbonExpandOnHover, true);
+    await manualSize.selectOption('expanded');
+    await until(
+      async () => (await state()).settings.value.host.ribbonDisplayMode === 'expanded',
+      'manual preference restored',
+    );
+    checks.push(
+      'legacy compact state is ignored; default expanded, GUI manual-size selection and restart persistence work; editing manual size preserves hover mode',
+    );
     await delaySettingsChecks();
     await widthSettingsChecks();
     const compactMain = await mainBounds();
-    const before = fs.readFileSync(
+    const savedFiles = [
+      file(profile),
       file(profile, `settings-${require('node:os').hostname()}.json`),
-      'utf8',
-    );
+    ];
+    const before = savedFiles.map((name) => fs.readFileSync(name, 'utf8'));
+    const beforeRevision = (await state()).settings.revision;
     await move('inside');
     await mode('expanded');
     assert.deepEqual(await mainBounds(), compactMain, 'host settings keep their size during hover');
     await move('left');
     await mode('compact');
-    assert.equal(
-      fs.readFileSync(file(profile, `settings-${require('node:os').hostname()}.json`), 'utf8'),
+    assert.deepEqual(
+      savedFiles.map((name) => fs.readFileSync(name, 'utf8')),
       before,
-      'hover never saves UI state',
+      'hover never saves settings or UI state',
     );
+    assert.equal((await state()).settings.revision, beforeRevision);
     await move('inside');
     await mode('expanded');
     await host.save({ host: { ribbonExpandOnHover: false } });
@@ -532,6 +572,9 @@ async function widthSettingsChecks() {
     await rail.locator('[data-ribbon-id="ribbon-display-mode"]').click();
     await mode('compact');
     assert.equal((await state()).settings.value.host.ribbonExpandOnHover, false);
+    assert.equal((await state()).settings.value.host.ribbonDisplayMode, 'compact');
+    assert.equal(JSON.parse(fs.readFileSync(file(profile))).host.ribbonDisplayMode, 'compact');
+    assert.equal(await manualSize.inputValue(), 'compact');
     await move('body');
     await move('inside');
     await delay(1100);
@@ -646,16 +689,53 @@ async function widthSettingsChecks() {
       async () => (await state()).settings.value.host.ribbonHoverCollapseDelayMs === 500,
       'restart delay saved',
     );
+    await persistedDelay.press('Tab');
+    await until(
+      async () => !(await persistedDelay.isDisabled()),
+      'settings input commit completed',
+    );
     await host.resize(1720, 1000);
     await host.main.screenshot({ path: path.join(profile, 'settings-wide.png') });
-    await host.resize(900, 620);
+    // Finish the settings update before triggering a new settings-page layout projection.
     await host.save({ host: { theme: 'dark' } });
+    await until(async () => !(await persistedDelay.isDisabled()), 'theme update completed');
+    await host.resize(900, 620);
     await toggle.scrollIntoViewIfNeeded();
+    assert.deepEqual(
+      await host.main.getByRole('alert').allTextContents(),
+      [],
+      'narrow settings have no unexpected errors',
+    );
     await host.main.screenshot({ path: path.join(profile, 'settings-narrow-dark.png') });
     await host.main
       .getByRole('spinbutton', { name: '大きくしたときの幅（px）', exact: true })
       .scrollIntoViewIfNeeded();
     await host.main.screenshot({ path: path.join(profile, 'settings-width-narrow-dark.png') });
+    await manualSize.focus();
+    await manualSize.press('End');
+    await until(
+      async () => (await state()).settings.value.host.ribbonDisplayMode === 'expanded',
+      'narrow manual size changed by keyboard',
+    );
+    assert.equal((await state()).settings.value.host.ribbonExpandOnHover, true);
+    await manualSize.press('Home');
+    await until(
+      async () => (await state()).settings.value.host.ribbonDisplayMode === 'compact',
+      'narrow manual size restored by keyboard',
+    );
+    await until(
+      async () => !(await manualSize.isDisabled()),
+      'narrow manual size commit completed',
+    );
+    await manualSize.scrollIntoViewIfNeeded();
+    assert.deepEqual(
+      await host.main.getByRole('alert').allTextContents(),
+      [],
+      'manual size keyboard edits have no errors',
+    );
+    await host.main.screenshot({
+      path: path.join(profile, 'settings-manual-size-narrow-dark.png'),
+    });
     await host.close();
     host = undefined;
     await start();
@@ -664,6 +744,7 @@ async function widthSettingsChecks() {
     assert.equal((await state()).settings.value.host.ribbonExpandOnHover, true);
     assert.equal((await state()).settings.value.host.ribbonHoverCollapseDelayMs, 500);
     assert.equal((await state()).settings.value.host.ribbonExpandedWidth, 280);
+    assert.equal((await state()).settings.value.host.ribbonDisplayMode, 'compact');
     await move('inside');
     await mode('expanded');
     await move('body');

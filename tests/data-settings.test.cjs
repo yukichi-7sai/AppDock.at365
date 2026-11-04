@@ -34,7 +34,6 @@ test('device UI state survives restart in data settings without changing shared 
     fs.readdirSync(path.join(root, 'local-a/settings-backups/device/pc-a')).sort();
   const beforeBackups = backups();
   const ribbon = new RibbonState(a.uiStateStorage('ribbon'), () => {}, assert.fail);
-  ribbon.setDisplayMode('expanded');
   ribbon.set('group:one', true);
   const gallery = new GalleryViewStateStore(a.uiStateStorage('gallery'));
   gallery.save('library', 180);

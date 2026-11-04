@@ -477,7 +477,7 @@ let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
 let ribbonHover: RibbonHover | undefined;
 function ribbonDisplayMode() {
-  return ribbonHover?.displayMode ?? ribbonState?.displayMode ?? 'compact';
+  return ribbonHover?.displayMode ?? settings.value.host.ribbonDisplayMode;
 }
 const navigation = new NavigationCoordinator(
   () => changed(),
@@ -595,16 +595,13 @@ const presentation = new UiPresentation({
   },
 });
 function setRibbonDisplayMode(mode: import('../shared/ribbon').RibbonDisplayMode) {
-  if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
-  if (settings.value.host.ribbonExpandOnHover) {
-    const value = prepareSettings({
+  return commitSettings(
+    prepareSettings({
       ...settings.value,
-      host: { ...settings.value.host, ribbonExpandOnHover: false },
-    });
-    ribbonState.setDisplayMode(mode, () =>
-      commitSettings(value, settings.revision, undefined, [], 'page', mode),
-    );
-  } else ribbonState.setDisplayMode(mode);
+      host: { ...settings.value.host, ribbonExpandOnHover: false, ribbonDisplayMode: mode },
+    }),
+    settings.revision,
+  );
 }
 async function toggleTheme() {
   commitSettings(
@@ -2461,7 +2458,6 @@ function commitSettings(
   resetPage?: SettingsPageDefinition,
   rewrite: ('shared' | 'device')[] = [],
   resetScope: SettingsResetScope = 'page',
-  ribbonMode?: import('../shared/ribbon').RibbonDisplayMode,
 ) {
   assertSettingsWritable();
   settings.assertRevision(revision);
@@ -2491,7 +2487,6 @@ function commitSettings(
     resetPage
       ? settingsPageStorage(resetPage, resetScope).files.map((file) => file.scope)
       : rewrite,
-    ribbonMode,
   );
 }
 function settingsPageStorage(
@@ -4969,7 +4964,7 @@ async function initialize() {
         origin = window.getContentBounds();
       return !!ribbonHost?.containsContentPoint({ x: point.x - origin.x, y: point.y - origin.y });
     },
-    manualMode: () => ribbonState?.displayMode ?? 'compact',
+    manualMode: () => settings.value.host.ribbonDisplayMode,
     changed,
   });
   window.on('blur', () => ribbonHover?.reset());

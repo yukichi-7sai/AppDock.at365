@@ -10,7 +10,7 @@
 
 共有設定はEXE隣の`data/settings.json`、端末別設定は同じ`data/`直下の`settings-<端末名>.json`を使う。旧配置の設定・画面状態・Storageは読込・コピー・移行しない。通常の新規起動は新しい保存先から開始する。
 
-リボンのグループ定義・所属・表示名・アイコンのみ表示は、リボンページで選んだ共有`settings.json`または自端末の`settings-<端末名>.json`へ保存する。持続型の開閉・表示モードは端末別設定の`uiState.ribbon`へ分離し、一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-customization-design.md#pc専用の開閉状態)を参照する。
+リボンのグループ定義・所属・表示名・アイコンのみ表示・手動時の大きさは、リボンページで選んだ共有`settings.json`または自端末の`settings-<端末名>.json`へ保存する。手動時の大きさは`host.ribbonDisplayMode`で既定expanded。旧`uiState.ribbon.displayMode`は引き継がない。持続型グループの開閉は端末別設定の`uiState.ribbon`へ分離し、ホバーによる一時表示・一時パネル・バッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-customization-design.md#pc専用の開閉状態)を参照する。
 
 画像ライブラリーと画像選択のカードサイズは端末別設定の`uiState.gallery`へ独立して保存する。グループ定義・所属は引き続き共有`settings.json`、原画像は共有assets。検索・選択・閲覧位置はWindow内だけに保持する。破損・未知版・外部変更を上書きせず、設定カテゴリのリセットで原画像やカードサイズを削除しない。[共通ギャラリー](image-gallery.md)を参照する。
 

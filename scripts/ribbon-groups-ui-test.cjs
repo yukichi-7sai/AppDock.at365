@@ -19,6 +19,7 @@ const settings = require('../out/main/shared/settings-schema').createDefaultSett
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
 settings.host.theme = 'light';
+settings.host.ribbonDisplayMode = 'compact';
 settings.globalShortcutCommands = [];
 const fixture = path.join(profile, 'extensions', 'ribbon');
 fs.mkdirSync(fixture, { recursive: true });

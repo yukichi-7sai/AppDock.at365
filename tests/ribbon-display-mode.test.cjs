@@ -5,36 +5,35 @@ const { test } = require('node:test'),
 const { RibbonState } = require('../out/main/main/core/ribbon-state'),
   { UiPresentation, NavigationCoordinator } = require('../out/main/main/core/ui-presentation'),
   { createDefaultSettings } = require('../out/main/shared/settings-schema');
-test('display mode shares PC-local state with groups, accepts old state and commits atomically', () => {
+test('group state accepts old display modes without retaining them on new writes', () => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/ribbon-mode-state-')),
     file = path.join(dir, 'ribbon-state.json');
   let changed = 0,
     failed = 0;
-  fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, expanded: { 'group:one': true } }));
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ schemaVersion: 1, expanded: { 'group:one': true }, displayMode: 'compact' }),
+  );
   const s = new RibbonState(
     file,
     () => changed++,
     () => failed++,
   );
-  assert.equal(s.displayMode, 'compact');
   assert(s.isExpanded('group:one'));
-  assert.equal(s.setDisplayMode('expanded'), true);
-  assert.equal(s.setDisplayMode('expanded'), false);
-  assert.equal(changed, 1);
   s.set('group:two', true);
   assert.equal(
     new RibbonState(
       file,
       () => {},
       () => {},
-    ).displayMode,
-    'expanded',
+    ).isExpanded('group:two'),
+    true,
   );
   assert.deepEqual(JSON.parse(fs.readFileSync(file)).expanded, {
     'group:one': true,
     'group:two': true,
   });
-  assert.throws(() => s.setDisplayMode('invalid'));
+  assert.equal(JSON.parse(fs.readFileSync(file)).displayMode, undefined);
   const bytes = fs.readFileSync(file, 'utf8'),
     io = require('../out/main/main/core/settings'),
     write = io.atomicWrite;
@@ -42,14 +41,14 @@ test('display mode shares PC-local state with groups, accepts old state and comm
     throw Error('fixture write failure');
   };
   try {
-    assert.throws(() => s.setDisplayMode('compact'));
+    assert.throws(() => s.set('group:two', false));
   } finally {
     io.atomicWrite = write;
   }
-  assert.equal(s.displayMode, 'expanded');
+  assert.equal(s.isExpanded('group:two'), true);
   assert.equal(fs.readFileSync(file, 'utf8'), bytes);
   assert.equal(failed, 1);
-  assert.equal(changed, 2);
+  assert.equal(changed, 1);
 });
 test('expanded display respects individual icon flags without changing settings or command identity', async () => {
   const settings = createDefaultSettings();

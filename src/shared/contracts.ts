@@ -9,6 +9,7 @@ export interface HostSettings {
   showHints: boolean;
   showStatusBar: boolean;
   ribbonExpandOnHover: boolean;
+  ribbonDisplayMode: import('./ribbon').RibbonDisplayMode;
   ribbonExpandedWidth: number;
   ribbonHoverCollapseDelayMs: number;
   overlayBackground: 'blur' | 'transparent' | 'translucent';

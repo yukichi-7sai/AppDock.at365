@@ -64,6 +64,7 @@ function change(value, pageId, alternate = false) {
       speech: { voice: alternate ? 'incoming' : 'local', speed: alternate ? 0.75 : 1.5 },
     };
   } else if (pageId === 'ribbon') {
+    next.host.ribbonDisplayMode = alternate ? 'expanded' : 'compact';
     next.host.ribbonExpandOnHover = !alternate;
     next.host.ribbonExpandedWidth = alternate ? 320 : 280;
     next.host.ribbonHoverCollapseDelayMs = alternate ? 0 : 2500;
@@ -258,57 +259,76 @@ test('sharing a local page rolls both files back if the second write fails', (t)
   assert.equal(store.hostPageLocalSettings('about'), true);
 });
 
-test('manual ribbon override commits auto OFF and the remembered mode together, preserving groups', (t) => {
-  const { store } = fixture(t);
-  const { RibbonState } = require('../out/main/main/core/ribbon-state');
-  const ribbon = new RibbonState(
-    store.uiStateStorage('ribbon'),
-    () => {},
-    () => {},
-  );
-  ribbon.set('group:keep', true);
-  const automatic = structuredClone(store.value);
-  automatic.host.ribbonExpandOnHover = true;
-  store.save(automatic, store.revision);
-  const next = structuredClone(store.value);
-  next.host.ribbonExpandOnHover = false;
-  const before = [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8'));
-  const save = store.device.save;
-  store.device.save = () => {
-    throw Error('injected ribbon mode failure');
-  };
-  try {
-    assert.throws(
-      () =>
-        ribbon.setDisplayMode('expanded', () =>
-          store.save(next, store.revision, undefined, [], 'expanded'),
-        ),
-      /injected/,
+for (const local of [false, true])
+  test(`manual ribbon override commits auto OFF and size atomically in ${local ? 'local' : 'shared'} settings`, (t) => {
+    const { store } = fixture(t);
+    store.setHostPageLocalSettings('ribbon', local, store.revision);
+    const { RibbonState } = require('../out/main/main/core/ribbon-state');
+    const ribbon = new RibbonState(
+      store.uiStateStorage('ribbon'),
+      () => {},
+      () => {},
     );
-  } finally {
-    store.device.save = save;
-  }
-  assert.equal(store.value.host.ribbonExpandOnHover, true);
-  assert.equal(ribbon.displayMode, 'compact');
-  assert.deepEqual(
-    [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8')),
-    before,
-  );
-  ribbon.setDisplayMode('expanded', () =>
-    store.save(next, store.revision, undefined, [], 'expanded'),
-  );
-  assert.equal(store.value.host.ribbonExpandOnHover, false);
-  assert.equal(ribbon.displayMode, 'expanded');
-  ribbon.set('group:second', true); // The state-storage comparison is refreshed after the transaction.
-  const restored = new RibbonState(
-    store.uiStateStorage('ribbon'),
-    () => {},
-    () => {},
-  );
-  assert.equal(restored.displayMode, 'expanded');
-  assert.equal(restored.isExpanded('group:keep'), true);
-  assert.equal(restored.isExpanded('group:second'), true);
-});
+    ribbon.set('group:keep', true);
+    const automatic = structuredClone(store.value);
+    automatic.host.ribbonExpandOnHover = true;
+    store.save(automatic, store.revision);
+    const next = structuredClone(store.value);
+    next.host.ribbonExpandOnHover = false;
+    next.host.ribbonDisplayMode = 'compact';
+    const before = [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8'));
+    const target = local ? store.device : store.shared;
+    const save = target.save;
+    target.save = () => {
+      throw Error('injected ribbon mode failure');
+    };
+    try {
+      assert.throws(() => store.save(next, store.revision), /injected/);
+    } finally {
+      target.save = save;
+    }
+    assert.equal(store.value.host.ribbonExpandOnHover, true);
+    assert.equal(store.value.host.ribbonDisplayMode, 'expanded');
+    assert.deepEqual(
+      [store.shared.file, store.device.file].map((f) => fs.readFileSync(f, 'utf8')),
+      before,
+    );
+    store.save(next, store.revision);
+    assert.equal(store.value.host.ribbonExpandOnHover, false);
+    assert.equal(store.value.host.ribbonDisplayMode, 'compact');
+    ribbon.set('group:second', true); // The state-storage comparison is refreshed after the transaction.
+    const restored = new RibbonState(
+      store.uiStateStorage('ribbon'),
+      () => {},
+      () => {},
+    );
+    store.reload();
+    assert.equal(store.value.host.ribbonDisplayMode, 'compact');
+    assert.equal(restored.isExpanded('group:keep'), true);
+    assert.equal(restored.isExpanded('group:second'), true);
+  });
+
+for (const legacyMode of ['compact', 'expanded'])
+  test(`legacy ${legacyMode} UI state does not become the manual size setting`, (t) => {
+    const { store } = fixture(t, (device) => {
+      device.uiState = {
+        ribbon: { schemaVersion: 1, expanded: { 'group:keep': true }, displayMode: legacyMode },
+      };
+    });
+    assert.equal(store.value.host.ribbonDisplayMode, 'expanded');
+    const { RibbonState } = require('../out/main/main/core/ribbon-state');
+    assert.equal(
+      new RibbonState(store.uiStateStorage('ribbon'), () => {}, assert.fail).isExpanded(
+        'group:keep',
+      ),
+      true,
+    );
+    const next = structuredClone(store.value);
+    next.host.ribbonDisplayMode = 'compact';
+    store.save(next, store.revision);
+    store.reload();
+    assert.equal(store.value.host.ribbonDisplayMode, 'compact');
+  });
 
 test('switching a legacy tray command list to local retains its resolved menu and unknown commands', (t) => {
   const { store, file } = fixture(t);

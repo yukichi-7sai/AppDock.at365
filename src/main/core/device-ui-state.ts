@@ -9,6 +9,7 @@ export interface DeviceUiState {
   ribbon?: {
     schemaVersion: 1;
     expanded: Record<string, boolean>;
+    /** Accepted for older device files only; manual size is now a host setting. */
     displayMode?: 'compact' | 'expanded';
   };
   gallery?: ImageGalleryViewState;

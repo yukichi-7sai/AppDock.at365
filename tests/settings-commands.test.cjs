@@ -274,6 +274,37 @@ test('custom accent API validates HEX in dryRun, saves the pair atomically, and 
     (e) => e.code === 'REVISION_CONFLICT',
   );
 });
+test('manual ribbon size is publicly editable with validation and dry-run protection', (t) => {
+  const f = fixture(t);
+  assert.deepEqual(f.api.call('settings.getSchema').fields.ribbonDisplayMode.enum, [
+    'compact',
+    'expanded',
+  ]);
+  assert.equal(f.commands.get().values.ribbonDisplayMode, 'expanded');
+  const revision = f.commands.revision();
+  assert.throws(
+    () =>
+      f.commands.execute('appdock.settings.update', {
+        changes: { ribbonDisplayMode: 'large' },
+        expectedRevision: revision,
+      }),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  f.commands.execute('appdock.settings.update', {
+    changes: { ribbonDisplayMode: 'compact' },
+    expectedRevision: revision,
+    dryRun: true,
+  });
+  assert.equal(f.commands.revision(), revision);
+  assert.equal(f.settings.value.host.ribbonDisplayMode, 'expanded');
+  f.commands.execute('appdock.settings.update', {
+    changes: { ribbonDisplayMode: 'compact' },
+    expectedRevision: revision,
+  });
+  assert.equal(f.settings.value.host.ribbonDisplayMode, 'compact');
+  assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.ribbonDisplayMode, 'compact');
+});
+
 test('ribbon width is publicly editable and rejects invalid dimensions atomically', (t) => {
   const f = fixture(t);
   const schema = f.api.call('settings.getSchema').fields.ribbonExpandedWidth;

@@ -479,6 +479,35 @@ export function RibbonSettings({
       aria-label={translate('settings.ribbonSettings.title')}
     >
       <SettingsSection data-testid="ribbon-behavior-settings">
+        <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonDisplayMode')}>
+          <SettingsField
+            title={translate('settings.ribbonSettings.manualSize')}
+            description={translate('settings.ribbonSettings.manualSizeDescription')}
+            {...settingAnchor('ribbon', 'ribbonDisplayMode')}
+          >
+            <select
+              aria-label={translate('settings.ribbonSettings.manualSize')}
+              disabled={busy}
+              value={settings.host.ribbonDisplayMode}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  host: {
+                    ...settings.host,
+                    ribbonDisplayMode: event.target.value as RibbonDisplayMode,
+                  },
+                })
+              }
+            >
+              <option value="compact">
+                {translate('settings.ribbonSettings.manualSizeSmall')}
+              </option>
+              <option value="expanded">
+                {translate('settings.ribbonSettings.manualSizeLarge')}
+              </option>
+            </select>
+          </SettingsField>
+        </SettingsMcpScope>
         <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonExpandOnHover')}>
           <SettingsField
             title={translate('settings.ribbonSettings.expandOnHover')}

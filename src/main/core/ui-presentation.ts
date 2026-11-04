@@ -233,7 +233,7 @@ export class UiPresentation {
     local = true,
   ): RibbonView {
     const settings = this.options.settings();
-    const displayMode = this.options.displayMode?.() ?? 'compact';
+    const displayMode = this.options.displayMode?.() ?? settings.host.ribbonDisplayMode;
     const dark = this.options.dark();
     const route = this.options.navigation.state.route;
     const version = this.options.version?.();

@@ -1,12 +1,10 @@
 import { hostText } from '../../shared/i18n';
 import { stateStorage, type StateStorage } from './state-storage';
 import { validGroupId } from '../../shared/applet-pages';
-import type { RibbonDisplayMode } from '../../shared/ribbon';
 
 /** PC-local UI state. A failed write never changes the published state. */
 export class RibbonState {
   private expanded: Record<string, boolean> = {};
-  private mode: RibbonDisplayMode = 'compact';
   private storage: StateStorage;
   constructor(
     storage: StateStorage | string,
@@ -33,30 +31,12 @@ export class RibbonState {
       )
         throw Error(hostText('services.ribbonState.readFailed'));
       this.expanded = value.expanded;
-      this.mode = value.displayMode ?? 'compact';
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') failed(error);
     }
   }
   isExpanded(id: string) {
     return (!this.groupIds || this.groupIds().includes(id)) && this.expanded[id] === true;
-  }
-  get displayMode() {
-    return this.mode;
-  }
-  setDisplayMode(mode: RibbonDisplayMode, persist?: () => void) {
-    if (mode !== 'compact' && mode !== 'expanded')
-      throw Error(hostText('services.ribbonState.invalidMode'));
-    if (mode === this.mode && !persist) return false;
-    if (persist) {
-      persist();
-      // The host can commit the setting and UI mode in one settings transaction.
-      const stored = this.storage.read() as { expanded: Record<string, boolean> };
-      this.expanded = stored.expanded;
-    } else this.write(this.expanded, mode);
-    this.mode = mode;
-    this.changed();
-    return true;
   }
   set(id: string, open: boolean) {
     if (!validGroupId(id) || (this.groupIds && !this.groupIds().includes(id)))
@@ -70,14 +50,14 @@ export class RibbonState {
       ),
       [id]: open,
     };
-    this.write(next, this.mode);
+    this.write(next);
     this.expanded = next;
     this.changed();
     return true;
   }
-  private write(expanded: Record<string, boolean>, displayMode: RibbonDisplayMode) {
+  private write(expanded: Record<string, boolean>) {
     try {
-      this.storage.write({ schemaVersion: 1, expanded, displayMode });
+      this.storage.write({ schemaVersion: 1, expanded });
     } catch (error) {
       this.failed(error);
       throw Error(hostText('services.ribbonState.saveFailed'));
