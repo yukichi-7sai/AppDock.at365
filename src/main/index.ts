@@ -5097,7 +5097,7 @@ async function initialize() {
           throw Error(hostText('services.index.invalidDeletion'));
         return library.rename(request.entries, operation.names).then(() => {});
       }
-      return library.edit(operation);
+      return library.edit(operation, request.kind === 'order' ? request.groups : undefined);
     },
     failed: (request) =>
       request.media === 'text'

@@ -1,7 +1,8 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
+import { SettingsOrderList } from './SettingsOrderList';
 import type { UiCommand } from '../../shared/commands';
 import type { CommandExecutionMode } from '../../shared/command-execution';
 import {
@@ -21,7 +22,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   inputLabel,
   conditionLabel,
   groupRows,
-  moveRow,
   onApply,
   onClose,
 }: {
@@ -35,7 +35,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   inputLabel(input: string): string;
   conditionLabel(row: R, command?: UiCommand): string;
   groupRows(rows: R[]): [string, R[]][];
-  moveRow(rows: R[], from: string, to: string): R[];
   onApply(
     ordered: R[],
     original: R[],
@@ -64,19 +63,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState('');
-  const [over, setOver] = useState<string | null>(null);
-  const dragged = useRef<string | null>(null);
-  const selector = useRef<HTMLSelectElement>(null);
-  const handles = useRef(new Map<string, HTMLButtonElement>());
-  const movedHandle = useRef<string | null>(null);
-  useLayoutEffect(() => {
-    const id = movedHandle.current;
-    movedHandle.current = null;
-    if (!id) return;
-    const handle = handles.current.get(id);
-    handle?.focus({ preventScroll: true });
-    handle?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [ordered]);
   const originalGroups = new Map(groupRows(original));
   const changed = groups.filter(
     ([name, group]) =>
@@ -93,17 +79,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
     validModes = false;
   }
 
-  const move = (from: string, to: string) => {
-    setOrdered((value) => moveRow(value, from, to));
-    const source = rows.find((row) => row.id === from);
-    setNotice(
-      translate('settings.bindingOrderDialog.moved', {
-        value: commandTitle(source?.command ?? ''),
-        value2: rows.findIndex((row) => row.id === to) + 1,
-      }),
-    );
-    setError('');
-  };
   return (
     <OrderDialogFrame
       title={title}
@@ -146,14 +121,11 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
           }
         >
           <select
-            ref={selector}
             aria-label={translate('settings.bindingOrderDialog.input', { inputName: inputName })}
             value={key}
             disabled={!groups.length}
             onChange={(event) => {
               setKey(event.target.value);
-              dragged.current = null;
-              setOver(null);
               setNotice('');
             }}
           >
@@ -196,103 +168,35 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
             : translate(`settings.inputExecution.${effectiveMode}Hint`)}
         </p>
       </div>
-      <ol
-        className="shortcut-order-list"
-        aria-label={translate('settings.bindingOrderDialog.executionOrder', {
-          value: inputLabel(key),
-        })}
-      >
-        {rows.map((row, index) => {
+      <SettingsOrderList
+        key={key}
+        label={translate('settings.bindingOrderDialog.executionOrder', { value: inputLabel(key) })}
+        items={rows.map((row) => {
           const command = catalog.get(row.command);
-          const title = commandTitle(row.command);
-          const detail = [
-            command && command.title !== row.command ? command.extension : '',
-            conditionLabel(row, command),
-          ]
-            .filter(Boolean)
-            .join(' · ');
-          return (
-            <li
-              key={row.id}
-              data-order-binding={row.id}
-              className={`shortcut-order-row${over === row.id ? ' drop-target' : ''}`}
-              onDragOver={(event) => {
-                if (dragged.current && dragged.current !== row.id) {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = 'move';
-                  setOver(row.id);
-                }
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (dragged.current) move(dragged.current, row.id);
-                dragged.current = null;
-                setOver(null);
-              }}
-            >
-              <button
-                type="button"
-                className="shortcut-order-handle"
-                ref={(element) => {
-                  if (element) handles.current.set(row.id, element);
-                  else handles.current.delete(row.id);
-                }}
-                draggable
-                aria-label={translate('settings.bindingOrderDialog.drag', { title: title })}
-                aria-keyshortcuts="ArrowUp ArrowDown"
-                title={translate('settings.bindingOrderDialog.dragHint')}
-                onDragStart={(event) => {
-                  dragged.current = row.id;
-                  event.dataTransfer.effectAllowed = 'move';
-                  event.dataTransfer.setData('text/plain', row.id);
-                }}
-                onDragEnd={() => {
-                  dragged.current = null;
-                  setOver(null);
-                }}
-                onKeyDown={(event) => {
-                  if (
-                    !event.nativeEvent.isComposing &&
-                    event.keyCode !== 229 &&
-                    !event.altKey &&
-                    !event.ctrlKey &&
-                    !event.metaKey &&
-                    !event.shiftKey &&
-                    ['ArrowUp', 'ArrowDown'].includes(event.key)
-                  ) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const target = rows[index + (event.key === 'ArrowUp' ? -1 : 1)];
-                    if (target) {
-                      movedHandle.current = row.id;
-                      move(row.id, target.id);
-                    }
-                  }
-                }}
-              >
-                ⠿
-              </button>
-              <span
-                className="shortcut-order-number"
-                aria-label={translate('settings.bindingOrderDialog.position', { value: index + 1 })}
-              >
-                {index + 1}
-              </span>
-              <div className="shortcut-order-command">
-                <strong title={title}>{title}</strong>
-                <small title={detail}>{detail}</small>
-                {(!row.enabled || !command?.available) && (
-                  <small className="shortcut-order-state">
-                    {!row.enabled
-                      ? translate('settings.bindingOrderDialog.disabled')
-                      : translate('settings.bindingOrderDialog.unavailable')}
-                  </small>
-                )}
-              </div>
-            </li>
-          );
+          return {
+            id: row.id,
+            title: commandTitle(row.command),
+            description: [
+              command && command.title !== row.command ? command.extension : '',
+              conditionLabel(row, command),
+            ]
+              .filter(Boolean)
+              .join(' · '),
+            state: !row.enabled
+              ? translate('settings.bindingOrderDialog.disabled')
+              : !command?.available
+                ? translate('settings.bindingOrderDialog.unavailable')
+                : undefined,
+          };
         })}
-      </ol>
+        onChange={(ids, message) => {
+          const byId = new Map(rows.map((row) => [row.id, row]));
+          let index = 0;
+          setOrdered(ordered.map((row) => (byId.has(row.id) ? byId.get(ids[index++])! : row)));
+          setNotice(message);
+          setError('');
+        }}
+      />
     </OrderDialogFrame>
   );
 }

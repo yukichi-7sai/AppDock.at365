@@ -26,6 +26,9 @@
 .settings-error[data-error='false'] {
   background: transparent;
 }
+.settings-error[data-message='true'] {
+  --settings-error-color: var(--muted);
+}
 .settings-error-summary {
   flex: 1;
   min-width: 0;
@@ -47,6 +50,16 @@
 .settings-error-trigger:hover,
 .settings-error-trigger:focus-visible {
   background: color-mix(in srgb, var(--settings-error-color) 10%, transparent);
+}
+.settings-error .settings-error-trigger[data-icon] {
+  order: -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
 }
 .settings-error-tooltip {
   position: fixed;

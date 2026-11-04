@@ -207,8 +207,8 @@ export class AssetLibraryHost {
     this.options.writable();
     return this.images.add(await fs.readFile(source), path.basename(source));
   }
-  async edit(operation: ImageLibraryEdit) {
-    this.configuration.edit(operation);
+  async edit(operation: ImageLibraryEdit, orderGroups?: readonly { id: string; name: string }[]) {
+    this.configuration.edit(operation, orderGroups);
   }
   inUse(ref: RegisteredImageRef) {
     const contains = (value: unknown): boolean => {

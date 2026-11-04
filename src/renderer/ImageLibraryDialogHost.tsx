@@ -15,6 +15,7 @@ import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
 import { TextLibraryEditor } from './TextLibraryEditor';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
+import { libraryOrderLabel } from '../shared/order-list';
 import { RegisteredGalleryPreview } from './settings-ui/RegisteredImagePicker';
 
 const DialogFocus = createContext<{ current: { target: HTMLElement | null } | null } | null>(null);
@@ -267,7 +268,7 @@ function Editor({
         listLabel={t('images.groupOrderLabel')}
         items={r.groups
           .filter((g) => r.media !== 'text' || g.id !== snippetGroupId)
-          .map((g) => ({ id: g.id, title: g.name }))}
+          .map((g) => ({ id: g.id, title: g.name, ...libraryOrderLabel(g.name) }))}
         onClose={close}
         onApply={(ids) =>
           save({

@@ -11,9 +11,9 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     .screenshot({ path: path.join(profile, 'shortcut-order-button.png') });
   const order = () =>
     panel
-      .locator('[data-order-binding]')
-      .evaluateAll((items) => items.map((item) => item.dataset.orderBinding));
-  const item = (id) => panel.locator(`[data-order-binding="${id}"]`);
+      .locator('[data-order-id]')
+      .evaluateAll((items) => items.map((item) => item.dataset.orderId));
+  const item = (id) => panel.locator(`[data-order-id="${id}"]`);
   const cancel = () => panel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   const apply = () => panel.getByRole('button', { name: '適用', exact: true }).click();
   const choose = (key) => panel.getByLabel('設定するキー').selectOption(key);

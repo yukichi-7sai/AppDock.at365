@@ -7,7 +7,6 @@ import {
   externalShortcutScope,
   keybindingGroups,
   keybindingConditionLabel,
-  moveKeybindingWithinKey,
   withKeybindings,
 } from '../../shared/keybindings';
 import { BindingOrderDialog } from './BindingOrderDialog';
@@ -53,7 +52,6 @@ export function ShortcutOrderDialog({
           : '')
       }
       groupRows={keybindingGroups}
-      moveRow={moveKeybindingWithinKey}
       onApply={(ordered, original, modes, originalModes) => {
         const next = applyBindingSettings(
           getKeybindings(settings),

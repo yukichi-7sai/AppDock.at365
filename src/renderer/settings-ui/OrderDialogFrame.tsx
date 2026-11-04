@@ -60,6 +60,8 @@ export function OrderDialogFrame({
       busy={pending}
       error={error}
       message={message}
+      showMessages
+      statusDetailsAppearance="icon"
       bodyClassName="order-dialog-body"
       header={
         <header>
@@ -82,9 +84,10 @@ export function OrderDialogFrame({
           </button>
         </header>
       }
-      footer={
+      footer={(status) => (
         <footer>
-          <div>
+          {status}
+          <div className="order-dialog-actions">
             <button
               type="button"
               data-testid="settings-dialog-cancel"
@@ -106,7 +109,7 @@ export function OrderDialogFrame({
             </SettingsButton>
           </div>
         </footer>
-      }
+      )}
     >
       {children}
     </SettingsModal>

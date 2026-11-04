@@ -3554,6 +3554,16 @@ summary {
 .order-dialog-frame > header h2 {
   margin: 0;
 }
+.order-dialog-frame > footer {
+  flex-wrap: nowrap;
+}
+.order-dialog-frame > footer > .settings-status-area {
+  flex: 1;
+  margin: 0;
+}
+.order-dialog-frame > footer > .order-dialog-actions {
+  flex: none;
+}
 .shortcut-order-key {
   display: flex;
   align-items: center;
@@ -3616,20 +3626,17 @@ summary {
   gap: 8px;
 }
 .shortcut-order-row {
+  position: relative;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 46px;
   padding: 2px 4px;
   border: 0;
   border-radius: 8px;
 }
-.shortcut-order-row.drop-target {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.settings-order-dialog .shortcut-order-row[draggable='true'] {
+.shortcut-order-row[draggable='true'] {
   cursor: grab;
   user-select: none;
 }
@@ -3678,15 +3685,103 @@ summary {
 .shortcut-order-command .shortcut-order-state {
   flex: none;
   max-width: none;
+  white-space: normal;
 }
 .shortcut-order-command small {
   color: var(--muted);
   font-size: 11px;
 }
-.shortcut-order-notice {
+.shortcut-order-moves {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.order-move-up svg {
+  transform: rotate(-90deg);
+}
+.order-move-down svg {
+  transform: rotate(90deg);
+}
+.settings-order-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  padding-top: 12px;
+}
+.settings-order-toolbar button {
+  background: transparent;
+  color: var(--accent);
+}
+.settings-order-group {
+  position: relative;
+  min-width: 0;
+}
+.settings-order-group-heading {
+  background: var(--settings-group-background);
+}
+.settings-order-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
   min-height: 32px;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+.settings-order-group-toggle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-order-group-toggle > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.settings-order-group-toggle[aria-expanded='true'] > svg {
+  transform: rotate(90deg);
+}
+.settings-order-group-count {
+  flex: none;
   font-size: 12px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.settings-order-children {
+  list-style: none;
+  margin: 4px 0 4px 44px;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--border);
+}
+.settings-order-children[hidden] {
+  display: none;
+}
+.shortcut-order-list [data-drop-position]::before {
+  content: '';
+  position: absolute;
+  height: 2px;
+  background: var(--accent);
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.shortcut-order-list [data-drop-position='before']::before {
+  top: -3px;
+}
+.shortcut-order-list [data-drop-position='after']::before {
+  bottom: -3px;
+}
+.shortcut-order-list [data-dragging='true'] {
+  opacity: 0.55;
 }
 @media (max-width: 540px) {
   .shortcut-order-command {
@@ -3698,6 +3793,16 @@ summary {
   }
   .shortcut-order-command small {
     max-width: 100%;
+  }
+  .settings-order-children {
+    margin-left: 16px;
+    padding-left: 4px;
+  }
+  .settings-order-group-heading {
+    flex-wrap: wrap;
+  }
+  .settings-order-group-count {
+    margin-left: auto;
   }
 }
 @media (max-width: 720px) {

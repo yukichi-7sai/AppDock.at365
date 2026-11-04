@@ -94,8 +94,19 @@ export class LibraryClassificationStore {
       },
     };
   }
-  edit(operation: ImageLibraryEdit) {
+  edit(operation: ImageLibraryEdit, orderGroups?: readonly Pick<ImageGroup, 'id' | 'name'>[]) {
     this.writable();
+    if (operation.kind === 'order' && orderGroups) {
+      const current = this.snapshot().groups;
+      if (
+        current.length !== orderGroups.length ||
+        current.some(
+          (group, index) =>
+            group.id !== orderGroups[index].id || group.name !== orderGroups[index].name,
+        )
+      )
+        throw new ImageLibrarySettingsError(this.media);
+    }
     this.plan(editImageLibrary(this.snapshot(), operation, this.media), this.revision).commit();
   }
   /** Add downloaded classifications in one revision, retaining manual names, order and memberships. */

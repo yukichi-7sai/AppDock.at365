@@ -71,7 +71,10 @@ settings.gestures.bindings = [
     when: { scope: 'app', appletIds: [], processes: [] },
   },
 ];
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = process.argv[2] ? testHostPath(profile) : null;
 if (portable) {
@@ -290,7 +293,10 @@ const checks = [];
         when: { scope: 'global', appletIds: [] },
       },
     ];
-    fs.writeFileSync(require('./test-settings.cjs').file(conflictProfile, 'settings.json'), JSON.stringify(conflictSettings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(conflictProfile, 'settings.json'),
+      JSON.stringify(conflictSettings),
+    );
     const conflictApp = await launch(conflictProfile);
     try {
       const cp = require('./settings-aware-page.cjs').settingsAwarePage(
@@ -404,11 +410,11 @@ const checks = [];
     const orderPanel = page.locator('.shortcut-order-dialog');
     await orderPanel.getByLabel('設定するキー').selectOption('Ctrl+F8');
     const previousOrder = await orderPanel
-      .locator('[data-order-binding]')
-      .evaluateAll((items) => items.map((el) => el.dataset.orderBinding));
+      .locator('[data-order-id]')
+      .evaluateAll((items) => items.map((el) => el.dataset.orderId));
     assert(previousOrder.length > 1);
     await orderPanel
-      .locator('[data-order-binding]')
+      .locator('[data-order-id]')
       .last()
       .getByRole('button', { name: /を上へ/ })
       .click();

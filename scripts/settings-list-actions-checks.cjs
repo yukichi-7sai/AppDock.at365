@@ -343,7 +343,7 @@ module.exports = async ({
     await binding(id).locator('.binding-order').click();
     const order = host.locator('.shortcut-order-dialog');
     await order.waitFor();
-    assert((await order.locator('[data-order-binding]').count()) >= 2);
+    assert((await order.locator('[data-order-id]').count()) >= 2);
     await order.press('Escape');
     assert(
       await binding(id)

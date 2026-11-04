@@ -22,6 +22,7 @@ Object.assign(initial.host, {
   notifications: false,
 });
 initial.updates.checkHostOnStartup = false;
+initial.updates.checkHostOnAboutOpen = false;
 initial.updates.checkAppletsOnStartup = false;
 initial.keybindings = [];
 initial.globalShortcutCommands = [];
@@ -90,7 +91,19 @@ initial.mcpServers = {
     description: '',
   })),
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+const groupedOrder = require('./grouped-order-checks.cjs');
+for (const media of ['image', 'sound', 'text']) {
+  initial[media + 'Library'] = {
+    groups: groupedOrder.fixture.map((group) => ({
+      ...group,
+      [media === 'image' ? 'images' : 'files']: [],
+    })),
+  };
+}
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const source = process.argv[2] && path.resolve(process.argv[2]);
 const portable = source && testHostPath(profile);
@@ -193,10 +206,11 @@ const cases = [
   },
 ];
 async function open(target) {
-  await host.evaluate(
-    (page) => window.dock.executeCommand(`appdock.settings.${page}.open`),
-    target.page,
-  );
+  if (!(await host.getByTestId(`settings-page:${target.page}`).isVisible()))
+    await host.evaluate(
+      (page) => window.dock.executeCommand(`appdock.settings.${page}.open`),
+      target.page,
+    );
   await host.getByTestId(`settings-page:${target.page}`).waitFor();
   await host.getByRole('button', { name: target.button, exact: true }).click();
   await host.locator('.settings-order-dialog').waitFor();
@@ -216,8 +230,17 @@ async function open(target) {
         last = target.ids.at(-1);
       const before = await saved();
       assert.deepEqual(await order(), target.ids);
-      assert.equal(await dialog.locator('.shortcut-order-moves').count(), 0);
-      assert.equal(await dialog.locator('.shortcut-order-row button').count(), target.ids.length);
+      const firstRow = dialog.locator(`[data-order-id="${first}"]`);
+      assert(await firstRow.getByRole('button', { name: /を上へ$/ }).isDisabled());
+      await firstRow.getByRole('button', { name: /を下へ$/ }).click();
+      assert.equal((await order())[1], first);
+      await firstRow.getByRole('button', { name: /を上へ$/ }).click();
+      assert.deepEqual(await order(), target.ids);
+      assert.match(
+        await dialog.locator('.settings-status-area .settings-error-summary').innerText(),
+        /移動しました/,
+      );
+      assert.equal(await dialog.locator('.settings-error[data-error="true"]').count(), 0);
       assert.equal(await handle(first).getAttribute('aria-keyshortcuts'), 'ArrowUp ArrowDown');
       assert.match(await handle(first).getAttribute('title'), /フォーカスして↑↓キー/);
       await handle(first).press('ArrowUp');
@@ -259,11 +282,15 @@ async function open(target) {
       assert.deepEqual(target.values(await saved()), moved);
       await open(target);
       assert.deepEqual(await order(), moved);
-      await handle(first).dragTo(dialog.locator(`[data-order-id="${target.ids[1]}"]`));
+      await handle(first).dragTo(dialog.locator(`[data-order-id="${target.ids[1]}"]`), {
+        targetPosition: { x: 100, y: 3 },
+      });
       assert.deepEqual(await order(), target.ids, 'dragging still works');
       await dialog
         .locator(`[data-order-id="${first}"] .shortcut-order-command strong`)
-        .dragTo(dialog.locator(`[data-order-id="${target.ids[2]}"]`));
+        .dragTo(dialog.locator(`[data-order-id="${target.ids[2]}"]`), {
+          targetPosition: { x: 100, y: 36 },
+        });
       assert.deepEqual(
         await order(),
         [target.ids[1], target.ids[2], first, ...target.ids.slice(3)],
@@ -416,7 +443,7 @@ async function open(target) {
     );
     await clear.click();
     await host.screenshot({ path: path.join(profile, 'custom-command-filters-light.png') });
-    await host.setViewportSize({ width: 480, height: 540 });
+    await host.setViewportSize({ width: 900, height: 620 });
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.host.theme = 'dark';
@@ -475,6 +502,7 @@ async function open(target) {
     await host.screenshot({ path: path.join(profile, 'custom-command-filters-dark-narrow.png') });
     await clear.click();
     checks.push('custom filters and visible row actions remain reachable in a narrow dark layout');
+    const grouped = await groupedOrder.check({ host, saved, checks, profile });
     const durable = await saved();
     assert.equal(durable.ai.defaultConnectionId, initial.ai.defaultConnectionId);
     assert.deepEqual(
@@ -483,6 +511,12 @@ async function open(target) {
     );
     await stop();
     await start();
+    for (const { property, ids } of grouped)
+      assert.deepEqual(
+        (await saved())[property].groups.map((group) => group.id),
+        ids,
+      );
+    checks.push('all three library group orders survive a real restart');
     for (const target of cases) {
       assert.deepEqual(target.values(await saved()), target.values(durable));
       await open(target);

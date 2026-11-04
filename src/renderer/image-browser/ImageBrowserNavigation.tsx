@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ImageLibraryLayout } from '../../shared/image-library-page';
 import { Icon } from '../../shared/ui-icons';
+import { libraryOrderLabel } from '../../shared/order-list';
 import { useLibraryTranslation } from './LibraryMedia';
 
 export interface ImageBrowserGroup {
@@ -68,8 +69,7 @@ export function ImageBrowserNavigation({
   const buckets: { prefix: string; groups: ImageBrowserGroup[] }[] = [];
   const byPrefix = new Map<string, (typeof buckets)[number]>();
   for (const g of groups.slice(2)) {
-    const colon = g.title.indexOf(':'),
-      prefix = colon > 0 ? g.title.slice(0, colon).trim() : '';
+    const prefix = libraryOrderLabel(g.title).group ?? '';
     if (!prefix) buckets.push({ prefix: '', groups: [g] });
     else {
       let bucket = byPrefix.get(prefix);
@@ -172,9 +172,7 @@ export function ImageBrowserNavigation({
               </button>
               {!layout.collapsedGroups.includes(bucket.prefix) && (
                 <div className="library-prefix-children">
-                  {bucket.groups.map((g) =>
-                    groupRow(g, g.title.slice(g.title.indexOf(':') + 1).trim()),
-                  )}
+                  {bucket.groups.map((g) => groupRow(g, libraryOrderLabel(g.title).displayTitle))}
                 </div>
               )}
             </div>

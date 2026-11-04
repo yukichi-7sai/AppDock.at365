@@ -11,7 +11,6 @@ import {
   groupGestureBindings,
   gestureTitle,
   gestureConditionLabel,
-  moveGestureBinding,
 } from '../../shared/gestures';
 import { BindingOrderDialog } from '../settings-ui/BindingOrderDialog';
 import { applyBindingSettings } from '../../shared/binding-order';
@@ -62,7 +61,6 @@ export function GestureOrderDialog({
               .filter(([, group]) => group.length)
           : groupGestureBindings(rows).map((group) => [group.gesture, group.bindings])
       }
-      moveRow={moveGestureBinding}
       onApply={(ordered, original, modes, originalModes) =>
         onChange({
           ...settings,

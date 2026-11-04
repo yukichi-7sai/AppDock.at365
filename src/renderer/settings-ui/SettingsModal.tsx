@@ -28,10 +28,13 @@ export function SettingsModal({
   initialFocus = '[data-initial-focus], .shortcut-capture',
   returnFocus: requestedReturnFocus,
   collapseStatusWhenEmpty = false,
+  showMessages = false,
+  statusDetailsAppearance,
 }: {
   children: ReactNode;
   header?: ReactNode;
-  footer?: ReactNode;
+  /** A renderer can place the shared status area beside its footer actions. */
+  footer?: ReactNode | ((status: ReactNode) => ReactNode);
   error?: string;
   errorTarget?: string;
   message?: string;
@@ -49,6 +52,8 @@ export function SettingsModal({
   /** An opener captured before asynchronous preparation makes its page inert. */
   returnFocus?: HTMLElement | null;
   collapseStatusWhenEmpty?: boolean;
+  showMessages?: boolean;
+  statusDetailsAppearance?: 'text' | 'icon';
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const composing = useRef<EventTarget | null>(null);
@@ -115,6 +120,14 @@ export function SettingsModal({
       });
     };
   }, []);
+  const status = (
+    <SettingsStatusArea
+      action={errorAction}
+      collapseWhenEmpty={collapseStatusWhenEmpty}
+      showMessages={showMessages}
+      detailsAppearance={statusDetailsAppearance}
+    />
+  );
   return createPortal(
     <SettingsStatusProvider error={error} target={errorTarget} busy={busy} message={message}>
       <SettingsInputMode.Provider value="input">
@@ -154,8 +167,12 @@ export function SettingsModal({
           }}
           onKeyDownCapture={(event) => {
             if (
-              event.defaultPrevented || event.key !== 'Enter' || !event.ctrlKey ||
-              event.shiftKey || event.altKey || event.metaKey
+              event.defaultPrevented ||
+              event.key !== 'Enter' ||
+              !event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey ||
+              event.metaKey
             )
               return;
             const target = event.target;
@@ -182,7 +199,8 @@ export function SettingsModal({
             // A pointer click commits blur-only inputs before the button's click handler runs.
             if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
               flushSync(() => target.blur());
-              if (target.isConnected && modal.matches(':modal')) target.focus({ preventScroll: true });
+              if (target.isConnected && modal.matches(':modal'))
+                target.focus({ preventScroll: true });
             }
             if (document.activeElement?.closest('dialog:modal') === modal && !confirm.disabled)
               confirm.click();
@@ -204,8 +222,14 @@ export function SettingsModal({
           <div className={bodyClassName} inert={busy || undefined} aria-busy={busy || undefined}>
             {children}
           </div>
-          <SettingsStatusArea action={errorAction} collapseWhenEmpty={collapseStatusWhenEmpty} />
-          {footer}
+          {typeof footer === 'function' ? (
+            footer(status)
+          ) : (
+            <>
+              {status}
+              {footer}
+            </>
+          )}
         </dialog>
       </SettingsInputMode.Provider>
     </SettingsStatusProvider>,

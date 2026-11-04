@@ -94,9 +94,13 @@ export function useSettingsFeedback({
 export function SettingsStatusArea({
   action,
   collapseWhenEmpty = false,
+  showMessages = false,
+  detailsAppearance,
 }: {
   action?: ReactNode;
   collapseWhenEmpty?: boolean;
+  showMessages?: boolean;
+  detailsAppearance?: 'text' | 'icon';
 }) {
   const { t } = useHostTranslation();
   const scope = useContext(SettingsStatusContext);
@@ -117,9 +121,17 @@ export function SettingsStatusArea({
   ];
   return (
     <>
-      {(!collapseWhenEmpty || errors.length > 0 || action) && (
+      {(!collapseWhenEmpty ||
+        errors.length > 0 ||
+        (showMessages && messages.length > 0) ||
+        action) && (
         <div className="settings-status-area">
-          <SettingsError id={scope?.errorId ?? 'settings-error'} error={errors.join('\n')} />
+          <SettingsError
+            id={scope?.errorId ?? 'settings-error'}
+            error={errors.join('\n')}
+            message={showMessages ? messages.join('、') : undefined}
+            detailsAppearance={detailsAppearance}
+          />
           {entries
             .filter((entry) => entry.error && entry.retry)
             .map((entry, index) => (
@@ -130,9 +142,11 @@ export function SettingsStatusArea({
           {action}
         </div>
       )}
-      <span className="sr-only" role="status" aria-atomic="true">
-        {messages.join('、')}
-      </span>
+      {!showMessages && (
+        <span className="sr-only" role="status" aria-atomic="true">
+          {messages.join('、')}
+        </span>
+      )}
     </>
   );
 }

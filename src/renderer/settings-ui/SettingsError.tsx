@@ -1,10 +1,22 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { settingsPopoverScroll } from './settings-popover-scroll';
+import { Icon } from '../../shared/ui-icons';
 import './settings-error.css';
 
 /** Stable summary row with keyboard-readable, scrollable error details. */
-export function SettingsError({ error, id }: { error?: string; id: string }) {
+export function SettingsError({
+  error,
+  message,
+  id,
+  detailsAppearance = 'text',
+}: {
+  error?: string;
+  message?: string;
+  id: string;
+  detailsAppearance?: 'text' | 'icon';
+}) {
+  const text = error || message;
   const { t } = useHostTranslation();
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLSpanElement>(null);
@@ -27,11 +39,11 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
   useEffect(() => {
     setOpen(false);
     return () => window.clearTimeout(timer.current);
-  }, [error]);
+  }, [text]);
   useLayoutEffect(() => {
     const tooltip = popup.current;
     const button = trigger.current;
-    if (!open || !error || !tooltip || !button) return;
+    if (!open || !text || !tooltip || !button) return;
     tooltip.style.maxHeight = 'min(320px, calc(100dvh - 16px))';
     tooltip.showPopover();
     const rect = button.getBoundingClientRect();
@@ -82,28 +94,29 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
       window.removeEventListener('scroll', scroll, true);
       window.removeEventListener('resize', dismiss);
     };
-  }, [open, error]);
+  }, [open, text]);
   return (
-    <div className="settings-error" data-error={!!error}>
+    <div className="settings-error" data-error={!!error} data-message={!error && !!message}>
       <span
         id={id}
         className="sr-only"
-        role={error ? 'alert' : undefined}
-        aria-live="assertive"
+        role={error ? 'alert' : message ? 'status' : undefined}
+        aria-live={error ? 'assertive' : 'polite'}
         aria-atomic="true"
       >
-        {error}
+        {text}
       </span>
       <span className="settings-error-summary" aria-hidden="true">
-        {error}
+        {text}
       </span>
       <button
         ref={trigger}
         type="button"
         className="settings-error-trigger"
-        style={{ visibility: error ? 'visible' : 'hidden' }}
-        disabled={!error}
-        aria-label={t('common.errorDetails')}
+        data-icon={detailsAppearance === 'icon' || undefined}
+        style={{ visibility: text ? 'visible' : 'hidden' }}
+        disabled={!text}
+        aria-label={t(error ? 'common.errorDetails' : 'common.messageDetails')}
         aria-describedby={`${id}-tooltip`}
         onPointerEnter={show}
         onPointerLeave={leave}
@@ -114,7 +127,7 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
         }}
         onClick={show}
       >
-        {t('common.details')}
+        {detailsAppearance === 'icon' ? <Icon name="info" size={17} /> : t('common.details')}
       </button>
       <span
         ref={popup}
@@ -133,7 +146,7 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
             setOpen(false);
         }}
       >
-        {error}
+        {text}
       </span>
     </div>
   );

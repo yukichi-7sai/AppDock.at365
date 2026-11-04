@@ -4,12 +4,12 @@ const path = require('node:path');
 module.exports = async ({ host, saved, save, checks, profile, row }) => {
   const panel = host.getByTestId('settings-dialog');
   const mode = panel.getByTestId('binding-execution-mode');
-  const item = (id) => panel.locator(`[data-order-binding="${id}"]`);
+  const item = (id) => panel.locator(`[data-order-id="${id}"]`);
   const handle = (id) => item(id).locator('.shortcut-order-handle');
   const order = () =>
     panel
-      .locator('[data-order-binding]')
-      .evaluateAll((elements) => elements.map((element) => element.dataset.orderBinding));
+      .locator('[data-order-id]')
+      .evaluateAll((elements) => elements.map((element) => element.dataset.orderId));
   const alignedHint = async () => {
     const heading = await panel.locator('header h2').boundingBox();
     const hint = await panel.locator('header .settings-hint-trigger svg').boundingBox();

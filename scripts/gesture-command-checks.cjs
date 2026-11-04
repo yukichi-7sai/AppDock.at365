@@ -49,8 +49,8 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   const orderPanel = page.locator('.shortcut-order-dialog');
   const orderIds = () =>
     orderPanel
-      .locator('[data-order-binding]')
-      .evaluateAll((items) => items.map((el) => el.dataset.orderBinding));
+      .locator('[data-order-id]')
+      .evaluateAll((items) => items.map((el) => el.dataset.orderId));
   const saved = () => snapshot().then((s) => s.settings.value.gestures.bindings);
   const save = async () => {
     await settleSettings(page);
@@ -152,18 +152,18 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await page.locator(`[data-binding-id="${b}"] .binding-order`).click();
   assert.deepEqual(await orderIds(), [b, a], 'full gesture group despite filtered command list');
   await orderPanel
-    .locator(`[data-order-binding="${a}"] .shortcut-order-handle`)
-    .dragTo(orderPanel.locator(`[data-order-binding="${b}"]`));
+    .locator(`[data-order-id="${a}"] .shortcut-order-handle`)
+    .dragTo(orderPanel.locator(`[data-order-id="${b}"]`));
   assert.deepEqual(await orderIds(), [a, b]);
   await orderPanel.screenshot({ path: path.join(profile, 'gesture-order.png') });
   await orderPanel.getByLabel('設定するジェスチャー').selectOption('key:Ctrl+A');
   assert.equal((await orderIds()).length, 1);
   await orderPanel.getByLabel('設定するジェスチャー').selectOption('move-left');
   assert.deepEqual(await orderIds(), [a, b]);
-  await orderPanel.locator(`[data-order-binding="${a}"] .shortcut-order-handle`).press('ArrowDown');
+  await orderPanel.locator(`[data-order-id="${a}"] .shortcut-order-handle`).press('ArrowDown');
   assert.deepEqual(await orderIds(), [b, a]);
   await orderPanel
-    .locator(`[data-order-binding="${a}"]`)
+    .locator(`[data-order-id="${a}"]`)
     .locator('.shortcut-order-handle')
     .press('ArrowUp');
   await orderPanel.getByRole('button', { name: '適用', exact: true }).click();
