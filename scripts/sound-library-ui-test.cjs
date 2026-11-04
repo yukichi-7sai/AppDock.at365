@@ -209,10 +209,17 @@ const result = () =>
       async () => (await model()).content.playback?.state === 'playing',
       'silent WAV actual playback',
     );
+    await page.getByRole('button', { name: '選択を解除', exact: true }).click();
+    await until(async () => (await model()).content.selected === 0, 'clear while playing');
+    await until(
+      () => page.getByRole('button', { name: '試聴', exact: true }).isDisabled(),
+      'cleared selection rendered',
+    );
+    assert(await page.getByRole('button', { name: '停止', exact: true }).isEnabled());
     await page.getByRole('button', { name: '停止', exact: true }).click();
     await until(async () => !(await model()).content.playback, 'preview stop');
     checks.push(
-      'sound navigation, prefix collapse, selection without autoplay, explicit playback and stop',
+      'sound navigation, prefix collapse, selection without autoplay, explicit playback and stop after clearing selection',
     );
     const card = page.getByRole('button', { name: '通知/long.wavを選択', exact: true });
     await until(

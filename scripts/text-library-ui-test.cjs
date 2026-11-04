@@ -147,11 +147,30 @@ const choose = (page, file, options) =>
       async () => (await model())?.content.total === 141 && !(await model()).content.indexing,
       'text index',
     );
+    assert(await page.getByRole('button', { name: '選択を解除', exact: true }).isDisabled());
+    assert(await page.getByRole('button', { name: '本文を編集', exact: true }).isDisabled());
     const search = page.getByRole('searchbox');
     await search.fill('目印 139');
     await search.press('Enter');
     await until(async () => (await model()).content.total === 1, 'body search');
     assert.equal((await model()).content.items[0].title, '定型/sample-139.txt');
+    const selectAll = page.getByRole('button', { name: 'すべて選択', exact: true });
+    await selectAll.focus();
+    await selectAll.press('Enter');
+    await until(async () => (await model()).content.selected === 1, 'select filtered text');
+    await until(
+      () => page.getByRole('button', { name: '本文を編集', exact: true }).isEnabled(),
+      'selected text rendered',
+    );
+    await page.getByRole('button', { name: '選択を解除', exact: true }).click();
+    await until(async () => (await model()).content.selected === 0, 'clear filtered text');
+    await until(
+      () => page.getByRole('button', { name: '本文をコピー', exact: true }).isDisabled(),
+      'cleared text selection rendered',
+    );
+    checks.push(
+      'persistent selection controls select only filtered results by Enter and clear selection',
+    );
     await search.fill('');
     await search.press('Enter');
     await until(async () => (await model()).content.total === 141, 'clear search');
@@ -179,9 +198,13 @@ const choose = (page, file, options) =>
     assert.equal(fs.existsSync(path.join(directory, 'あいさつ.txt')), false);
     await body.evaluate((el) => {
       el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+      );
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true, bubbles: true }));
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true, bubbles: true }),
+      );
     });
     assert(await body.isVisible());
     await body.press('Control+Enter');

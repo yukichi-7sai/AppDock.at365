@@ -63,6 +63,7 @@ export const soundLibraryKeys = new Set<string>([
   'images.selectAll',
   'images.selectImages',
   'images.selectedCount',
+  'images.selectionSummary',
   'images.title',
   'services.galleryViewState.invalidSize',
   'services.imageLibraryDialogs.busyEnded',

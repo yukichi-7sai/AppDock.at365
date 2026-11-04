@@ -158,6 +158,8 @@ const resize = (width, height) =>
     await until(async () => (await model()).content.total === 201, 'catalogue');
     const page = host.locator('.library-page');
     const first = page.locator('.ad-gallery-card').first();
+    assert(await page.getByRole('button', { name: '選択を解除', exact: true }).isDisabled());
+    assert(await page.getByRole('button', { name: 'プレビュー', exact: true }).isDisabled());
     await first.locator('.ad-gallery-image').click();
     await until(async () => (await model()).content.selected === 1, 'click selection');
     assert.equal(await host.getByRole('dialog').count(), 0);
@@ -167,15 +169,33 @@ const resize = (width, height) =>
       .locator('.ad-gallery-image')
       .click({ modifiers: ['Shift'] });
     await until(async () => (await model()).content.selected === 3, 'shift range');
+    const toolbarPreview = page.getByRole('button', { name: 'プレビュー', exact: true });
+    await toolbarPreview.focus();
+    await toolbarPreview.press('Enter');
+    const toolbarDialog = host.getByRole('dialog');
+    await toolbarDialog.waitFor();
+    await toolbarDialog.getByRole('button', { name: '次の画像', exact: true }).click();
+    await toolbarDialog.getByRole('button', { name: '閉じる', exact: true }).click();
+    await toolbarDialog.waitFor({ state: 'hidden' });
+    await until(
+      () => toolbarPreview.evaluate((el) => el === document.activeElement),
+      'toolbar preview focus restored',
+    );
+    assert.equal((await model()).content.selected, 3);
+    checks.push(
+      'toolbar preview opens by Enter, traverses selected images and restores focus/selection',
+    );
     await page.getByRole('button', { name: 'グループに追加', exact: true }).click();
     const add = host.getByRole('dialog', { name: 'グループに追加', exact: true });
     await add.waitFor();
     assert((await add.innerText()).includes('3枚'));
     await add.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(async () => (await page.getAttribute('inert')) === null, 'dialog released');
-    await page.getByRole('button', { name: 'すべて選択（201枚）', exact: true }).click();
+    await page.getByRole('button', { name: 'すべて選択', exact: true }).click();
     await until(async () => (await model()).content.selected === 201, 'all including unrendered');
-    await first.click({ button: 'right' });
+    const moreActions = page.getByRole('button', { name: 'その他', exact: true });
+    await moreActions.focus();
+    await moreActions.press('Enter');
     const menu = host.getByRole('menu', { name: '201枚を選択', exact: true });
     await menu.waitFor();
     assert(
@@ -183,6 +203,13 @@ const resize = (width, height) =>
         .getByRole('menuitem', { name: '画像をコピー（1枚・PNG）', exact: true })
         .isDisabled(),
     );
+    await menu.press('Escape');
+    await until(
+      () => moreActions.evaluate((e) => e === document.activeElement),
+      'toolbar menu focus',
+    );
+    await first.click({ button: 'right' });
+    await menu.waitFor();
     await menu.press('Escape');
     await until(
       () => first.locator('.ad-gallery-image').evaluate((e) => e === document.activeElement),
@@ -222,7 +249,7 @@ const resize = (width, height) =>
     );
     checks.push('rename cancel/save preserves bytes and memberships');
 
-    await page.getByRole('button', { name: 'すべて選択（201枚）', exact: true }).click();
+    await page.getByRole('button', { name: 'すべて選択', exact: true }).click();
     await until(async () => (await model()).content.selected === 201, 'copy targets');
     const nativeClipboard = process.env.APPDOCK_TEST_NATIVE_CLIPBOARD === '1';
     const canRestoreClipboard =
@@ -245,7 +272,7 @@ const resize = (width, height) =>
       }));
     if (canRestoreClipboard) {
       try {
-        await page.getByRole('button', { name: '操作', exact: false }).last().click();
+        await page.getByRole('button', { name: 'その他', exact: true }).click();
         await host.getByRole('menuitem', { name: 'パスをコピー', exact: true }).click();
         await until(
           async () =>
@@ -263,7 +290,7 @@ const resize = (width, height) =>
           return paths.length;
         }, directory);
         assert.equal(pathCount, 201);
-        await page.getByRole('button', { name: '操作', exact: false }).last().click();
+        await page.getByRole('button', { name: 'その他', exact: true }).click();
         await host.getByRole('menuitem', { name: 'ファイルをコピー', exact: true }).click();
         await until(async () => !(await model()).content.busy, 'native files copied');
         assert.equal((await model()).content.error, '');
@@ -449,7 +476,7 @@ const resize = (width, height) =>
     await folderDialog.getByRole('button', { name: '適用', exact: true }).click();
     await folderDialog.waitFor({ state: 'hidden' });
     await until(async () => (await page.getAttribute('inert')) === null, 'folder rename released');
-    await page.getByRole('button', { name: 'すべて選択（2枚）', exact: true }).click();
+    await page.getByRole('button', { name: 'すべて選択', exact: true }).click();
     await page.getByRole('button', { name: '削除', exact: true }).click();
     const deletion = host.getByRole('dialog', { name: '画像を削除', exact: true });
     await deletion.waitFor();

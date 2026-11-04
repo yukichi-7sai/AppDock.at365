@@ -9,12 +9,21 @@ export type IconName =
   | 'search'
   | 'arrow'
   | 'play'
+  | 'eye'
+  | 'copy'
+  | 'select-all'
+  | 'clear-selection'
+  | 'list-plus'
+  | 'list-minus'
+  | 'folder-move'
+  | 'more'
   | 'refresh'
   | 'power'
   | 'check'
   | 'folder'
   | 'chevron'
   | 'chevron-left'
+  | 'chevron-down'
   | 'close'
   | 'minus'
   | 'square'
@@ -49,6 +58,36 @@ export type IconName =
   | 'help';
 const playIcon = <path d="m7 4 13 8-13 8Z" />;
 const paths: Record<IconName, React.ReactNode> = {
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="8" y="8" width="13" height="13" rx="2" />
+      <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+    </>
+  ),
+  'select-all': <path d="m3 6 2 2 4-4m-6 12 2 2 4-4M13 6h8m-8 10h8" />,
+  'clear-selection': (
+    <path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3M11 3h2M3 11v2m8 8h2m8-10v2" />
+  ),
+  'list-plus': <path d="M3 5h18M3 11h10M3 17h10m5-5v10m-5-5h10" />,
+  'list-minus': <path d="M3 5h18M3 11h10M3 17h6m4 0h10" />,
+  'folder-move': (
+    <>
+      <path d="M21 10V7a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M7 13h10m-4-4 4 4-4 4" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
   palette: (
     <>
       <path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.4-3.4 1.5 1.5 0 0 1 1.1-2.6H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z" />
@@ -182,6 +221,7 @@ const paths: Record<IconName, React.ReactNode> = {
   folder: <path d="M3 7V5a1 1 0 0 1 1-1h6l2 3h8a1 1 0 0 1 1 1v11H3Z" />,
   chevron: <path d="m9 5 7 7-7 7" />,
   'chevron-left': <path d="m15 5-7 7 7 7" />,
+  'chevron-down': <path d="m5 9 7 7 7-7" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
   minus: <path d="M5 12h14" />,
   square: <rect x="6" y="6" width="12" height="12" rx="1" />,

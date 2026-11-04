@@ -803,9 +803,23 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                 }
               >
                 <div className="library-summary">
-                  <div>
-                    <strong>{t('images.imageCount', { count: c.total })}</strong>
-                    {c.indexing && <span role="status">{t('texts.indexing')}</span>}
+                  <div className="library-selection-controls">
+                    <SettingsButton
+                      disabled={!c.total || c.selected === c.total || c.busy}
+                      onClick={() => run({ command: 'select-all' })}
+                    >
+                      <Icon name="select-all" size={15} />
+                      {t('images.selectAll')}
+                    </SettingsButton>
+                    <SettingsButton
+                      disabled={!c.selected || c.busy}
+                      onClick={() => run({ command: 'clear' })}
+                    >
+                      <Icon name="clear-selection" size={15} />
+                      {t('images.clearSelection')}
+                    </SettingsButton>
+                  </div>
+                  <div className="library-selection-status">
                     {c.group !== 'all' && (
                       <button
                         className="library-filter-chip"
@@ -816,107 +830,123 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                         <Icon name="close" size={12} />
                       </button>
                     )}
+                    {c.indexing && <span role="status">{t('texts.indexing')}</span>}
+                    {c.playback && (
+                      <span role="status">
+                        {t(
+                          c.playback.state === 'playing'
+                            ? 'sounds.playing'
+                            : c.playback.state === 'waiting'
+                              ? 'sounds.waiting'
+                              : 'sounds.loading',
+                        )}
+                      </span>
+                    )}
+                    <span className="library-selection-count" aria-live="polite">
+                      {t('images.selectionSummary', { total: c.total, count: c.selected })}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!c.total || c.busy}
-                    onClick={() => run({ command: 'select-all' })}
-                  >
-                    {t('images.selectAll', { count: c.total })}
-                  </button>
                 </div>
                 <div className="library-selection">
-                  {media === 'text' && (
-                    <>
-                      <SettingsButton
-                        disabled={c.selected !== 1 || c.busy}
-                        onClick={() => dialog('preview')}
-                      >
-                        {t('texts.preview')}
-                      </SettingsButton>
-                      <SettingsButton
-                        disabled={c.selected !== 1 || c.busy}
-                        onClick={() => dialog('text-edit')}
-                      >
-                        {t('texts.edit')}
-                      </SettingsButton>
+                  <div className="library-action-group">
+                    {media === 'image' && (
                       <SettingsButton
                         disabled={!c.selected || c.busy}
-                        onClick={() => run({ command: 'file-action', operation: 'copy-text' })}
-                      >
-                        {t('texts.copy')}
-                      </SettingsButton>
-                    </>
-                  )}
-                  {media === 'sound' && (
-                    <>
-                      <SettingsButton
-                        disabled={c.selected !== 1 || c.busy}
                         onClick={() => dialog('preview')}
                       >
-                        {t('sounds.play')}
+                        <Icon name="eye" size={15} />
+                        {t('images.preview')}
                       </SettingsButton>
-                      <SettingsButton
-                        disabled={!c.playback}
-                        onClick={() => run({ command: 'stop-playback' })}
-                      >
-                        {t('sounds.stop')}
-                      </SettingsButton>
-                      {c.playback && (
-                        <span role="status">
-                          {t(
-                            c.playback.state === 'playing'
-                              ? 'sounds.playing'
-                              : c.playback.state === 'waiting'
-                                ? 'sounds.waiting'
-                                : 'sounds.loading',
-                          )}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  <span aria-live="polite">{t('images.selectedCount', { count: c.selected })}</span>
-                  <SettingsButton
-                    disabled={!c.selected || c.busy}
-                    onClick={() => dialog('batch-add')}
-                  >
-                    {t('images.addToGroup')}
-                  </SettingsButton>
-                  <SettingsButton
-                    disabled={!c.selected || c.busy}
-                    onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
-                  >
-                    {t('images.removeFromGroup')}
-                  </SettingsButton>
-                  <SettingsButton
-                    disabled={!c.selected || c.busy}
-                    onClick={() => dialog('folder-move')}
-                  >
-                    {t('images.moveShort')}
-                  </SettingsButton>
-                  <SettingsButton
-                    disabled={!c.selected || c.busy}
-                    onClick={() => dialog('delete-image')}
-                  >
-                    <Icon name="trash" size={14} />
-                    {t('images.delete')}
-                  </SettingsButton>
-                  <SettingsButton
-                    disabled={!c.selected || c.busy}
-                    aria-haspopup="menu"
-                    onClick={(e) => imageMenu(undefined, e.currentTarget)}
-                  >
-                    {t('images.actions')} ▾
-                  </SettingsButton>
-                  {c.selected > 0 && (
-                    <button
-                      type="button"
-                      disabled={c.busy}
-                      onClick={() => run({ command: 'clear' })}
+                    )}
+                    {media === 'text' && (
+                      <>
+                        <SettingsButton
+                          disabled={c.selected !== 1 || c.busy}
+                          onClick={() => dialog('preview')}
+                        >
+                          <Icon name="eye" size={15} />
+                          {t('texts.preview')}
+                        </SettingsButton>
+                        <SettingsButton
+                          disabled={c.selected !== 1 || c.busy}
+                          onClick={() => dialog('text-edit')}
+                        >
+                          <Icon name="edit" size={15} />
+                          {t('texts.edit')}
+                        </SettingsButton>
+                        <SettingsButton
+                          disabled={!c.selected || c.busy}
+                          onClick={() => run({ command: 'file-action', operation: 'copy-text' })}
+                        >
+                          <Icon name="copy" size={15} />
+                          {t('texts.copy')}
+                        </SettingsButton>
+                      </>
+                    )}
+                    {media === 'sound' && (
+                      <>
+                        <SettingsButton
+                          disabled={c.selected !== 1 || c.busy}
+                          onClick={() => dialog('preview')}
+                        >
+                          <Icon name="play" size={15} />
+                          {t('sounds.play')}
+                        </SettingsButton>
+                        <SettingsButton
+                          disabled={!c.playback}
+                          onClick={() => run({ command: 'stop-playback' })}
+                        >
+                          <Icon name="square" size={15} />
+                          {t('sounds.stop')}
+                        </SettingsButton>
+                      </>
+                    )}
+                  </div>
+                  <div className="library-action-group">
+                    <SettingsButton
+                      disabled={!c.selected || c.busy}
+                      onClick={() => dialog('batch-add')}
                     >
-                      {t('images.clearSelection')}
-                    </button>
-                  )}
+                      <Icon name="list-plus" size={15} />
+                      {t('images.addToGroup')}
+                    </SettingsButton>
+                    <SettingsButton
+                      disabled={!c.selected || c.busy}
+                      onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
+                    >
+                      <Icon name="list-minus" size={15} />
+                      {t('images.removeFromGroup')}
+                    </SettingsButton>
+                  </div>
+                  <div className="library-action-group">
+                    <SettingsButton
+                      disabled={!c.selected || c.busy}
+                      onClick={() => dialog('folder-move')}
+                    >
+                      <Icon name="folder-move" size={15} />
+                      {t('images.moveShort')}
+                    </SettingsButton>
+                    <SettingsButton
+                      disabled={!c.selected || c.busy}
+                      aria-haspopup="menu"
+                      aria-expanded={menu?.kind === 'images' && !menu.target}
+                      onClick={(e) => imageMenu(undefined, e.currentTarget)}
+                    >
+                      <Icon name="more" size={15} />
+                      {t('images.actions')}
+                      <Icon name="chevron-down" size={12} />
+                    </SettingsButton>
+                  </div>
+                  <div className="library-action-group">
+                    <SettingsButton
+                      className="library-selection-delete"
+                      disabled={!c.selected || c.busy}
+                      onClick={() => dialog('delete-image')}
+                    >
+                      <Icon name="trash" size={15} />
+                      {t('images.delete')}
+                    </SettingsButton>
+                  </div>
                 </div>
               </ImageBrowserFilters>
             </div>

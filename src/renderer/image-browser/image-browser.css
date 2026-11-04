@@ -105,8 +105,6 @@
   padding-left: 28px;
 }
 .library-section-heading > button,
-.library-summary > button,
-.library-selection > button:not(.settings-action-button),
 .library-status button,
 .library-load-more button,
 .library-empty-actions button {
@@ -252,6 +250,7 @@
 .library-toolbar,
 .library-summary,
 .library-summary > div,
+.library-action-group,
 .library-selection {
   display: flex;
   align-items: center;
@@ -339,12 +338,21 @@
   padding-top: 6px;
   font-size: 12px;
 }
-.library-summary > div {
+.library-summary > .library-selection-status {
   flex-wrap: wrap;
-  gap: 6px;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 6px 12px;
+  color: var(--muted);
 }
-.library-summary strong {
-  font-size: 12px;
+.library-selection-count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.image-browser .library-selection-controls .settings-action-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
 }
 .library-filter-chip {
   display: inline-flex;
@@ -367,17 +375,21 @@
 .library-selection {
   flex-wrap: wrap;
   min-height: 40px;
-  gap: 5px;
+  gap: 8px 18px;
   padding-top: 4px;
   font-size: 12px;
 }
-.library-selection > span {
-  color: var(--muted);
-  min-width: 65px;
+.library-action-group {
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 5px;
 }
-.image-browser .library-selection .settings-action-button {
-  min-height: 28px;
-  padding: 3px 7px;
+.library-selection .settings-action-label,
+.library-selection-controls .settings-action-label {
+  white-space: nowrap;
+}
+.image-browser .library-selection-delete {
+  color: var(--danger);
 }
 .library-grid-pad {
   padding: 12px;
