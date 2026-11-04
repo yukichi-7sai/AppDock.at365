@@ -67,10 +67,10 @@ module.exports = async ({ host, open, saved, save, checks, profile, row, until }
           ? 'gesture-settings-tab:triggers'
           : 'command-trigger-tab:' + (kind === 'shortcuts' ? 'commands' : kind),
       )
-      .click();
+      .press('Enter');
     const edit = async () => {
       if (kind === 'shortcuts') {
-        await row(kind, 'same-id').locator('.binding-order').click();
+        await row(kind, 'same-id').locator('.binding-order').press('Enter');
       } else {
         await host
           .getByTestId('trigger-stack-table')
@@ -167,7 +167,7 @@ module.exports = async ({ host, open, saved, save, checks, profile, row, until }
   }
 
   await open();
-  await host.getByTestId('command-trigger-tab:gestures').click();
+  await host.getByTestId('command-trigger-tab:gestures').press('Enter');
   const table = host.getByTestId('trigger-stack-table');
   const baseline = await saved();
   await table.getByRole('button', { name: /追加/ }).click();

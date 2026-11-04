@@ -78,7 +78,7 @@ function TriggerBindingDialog({
 }: {
   edit: BindingEdit<CommandTriggerBinding>;
   applets: { id: string; title: string }[];
-  apply(row: CommandTriggerBinding): void;
+  apply(row: CommandTriggerBinding, editTrigger?: boolean): Promise<void>;
   close(): void;
 }) {
   const row = edit.row;
@@ -94,6 +94,11 @@ function TriggerBindingDialog({
       {...common}
       initial={row.binding}
       onApply={(binding) => apply(commandTriggerBinding('shortcuts', binding))}
+      onApplyAndEdit={
+        edit.adding
+          ? (binding) => apply(commandTriggerBinding('shortcuts', binding), true)
+          : undefined
+      }
     />
   ) : (
     <GestureBindingDialog
@@ -101,6 +106,9 @@ function TriggerBindingDialog({
       touchpad={row.kind === 'touchpad-gestures'}
       initial={row.binding}
       onApply={(binding) => apply(commandTriggerBinding(row.kind, binding))}
+      onApplyAndEdit={
+        edit.adding ? (binding) => apply(commandTriggerBinding(row.kind, binding), true) : undefined
+      }
     />
   );
 }
@@ -129,7 +137,7 @@ export function CommandTriggersEditor({
   scrollPositions,
 }: {
   settings: Settings;
-  onChange(settings: Settings): void;
+  onChange(settings: Settings): void | Promise<unknown>;
   commands: UiCommand[];
   applets: ExtensionSnapshot[];
   statuses: GlobalHotKeyStatus[];

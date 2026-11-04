@@ -72,9 +72,13 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   providerIcon?(id: string | null | undefined): IconName;
   conditionLabel(row: R, command: UiCommand): string;
   newBinding(command: UiCommand): R;
-  applyBinding(row: R, original?: R): void;
-  deleteBinding(row: R): void;
-  renderEditor(edit: BindingEdit<R>, apply: (row: R) => void, close: () => void): ReactNode;
+  applyBinding(row: R, original?: R): void | Promise<unknown>;
+  deleteBinding(row: R): void | Promise<unknown>;
+  renderEditor(
+    edit: BindingEdit<R>,
+    apply: (row: R, editTrigger?: boolean) => Promise<void>,
+    close: () => void,
+  ): ReactNode;
   renderOrder(row: R, close: () => void): ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
@@ -156,9 +160,9 @@ export function CommandBindingList<R extends { id: string; command: string; enab
       restore.current = null;
     }
   }, [editing, orderKey, deleting, bindings]);
-  const apply = (row: R) => {
+  const apply = async (row: R, editTrigger = false) => {
     if (!editing) return;
-    applyBinding(row, editing.adding ? undefined : editing.row);
+    await applyBinding(row, editing.adding ? undefined : editing.row);
     setNotice(
       translate(
         editing.adding
@@ -168,6 +172,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
       ),
     );
     setEditing(null);
+    if (editing.adding && editTrigger && triggerStackActions) setOrderKey(row);
   };
   const rowActions = (
     command: UiCommand,
@@ -516,7 +521,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                 `[data-shortcut-command="${CSS.escape(deleting.row.command)}"] .applet-shortcut-add`,
               ),
             );
-            deleteBinding(deleting.row);
+            await deleteBinding(deleting.row);
             setNotice(translate('settings.commandBindingList.deleted', { title: deleting.title }));
           }}
         >

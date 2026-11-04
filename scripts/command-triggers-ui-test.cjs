@@ -47,6 +47,7 @@ const usabilityOnly = process.argv.includes('--usability-only');
 const tabResetOnly = process.argv.includes('--tab-reset-only');
 const enablementOnly = process.argv.includes('--enablement-only');
 const reselectionOnly = process.argv.includes('--reselection-only');
+const dialogActionsOnly = process.argv.includes('--dialog-actions-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -214,7 +215,7 @@ if (filterConsistencyOnly) {
   }
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
-if (reselectionOnly) {
+if (reselectionOnly || dialogActionsOnly) {
   initial.host.soundEnabled = false;
   initial.updates.checkHostOnStartup = false;
   initial.updates.checkAppletsOnStartup = false;
@@ -329,6 +330,7 @@ const recordSuccess = () => {
         tabResetOnly,
         enablementOnly,
         reselectionOnly,
+        dialogActionsOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -362,8 +364,12 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
-    if (reselectionOnly) {
-      await require('./trigger-reselection-checks.cjs')({
+    if (reselectionOnly || dialogActionsOnly) {
+      await require(
+        dialogActionsOnly
+          ? './trigger-dialog-action-checks.cjs'
+          : './trigger-reselection-checks.cjs',
+      )({
         host,
         open,
         saved,
@@ -372,6 +378,7 @@ const recordSuccess = () => {
         profile,
         row,
         until,
+        app: source ? undefined : app,
       });
       const durable = await saved();
       await app.close();
@@ -379,7 +386,7 @@ const recordSuccess = () => {
       host = await app.firstWindow();
       await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
       assert.deepEqual(await saved(), durable);
-      checks.push('all trigger replacements and stack entries survive an actual restart');
+      checks.push('all trigger dialog changes and stack entries survive an actual restart');
       assert.deepEqual(errors, []);
       recordSuccess();
       return;

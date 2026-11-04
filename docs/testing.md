@@ -115,6 +115,8 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 `command-triggers-ui-test.cjs --reselection-only`は、3方式のトリガー編集で現在の入力からの選び直し、重複拒否、入力途中の条件・順序の保持、両段階の取消、スタック全体の置き換え、外部競合と実再起動後の保存を確認する。逆引き・種類別タブ・機能ページから同じ編集ダイアログを使い、追加側の選び直しも確認する。
 
+`command-triggers-ui-test.cjs --dialog-actions-only`は、3方式の全コマンド削除とOK/取消、選び直した元のトリガーと実行方法の削除、外部競合、新規空トリガーの拒否を確認する。「追加してトリガーを編集」の入力検証・連打抑止・新規/既存スタックへの追加と選択行・編集取消後の追加保持、通常の追加/Ctrl+Enter、実再起動後の保存も確認する。ソース起動ではSettingsStoreの保存失敗fixtureで追加・削除の入力保持と明示再試行を検査し、発行物では実際の保存・画面遷移を検査する。保存待ち・拒否・無関係な外部変更の保護は`tests/settings-view-client.test.cjs`も担当する。
+
 代表的な実行例:
 
 ```powershell

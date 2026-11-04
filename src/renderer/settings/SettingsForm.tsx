@@ -42,6 +42,7 @@ import { settingsItemId } from '../../shared/settings-catalog';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
+  apply(value: Settings): Promise<void>;
 }
 export function SettingsForm({
   model,
@@ -228,7 +229,7 @@ export function SettingsForm({
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}
-            onChange={edit}
+            onChange={editor.apply}
             commands={commands}
             applets={extensions}
             statuses={globalHotKeys}
@@ -258,7 +259,7 @@ export function SettingsForm({
               settings={settings}
               commands={commands}
               applets={extensions}
-              onChange={edit}
+              onChange={editor.apply}
               busy={busy}
             />
           )}

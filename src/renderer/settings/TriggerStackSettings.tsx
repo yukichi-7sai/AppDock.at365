@@ -50,7 +50,7 @@ export function TriggerStackDialog({
   original?: TriggerStack | null;
   commands: UiCommand[];
   applets: { id: string; title: string }[];
-  onChange(settings: Settings): void;
+  onChange(settings: Settings): void | Promise<unknown>;
   onClose(): void;
   initialEntryId?: string;
   inheritedMode?: 'first' | 'all';
@@ -90,6 +90,7 @@ export function TriggerStackDialog({
       stack.input === normalizedInput &&
       !(stack.kind === before?.kind && stack.input === before.input),
   );
+  const deleting = !!before && value.entries.length === 0;
   return (
     <SettingsMcpScope itemId={settingsItemId(value.kind, 'bindings')}>
       <SettingsDialog
@@ -109,16 +110,22 @@ export function TriggerStackDialog({
         }
         onClose={onClose}
         valid={
-          validInput &&
-          !duplicate &&
-          (selecting || (valid && validMode && value.entries.length > 0))
+          (!selecting && deleting) ||
+          (validInput &&
+            !duplicate &&
+            (selecting || (valid && validMode && value.entries.length > 0)))
+        }
+        message={
+          !selecting && deleting ? t('settings.commandStacks.emptyDeletesTrigger') : undefined
         }
         error={
-          duplicate
-            ? t('settings.commandStacks.triggerExists')
-            : !validMode
-              ? t('settings.commandStacks.invalidCount')
-              : undefined
+          !selecting && deleting
+            ? undefined
+            : duplicate
+              ? t('settings.commandStacks.triggerExists')
+              : !validMode
+                ? t('settings.commandStacks.invalidCount')
+                : undefined
         }
         applyLabel={
           selecting
@@ -141,7 +148,7 @@ export function TriggerStackDialog({
             setSelecting(false);
             return;
           }
-          onChange(applyTriggerStack(settings, value, before));
+          await onChange(applyTriggerStack(settings, deleting ? null : value, before));
         }}
       >
         {(ready, setError) => (
@@ -226,7 +233,7 @@ export function TriggerStackSettings({
   kind: TriggerStackKind;
   commands: UiCommand[];
   applets: ExtensionSnapshot[];
-  onChange(settings: Settings): void;
+  onChange(settings: Settings): void | Promise<unknown>;
   busy?: boolean;
   inheritedMode?: 'first' | 'all';
 }) {

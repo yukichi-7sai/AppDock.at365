@@ -18,6 +18,7 @@ export function AppletShortcutDialog({
   applets,
   adding,
   onApply,
+  onApplyAndEdit,
   onClose,
 }: {
   initial: Keybinding;
@@ -25,7 +26,8 @@ export function AppletShortcutDialog({
   ownerTitle?: string;
   applets: { id: string; title: string }[];
   adding: boolean;
-  onApply(row: Keybinding): void;
+  onApply(row: Keybinding): void | Promise<unknown>;
+  onApplyAndEdit?(row: Keybinding): void | Promise<unknown>;
   onClose(): void;
 }) {
   const { t: translate } = useHostTranslation();
@@ -39,6 +41,15 @@ export function AppletShortcutDialog({
     !draft.excludedProcessError &&
     (value.when.scope !== 'applets' || !!value.when.appletIds.length) &&
     (value.when.scope !== 'exe' || (!draft.processError && !!draft.processes.length));
+  const apply = (action: typeof onApply) =>
+    action({
+      ...value,
+      key: normalizeShortcut(value.key),
+      when: {
+        ...conditionExclusions(value.when, draft),
+        ...(value.when.scope === 'exe' ? { processes: draft.processes } : {}),
+      },
+    });
   return (
     <BindingEditDialog
       className="binding-editor-dialog"
@@ -47,16 +58,8 @@ export function AppletShortcutDialog({
       valid={valid}
       error={protectedKey ? translate('settings.appletShortcutDialog.protectedKey') : undefined}
       errorTarget={translate('settings.appletShortcutDialog.key')}
-      onApply={() =>
-        onApply({
-          ...value,
-          key: normalizeShortcut(value.key),
-          when: {
-            ...conditionExclusions(value.when, draft),
-            ...(value.when.scope === 'exe' ? { processes: draft.processes } : {}),
-          },
-        })
-      }
+      onApply={() => apply(onApply)}
+      onApplyAndEdit={onApplyAndEdit ? () => apply(onApplyAndEdit) : undefined}
       onClose={onClose}
       footerStart={
         <BindingEnabledControl

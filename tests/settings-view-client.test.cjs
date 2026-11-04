@@ -142,6 +142,70 @@ function fixture(pageId = 'touchpad-gestures', actions = {}) {
   };
 }
 
+test('dialog apply waits for persistence and leaves rejected drafts out of the settings view', async () => {
+  const f = fixture('command-triggers');
+  const baseline = structuredClone(f.displayed.content.values);
+  const editor = f.client.editor(f.displayed);
+  editor.value.keybindings = [
+    {
+      id: 'added',
+      command: 'appdock.settings.open',
+      key: 'Ctrl+F8',
+      enabled: true,
+      when: { scope: 'app', appletIds: [] },
+    },
+  ];
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  f.behavior(async () => {
+    await gate;
+    throw Error('save rejected');
+  });
+  const pending = editor.apply(editor.value);
+  const rejected = assert.rejects(pending, /save rejected/);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(f.displayed.content.values, baseline);
+  release();
+  await rejected;
+  await f.client.flush();
+  assert.deepEqual(f.displayed.content.values, baseline);
+  assert.equal(editor.value.keybindings[0].id, 'added');
+  f.behavior(async (operation) => f.save(operation));
+  await editor.apply(editor.value);
+  assert.equal(f.displayed.content.values.keybindings[0].id, 'added');
+  assert.equal(f.calls, 2);
+});
+
+test('dialog apply preserves unrelated external values and rejects edits to the same bindings', async () => {
+  const f = fixture('command-triggers');
+  f.behavior(async (operation) => f.save(operation));
+  const editor = f.client.editor(f.displayed);
+  editor.value.keybindings = [
+    {
+      id: 'added',
+      command: 'appdock.settings.open',
+      key: 'Ctrl+F8',
+      enabled: true,
+      when: { scope: 'app', appletIds: [] },
+    },
+  ];
+  f.external((values) => {
+    values.gestures.inputExecutionModes = { 'move-up': 'first' };
+  });
+  await editor.apply(editor.value);
+  assert.deepEqual(f.displayed.content.values.gestures.inputExecutionModes, { 'move-up': 'first' });
+  const stale = f.client.editor(f.displayed);
+  stale.value.keybindings = [];
+  f.external((values) => {
+    values.keybindings[0].enabled = false;
+  });
+  await assert.rejects(stale.apply(stale.value));
+  await f.client.flush();
+  assert.equal(f.displayed.content.values.keybindings[0].enabled, false);
+});
+
 test('page links wait for queued saves and never hold the queue during navigation', async () => {
   const f = fixture('general', { openPageLink: 'link' });
   let release,

@@ -313,8 +313,31 @@ export class SettingsViewClient {
       before: displayed.content.values,
       revision: model.content.editing.editRevision,
     };
+    const submit = (value: Settings) =>
+      this.act(
+        {
+          kind: 'edit',
+          action: {
+            type: 'page-values',
+            pageId: model.content.page.id,
+            before: basis.before,
+            value: settingsProjection(
+              value,
+              model.content.page,
+              model.content.auxiliary.applets ?? [],
+            ),
+          },
+        },
+        basis.revision,
+        basis,
+      );
     return {
       value: materialize(displayed),
+      // Grouped dialog drafts remain in the dialog until persistence succeeds.
+      apply: async (value: Settings) => {
+        await submit(value);
+        await this.flush();
+      },
       edit: (value: Settings) => {
         const values = settingsProjection(
           value,
@@ -323,20 +346,10 @@ export class SettingsViewClient {
         );
         // Async controls can finish after an external update. Compare against the
         // values that produced this editor, not the newly accepted server values.
-        const before = basis.before;
         this.input = { pageId: model.content.page.id, values, basis };
         this.inputVersion++;
         this.render(this.display(model));
-        ignore(
-          this.act(
-            {
-              kind: 'edit',
-              action: { type: 'page-values', pageId: model.content.page.id, before, value: values },
-            },
-            basis.revision,
-            basis,
-          ),
-        );
+        ignore(submit(value));
       },
     };
   }
