@@ -38,6 +38,7 @@ function App() {
   const ribbonLayoutMode = snapshot?.settings.value.host.ribbonExpandOnHover
     ? 'compact'
     : snapshot?.ribbonDisplayMode;
+  const ribbonExpandedWidth = snapshot?.settings.value.host.ribbonExpandedWidth;
   const [settingsIndex, setSettingsIndex] = useState<SettingsIndexModel>();
   useEffect(() => {
     if (!snapshot?.uiReady) return;
@@ -410,8 +411,8 @@ function App() {
       style={
         {
           '--applet-sidebar-width': `${appletSidebar.width}px`,
-          '--ribbon-width': `${ribbonDisplayWidth(ribbonLayoutMode)}px`,
-          '--ribbon-display-width': `${ribbonDisplayWidth(snapshot?.ribbonDisplayMode)}px`,
+          '--ribbon-width': `min(${ribbonDisplayWidth(ribbonLayoutMode, ribbonExpandedWidth)}px, 100vw)`,
+          '--ribbon-display-width': `min(${ribbonDisplayWidth(snapshot?.ribbonDisplayMode, ribbonExpandedWidth)}px, 100vw)`,
           '--statusbar-height':
             snapshot?.settings.value.host.showStatusBar === false ? '0px' : '28px',
         } as React.CSSProperties

@@ -12,6 +12,7 @@ import {
   ribbonPresentation,
 } from '../../shared/ribbon-layout';
 import {
+  compactRibbonWidth,
   defaultRibbonRightClickCommand,
   ribbonGroupIcons,
   type RibbonBuiltinIcon,
@@ -28,6 +29,7 @@ import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
+import { DescriptionText } from '../settings-ui/DescriptionText';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { Toggle } from '../settings-ui/Toggle';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
@@ -480,7 +482,11 @@ export function RibbonSettings({
         <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonExpandOnHover')}>
           <SettingsField
             title={translate('settings.ribbonSettings.expandOnHover')}
-            description={translate('settings.ribbonSettings.expandOnHoverDescription')}
+            description={
+              <DescriptionText
+                text={translate('settings.ribbonSettings.expandOnHoverDescription')}
+              />
+            }
             {...settingAnchor('ribbon', 'ribbonExpandOnHover')}
           >
             <Toggle
@@ -517,6 +523,29 @@ export function RibbonSettings({
                     ...settings.host,
                     ribbonHoverCollapseDelayMs: numberInput(event.target.value),
                   },
+                })
+              }
+            />
+          </SettingsField>
+        </SettingsMcpScope>
+        <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbonExpandedWidth')}>
+          <SettingsField
+            title={translate('settings.ribbonSettings.expandedWidth')}
+            description={translate('settings.ribbonSettings.expandedWidthDescription')}
+            {...settingAnchor('ribbon', 'ribbonExpandedWidth')}
+          >
+            <SettingsInput
+              aria-label={translate('settings.ribbonSettings.expandedWidth')}
+              type="number"
+              min={compactRibbonWidth}
+              max={Number.MAX_SAFE_INTEGER}
+              step={1}
+              disabled={busy}
+              value={settings.host.ribbonExpandedWidth}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  host: { ...settings.host, ribbonExpandedWidth: numberInput(event.target.value) },
                 })
               }
             />

@@ -2,7 +2,12 @@ import { hostText } from './i18n';
 import { imageReference } from './registered-images';
 export type RibbonPlacement = 'top' | 'bottom';
 export type RibbonDisplayMode = 'compact' | 'expanded';
-export const ribbonDisplayWidth = (mode?: RibbonDisplayMode) => (mode === 'expanded' ? 200 : 56);
+export const compactRibbonWidth = 56;
+export const defaultRibbonExpandedWidth = 200;
+export const ribbonDisplayWidth = (
+  mode?: RibbonDisplayMode,
+  expandedWidth = defaultRibbonExpandedWidth,
+) => (mode === 'expanded' ? expandedWidth : compactRibbonWidth);
 export interface AppletRibbonItem {
   id: string;
   title: string;

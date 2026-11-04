@@ -274,6 +274,31 @@ test('custom accent API validates HEX in dryRun, saves the pair atomically, and 
     (e) => e.code === 'REVISION_CONFLICT',
   );
 });
+test('ribbon width is publicly editable and rejects invalid dimensions atomically', (t) => {
+  const f = fixture(t);
+  const schema = f.api.call('settings.getSchema').fields.ribbonExpandedWidth;
+  assert.equal(schema.type, 'number');
+  assert.equal(schema.minimum, 56);
+  assert.equal(f.commands.get().values.ribbonExpandedWidth, 200);
+  const revision = f.commands.revision();
+  for (const width of [55, 280.5, '280'])
+    assert.throws(
+      () =>
+        f.commands.execute('appdock.settings.update', {
+          changes: { ribbonExpandedWidth: width },
+          expectedRevision: revision,
+        }),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  assert.equal(f.commands.revision(), revision);
+  f.commands.execute('appdock.settings.update', {
+    changes: { ribbonExpandedWidth: 280 },
+    expectedRevision: revision,
+  });
+  assert.equal(f.settings.value.host.ribbonExpandedWidth, 280);
+  assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.ribbonExpandedWidth, 280);
+});
+
 test('hover delay is publicly editable with validation, revision and dry-run protection', (t) => {
   const f = fixture(t);
   const schema = f.api.call('settings.getSchema').fields.ribbonHoverCollapseDelayMs;

@@ -164,6 +164,8 @@ export function parseSettings(value: unknown): Settings {
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidRows'));
   if (!Number.isSafeInteger(value.host.ribbonHoverCollapseDelayMs))
     throw Error(hostText('settings.ribbonSettings.invalidCollapseDelay'));
+  if (!Number.isSafeInteger(value.host.ribbonExpandedWidth))
+    throw Error(hostText('settings.ribbonSettings.invalidExpandedWidth'));
   for (const key of ['textPaletteWidth', 'clipboardPaletteWidth'])
     if (!Number.isSafeInteger(value.host[key])) throw Error(hostText('inputPalette.invalidWidth'));
   if (!isStartPage(value.host.startPage)) throw Error(hostText('general.startPage.invalid'));

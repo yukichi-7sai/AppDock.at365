@@ -1,6 +1,7 @@
 import { localizedMetadata } from './translation-metadata';
 import type { HostSettings, SettingDefinition } from './contracts';
 import { hostText } from './i18n';
+import { compactRibbonWidth, defaultRibbonExpandedWidth } from './ribbon';
 import {
   defaultInputPaletteRows,
   defaultInputPaletteWidth,
@@ -47,6 +48,17 @@ const definitions = localizedMetadata(
         default: false,
         automation: true,
         generateCommands: [...switches],
+      },
+      ribbonExpandedWidth: {
+        pageId: 'ribbon',
+        title: hostText('settings.ribbonSettings.expandedWidth'),
+        description: hostText('settings.ribbonSettings.expandedWidthDescription'),
+        type: 'number',
+        default: defaultRibbonExpandedWidth,
+        minimum: compactRibbonWidth,
+        maximum: Number.MAX_SAFE_INTEGER,
+        step: 1,
+        automation: true,
       },
       ribbonHoverCollapseDelayMs: {
         pageId: 'ribbon',

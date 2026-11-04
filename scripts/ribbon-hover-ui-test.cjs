@@ -142,18 +142,24 @@ async function mode(expected) {
   await until(async () => (await state()).ribbonDisplayMode === expected, `mode ${expected}`);
   await until(async () => {
     const g = await geometry();
-    return (
-      Math.abs(
-        g.bounds.width -
-          (expected === 'expanded' ? 200 : 56) * (await state()).settings.value.host.zoomFactor,
-      ) <= 1
+    const current = (await state()).settings.value.host;
+    const width = Math.min(
+      expected === 'expanded' ? current.ribbonExpandedWidth : 56,
+      await host.main.evaluate(() => innerWidth),
     );
+    return Math.abs(g.bounds.width - width * current.zoomFactor) <= 1;
   }, `native width ${expected}`);
   await until(async () => {
     const s = await state(),
       g = await geometry(),
       rect = await mainBounds();
-    const width = s.settings.value.host.ribbonExpandOnHover || expected === 'compact' ? 56 : 200;
+    const width =
+      s.settings.value.host.ribbonExpandOnHover || expected === 'compact'
+        ? 56
+        : Math.min(
+            s.settings.value.host.ribbonExpandedWidth,
+            await host.main.evaluate(() => innerWidth),
+          );
     return Math.abs(rect.x - g.bounds.x / s.settings.value.host.zoomFactor - width) <= 1;
   }, `page reservation ${expected}`);
 }
@@ -210,6 +216,21 @@ async function overlayChecks() {
     }));
   const pageBefore = await metrics();
   await move('inside');
+  await mode('expanded');
+  const savedWidth = (await state()).settings.value.host.ribbonExpandedWidth;
+  await host.save({ host: { ribbonExpandedWidth: savedWidth + 40 } });
+  await mode('expanded');
+  assert.deepEqual(
+    await nativePageGeometry('main'),
+    before,
+    'width changes during hover preserve native page bounds',
+  );
+  assert.deepEqual(
+    await metrics(),
+    pageBefore,
+    'width changes during hover never resize or recreate page',
+  );
+  await host.save({ host: { ribbonExpandedWidth: savedWidth } });
   await mode('expanded');
   assert.deepEqual(await mainBounds(), mainBefore, 'main area does not move or resize');
   assert.deepEqual(
@@ -367,6 +388,92 @@ async function delaySettingsChecks() {
     'delay input defaults to 200ms; Enter/blur save, Escape cancels, invalid values stay unsaved; 2500ms survives polling and re-entry cancels; zero collapses on detection without resizing main',
   );
 }
+async function widthSettingsChecks() {
+  const input = host.main.getByRole('spinbutton', {
+    name: '大きくしたときの幅（px）',
+    exact: true,
+  });
+  const saved = async () => (await state()).settings.value.host.ribbonExpandedWidth;
+  assert.equal(await input.inputValue(), '200');
+  await input.fill('320');
+  assert.equal(await saved(), 200);
+  await input.press('Escape');
+  assert.equal(await input.inputValue(), '200');
+  await input.fill('280');
+  await input.press('Enter');
+  await until(async () => (await saved()) === 280, 'width saved');
+  await input.fill('55');
+  await input.press('Enter');
+  await until(async () => (await host.main.getByRole('alert').count()) > 0, 'too narrow rejected');
+  assert.equal(await saved(), 280);
+  await input.fill('280');
+  await input.press('Enter');
+  await until(
+    async () => (await host.main.getByRole('alert').count()) === 0,
+    'width error cleared',
+  );
+  const before = await mainBounds();
+  await move('inside');
+  await mode('expanded');
+  assert.deepEqual(await mainBounds(), before, 'custom hover width preserves main');
+  await host.save({ host: { ribbonExpandedWidth: 100000 } });
+  await mode('expanded');
+  assert(
+    (await geometry()).bounds.width <= (await geometry()).origin.width,
+    'wide setting fits window',
+  );
+  assert.equal(await saved(), 100000, 'fitting never overwrites stored width');
+  await move('left');
+  await mode('compact');
+  await input.fill('280');
+  await input.press('Enter');
+  await until(async () => (await saved()) === 280, 'custom width restored');
+  const link = host.main.getByRole('button', {
+    name: 'リボンの大きさを切り替えるをコマンドパレットで表示',
+    exact: true,
+  });
+  await link.click();
+  let palette = await overlayPage(host.main);
+  assert.equal(await palette.getByRole('combobox').inputValue(), 'appdock.ribbon.toggle');
+  assert.equal(
+    (await state()).settings.value.host.ribbonExpandOnHover,
+    true,
+    'opening link does not execute command',
+  );
+  await closingAction(palette.getByRole('combobox').press('Escape'));
+  await until(async () => !(await state()).overlay.active, 'link palette cancelled');
+  await until(
+    () => link.evaluate((element) => element === document.activeElement),
+    'link focus restored',
+  );
+  await link.press('Enter');
+  palette = await overlayPage(host.main);
+  await closingAction(palette.getByRole('combobox').press('Enter'));
+  await until(
+    async () => !(await state()).settings.value.host.ribbonExpandOnHover,
+    'palette command explicitly executed',
+  );
+  await mode('expanded');
+  assert.equal(
+    (await mainBounds()).width,
+    before.width - (280 - 56),
+    'manual expansion reserves configured width',
+  );
+  await input.fill('320');
+  await input.press('Tab');
+  await until(async () => (await saved()) === 320, 'manual width changed by blur');
+  await mode('expanded');
+  assert.equal((await mainBounds()).width, before.width - (320 - 56));
+  await input.fill('280');
+  await input.press('Enter');
+  await until(async () => (await saved()) === 280, 'width reset for hover');
+  await host.save({ host: { ribbonExpandOnHover: true } });
+  await move('body');
+  await mode('compact');
+  checks.push(
+    'expanded width defaults to 200px, edits/invalid values/cancellation persist correctly; custom widths serve hover overlay and manual layout; oversized width fits without changing saved value; command link selects without running, cancels with focus return and executes only on confirmation',
+  );
+}
 (async () => {
   try {
     await start();
@@ -379,6 +486,7 @@ async function delaySettingsChecks() {
     await toggle.click();
     await mode('compact');
     await delaySettingsChecks();
+    await widthSettingsChecks();
     const compactMain = await mainBounds();
     const before = fs.readFileSync(
       file(profile, `settings-${require('node:os').hostname()}.json`),
@@ -400,7 +508,7 @@ async function delaySettingsChecks() {
     await mode('expanded');
     assert.equal(
       (await mainBounds()).width,
-      compactMain.width - 144,
+      compactMain.width - ((await state()).settings.value.host.ribbonExpandedWidth - 56),
       'turning auto off reserves the remembered expanded width',
     );
     await host.save({ host: { ribbonExpandOnHover: true } });
@@ -453,6 +561,10 @@ async function delaySettingsChecks() {
       'group surface',
     );
     await group.getByRole('dialog', { name: 'Hover group', exact: true }).waitFor();
+    assert.equal(
+      Math.round((await group.getByRole('dialog').boundingBox()).width),
+      (await state()).settings.value.host.ribbonExpandedWidth,
+    );
     await delay(1200);
     await mode('expanded');
     await closingAction(group.locator('[data-ribbon-id="image-library"]').click());
@@ -540,6 +652,10 @@ async function delaySettingsChecks() {
     await host.save({ host: { theme: 'dark' } });
     await toggle.scrollIntoViewIfNeeded();
     await host.main.screenshot({ path: path.join(profile, 'settings-narrow-dark.png') });
+    await host.main
+      .getByRole('spinbutton', { name: '大きくしたときの幅（px）', exact: true })
+      .scrollIntoViewIfNeeded();
+    await host.main.screenshot({ path: path.join(profile, 'settings-width-narrow-dark.png') });
     await host.close();
     host = undefined;
     await start();
@@ -547,6 +663,7 @@ async function delaySettingsChecks() {
     await mode('compact');
     assert.equal((await state()).settings.value.host.ribbonExpandOnHover, true);
     assert.equal((await state()).settings.value.host.ribbonHoverCollapseDelayMs, 500);
+    assert.equal((await state()).settings.value.host.ribbonExpandedWidth, 280);
     await move('inside');
     await mode('expanded');
     await move('body');
