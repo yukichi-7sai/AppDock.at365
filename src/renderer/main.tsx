@@ -34,6 +34,10 @@ function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
+  // Hover changes only the ribbon surface; the page keeps its compact reservation.
+  const ribbonLayoutMode = snapshot?.settings.value.host.ribbonExpandOnHover
+    ? 'compact'
+    : snapshot?.ribbonDisplayMode;
   const [settingsIndex, setSettingsIndex] = useState<SettingsIndexModel>();
   useEffect(() => {
     if (!snapshot?.uiReady) return;
@@ -71,7 +75,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [snapshot?.ribbonDisplayMode]);
+  }, [ribbonLayoutMode]);
   const dialogNavigation = useRef(snapshot?.navigation.request);
   useLayoutEffect(() => {
     const changed = dialogNavigation.current !== snapshot?.navigation.request;
@@ -291,7 +295,7 @@ function App() {
     restoringPage,
     pagePlacementRevision,
     snapshot?.navigation.request,
-    snapshot?.ribbonDisplayMode,
+    ribbonLayoutMode,
   ]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -406,7 +410,8 @@ function App() {
       style={
         {
           '--applet-sidebar-width': `${appletSidebar.width}px`,
-          '--ribbon-width': `${ribbonDisplayWidth(snapshot?.ribbonDisplayMode)}px`,
+          '--ribbon-width': `${ribbonDisplayWidth(ribbonLayoutMode)}px`,
+          '--ribbon-display-width': `${ribbonDisplayWidth(snapshot?.ribbonDisplayMode)}px`,
           '--statusbar-height':
             snapshot?.settings.value.host.showStatusBar === false ? '0px' : '28px',
         } as React.CSSProperties

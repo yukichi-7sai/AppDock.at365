@@ -3945,6 +3945,7 @@ summary {
 
 .shell-ribbon-slot {
   min-height: 0;
+  width: var(--ribbon-display-width, var(--ribbon-width, 56px));
 }
 
 .host-page-slot {

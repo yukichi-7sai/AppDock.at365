@@ -191,8 +191,15 @@ export class RibbonHost {
     if (!this.active) return;
     if (this.bounds) this.active.view.setBounds(this.bounds);
     this.active.view.setVisible(!!this.bounds);
+    this.raise();
     this.options.hoverChanged?.();
     this.options.layer?.();
+  }
+  /** Keep the ribbon above attached Applet pages without recreating either view. */
+  raise() {
+    const view = this.active?.view;
+    if (!view || !this.bounds || !view.getVisible() || this.options.window.isDestroyed()) return;
+    this.options.window.contentView.addChildView(view);
   }
   refresh() {
     if (this.disposed || !this.options.ready()) return;

@@ -4838,6 +4838,7 @@ async function initialize() {
     pointer: (inside) => ribbonHover?.pointer(inside),
     hoverChanged: () => ribbonHover?.refresh(),
     layer: () => {
+      notificationBanner?.layout();
       overlayHost?.layout();
     },
 
@@ -5195,6 +5196,7 @@ async function initialize() {
   configurePageHost({
     inputContextChanged: () => gestures?.requestRefresh(),
     overlay: () => {
+      ribbonHost?.raise();
       notificationBanner?.layout();
       overlayHost?.layout();
     },
