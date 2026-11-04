@@ -1,4 +1,4 @@
-import type { GalleryModel } from '../../src/shared/image-gallery';
+import type { GalleryModel } from '../../shared/image-gallery';
 
 export interface GalleryDropTarget {
   element: HTMLElement;

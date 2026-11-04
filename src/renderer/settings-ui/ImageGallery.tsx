@@ -7,8 +7,8 @@ import {
   type GalleryModel,
   type GalleryOptions,
   type GalleryPreviewModel,
-} from '../../../ui/image-gallery';
-import '../../../ui/image-gallery/gallery.css';
+} from '../image-gallery';
+import '../image-gallery/gallery.css';
 
 export function ImageGallery({
   model,

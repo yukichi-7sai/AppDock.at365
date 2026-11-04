@@ -5,8 +5,8 @@ import {
   type GalleryItem,
   type GalleryModel,
   type GallerySize,
-} from '../../src/shared/image-gallery';
-export * from '../../src/shared/image-gallery';
+} from '../../shared/image-gallery';
+export * from '../../shared/image-gallery';
 import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
 
 export interface GalleryOptions {

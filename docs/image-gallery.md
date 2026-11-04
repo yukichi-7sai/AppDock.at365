@@ -1,6 +1,6 @@
-# 共通画像ギャラリー
+# 本体の画像ギャラリー
 
-`ui/image-gallery/`はフレームワークに依存しないDOM部品。壁紙履歴を基準にした16:10の画像枠、角丸カード、揃った操作列、サイズスライダーと拡大表示の内容を提供する。本体の画像ライブラリーページ、画像選択ダイアログ、WallpaperSlideshowの壁紙履歴が使用する。
+`src/renderer/image-gallery/`は本体専用のDOM部品。16:10の画像枠、角丸カード、揃った操作列、サイズスライダーと拡大表示の内容を提供する。本体の画像・音・テキストのライブラリーと画像選択ダイアログが使用する。mainとrendererで共有する表示モデル・サイズ検証は`src/shared/image-gallery.ts`に置く。
 
 ## 部品の接続
 
@@ -28,7 +28,7 @@ CSSは`gallery.css`を読み込む。`.ad-gallery`配下と専用クラスへ限
 
 選択枠はカードの上に重ねた疑似要素で2 CSS pxを描く。画像や市松背景に枠を隠させず、選択時も寸法を変えない。枠はポインター操作を透過する。
 
-`mountGalleryPreview(container, { image })`は拡大画像、読み込み状態、補足情報、所属ラベルを描く。`setModel`のassetIdとstateで取得を切り替え、古い応答と破棄後の応答を無視する。許可URLの検査はカードと共通。モーダル・フォーカス・原画像へのアクセス権は呼出元が所有する。本体はSettingsModal、壁紙履歴は既存native dialogへ配置する。Reactでは`settings-ui/ImageGallery.tsx`の薄いadapterを使う。
+`mountGalleryPreview(container, { image })`は拡大画像、読み込み状態、補足情報、所属ラベルを描く。`setModel`のassetIdとstateで取得を切り替え、古い応答と破棄後の応答を無視する。許可URLの検査はカードと共通。モーダル・フォーカス・原画像へのアクセス権は呼出元が所有する。SettingsModalへ配置する。Reactでは`settings-ui/ImageGallery.tsx`の薄いadapterを使う。
 
 画像は可視領域と前後300pxで最大3要求を行い、元の正常画像を保持して次のdecode完了後に差し替える。画面外ではsrcと取得中の応答を失効させ、遅い応答で画像を再保持しない。再び表示範囲へ戻ったときに再取得する。管理ページと画像選択は64/512/1024/2048px、ほかの呼出元は512/1024/2048pxから、実カード幅とdevicePixelRatioに応じて選ぶ。部品内で原画像の読み込み、保存、外部サービス呼出しを行わない。
 
@@ -36,11 +36,11 @@ CSSは`gallery.css`を読み込む。`.ad-gallery`配下と専用クラスへ限
 
 ## ビルドと配布
 
-`dev.bat pnpm run build:image-gallery`は`out/ui/image-gallery/`にES module、CSS、manifestを作る。通常のbuildにも含む。manifestは`apiVersion: 1`、本体版、出力ファイルと入力ソースのSHA256を持つ。
+通常のrendererビルドへ含め、Applet向けの独立bundle・manifestは生成・配布しない。既存checkoutに残る旧`out/ui/image-gallery/`も本体の配布物へ含めない。
 
-Appletへ適用するときはこの出力一式をvendorへ梱包し、版とhashを記録する。開発repoの相対参照や本体内部importに依存させない。更新時はbundle全体を差し替え、呼出元のadapterと独立配置での起動を確認する。共通部品の更新だけで未変更Appletを一括発行しない。
+WallpaperSlideshowの履歴表示は同Appletの`web/history-gallery.js`とCSSが所有する。本体の表示部品をimport・コピーせず、ビルド時の同期もしない。本体のギャラリー変更だけでAppletの追随修正・再発行は不要。ページ表示・Storage・元画像参照などの公開APIの互換性は別途維持する。
 
-WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビルドを実行し、apiVersion・本体版・元ソース・出力hashを照合して`web/vendor/image-gallery/`へ同期する。発行時も同梱ファイルと元のhashを照合する。実行時は同梱ES moduleだけを読み、本体の開発フォルダーを参照しない。
+部品単体のGUI検査は`scripts/gallery-component-helper.cjs`で現在のrendererソースを各試験profile内にbundle化する。このfixtureは試験専用で、発行物のページを検査する部分と区別する。
 
 ## 本体管理ページの境界
 
@@ -80,9 +80,9 @@ WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビル�
 
 `tests/image-file-actions.test.cjs`は複数改名・名前交換・大小文字変更・移動・所属追従、旧使用中参照の拒否、競合/保存失敗時の復旧と他ファイルの保護を担当する。`tests/device-settings.test.cjs`は実際の端末設定ストアを通した小型サイズ・左幅・折りたたみの再読込と共有設定の不変を確認する。
 
-`tests/image-gallery.test.cjs`でサイズ保存、競合、一括所属、選択、ページ寿命、部分登録、最大カタログを確認する。`scripts/image-gallery-ui-test.cjs [固定EXE]`は独立した隔離profileでページ・3モードのbundle・明暗・サイズ・再起動を確認する。既存APIと選択ダイアログの互換性は`image-library-ui-test.cjs [固定EXE]`で確認する。同スクリプトから呼ぶ`image-picker-browser-checks.cjs`は151枚のSVGを追加し、分類・検索の積集合と順序、選択を隠したときの固定フッター、24pxアイコン、自動追加、独立した表示状態、狭幅popoverとフォーカス復帰を確認する。これらは物理IME、複数モニターのDPI移動、実NAS、実壁紙操作の証明にはしない。
+`tests/image-gallery.test.cjs`でサイズ保存、競合、一括所属、選択、ページ寿命、部分登録、最大カタログを確認する。`scripts/image-gallery-ui-test.cjs [固定EXE]`は独立した隔離profileで発行物のページ・明暗・サイズ・再起動と、rendererソースの試験用bundleの3モードを確認する。既存APIと選択ダイアログの互換性は`image-library-ui-test.cjs [固定EXE]`で確認する。同スクリプトから呼ぶ`image-picker-browser-checks.cjs`は151枚のSVGを追加し、分類・検索の積集合と順序、選択を隠したときの固定フッター、24pxアイコン、自動追加、独立した表示状態、狭幅popoverとフォーカス復帰を確認する。これらは物理IME、複数モニターのDPI移動、実NAS、実壁紙操作の証明にはしない。
 
-`scripts/image-gallery-capacity-ui-test.cjs [固定EXE]`は512枚のPNG、64グループ、4096所属を隔離profileに作り、全件選択・追加表示・検索・キーボードでのサイズ変更・原画像/共有設定の保持を確認する。スクロール各地点の画像src数、表示寸法からのRGBA相当量、data URL文字列量、プロセスメモリーを記録する。RGBA相当量は実測したOSメモリーやdecode中の最大使用量とは区別する。共通bundleへの制御した遅延応答で、画面外への移動・再表示・破棄も検証する。
+`scripts/image-gallery-capacity-ui-test.cjs [固定EXE]`は512枚のPNG、64グループ、4096所属を隔離profileに作り、全件選択・追加表示・検索・キーボードでのサイズ変更・原画像/共有設定の保持を確認する。スクロール各地点の画像src数、表示寸法からのRGBA相当量、data URL文字列量、プロセスメモリーを記録する。RGBA相当量は実測したOSメモリーやdecode中の最大使用量とは区別する。rendererソースの試験用bundleへの制御した遅延応答で、画面外への移動・再表示・破棄も検証する。
 
 `scripts/image-library-session-ui-test.cjs [固定EXE]`はモーダル表示後に届くスクロール通知を再現し、位置記録でエラーを表示しないこと、背景の編集と不正な画像IDを拒否すること、画像取得とページ再表示を確認する。capture/decode失敗時のダイアログ表示とView復元、準備が遅い場合の連続クリック、終了後のグループ切り替えも確認する。自動化のfocus emulationを無効にした通常表示と、本体preloadの描画フレームを止めた状態でも表示・取消・復帰を確認する。
 
@@ -97,7 +97,7 @@ WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビル�
 - 新しい画像をdecodeできるまで現在の正常画像を残す。読み込みでカード高さ、スクロール位置、操作列を変えない。
 - 更新・削除検知で内容世代を変え、古い取得結果で新しい画像を上書きしない。復旧時は元の安定キーで置換する。
 - Shellへ配信するURL／不透明IDは許可された生存Viewへ限定する。本体の既存asset配信の送信元検査を再利用または拡張し、リモートWebへ公開しない。
-- WallpaperSlideshowはメモリStorageの履歴パスと元画像の一時参照を使い、表示中だけ生成するBlob URLをアダプターへ渡す。共通部品の都合で1MiBのRPC上限を緩めたり、画像bytesをpageActions結果へ埋めたりしない。寿命と権限は[メモリStorage](memory-storage.md)を参照する。
+- Appletの画像表示・元画像参照の寿命と権限は[メモリStorage](memory-storage.md)を参照する。本体のギャラリーをAppletへ提供する契約には含めない。
 
 ## 空状態・失敗・アクセシビリティ
 

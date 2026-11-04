@@ -14,7 +14,7 @@ import {
   mountImageGallery,
   mountGallerySizeControl,
   type GalleryModel,
-} from '../../../ui/image-gallery';
+} from '../image-gallery';
 import { useLibraryTranslation } from './LibraryMedia';
 import { Icon } from '../../shared/ui-icons';
 import { ImageBrowserNavigation } from './ImageBrowserNavigation';
@@ -23,7 +23,7 @@ import {
   ImageBrowserSplitter,
   useImageBrowserNavigation,
 } from './ImageBrowserControls';
-import '../../../ui/image-gallery/gallery.css';
+import '../image-gallery/gallery.css';
 import './image-browser.css';
 
 export function ImagePickerBrowser({

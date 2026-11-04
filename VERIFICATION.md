@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-11-04 ギャラリー分離のコミット前照合
+
+- 利用者から動作確認完了と、本体・WallpaperSlideshow両方のコミット依頼を受領した。個別の手動確認項目は指定されていないため、自動試験の未確認範囲を確認済みへ変更しない。
+- 実装終了時の入力1152ファイル、成功コマンド12件の完全ログ、発行先117ファイルと更新ZIPのSHA256が一致した。型検査・build・画像関連58件・固定本体GUI41群と、兄弟Appletのnative/履歴試験の成功を再利用した。失敗した旧試行は再利用せず、成功した後続試行を参照する。
+- 今回の追記は検証文書のみ。製品・試験・依存・版・発行物は変更せず、追加回帰・再発行は行わない。対象差分、再利用判定、stage/commit treeの照合は`.artifacts/commit-validation-gallery-split-20261104/`へ記録する。push・Releaseは依頼範囲に含めない。
+
+## 2026-11-04 ギャラリーを本体rendererと壁紙履歴へ分離（0.143.0）
+
+- 開始時のmainはclean。通常環境で`pull --ff-only`し、`6931094`へ更新してから実装した。`ui/image-gallery`の3ファイルを`src/renderer/image-gallery`へ移し、本体の管理ページ・画像選択・React adapterの参照を変更。mainも使用するモデルとサイズ検証は`src/shared`に保持した。移動した3ファイルはimportの相対パス以外が元と完全一致することを照合した。
+- Applet向け`build:image-gallery`・bundle生成スクリプトを廃止。既存checkoutに残る旧`out/ui/image-gallery`は配布対象から除外した。部品GUIのfixtureだけは現在のrendererソースから試験profile内へ生成し、発行物の画面を検査する部分と区別した。WallpaperSlideshowは自身の専用JS/CSSを所有し、本体のギャラリーから取り込まない。通知の共通UI、SDK/Runtime、ページ・Storage・元画像API、設定・保存形式は変更していない。
+- Applet向けUI bundleの提供契約を終了するため0.142.0から0.143.0へ更新。WallpaperSlideshowは0.12.1、最低本体版0.115.0を維持する。未変更AppletやSDK/Runtimeの版更新・再発行は行わない。
+- 固定依存照合、型検査、build、画像関連4ファイル58件が成功。ソース版のギャラリーGUI12群も成功。発行前レビューで要件・画像寿命・保存/API境界・配布対象・試験範囲を確認し、旧bundleの配布除外と旧Applet同梱ファイルの発行先整理を追加、不要な履歴選択CSSを除去した。残る阻害指摘なし。
+- 発行物のGUIは画像ギャラリー12群、画像選択/既存Applet連携10群、512枚の容量・遅延画像4群、音7群、テキスト8群の計41群成功。選択・ドラッグ整理・プレビュー・サイズとサイドバー保存・再起動、画面外/破棄後の遅延画像拒否を確認。明暗の代表画像も確認した。音は無音WAV、クリップボードや削除は隔離adapterを使用した。
+- 初回の画像選択試験は未生成の.NET fixtureで停止し、既存ビルド手順で準備した。次の試験でProfileの旧固定名「プロフィール」が現行manifestの「Profile」と不一致になり、fixtureの宣言名を照合するよう修正した。容量試験の旧「さらに表示」操作と180px下限は、現行のスクロール追加・40pxへ修正。遅延応答の固定時間待ちは実IntersectionObserver通知待ちへ変更し、画面外src 0・復帰後3・dispose後子要素0を確認した。失敗ログは保持。これらはテストだけの修正で、発行後の製品変更はない。
+- `publish.bat`終了0。`A:\40.ARTIFACT\AppDock.at365`へ発行し、117ファイルのビルド元・発行先・共用ランタイム・更新ZIPのSHA256一致、feed/ASARの0.143.0、ASARに旧ギャラリーbundleがないことを確認。ZIP SHA256は`b8dfcec93736662fd4030b05a4c658270de5ad0b8b1ef83d4ad1deb306372fcb`。
+- 証跡は`.artifacts/gallery-split-20261104/`の各コマンドJSON/完全ログ、入力ハッシュ、`review.json`、`commands-summary.json`、`artifacts.json`、`asar.json`。GUI profileはsummaryから参照する。今回のprofileの終了を確認し、本体側18ファイルのnative/.NET実行コピーを削除。結果・画像・設定・data・manifest・Web fixture・共用ランタイム・固定build・過去の照合用証跡は保持した。
+- 物理入力・実NAS・実壁紙変更・実ごみ箱操作・無関係な全回帰は未実施。コミット・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-11-04 実モニター間のDPI往復スモークテスト（0.142.0、一部成功）
 
 - LUNAの4K 2画面（メイン150% / 144 DPI、右100% / 96 DPI）で、発行済み0.142.0を共用テストランタイムから隔離profileで起動。開始時のmainは`897697319e70f1a8d41260e40daa25a690366c81`でclean。製品・依存・Windows表示設定は変更せず、更新確認・音声・入力フックを無効にしたテスト設定を使用した。

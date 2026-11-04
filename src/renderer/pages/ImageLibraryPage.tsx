@@ -12,15 +12,11 @@ import type {
   ImageLibraryLayout,
   ImageLibraryFileAction,
 } from '../../shared/image-library-page';
-import {
-  libraryGallerySize,
-  mountImageGallery,
-  mountGallerySizeControl,
-} from '../../../ui/image-gallery';
+import { libraryGallerySize, mountImageGallery, mountGallerySizeControl } from '../image-gallery';
 import { Icon } from '../../shared/ui-icons';
 import { useImageLibraryDialogFocus } from '../ImageLibraryDialogHost';
 import { ImageLibraryMenu, type LibraryMenuItem } from './ImageLibraryMenu';
-import '../../../ui/image-gallery/gallery.css';
+import '../image-gallery/gallery.css';
 import './image-library.css';
 import { ImageBrowserNavigation } from '../image-browser/ImageBrowserNavigation';
 import {

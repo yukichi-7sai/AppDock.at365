@@ -1,4 +1,4 @@
-/** Public, framework-neutral gallery presentation. No file-system or host operations. */
+/** Host-internal gallery models and size validation shared by main and renderer. */
 export const gallerySize = { min: 120, max: 360, step: 20, initial: 260 } as const;
 export const libraryGallerySize = { min: 40, max: 360, step: 4, initial: 260 } as const;
 export type GallerySize = { min: number; max: number; step: number; initial: number };

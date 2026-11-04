@@ -2,11 +2,32 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-/** Run the distributable gallery bundle in an isolated local fixture document. */
+exports.galleryComponentBundleUrl = (profile) =>
+  pathToFileURL(path.join(profile, 'gallery-component/image-gallery.js')).href;
+
+/** Exercise renderer source in a test-only bundle; no Applet distribution is built. */
 exports.galleryComponentPage = async (app, host, profile) => {
-  const appPath = await app.evaluate(({ app }) => app.getAppPath());
+  const root = path.resolve(__dirname, '..');
+  const output = path.join(profile, 'gallery-component');
+  const { build } = await import('vite');
+  await build({
+    configFile: false,
+    build: {
+      outDir: output,
+      emptyOutDir: true,
+      lib: {
+        entry: path.join(root, 'src/renderer/image-gallery/index.ts'),
+        formats: ['es'],
+        fileName: () => 'image-gallery.js',
+      },
+    },
+  });
+  fs.copyFileSync(
+    path.join(root, 'src/renderer/image-gallery/gallery.css'),
+    path.join(output, 'gallery.css'),
+  );
   const fixture = path.join(profile, 'gallery-component.html');
-  const stylesheet = pathToFileURL(path.join(appPath, 'out/ui/image-gallery/gallery.css')).href;
+  const stylesheet = pathToFileURL(path.join(output, 'gallery.css')).href;
   fs.writeFileSync(
     fixture,
     `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="${stylesheet}"><body></body>`,

@@ -89,7 +89,10 @@ settings.imageLibrary = {
     images: i < 8 ? refs : [],
   })),
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const originals = Object.fromEntries(
   refs.map((ref) => [ref.file, hash(path.join(images, ref.file))]),
 );
@@ -235,8 +238,10 @@ async function theme(value) {
       'select all including unloaded',
     );
     for (let count = 128; count <= 512; count += 64) {
-      await page.getByRole('button', { name: /さらに表示/ }).click();
-      await until(async () => (await model()).content.items.length === count, `load ${count}`);
+      await page.locator('.library-scroll').evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await until(async () => (await model()).content.items.length >= count, `load ${count}`);
     }
     assert.equal(await page.locator('.ad-gallery-card').count(), 512);
     assert.equal((await model()).content.selected, 512);
@@ -292,7 +297,7 @@ async function theme(value) {
     await slider.press('End');
     await until(async () => (await model()).content.cardWidth === 360, 'End saves maximum');
     await slider.press('Home');
-    await until(async () => (await model()).content.cardWidth === 180, 'Home saves minimum');
+    await until(async () => (await model()).content.cardWidth === 40, 'Home saves minimum');
     assert.equal((await model()).content.selected, 512);
     assert.equal((await model()).content.items.length, 512);
     assert.equal(await slider.evaluate((e) => e === document.activeElement), true);
@@ -309,14 +314,11 @@ async function theme(value) {
       await page.screenshot({ path: path.join(profile, `${mode}.png`) });
     }
     checks.push(
-      'maximum catalogue retains loaded count/selection through keyboard sizing and search',
+      'large catalogue retains loaded count/selection through keyboard sizing and search',
     );
     for (const [file, expected] of Object.entries(originals))
       assert.equal(hash(path.join(images, file)), expected);
-    const appPath = await app.evaluate(({ app }) => app.getAppPath());
-    const bundleUrl = require('node:url').pathToFileURL(
-      path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
-    ).href;
+    const bundleUrl = require('./gallery-component-helper.cjs').galleryComponentBundleUrl(profile);
     const componentPage = await require('./gallery-component-helper.cjs').galleryComponentPage(
       app,
       host,
@@ -356,19 +358,26 @@ async function theme(value) {
         actions: [],
       }));
       gallery.setModel({ items, cardWidth: 260, fit: 'contain', selection: 'none', empty: '' });
-      await wait(() => requests.length === 3);
+      let firstVisible;
+      const visibilityObserver = new IntersectionObserver(
+        ([entry]) => {
+          firstVisible = entry.isIntersecting;
+        },
+        { root: box, rootMargin: '300px' },
+      );
+      visibilityObserver.observe(grid.firstElementChild);
+      await wait(() => requests.length === 3 && firstVisible === true);
       const first = requests.splice(0);
       box.scrollTop = box.scrollHeight;
-      // Allow the real IntersectionObserver to report the first cards leaving its margin.
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Wait for the real viewport notification before releasing the delayed replies.
+      await wait(() => firstVisible === false);
       for (const request of first) request.resolve(source);
       await wait(() => requests.length === 3);
-      await new Promise((resolve) => setTimeout(resolve, 80));
       const offscreenSources = [...grid.querySelectorAll('article')]
         .slice(0, 3)
         .filter((c) => c.querySelector('img').hasAttribute('src')).length;
       box.scrollTop = 0;
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await wait(() => firstVisible === true);
       for (const request of requests.splice(0)) request.resolve(source);
       await wait(() => requests.length === 3);
       for (const request of requests.splice(0)) request.resolve(source);
@@ -382,8 +391,9 @@ async function theme(value) {
         .filter((c) => c.querySelector('img').hasAttribute('src')).length;
       const pending = requests.splice(0);
       gallery.dispose();
+      visibilityObserver.disconnect();
       for (const request of pending) request.resolve(source);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       const childrenAfterDispose = grid.childElementCount;
       box.remove();
       return { offscreenSources, restoredSources, childrenAfterDispose };

@@ -663,10 +663,7 @@ async function selectedBorder(label) {
         .map((i) => i.file),
     );
     checks.push('saved group image order survives process restart and renders in that order');
-    const appPath = await app.evaluate(({ app }) => app.getAppPath());
-    const bundleUrl = require('node:url').pathToFileURL(
-      path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
-    ).href;
+    const bundleUrl = require('./gallery-component-helper.cjs').galleryComponentBundleUrl(profile);
     const componentPage = await require('./gallery-component-helper.cjs').galleryComponentPage(
       app,
       host,
@@ -785,7 +782,7 @@ async function selectedBorder(label) {
       values: [360],
     });
     checks.push(
-      'standalone public bundle supports history/picker modes, stable keys, text escaping, size commit and safe/stale/disposed previews',
+      'renderer-only fixture supports non-selecting/picker modes, stable keys, text escaping, size commit and safe/stale/disposed previews',
     );
     assert.deepEqual(errors, []);
     fs.writeFileSync(

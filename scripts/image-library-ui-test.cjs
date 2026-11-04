@@ -90,6 +90,9 @@ const pdir = path.join(profile, 'extensions', 'at365.profile');
 fs.mkdirSync(pdir, { recursive: true });
 for (const file of ['extension.json', 'index.cjs'])
   require('./copy-host.cjs').copyHost(path.join(profileSource, file), path.join(pdir, file));
+const profileRibbonTitle = JSON.parse(
+  fs.readFileSync(path.join(pdir, 'extension.json'), 'utf8'),
+).ribbonItems.find((item) => item.id === 'main').title;
 settings.extensions['at365.profile'] = { enabled: true, settings: { name: 'Profile fixture' } };
 install(
   'at365.web-applet',
@@ -641,7 +644,7 @@ async function chooseInPicker(file) {
     );
     const pbutton = rail.locator('[data-ribbon-id="applet:at365.profile:main"]');
     await pbutton.locator('img').waitFor();
-    assert.equal(await pbutton.getAttribute('title'), 'プロフィール');
+    assert.equal(await pbutton.getAttribute('title'), profileRibbonTitle);
     assert.equal(await pbutton.locator('.rail-label').count(), 0);
     assert(!(await rail.locator('body').innerText()).includes('Hidden profile name'));
     await host.screenshot({ path: path.join(profile, 'profile.png') });
