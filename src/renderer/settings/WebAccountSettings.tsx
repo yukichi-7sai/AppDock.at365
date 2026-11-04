@@ -1,8 +1,9 @@
 import { useHostTranslation } from '../HostTranslation';
-import { CommandListSection, CommandListSummary } from '../settings-ui/CommandListScroll';
+import { CommandListSection } from '../settings-ui/CommandListScroll';
 import {
   ListIcon,
-  SettingsListAddButton,
+  SettingsListToolbar,
+  SettingsListToolbarActions,
   SettingsListLayout,
 } from '../settings-ui/SettingsListTable';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -224,13 +225,29 @@ export function WebAccountSettings({
           actionsAlign="start"
           commandListScroll
           toolbar={
-            <CommandListSummary className="settings-list-toolbar" actions={null}>
+            <SettingsListToolbar
+              actions={
+                <SettingsListToolbarActions
+                  addLabel={translate('settings.webAccountSettings.add')}
+                  addDisabled={busy}
+                  onAdd={() =>
+                    void run(() =>
+                      settingsControls.createWebAccount(
+                        translate('settings.webAccountSettings.defaultName', {
+                          value: accounts.length + 1,
+                        }),
+                      ),
+                    )
+                  }
+                />
+              }
+            >
               <span role="status">
                 {translate('settings.settingsListTable.unlimitedCount', {
                   count: accounts.length,
                 })}
               </span>
-            </CommandListSummary>
+            </SettingsListToolbar>
           }
         >
           <thead>
@@ -242,19 +259,6 @@ export function WebAccountSettings({
                     title={translate('settings.webAccountSettings.name')}
                     itemId={settingsItemId('web-accounts', 'accounts')}
                     settingKey="name"
-                  />
-                  <SettingsListAddButton
-                    label={translate('settings.webAccountSettings.add')}
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        settingsControls.createWebAccount(
-                          translate('settings.webAccountSettings.defaultName', {
-                            value: accounts.length + 1,
-                          }),
-                        ),
-                      )
-                    }
                   />
                 </span>
               </th>

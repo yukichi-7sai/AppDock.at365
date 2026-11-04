@@ -17,10 +17,10 @@ import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
 import {
   ListIcon,
-  SettingsListAddButton,
+  SettingsListToolbar,
+  SettingsListToolbarActions,
   SettingsListLayout,
 } from '../settings-ui/SettingsListTable';
-import { CommandListSummary } from '../settings-ui/CommandListScroll';
 import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
 import {
   AiConnectionDialog,
@@ -98,37 +98,30 @@ export function AiSettingsForm({
           title={translate('settings.aiSettings.registered')}
           actionsAlign="start"
           toolbar={
-            <CommandListSummary className="settings-list-toolbar" actions={null}>
+            <SettingsListToolbar
+              actions={
+                <SettingsListToolbarActions
+                  addLabel={translate('settings.aiSettings.add')}
+                  addDisabled={busy}
+                  onAdd={() => open('edit', null)}
+                  orderLabel={translate('settings.aiSettings.order')}
+                  orderDisabled={busy || value.connections.length < 2}
+                  onOrder={() =>
+                    setDialog({
+                      kind: 'order',
+                      connections: structuredClone(value.connections),
+                    })
+                  }
+                />
+              }
+            >
               {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
-            </CommandListSummary>
+            </SettingsListToolbar>
           }
         >
           <thead>
             <tr>
-              <th>
-                <span className="settings-list-heading">
-                  {translate('settings.aiSettings.server')}
-                  <SettingsListAddButton
-                    label={translate('settings.aiSettings.add')}
-                    disabled={busy}
-                    onClick={() => open('edit', null)}
-                  />
-                  <button
-                    className="settings-list-icon ai-icon-button"
-                    aria-label={translate('settings.aiSettings.order')}
-                    title={translate('settings.aiSettings.orderAction')}
-                    disabled={busy || value.connections.length < 2}
-                    onClick={() =>
-                      setDialog({
-                        kind: 'order',
-                        connections: structuredClone(value.connections),
-                      })
-                    }
-                  >
-                    <ListIcon kind="order" />
-                  </button>
-                </span>
-              </th>
+              <th>{translate('settings.aiSettings.server')}</th>
               <th>{translate('settings.aiSettings.model')}</th>
               <th className="settings-list-actions-heading">
                 {translate('settings.aiSettings.actions')}

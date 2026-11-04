@@ -373,7 +373,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       await checkAssigned(customRow('Custom 2'), 'Custom 2', 'ショートカット', false);
       await checkAssigned(customRow('Custom 2'), 'Custom 2', 'マウスジェスチャー', true);
       assert.deepEqual(await host.locator('.custom-commands-settings thead th').allTextContents(), [
-        '名前＋',
+        '名前',
         '種類',
         '提供元',
         '有効',

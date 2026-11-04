@@ -127,8 +127,6 @@ export function McpClientSettingsForm({
         {...settingAnchor('mcp-client', 'connections')}
       >
         <SettingsListTable
-          addInTitle
-          orderInTitle
           actionsAlign="start"
           definition={definition}
           busy={busy || pending || !auxiliary || !!auxiliary.error}

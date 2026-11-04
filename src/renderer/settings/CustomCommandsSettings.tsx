@@ -262,8 +262,6 @@ export function CustomCommandsSettings({
           }
           titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
           navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
-          addInTitle
-          orderInTitle
           commandListScroll
           definition={list}
           canAdd={types.length > 0}

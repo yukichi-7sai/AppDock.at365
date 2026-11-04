@@ -377,7 +377,6 @@ export function TriggerStackSettings({
                 ),
         }))}
         busy={busy}
-        addInTitle
         commandListScroll
         onAdd={() =>
           setDialog({

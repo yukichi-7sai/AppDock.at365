@@ -14,6 +14,31 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `settings-order-ui-${Date.now()}`);
 const local = path.join(profile, 'local');
 fs.mkdirSync(local, { recursive: true });
+// Opening Applet management must not contact GitHub during this list UI test.
+const fetchedAt = Date.now();
+fs.writeFileSync(
+  path.join(local, 'applet-catalog-cache.json'),
+  JSON.stringify({
+    schemaVersion: 1,
+    repositories: Object.fromEntries(
+      require('../resources/configs/applets.json').applets.map((repository, index) => [
+        repository,
+        {
+          release: { fetchedAt, value: 'unpublished' },
+          development: {
+            fetchedAt,
+            value: {
+              id: `fixture.catalog.${index}`,
+              displayName: `Offline catalog ${index}`,
+              version: '0.0.0',
+              date: new Date(fetchedAt).toISOString(),
+            },
+          },
+        },
+      ]),
+    ),
+  }),
+);
 const initial = createDefaultSettings();
 Object.assign(initial.host, {
   hardwareAcceleration: false,
@@ -188,18 +213,21 @@ const cases = [
   },
   {
     page: 'ai',
+    add: 'AIサーバーを追加',
     button: 'AIサーバーを並べ替え',
     ids: initial.ai.connections.map((c) => c.id),
     values: (s) => s.ai.connections.map((c) => c.id),
   },
   {
     page: 'mcp-client',
+    add: '接続先を追加',
     button: 'MCP接続先を並べ替え',
     ids: initial.mcpServers.items.map((c) => c.id),
     values: (s) => s.mcpServers.items.map((c) => c.id),
   },
   {
     page: 'custom-commands',
+    add: 'コマンドを追加',
     button: 'カスタムコマンドを並べ替え',
     ids: initial.customCommands.items.map((c) => c.id),
     values: (s) => s.customCommands.items.map((c) => c.id),
@@ -218,6 +246,29 @@ async function open(target) {
 (async () => {
   try {
     await start();
+    for (const target of cases.filter((target) => target.add)) {
+      await host.evaluate(
+        (page) => window.dock.executeCommand(`appdock.settings.${page}.open`),
+        target.page,
+      );
+      const page = host.getByTestId(`settings-page:${target.page}`);
+      await page.waitFor();
+      await settleSettings(host);
+      const before = await saved();
+      const add = page.getByRole('button', { name: target.add, exact: true });
+      assert.equal(await add.count(), 1);
+      await add.focus();
+      await add.press('Enter');
+      const dialog = host.getByRole('dialog');
+      await dialog.waitFor();
+      await dialog.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+      assert(await add.evaluate((button) => button === document.activeElement));
+      assert.deepEqual(await saved(), before, `${target.page}: cancel preserves settings`);
+    }
+    checks.push(
+      'shared toolbar additions open by keyboard, cancel without saving and restore focus',
+    );
     for (const target of cases) {
       await open(target);
       const dialog = host.locator('.settings-order-dialog');

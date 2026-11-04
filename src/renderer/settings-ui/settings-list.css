@@ -33,6 +33,39 @@
   color: var(--muted);
   font-size: 12px;
 }
+.settings-list-toolbar > .command-list-summary-leading {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.settings-list-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.settings-list-toolbar-button > svg {
+  flex: none;
+}
+.settings-list-toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+.settings-list-toolbar-filters:empty {
+  display: none;
+}
+.settings-list-toolbar-filters .command-provider-filter {
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-list-toolbar-filters .command-provider-filter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .settings-list-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);

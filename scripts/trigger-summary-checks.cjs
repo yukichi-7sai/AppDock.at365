@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 
 module.exports = async ({ host, open, saved, checks, profile }) => {
   const baseline = await saved();
@@ -16,6 +17,7 @@ module.exports = async ({ host, open, saved, checks, profile }) => {
         await open(kind);
         await host.getByTestId('gesture-settings-tab:triggers').click();
       }
+      await settleSettings(host);
       const table = host.getByTestId('trigger-stack-table');
       const row = table.getByTestId(`trigger-stacks:${kind}:list:row:${input}`);
       const commands = await row.getByRole('cell').nth(1).innerText();

@@ -1,5 +1,28 @@
 # 検証記録
 
+## 2026-11-05 共通ツールバーの追加ボタン色統一とコミット前照合（0.147.7）
+
+- 利用者から、本体設定の追加ボタンが通常時に濃色となり、Applet設定や他のアクセント操作と異なるとの指摘と、修正を含めたコミット依頼を受領。前回の16ファイルと1,049入力が作業開始時の記録に一致することを確認。未コミット変更を保持してoriginをfetchし、HEADとorigin/mainが`1e4f414`で一致していた。
+- 原因は、共通追加ボタンの`primary`に対し、カード内だけ`.settings-section button.primary`が淡い背景を指定していたこと。`SettingsListToolbarActions`の追加ボタンに既存`accent-action`を併記し、寸法を保ったままカード内外の通常色・ホバー色を共通化した。新しい色値・画面固有CSS・保存処理は追加していない。
+- 型検査・ビルドが成功。発行前レビューで要件、既存の共通色との一致、カード内の優先順位、無効状態/フォーカス/取消、API/保存への影響、検証範囲を確認し、阻害指摘なし。発行済み製品への内部表示修正として0.147.6から0.147.7へパッチ更新し、`publish.bat`終了0。
+- 一時確認runnerで本体10入口と停止したWallpaperSlideshow設定1入口を巡り、明暗2テーマ×11入口の22組について、通常時の`accent-soft`/アクセント文字、ホバー時の`accent-hover`/アクセント用文字・枠、キーボードフォーカスを確認。AIとAppletの追加ダイアログはEnter起動・Escape取消・設定不変・フォーカス復帰も確認した。開発版と最終固定EXEの両方で成功。通常状態の明暗画像と計算済みスタイルを確認し、実利用者による修正版の手動確認とは区別する。
+- 一時runnerの初回2回は、対象ページ/ボタンの表示前に件数を調べる、または切替前ページのタブを操作して失敗。対象ページと追加ボタンの表示待ちを補い、開発版再実行と固定EXEで完走。失敗ログ・profile・画像を保持しており、部分成功を最終成功へ置き換えていない。意匠の完全一致を永続回帰へ追加していない。
+- 標準回帰183ファイルを棚卸しし、試験ハッシュ・開始commitの成功対応・元ログSHA256を照合。うち3ファイルは前回ツールバー実装時の21件成功を、残りは検証済み`1e4f414`の試験別成功記録を再利用した。main/shared/保存/公開API/依存/ツールは不変。前回のソース40群・固定EXE47群と兄弟入力16ファイルも照合し、色クラスのみの変更が影響しない追加/順序/絞り込み/保存/再起動の成功を再利用。0.147.7の発行物確認と表示/操作確認は今回新規に実施した。
+- package/feed/manifest/PE版0.147.7と、ZIP・発行先・build stage・共用runtimeの管理101ファイルが一致。EXE SHA256=`7170c46f54c4d0cf0f7be2c73aa581f4520a1b6e7156527595a9160b67bdcbac`、ZIP SHA256=`f15f5d13d373aa04af950fe76449bb59d189e00cd013772b12ab8a63c5aac099`、175,103,967 bytes。
+- 証跡は`.artifacts/list-toolbar-accent-20261105/`。前回の共通ツールバー実装と今回の色修正・文書/検証記録の16ファイルをコミット範囲とし、試験別再利用元、固定EXE結果、入力hash、stage/commit treeを照合する。今回の新規profile4件は成功各方式1件と失敗2件のため全件保持、削除0。関連試験プロセス0を確認。push・Release・実利用先deployは行わない。
+
+## 2026-11-05 設定一覧の共通ツールバー（0.147.6）
+
+- 開始時のmainはcleanで、`pull --ff-only`により`1e4f414`の最新状態を確認。宣言型Applet一覧、コマンドトリガーの種類別一覧と各ジェスチャーのトリガー一覧、カスタムコマンド、Webアカウント、AI、MCPクライアントを対象とした。
+- `SettingsListToolbar`と`SettingsListToolbarActions`へ集約し、上段は検索/絞り込み、下段左は追加・任意の並べ替え、下段右は解除・1か所だけの件数とした。対象のヘッダー内操作を移し、空状態の案内と仕様文書も更新。トリガー一覧とWebアカウントには新しい全体並べ替えを追加していない。WebAppletの登録サイト/初期ショートカット、WallpaperSlideshowのモニター一覧、今後の`object-list`＋`list`宣言も本体の共通部品を使用する。Applet管理と全コマンド逆引き一覧は従来の操作構成を維持する。
+- 発行前に差分・要件・保存/API境界・フォーカス・取消・絞り込み順序・検証範囲をレビューし、阻害指摘なし。公開API、設定項目、manifest契約、保存形式/ファイルを変更しない内部UI改善のため、本体だけ0.147.5から0.147.6へパッチ更新。未変更Appletの版更新/再発行は行っていない。
+- `dev.bat run typecheck`、`dev.bat run build`、変更ファイルのPrettier確認、`git diff --check`が成功。`dev.bat exec node --test tests/localization.test.cjs tests/object-list-dialog.test.cjs tests/setting-list-draft.test.cjs`は21件成功。開発版GUIは`settings-order-ui-test.cjs`16群、`command-triggers-ui-test.cjs --dialog-actions-only`10群、`settings-hints-ui-test.cjs --web-account-list-only`9群、`web-list-ui-test.cjs`5群が成功した。
+- `publish.bat`終了0。共用test-runtimeと専用profileを使用した発行固定EXEで、同じ4経路が順に16/9/9/5群成功。追加の`--trigger-tabs-only`5群で3方式×種類別タブ/機能ページ、編集取消と再起動保持を確認した。一時Wallpaper確認3群では発行済みの宣言を読み込み、追加のキーボード操作/取消/フォーカス復帰、並べ替え取消/適用/実再起動後の記録保持を確認。WallpaperSlideshowは全工程で停止状態を維持し、実壁紙を操作していない。
+- 固定EXEの`--trigger-tabs-only`初回と診断再実行は、タブ切替直後の編集でダイアログを取得できず失敗。失敗JSON・ログ・診断画像を保持。既存`settleSettings`による画面切替後の待機を`trigger-summary-checks.cjs`へ加え、同じ固定EXEの診断wrapper経由の再実行で5群成功した。製品コード/発行物は変更しておらず、他の成功結果を再実行した扱いにはしていない。`settings-order-ui-test.cjs`のApplet管理表示にはオフラインcatalog fixtureを用い、匿名GitHub APIを使わない。
+- 明/暗テーマと狭幅でツールバーの配置を画像確認。最小幅900未満の人工viewport 820では既存トリガー本文の列が詰まる。900/820で従来のヘッダー内追加ボタンを一時DOMに復元して列幅を照合し、今回のボタン移動による幅の変化がないことを確認した。本文の列幅改善は今回の対象外とし、画面全体の狭幅品質が解消済みとは扱わない。
+- `A:\40.ARTIFACT\AppDock.at365`のpackage/feed/manifest/PE版と、更新ZIP・発行先・build stage・共用runtimeの管理対象101ファイルのSHA256が一致。EXE SHA256=`cab3cb1e6a045db67f5e35965292a0b005a174b09d2b5623d594d83310ee424e`、ZIP SHA256=`2647340c117f9b90675d25d3813ab8e84e6efca35bc1d4d4e1ba20c05465ec91`、175,104,216 bytes。
+- 証跡は`.artifacts/list-toolbar-validation-20261105/`。本体1,049入力、兄弟Appletのmanifest/発行payload16入力、完全ログ、レビュー、各profileと成果物hashを記録。開発版検証以降の差分はpackage版と上記テスト待機だけで、製品処理・依存・ツールが不変であることを照合した。GUIは直列実行し、関連試験プロセス0を確認。63フォルダーを結果/実行方式で整理判定し、直近成功3回・失敗/診断・検証文書参照分・他作業の参照状態が不明な証跡を保持、削除0。全回帰の一律実行、実利用者による手動確認、コミット、push、Release、実利用先deployは行っていない。
+
 ## 2026-11-05 並べ替えダイアログ変更のコミット前照合
 
 - 利用者から最終UIが良好との実利用確認と、今回の並べ替え変更をまとめてコミットする依頼を受領。グループ全体/子の移動、初期折りたたみ、フッターの情報アイコン、共通一覧への統一、保存競合保護、対応する試験と文書の29ファイルを対象とする。

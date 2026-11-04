@@ -82,6 +82,86 @@ export function SettingsListAddButton({
   );
 }
 
+/** Shared filters, list actions and a single result count above a settings table. */
+export function SettingsListToolbar({
+  controls,
+  filter,
+  actions,
+  trailingActions,
+  children,
+}: {
+  controls?: ReactNode;
+  filter?: ReactNode;
+  actions: ReactNode;
+  trailingActions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {controls}
+      {filter && <div className="settings-list-toolbar-filters">{filter}</div>}
+      <CommandListSummary
+        className="settings-list-toolbar"
+        leading={actions}
+        actions={trailingActions}
+      >
+        {children}
+      </CommandListSummary>
+    </>
+  );
+}
+
+export function SettingsListToolbarActions({
+  testId,
+  addLabel,
+  addDisabled = false,
+  onAdd,
+  orderLabel,
+  orderDisabled = false,
+  onOrder,
+}: {
+  testId?: string;
+  addLabel: string;
+  addDisabled?: boolean;
+  onAdd(): void;
+  orderLabel?: string;
+  orderDisabled?: boolean;
+  onOrder?(): void;
+}) {
+  const { t: translate } = useHostTranslation();
+  return (
+    <>
+      <button
+        type="button"
+        className="primary accent-action settings-list-toolbar-button"
+        data-testid={testId ? `${testId}:add` : undefined}
+        data-dialog-focus-fallback
+        aria-label={addLabel}
+        title={addLabel}
+        disabled={addDisabled}
+        onClick={onAdd}
+      >
+        <span aria-hidden="true">＋</span>
+        {translate('settings.settingsListTable.addAction')}
+      </button>
+      {onOrder && (
+        <button
+          type="button"
+          className="secondary settings-list-toolbar-button"
+          data-testid={testId ? `${testId}:list:order` : undefined}
+          aria-label={orderLabel ?? translate('settings.settingsListTable.order')}
+          title={orderLabel ?? translate('settings.settingsListTable.order')}
+          disabled={orderDisabled}
+          onClick={onOrder}
+        >
+          <ListIcon kind="order" />
+          {translate('settings.settingsListTable.order')}
+        </button>
+      )}
+    </>
+  );
+}
+
 /** Shared table frame for declared lists and lists with inline controls. */
 export function SettingsListLayout({
   title,
@@ -129,8 +209,6 @@ export function SettingsListTable({
   navigation,
   maxItems,
   canAdd = true,
-  addInTitle = false,
-  orderInTitle = false,
   commandListScroll = false,
   toolbarFilter,
   toolbarControls,
@@ -158,8 +236,6 @@ export function SettingsListTable({
   navigation?(entry: Record<string, unknown>): ReactNode;
   maxItems?: number;
   canAdd?: boolean;
-  addInTitle?: boolean;
-  orderInTitle?: boolean;
   commandListScroll?: boolean;
   toolbarFilter?: ReactNode;
   toolbarControls?: ReactNode;
@@ -192,40 +268,6 @@ export function SettingsListTable({
         )}
       </span>
     );
-  const orderInHeading = !!onOrder && addInTitle && orderInTitle;
-  const orderButton = (
-    <button
-      type="button"
-      className="settings-list-icon"
-      data-testid={testId ? `${testId}:list:order` : undefined}
-      title={translate('settings.settingsListTable.order')}
-      aria-label={translate('settings.settingsListTable.orderLabel', { title: definition.title })}
-      disabled={busy || entries.length < 2}
-      onClick={onOrder}
-    >
-      <ListIcon kind="order" />
-    </button>
-  );
-  const actions = (
-    <>
-      {toolbarActions}
-      {!!onOrder && !orderInHeading && orderButton}
-      {!addInTitle && (
-        <button
-          type="button"
-          className="primary"
-          data-testid={testId ? `${testId}:add` : undefined}
-          data-dialog-focus-fallback
-          disabled={busy || !canAdd || (maxItems !== undefined && entries.length >= maxItems)}
-          onClick={onAdd}
-        >
-          {translate('settings.settingsListTable.add', {
-            value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
-          })}
-        </button>
-      )}
-    </>
-  );
   return (
     <SettingsListLayout
       title={definition.title}
@@ -233,16 +275,30 @@ export function SettingsListTable({
       actionsAlign={actionsAlign}
       tableClassName={tableClassName}
       toolbar={
-        <>
-          {toolbarControls}
-          <CommandListSummary
-            className="settings-list-toolbar"
-            filter={toolbarFilter}
-            actions={actions}
-          >
-            {count}
-          </CommandListSummary>
-        </>
+        <SettingsListToolbar
+          controls={toolbarControls}
+          filter={toolbarFilter}
+          trailingActions={toolbarActions}
+          actions={
+            <SettingsListToolbarActions
+              testId={testId}
+              addLabel={translate('settings.settingsListTable.add', {
+                value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+              })}
+              addDisabled={
+                busy || !canAdd || (maxItems !== undefined && entries.length >= maxItems)
+              }
+              onAdd={onAdd}
+              orderLabel={translate('settings.settingsListTable.orderLabel', {
+                title: definition.title,
+              })}
+              orderDisabled={busy || entries.length < 2}
+              onOrder={onOrder}
+            />
+          }
+        >
+          {count}
+        </SettingsListToolbar>
       }
     >
       <thead>
@@ -251,25 +307,7 @@ export function SettingsListTable({
             <th>{definition.itemTitle ?? translate('settings.settingsListTable.item')}</th>
           )}
           {view.columns.map((key) => (
-            <th key={key}>
-              {addInTitle && key === view.titleKey ? (
-                <span className="settings-list-heading">
-                  {fields.find((field) => field.key === key)!.title}
-                  <SettingsListAddButton
-                    label={translate('settings.settingsListTable.add', {
-                      value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
-                    })}
-                    disabled={
-                      busy || !canAdd || (maxItems !== undefined && entries.length >= maxItems)
-                    }
-                    onClick={onAdd}
-                  />
-                  {orderInHeading && orderButton}
-                </span>
-              ) : (
-                fields.find((field) => field.key === key)!.title
-              )}
-            </th>
+            <th key={key}>{fields.find((field) => field.key === key)!.title}</th>
           ))}
           {view.enabledKey && (
             <th className="settings-list-state">
@@ -414,13 +452,9 @@ export function SettingsListTable({
               className="settings-list-empty"
             >
               {emptyMessage ??
-                (addInTitle
-                  ? translate('settings.settingsListTable.emptyHeader', {
-                      title: fields.find((field) => field.key === view.titleKey)!.title,
-                    })
-                  : translate('settings.settingsListTable.emptyButton', {
-                      value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
-                    }))}
+                translate('settings.settingsListTable.emptyButton', {
+                  value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                })}
             </td>
           </tr>
         )}
