@@ -34,11 +34,22 @@
       "dark": { "accent": "#f2c66a", "soft": "#40351f" }
     },
     {
-      "id": "sky-blue",
-      "label": "スカイブルー",
-      "hidden": true,
-      "light": { "accent": "#036a91", "soft": "#e5f6ff" },
-      "dark": { "accent": "#75d6f5", "soft": "#173b48" }
+      "id": "summer",
+      "label": "サマー",
+      "light": { "accent": "#3333FF", "soft": "#FFFFFF" },
+      "dark": { "accent": "#FFFFFF", "soft": "#3333FF" }
+    },
+    {
+      "id": "white",
+      "label": "世界の終わり",
+      "light": { "accent": "#FFFFFF", "soft": "#FFFFFF", "autoContrast": true },
+      "dark": { "accent": "#FFFFFF", "soft": "#FFFFFF", "autoContrast": true }
+    },
+    {
+      "id": "black",
+      "label": "ハードボイルド",
+      "light": { "accent": "#000000", "soft": "#000000", "autoContrast": true },
+      "dark": { "accent": "#000000", "soft": "#000000", "autoContrast": true }
     }
   ]
 }
