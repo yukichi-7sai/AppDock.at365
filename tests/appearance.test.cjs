@@ -32,14 +32,20 @@ const contrast = (a, b) => {
   return (values[0] + 0.05) / (values[1] + 0.05);
 };
 
-test('overlay background defaults to transparent, preserves explicit blur and rejects unknown choices', () => {
+test('overlay background defaults to transparent, persists all choices and rejects unknown choices', () => {
   const settings = createDefaultSettings();
   assert.equal(settings.host.overlayBackground, 'transparent');
   assert.equal(settingsStorageValue(settings).host?.overlayBackground, undefined);
   delete settings.host.overlayBackground;
   assert.equal(parseSettings(settings).host.overlayBackground, 'transparent');
-  settings.host.overlayBackground = 'blur';
-  assert.equal(parseSettings(settingsStorageValue(settings)).host.overlayBackground, 'blur');
+  for (const value of ['blur', 'translucent']) {
+    settings.host.overlayBackground = value;
+    assert.equal(parseSettings(settingsStorageValue(settings)).host.overlayBackground, value);
+    const page = settingsCatalog([], settings).find((page) => page.id === 'appearance');
+    const applied = applySettingsJson(settings, page, [], JSON.stringify({ host: { overlayBackground: value } }));
+    assert.equal(applied.host.overlayBackground, value);
+    assert.equal(resetSettingsPage(applied, page, []).host.overlayBackground, 'transparent');
+  }
   const item = settingsCatalog([], settings)
     .find((page) => page.id === 'appearance')
     .items.find((item) => item.key === 'overlayBackground');
@@ -48,6 +54,7 @@ test('overlay background defaults to transparent, preserves explicit blur and re
     item.definition.options.map(({ value, label }) => [value, label]),
     [
       ['transparent', '透明'],
+      ['translucent', '半透明'],
       ['blur', 'ブラー'],
     ],
   );
@@ -301,6 +308,7 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   assert.equal(body['--border'], initial.theme.border);
   assert.equal(root['--appdock-overlay-filter'], 'none');
   assert.equal(body['--appdock-overlay-filter'], 'none');
+  assert.equal(root['--appdock-overlay-background'], 'transparent');
   assert.equal(body['--accent'], '#245f9e');
   assert.equal(root.dataset.overlayShadow, 'on');
   assert.equal(root.dataset.notificationBannerShadow, 'on');
@@ -333,6 +341,24 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   assert.equal(root.dataset.notificationBannerShadow, 'off');
   assert.equal(root.dataset.notificationDesktopShadow, 'on');
   assert.equal(calls, 1);
+  for (const [index, dark] of [false, true].entries()) {
+    const snapshot = resolveAppearance('mint', dark, 5 + index);
+    snapshot.theme.scrim = dark ? '#12345680' : '#abcdef66';
+    ipc.emit('appearance:changed', {}, { ...snapshot, overlayBackground: 'translucent' });
+    for (const element of [root, body]) {
+      assert.equal(element['--appdock-overlay-background'], snapshot.theme.scrim);
+      assert.equal(element['--appdock-overlay-filter'], 'none');
+    }
+  }
+  for (const [index, overlayBackground] of ['transparent', 'blur'].entries()) {
+    ipc.emit('appearance:changed', {}, {
+      ...resolveAppearance('mint', false, 7 + index),
+      overlayBackground,
+    });
+    assert.equal(root['--appdock-overlay-background'], 'transparent');
+    assert.equal(body['--appdock-overlay-background'], 'transparent');
+    assert.equal(root['--appdock-overlay-filter'], overlayBackground === 'blur' ? 'blur(2px)' : 'none');
+  }
   for (const name of [
     'preload',
     'shell-preload',

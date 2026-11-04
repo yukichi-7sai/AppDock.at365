@@ -11,7 +11,7 @@ export interface HostSettings {
   showHints: boolean;
   showStatusBar: boolean;
   ribbonExpandOnHover: boolean;
-  overlayBackground: 'blur' | 'transparent';
+  overlayBackground: 'blur' | 'transparent' | 'translucent';
   overlayShadow: boolean;
   soundEnabled: boolean;
   textPaletteHistory: boolean;

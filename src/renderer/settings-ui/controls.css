@@ -1139,8 +1139,8 @@ main {
 .modal-backdrop {
   position: fixed;
   inset: 43px 0 28px;
-  background: var(--scrim);
-  backdrop-filter: blur(3px);
+  background: var(--appdock-overlay-background, transparent);
+  backdrop-filter: var(--appdock-overlay-filter, none);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -1843,7 +1843,8 @@ summary {
   padding: 20px;
 }
 .image-preview-dialog::backdrop {
-  background: var(--scrim);
+  background: var(--appdock-overlay-background, transparent);
+  backdrop-filter: var(--appdock-overlay-filter, none);
 }
 .image-preview-dialog img {
   display: block;
@@ -3221,7 +3222,7 @@ summary {
   overscroll-behavior: contain;
 }
 .applet-shortcut-dialog::backdrop {
-  background: transparent;
+  background: var(--appdock-overlay-background, transparent);
   backdrop-filter: var(--appdock-overlay-filter, none);
   inset: var(--dialog-page-top, 0px) var(--dialog-page-right, 0px) var(--dialog-page-bottom, 0px)
     var(--dialog-page-left, 0px);

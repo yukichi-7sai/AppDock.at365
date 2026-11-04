@@ -125,7 +125,7 @@ const definitions = localizedMetadata(() => ({
     type: 'select',
     default: 'transparent',
     automation: true,
-    options: (['transparent', 'blur'] as const).map((value) => ({
+    options: (['transparent', 'translucent', 'blur'] as const).map((value) => ({
       value,
       label: hostText(`appearance.overlayBackground.${value}`),
     })),

@@ -49,7 +49,7 @@ kbd {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: transparent;
+  background: var(--appdock-overlay-background, transparent);
   display: flex;
   justify-content: center;
   align-items: flex-start;

@@ -376,13 +376,16 @@ export function SettingsForm({
                       ...settings,
                       host: {
                         ...settings.host,
-                        overlayBackground: event.target.value as 'blur' | 'transparent',
+                        overlayBackground: event.target.value as 'blur' | 'transparent' | 'translucent',
                       },
                     })
                   }
                 >
                   <option value="transparent">
                     {t('appearance.overlayBackground.transparent')}
+                  </option>
+                  <option value="translucent">
+                    {t('appearance.overlayBackground.translucent')}
                   </option>
                   <option value="blur">{t('appearance.overlayBackground.blur')}</option>
                 </select>

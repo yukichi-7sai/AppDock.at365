@@ -28,13 +28,15 @@
 
 ### ダイアログ・パレットの背景
 
-「表示 → 共通」の「ダイアログ・パレットの背景」で「透明」「ブラー」を選ぶ。`host.overlayBackground`は表示ページで選んだ保存先へ格納する列挙値`blur | transparent`で、既定値は`transparent`。設定ダイアログ、画像プレビュー、コマンドパレットへ共通適用し、表示中の画面にも即時反映する。下のページは画像化せず、ブラーは2pxのCSS filter、透明はfilterなしとする。カバーの範囲と閉鎖操作は[一覧とダイアログ](settings-list-editing.md#描画順と背景の管理)に従う。
+「表示 → 共通」の「ダイアログ・パレットの背景」で「透明」「半透明」「ブラー」を選ぶ。`host.overlayBackground`は表示ページで選んだ保存先へ格納する列挙値`transparent | translucent | blur`で、既定値は`transparent`。設定ダイアログ、画像プレビュー、コマンドパレットへ共通適用し、表示中の画面にも即時反映する。半透明は選択テーマの`theme.json`の`scrim`を背後に重ね、ぼかしは付けない。ブラーは透明な背景と2pxのCSS filter、透明は色の覆いもfilterもなしとする。下のページは画像化しない。カバーの範囲と閉鎖操作は[一覧とダイアログ](settings-list-editing.md#描画順と背景の管理)に従う。半透明の選択肢と共通背景変数は0.140.0以降。
 
 その直下の「ダイアログ・パレットの影」で、共通ダイアログとコマンドパレットの外側の影を切り替える。`host.overlayShadow`は表示ページで選んだ保存先へ格納する真偽値で既定は`true`。表示中にも即時反映し、背景の透明/ブラーとは独立する。選択行の目印・フォーカス枠・メニューや画像カードの影には適用しない。通知の影は[通知設定](notifications.md)のバナー/デスクトップ通知で個別に設定する。
 
-共通preloadが`--appdock-overlay-filter`を配布する。別WebContentsのApplet本文のパレット用CSSも同じ設定に従い、不要なときは除去する。既存設定で項目を省略した場合も透明を使い、明示的な`blur`は保持する。保存・ページリセット・部分JSON・外部設定APIは既存の設定基盤へ接続する。
+共通preloadが`--appdock-overlay-background`と`--appdock-overlay-filter`を配布する。背景色は半透明時だけ`scrim`、それ以外は`transparent`。別WebContentsのApplet本文のパレット用ブラーCSSも同じ設定に従い、不要なときは除去する。半透明はパレット側の背景で描画し、下のApplet本文へ着色しない。既存設定で項目を省略した場合も透明を使い、明示的な`blur`は保持する。保存・ページリセット・部分JSON・外部設定APIは既存の設定基盤へ接続する。
 
-ローカルAppletのHTML `dialog`も、`::backdrop`を透明にして`backdrop-filter: var(--appdock-overlay-filter, none)`を参照します。影は共通preloadが更新する`:root[data-overlay-shadow='off']`で無効にします。これにより表示中にも設定へ追従し、Appletから全設定を取得する必要はありません。
+ローカルAppletのHTML `dialog`も、`::backdrop`に`background: var(--appdock-overlay-background, transparent)`と`backdrop-filter: var(--appdock-overlay-filter, none)`を指定します。影は共通preloadが更新する`:root[data-overlay-shadow='off']`で無効にします。これにより表示中にも設定へ追従し、Appletから全設定を取得する必要はありません。独自CSSで背景を固定しているAppletは、そのCSSで共通変数を参照する対応が必要です。
+
+`scripts/overlay-translucent-ui-test.cjs [固定EXE]`は隔離したテーマJSONと実画面で、3種類の背景切替、編集入力の保持、画像プレビュー、再起動後の保存と色の再読込を検査する。既定色のダイアログ/パレットは、子WebContentsViewも含むテストウィンドウの画像で確認する。既存の閉鎖操作・フォーカス・Applet本文は`dialog-blur-ui-test.cjs`で確認する。
 
 ### カスタムの2色
 

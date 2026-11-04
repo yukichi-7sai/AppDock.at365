@@ -542,6 +542,13 @@ async function closePalette(p, background = false) {
     await host.waitForFunction(
       () => getComputedStyle(document.querySelector('main')).filter === 'none',
     );
+    await background('translucent');
+    await p.waitForFunction(() => {
+      const color = getComputedStyle(document.querySelector('.modal-backdrop')).backgroundColor;
+      return color !== 'rgba(0, 0, 0, 0)';
+    });
+    assert.equal(await body.evaluate(() => getComputedStyle(document.documentElement).filter), 'none');
+    assert.equal(await nested.evaluate(() => getComputedStyle(document.documentElement).filter), 'none');
     await background('blur');
     await body.waitForFunction(
       () => getComputedStyle(document.documentElement).filter === 'blur(2px)',
@@ -574,6 +581,7 @@ async function closePalette(p, background = false) {
     await backgroundChoice.selectOption('transparent');
     assert.deepEqual(await backgroundChoice.locator('option').allTextContents(), [
       '透明',
+      '半透明',
       'ブラー',
     ]);
     await until(

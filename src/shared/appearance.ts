@@ -90,7 +90,7 @@ export function isAccentColor(value: unknown): value is AccentColor {
 }
 export interface AppearanceSnapshot {
   language?: string;
-  overlayBackground?: 'blur' | 'transparent';
+  overlayBackground?: 'blur' | 'transparent' | 'translucent';
   overlayShadow?: boolean;
   notificationBannerShadow?: boolean;
   notificationDesktopShadow?: boolean;

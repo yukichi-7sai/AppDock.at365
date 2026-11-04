@@ -223,6 +223,7 @@
   "appearance.overlayBackground.description": "画像プレビューを含む背景の見え方を選びます。",
   "appearance.overlayBackground.blur": "ブラー",
   "appearance.overlayBackground.transparent": "透明",
+  "appearance.overlayBackground.translucent": "半透明",
   "appearance.shell.default": "Default Shell",
   "appearance.shell.defaultOption": "Default Shell（常時有効）",
   "appearance.shell.notCreated": "未生成",
