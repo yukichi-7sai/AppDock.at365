@@ -46,9 +46,28 @@ export function AboutInformationPanel({
   const controls = useSettingsControls();
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
+  const [operation, setOperation] = useState<'restart' | 'quit'>();
+  const pending = useRef(false);
+  const changing = busy || checking || updates.busy || !!operation;
   const hostUpdate = updates.results.find((result) => result.id === 'host');
   const checkLabel = translate('settings.aboutSettings.checkUpdates');
-  useSettingsFeedback({ error, busy: checking, target: checkLabel });
+  const [errorTarget, setErrorTarget] = useState('');
+  useSettingsFeedback({ error, busy: checking || !!operation, target: errorTarget || checkLabel });
+  const run = async (kind: 'restart' | 'quit') => {
+    if (pending.current || changing) return;
+    pending.current = true;
+    setOperation(kind);
+    setError('');
+    setErrorTarget(translate(`settings.aboutSettings.${kind}`));
+    try {
+      await controls.executeCommand(`appdock.${kind}`);
+      // Keep actions disabled after acceptance until the host has finished shutting down.
+    } catch (reason) {
+      setError(updateError(reason));
+      pending.current = false;
+      setOperation(undefined);
+    }
+  };
   const autoCheckedOnOpen = useRef(false);
   useEffect(() => {
     if (autoCheckedOnOpen.current || !controls.checkHostOnAboutOpen) return;
@@ -84,9 +103,10 @@ export function AboutInformationPanel({
             title={checkLabel}
             aria-label={checkLabel}
             pending={checking}
-            disabled={busy || updates.busy}
+            disabled={changing}
             onClick={() => {
               setError('');
+              setErrorTarget(checkLabel);
               setChecking(true);
               void controls
                 .checkUpdates()
@@ -134,9 +154,34 @@ export function AboutInformationPanel({
           ))}
         </dl>
       </div>
-      <div className="about-update-buttons">
-        <UpdateActions appletCount={applets.length} embedded />
-        <VersionCheck disabled={busy || checking} embedded />
+      <div className="about-actions">
+        <div className="about-update-buttons">
+          <UpdateActions appletCount={applets.length} disabled={changing} embedded />
+          <VersionCheck disabled={changing} embedded />
+          <SettingsButton
+            icon
+            data-testid="about-restart"
+            title={translate('settings.aboutSettings.restartHint')}
+            disabled={changing}
+            pending={operation === 'restart'}
+            onClick={() => void run('restart')}
+          >
+            <Icon name="power" size={16} />
+            {translate('settings.aboutSettings.restart')}
+          </SettingsButton>
+        </div>
+        <SettingsButton
+          icon
+          className="about-quit"
+          data-testid="about-quit"
+          title={translate('settings.aboutSettings.quitHint')}
+          disabled={changing}
+          pending={operation === 'quit'}
+          onClick={() => void run('quit')}
+        >
+          <Icon name="square" size={16} />
+          {translate('settings.aboutSettings.quit')}
+        </SettingsButton>
       </div>
     </article>
   );

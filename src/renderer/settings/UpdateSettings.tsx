@@ -22,9 +22,11 @@ import { Icon } from '../../shared/ui-icons';
 export function UpdateActions({
   appletCount,
   embedded = false,
+  disabled = false,
 }: {
   appletCount: number;
   embedded?: boolean;
+  disabled?: boolean;
 }) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -61,7 +63,7 @@ export function UpdateActions({
       <SettingsActions className="update-actions">
         <button
           className="update-primary"
-          disabled={state.busy}
+          disabled={state.busy || disabled}
           onClick={() =>
             action(() => settingsControls.executeCommand('appdock.updates.installAll'))
           }
@@ -71,7 +73,7 @@ export function UpdateActions({
         {!embedded && (
           <button
             className="text-button"
-            disabled={state.busy || appletCount === 0}
+            disabled={state.busy || disabled || appletCount === 0}
             onClick={() => action(() => settingsControls.installUpdates('applets'))}
           >
             {translate('settings.updateSettings.updateApplets')}

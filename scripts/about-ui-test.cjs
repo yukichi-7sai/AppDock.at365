@@ -16,6 +16,8 @@ fs.mkdirSync(profile, { recursive: true });
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const version = require('../package.json').version;
 let hostFeedVersion = version;
+let releaseFeed;
+let holdFeed = false;
 const checks = [],
   measurements = [],
   requests = [],
@@ -38,20 +40,23 @@ async function until(fn, label) {
       const id = req.url.slice(1).replace('.json', '');
       requests.push(id);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          schemaVersion: 1,
-          kind: id === 'host' ? 'host' : 'applet',
-          id,
-          version: id === 'host' ? hostFeedVersion : '1.0.0',
-          payload: {
-            file: id === 'host' ? 'AppDock.at365.exe' : 'update.zip',
-            format: id === 'host' ? 'exe' : 'zip',
-            sha256: 'a'.repeat(64),
-            size: 20,
-          },
-        }),
-      );
+      const respond = () =>
+        res.end(
+          JSON.stringify({
+            schemaVersion: 1,
+            kind: id === 'host' ? 'host' : 'applet',
+            id,
+            version: id === 'host' ? hostFeedVersion : '1.0.0',
+            payload: {
+              file: id === 'host' ? 'AppDock.at365.exe' : 'update.zip',
+              format: id === 'host' ? 'exe' : 'zip',
+              sha256: 'a'.repeat(64),
+              size: 20,
+            },
+          }),
+        );
+      if (holdFeed) releaseFeed = respond;
+      else respond();
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -81,7 +86,16 @@ async function until(fn, label) {
           entry: 'worker.cjs',
         }),
       );
-      fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate = () => {};');
+      fs.writeFileSync(
+        path.join(folder, 'worker.cjs'),
+        `
+const fs = require('node:fs');
+const path = require('node:path');
+const record = (event) => fs.appendFileSync(path.join(__dirname, 'lifecycle.jsonl'), JSON.stringify({ event, pid: process.pid }) + '\\n');
+exports.activate = () => record('start');
+exports.deactivate = () => record('stop');
+`,
+      );
       initial.extensions[id] = {
         enabled: suffix === 'a',
         settings: {},
@@ -103,6 +117,7 @@ async function until(fn, label) {
     app = await launchTestHost({
       executablePath,
       portable,
+      mainInspector: true,
       env,
       args: [
         ...(portable ? [] : [root]),
@@ -135,6 +150,11 @@ async function until(fn, label) {
     await page.getByTestId('settings-nav:about').click();
     await page.getByRole('heading', { name: 'AppDock.at365', exact: true, level: 1 }).waitFor();
     const overview = page.getByTestId('about-overview');
+    for (const id of ['appdock.restart', 'appdock.quit'])
+      assert(
+        (await model()).content.actions[`settingAction:${id}`],
+        'About exposes its lifecycle action',
+      );
     assert.equal(await page.locator('h1').count(), 1);
     assert(
       await overview.evaluate(
@@ -280,6 +300,8 @@ async function until(fn, label) {
     );
     await page.getByTestId('settings-nav:shortcuts').click();
     await page.getByRole('heading', { name: shortcutTitle, exact: true, level: 1 }).waitFor();
+    for (const id of ['appdock.restart', 'appdock.quit'])
+      assert.equal((await model()).content.actions[`settingAction:${id}`], undefined);
     const catalog = (await model()).content.auxiliary.commands;
     await page.getByTestId('settings-nav:about').click();
     await overview.waitFor();
@@ -506,12 +528,11 @@ async function until(fn, label) {
         () => page.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
         'theme',
       );
-      for (const width of [1720, 1280, 900, 760, 600]) {
+      for (const width of [1720, 1280, 900]) {
         await app.evaluate(({ BrowserWindow }, width) => {
           const w = BrowserWindow.getAllWindows().find((w) =>
             w.webContents.getURL().startsWith('appdock://host/'),
           );
-          w.setMinimumSize(600, 600);
           w.setSize(width, width === 900 ? 620 : 1000);
         }, width);
         await until(() => page.evaluate((width) => innerWidth === width, width), 'window width');
@@ -523,25 +544,40 @@ async function until(fn, label) {
           .evaluate((e) => ({ clientWidth: e.clientWidth, scrollWidth: e.scrollWidth }));
         assert(size.scrollWidth <= size.clientWidth + 2, JSON.stringify(size));
         await page.mouse.move(0, 0);
-        const actions = await overview
-          .locator('.about-update-buttons button')
-          .evaluateAll((elements) =>
-            elements.map((element) => {
-              const rect = element.getBoundingClientRect();
-              return {
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-                background: getComputedStyle(element).backgroundColor,
-              };
-            }),
+        const actions = await overview.locator('.about-actions button').evaluateAll((elements) =>
+          elements.map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+              background: getComputedStyle(element).backgroundColor,
+            };
+          }),
+        );
+        assert.equal(actions.length, 4);
+        for (let i = 0; i < actions.length; i++) {
+          assert(actions[i].width > 0 && actions[i].height > 0, 'action stays visible');
+          for (let j = i + 1; j < actions.length; j++) {
+            const a = actions[i],
+              b = actions[j];
+            assert(
+              a.x + a.width <= b.x + 1 ||
+                b.x + b.width <= a.x + 1 ||
+                a.y + a.height <= b.y + 1 ||
+                b.y + b.height <= a.y + 1,
+              'actions do not overlap when wrapping',
+            );
+          }
+        }
+        if (width === 1720) {
+          assert(actions[2].x > actions[1].x, 'restart follows updates on the left');
+          assert(
+            actions[3].x > actions[2].x + actions[2].width + 12,
+            'quit is separated on the right',
           );
-        assert.equal(actions.length, 2);
-        assert(Math.abs(actions[0].y - actions[1].y) < 1, 'update buttons share a row');
-        assert(Math.abs(actions[0].width - actions[1].width) < 1, 'update buttons share width');
-        assert(Math.abs(actions[0].height - actions[1].height) < 1, 'update buttons share height');
-        if (theme === 'light') assert.equal(actions[1].background, 'rgb(255, 255, 255)');
+        }
         const accent = await page.evaluate(() => {
           const e = document.createElement('span');
           e.style.color = 'var(--accent)';
@@ -575,8 +611,22 @@ async function until(fn, label) {
       }
     }
     checks.push(
-      'Applet management link and real light/dark widths 1720/1280/900/760/600, including minimum 900x620, fit without horizontal page overflow',
+      'Applet management link and real light/dark widths 1720/1280/900, including the supported minimum 900x620, fit without horizontal page overflow',
     );
+    holdFeed = true;
+    await overview.getByRole('button', { name: '更新を確認', exact: true }).click();
+    await until(() => !!releaseFeed, 'held local update check');
+    assert(await overview.getByTestId('about-restart').isDisabled());
+    assert(await overview.getByTestId('about-quit').isDisabled());
+    holdFeed = false;
+    releaseFeed();
+    releaseFeed = undefined;
+    await until(
+      async () => await overview.getByTestId('about-restart').isEnabled(),
+      'actions recover after update check',
+    );
+    checks.push('restart and quit stay disabled while an update check is running');
+    await require('./about-lifecycle-checks.cjs')({ app, page, profile, checks, errors, until });
     assert.deepEqual(errors, []);
     success = true;
   } catch (e) {
@@ -585,6 +635,7 @@ async function until(fn, label) {
     process.exitCode = 1;
     await page?.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
   } finally {
+    releaseFeed?.();
     await app?.close().catch((e) => {
       errors.push(e.message);
       success = false;

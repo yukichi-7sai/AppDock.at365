@@ -3447,9 +3447,12 @@ function settingsPageActions(
       actions.checkAllUpdates = async () => executeCommand('appdock.updates.check');
     if (page.id === 'about')
       actions.checkHostOnAboutOpen = async () => updater.checkHostOnAboutOpen();
-    if (page.id === 'about')
+    if (page.id === 'about') {
       for (const command of updateCommands)
         actions[`settingAction:${command.id}`] = async () => executeCommand(command.id);
+      for (const id of ['appdock.restart', 'appdock.quit'])
+        actions[`settingAction:${id}`] = async () => executeCommand(id);
+    }
     if (page.id === 'applets')
       actions.checkAppletUpdates = async () =>
         updater.check(managedApplets(allApplets()).map((a) => a.id));
