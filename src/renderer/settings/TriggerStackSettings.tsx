@@ -57,7 +57,7 @@ export function TriggerStackDialog({
 }) {
   const { t } = useHostTranslation();
   const [value, setValue] = useState(() => structuredClone(initial));
-  const [before] = useState(() => (original ? structuredClone(original) : undefined));
+  const [before, setBefore] = useState(() => (original ? structuredClone(original) : undefined));
   const [valid, setValid] = useState(true);
   const [selecting, setSelecting] = useState(!before);
   const selection = useRef<HTMLDivElement>(null);
@@ -85,11 +85,11 @@ export function TriggerStackDialog({
   } catch {
     validInput = false;
   }
-  const duplicate = triggerStacks(settings, value.kind).some(
-    (stack) =>
-      stack.input === normalizedInput &&
-      !(stack.kind === before?.kind && stack.input === before.input),
+  const existing = triggerStacks(settings, value.kind).find(
+    (stack) => stack.input === normalizedInput,
   );
+  const openingExisting = selecting && !before && !!existing;
+  const duplicate = !!existing && existing.input !== before?.input && !openingExisting;
   const deleting = !!before && value.entries.length === 0;
   return (
     <SettingsMcpScope itemId={settingsItemId(value.kind, 'bindings')}>
@@ -145,6 +145,11 @@ export function TriggerStackDialog({
         }
         onApply={async () => {
           if (selecting) {
+            if (!before && existing) {
+              setBefore(structuredClone(existing));
+              setValue(structuredClone(existing));
+              setValid(true);
+            }
             setSelecting(false);
             return;
           }
@@ -204,6 +209,7 @@ export function TriggerStackDialog({
                 </SettingsMcpScope>
               </div>
               <CommandStackEditor
+                key={before ? JSON.stringify([before.kind, before.input]) : 'new'}
                 entries={value.entries}
                 onChange={(entries) => setValue({ ...value, entries })}
                 commands={commands}

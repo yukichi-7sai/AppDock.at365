@@ -48,6 +48,7 @@ const tabResetOnly = process.argv.includes('--tab-reset-only');
 const enablementOnly = process.argv.includes('--enablement-only');
 const reselectionOnly = process.argv.includes('--reselection-only');
 const dialogActionsOnly = process.argv.includes('--dialog-actions-only');
+const existingAddOnly = process.argv.includes('--existing-add-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -215,7 +216,7 @@ if (filterConsistencyOnly) {
   }
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
-if (reselectionOnly || dialogActionsOnly) {
+if (reselectionOnly || dialogActionsOnly || existingAddOnly) {
   initial.host.soundEnabled = false;
   initial.updates.checkHostOnStartup = false;
   initial.updates.checkAppletsOnStartup = false;
@@ -331,6 +332,7 @@ const recordSuccess = () => {
         enablementOnly,
         reselectionOnly,
         dialogActionsOnly,
+        existingAddOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -364,11 +366,13 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
-    if (reselectionOnly || dialogActionsOnly) {
+    if (reselectionOnly || dialogActionsOnly || existingAddOnly) {
       await require(
-        dialogActionsOnly
-          ? './trigger-dialog-action-checks.cjs'
-          : './trigger-reselection-checks.cjs',
+        existingAddOnly
+          ? './trigger-existing-add-checks.cjs'
+          : dialogActionsOnly
+            ? './trigger-dialog-action-checks.cjs'
+            : './trigger-reselection-checks.cjs',
       )({
         host,
         open,

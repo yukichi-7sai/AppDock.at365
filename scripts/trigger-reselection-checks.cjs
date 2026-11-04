@@ -172,7 +172,12 @@ module.exports = async ({ host, open, saved, save, checks, profile, row, until }
   const baseline = await saved();
   await table.getByRole('button', { name: /追加/ }).click();
   await select('gestures', 'move-down');
-  assert(await confirm.isDisabled());
+  await next();
+  await dialog.getByRole('heading', { name: 'トリガーの編集', exact: true }).waitFor();
+  assert.equal(await dialog.getByTestId('stack-entry').count(), 2);
+  await cancel();
+  assert.deepEqual(await saved(), baseline);
+  await table.getByRole('button', { name: /追加/ }).click();
   await select('gestures', 'move-left');
   await next();
   await dialog.getByTestId('stack-add-command').click();
@@ -183,7 +188,7 @@ module.exports = async ({ host, open, saved, save, checks, profile, row, until }
   await cancel();
   assert.deepEqual(await saved(), baseline);
   checks.push(
-    'addition still rejects occupied inputs and retains new commands across reselection without saving on cancel',
+    'addition opens occupied inputs for editing and retains new commands across reselection without saving on cancel',
   );
 
   const editMouse = async () => {
