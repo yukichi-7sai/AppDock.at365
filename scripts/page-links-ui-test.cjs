@@ -34,7 +34,17 @@ fs.writeFileSync(
     minimumHostVersion: '0.131.0',
     runtime: 'node',
     entry: 'worker.cjs',
-    capabilities: ['commands', 'pages', 'settings'],
+    capabilities: ['commands', 'pages', 'settings', 'notifications', 'custom-commands'],
+    customCommandTypes: [
+      {
+        id: owner + '.custom',
+        title: 'リンク付きコマンド種類',
+        configVersion: 1,
+        description: '種類の説明 [setting:tts] [command:fixture.page-links.target]',
+        configSchema: { type: 'object', properties: {}, additionalProperties: false },
+        fields: [],
+      },
+    ],
     description:
       '混在 [page:text-library] [setting:command-triggers] [command:appdock.text-palette.open]、不明 [page:missing]、文字 \\[page:logs] <b>plain</b>。本文 [page:page:fixture.page-links:main]',
     pages: [
@@ -47,7 +57,31 @@ fs.writeFileSync(
         openCommand: owner + '.open',
       },
     ],
-    commands: [{ id: owner + '.open', title: 'Open fixture', activateOnExecute: true }],
+    commands: [
+      {
+        id: owner + '.open',
+        title: 'Open fixture',
+        activateOnExecute: true,
+        description:
+          '関連 [command:fixture.page-links.target]、[page:logs]、[setting:general]、不明 [command:fixture.missing] [page:missing]、文字 \\[page:text-library] <b>plain</b>',
+      },
+      { id: owner + '.target', title: 'チップから確認する対象コマンド', activateOnExecute: true },
+    ],
+    notificationTypes: [
+      {
+        typeId: 'hint',
+        title: 'リンク付き通知ヒント',
+        description: 'ヒント [command:fixture.page-links.target] [page:logs] [setting:general]',
+        levels: ['info'],
+        defaultLevel: 'info',
+        allowedTargets: ['banner'],
+        defaultTargets: ['banner'],
+        requiredTargets: [],
+        lifetimePolicy: 'userDuration',
+        defaultDurationSeconds: 5,
+        history: 'session',
+      },
+    ],
     settings: [
       {
         key: 'text',
@@ -99,7 +133,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
   path.join(fixture, 'worker.cjs'),
-  `const fs=require('node:fs'),path=require('node:path');exports.activate=async c=>{c.commands.register('${owner}.open','Open',()=>fs.appendFileSync(path.join(__dirname,'executed.txt'),'run'));};`,
+  `const fs=require('node:fs'),path=require('node:path');exports.activate=async c=>{for(const [id,title] of [['open','Open fixture'],['target','チップから確認する対象コマンド']])c.commands.register('${owner}.'+id,title,()=>fs.appendFileSync(path.join(__dirname,'executed.txt'),'run'));await c.customCommands.register('${owner}.custom',async()=>{});};`,
 );
 const settings = createDefaultSettings();
 Object.assign(settings.host, {
@@ -171,6 +205,18 @@ let host, dock;
       await command('appdock.navigation.back');
       await settingsPage(dock);
     };
+    await require('./hint-links-ui-checks.cjs')({
+      host,
+      dock,
+      category,
+      command,
+      at,
+      back,
+      owner,
+      fixture,
+      profile,
+      report,
+    });
     await category('text-palette');
     assert.equal(await link('page', 'text-library').count(), 1);
     for (const title of ['定型文パレットを開く', 'クリップボード履歴パレットを開く']) {

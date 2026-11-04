@@ -379,7 +379,11 @@ export function AppletManagementSettings({
                     >
                       <strong>{a.displayName}</strong>
                     </button>
-                    <SettingsDescriptionIcon title={a.displayName} description={a.description} />
+                    <SettingsDescriptionIcon
+                      title={a.displayName}
+                      description={a.description}
+                      textMode="literal"
+                    />
                   </span>
                   <small>{a.id}</small>
                 </td>

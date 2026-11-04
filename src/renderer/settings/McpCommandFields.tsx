@@ -188,6 +188,7 @@ export function McpCommandFields({
             <SettingsDescriptionButton
               title={tool.title ?? tool.name}
               description={tool.description}
+              textMode="literal"
               label={translate('settings.mcpCommandFields.readDescription')}
             />
           </div>

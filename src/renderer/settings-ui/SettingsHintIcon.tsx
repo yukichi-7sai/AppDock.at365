@@ -1,8 +1,13 @@
 import { useHostTranslation } from '../HostTranslation';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsHints } from './SettingsHints';
+import { parseDescriptionText } from '../../shared/description-text';
+import { DescriptionText } from './DescriptionText';
+import { useOptionalSettingsControls } from './api';
 import { settingsPopoverScroll } from './settings-popover-scroll';
 import './settings-hint-icon.css';
+
+type TextMode = 'links' | 'plain' | 'literal';
 
 /** Optional title guidance shares the same preference as inline settings hints. */
 export function SettingsHintIcon({ title, hint }: { title: string; hint?: string }) {
@@ -15,19 +20,21 @@ export function SettingsDescriptionIcon({
   title,
   description,
   testId,
+  textMode,
 }: {
   title: string;
   description?: string;
   testId?: string;
+  textMode?: TextMode;
 }) {
   return description?.trim() ? (
-    <HintPopover title={title} hint={description} description testId={testId} />
+    <HintPopover title={title} hint={description} description testId={testId} textMode={textMode} />
   ) : null;
 }
 
 /** MCP restrictions remain visible even when optional hints are hidden. */
 export function SettingsLockIcon({ title, description }: { title: string; description: string }) {
-  return <HintPopover title={title} hint={description} description lock />;
+  return <HintPopover title={title} hint={description} description lock textMode="literal" />;
 }
 
 /** Long explanations open on request and stay available while their text is read. */
@@ -35,12 +42,22 @@ export function SettingsDescriptionButton({
   title,
   description,
   label,
+  textMode,
 }: {
   title: string;
   description: string;
   label: string;
+  textMode?: TextMode;
 }) {
-  return <HintPopover title={title} hint={description} description buttonLabel={label} />;
+  return (
+    <HintPopover
+      title={title}
+      hint={description}
+      description
+      buttonLabel={label}
+      textMode={textMode}
+    />
+  );
 }
 
 function HintPopover({
@@ -50,6 +67,7 @@ function HintPopover({
   testId,
   lock = false,
   buttonLabel,
+  textMode = 'links',
 }: {
   title: string;
   hint: string;
@@ -57,21 +75,37 @@ function HintPopover({
   testId?: string;
   lock?: boolean;
   buttonLabel?: string;
+  textMode?: TextMode;
 }) {
   const { t } = useHostTranslation();
+  const controls = useOptionalSettingsControls();
+  const hasReferences = useMemo(
+    () =>
+      textMode !== 'literal' && parseDescriptionText(hint).some((token) => token.kind !== 'text'),
+    [hint, textMode],
+  );
+  const interactive = textMode === 'links' && hasReferences && !!controls;
+  const region = !!buttonLabel || interactive;
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLSpanElement>(null);
   const closeTimer = useRef<number | undefined>(undefined);
+  const suppressFocus = useRef(false);
+  const visited = useRef(false);
   const [open, setOpen] = useState(false);
   const show = () => {
     window.clearTimeout(closeTimer.current);
+    visited.current = true;
     setOpen(true);
   };
   const leave = () => {
     window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(() => {
-      if (document.activeElement !== trigger.current) setOpen(false);
+      if (
+        document.activeElement !== trigger.current &&
+        !popup.current?.contains(document.activeElement)
+      )
+        setOpen(false);
     }, 100);
   };
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
@@ -101,7 +135,11 @@ function HintPopover({
       event.preventDefault();
       event.stopPropagation();
       setOpen(false);
-      if (buttonLabel && tooltip.contains(document.activeElement)) button.focus();
+      if (tooltip.contains(document.activeElement)) {
+        suppressFocus.current = true;
+        button.focus({ preventScroll: true });
+        suppressFocus.current = false;
+      }
     };
     const scroll = settingsPopoverScroll(button, tooltip, () => setOpen(false));
     const resize = () => setOpen(false);
@@ -122,6 +160,13 @@ function HintPopover({
       className={description ? 'settings-description-icon' : 'settings-hint-icon'}
       onPointerEnter={buttonLabel ? undefined : show}
       onPointerLeave={buttonLabel ? undefined : leave}
+      onBlur={
+        buttonLabel
+          ? undefined
+          : (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+            }
+      }
     >
       <button
         ref={trigger}
@@ -138,11 +183,16 @@ function HintPopover({
           lock ? 'settings.mcpAccess.label' : description ? 'common.description' : 'common.hint',
           { title },
         )}
-        aria-describedby={buttonLabel ? undefined : id}
-        aria-expanded={buttonLabel ? open : undefined}
-        aria-controls={buttonLabel ? id : undefined}
-        onFocus={buttonLabel ? undefined : show}
-        onBlur={buttonLabel ? undefined : () => setOpen(false)}
+        aria-describedby={buttonLabel ? undefined : interactive ? `${id}-text` : id}
+        aria-expanded={region ? open : undefined}
+        aria-controls={region ? id : undefined}
+        onFocus={
+          buttonLabel
+            ? undefined
+            : () => {
+                if (!suppressFocus.current) show();
+              }
+        }
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
@@ -188,12 +238,17 @@ function HintPopover({
           </svg>
         )}
       </button>
+      {interactive && (
+        <span id={`${id}-text`} className="sr-only">
+          <DescriptionText text={hint} interactive={false} />
+        </span>
+      )}
       <span
         ref={popup}
         id={id}
         className={`settings-hint-tooltip${buttonLabel ? ' settings-description-popover' : ''}`}
-        role={buttonLabel ? 'region' : 'tooltip'}
-        aria-label={buttonLabel ? title : undefined}
+        role={region ? 'region' : 'tooltip'}
+        aria-label={region ? title : undefined}
         popover="manual"
         onPointerEnter={buttonLabel ? undefined : show}
         onPointerLeave={buttonLabel ? undefined : leave}
@@ -211,7 +266,15 @@ function HintPopover({
             ×
           </button>
         )}
-        {hint}
+        {textMode === 'literal' ? (
+          hint
+        ) : (
+          <DescriptionText
+            text={hint}
+            interactive={interactive && visited.current}
+            focusFallback={() => trigger.current}
+          />
+        )}
       </span>
     </span>
   );

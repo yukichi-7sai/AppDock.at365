@@ -29,13 +29,21 @@ export function CommandReferencesProvider({
 export function useCommandReferences() {
   return useContext(References);
 }
-export function CommandLink({ commandId }: { commandId: string }) {
+export function CommandLink({
+  commandId,
+  focusFallback,
+}: {
+  commandId: string;
+  focusFallback?: () => HTMLElement | null;
+}) {
   const { t } = useHostTranslation();
   const command = useCommandReferences().get(commandId);
   const controls = useOptionalSettingsControls();
   const controlsRef = useRef(controls);
   controlsRef.current = controls;
   const button = useRef<HTMLButtonElement>(null);
+  const fallback = useRef(focusFallback);
+  fallback.current = focusFallback;
   const request = useRef<string | undefined>(undefined);
   const restoreFocus = useRef(false);
   const live = useRef(true);
@@ -45,7 +53,8 @@ export function CommandLink({ commandId }: { commandId: string }) {
     if (!busy && restoreFocus.current) {
       restoreFocus.current = false;
       // Wait for React to re-enable the button; the host restores native focus.
-      if (button.current?.isConnected) button.current.focus({ preventScroll: true });
+      const target = button.current?.checkVisibility() ? button.current : fallback.current?.();
+      if (target?.isConnected) target.focus({ preventScroll: true });
     }
   }, [busy]);
   useSettingsFeedback({ error, target: command?.title ?? commandId });

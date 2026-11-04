@@ -31,7 +31,13 @@ export function PageReferencesProvider({
   return <References.Provider value={index}>{children}</References.Provider>;
 }
 export const usePageReferences = () => useContext(References);
-export function PageLink({ kind, id }: PageLinkTarget) {
+export function PageLink({
+  kind,
+  id,
+  focusFallback,
+}: PageLinkTarget & {
+  focusFallback?: () => HTMLElement | null;
+}) {
   const { t } = useHostTranslation();
   const page = usePageReferences().get(pageLinkKey({ kind, id }));
   const controls = useOptionalSettingsControls();
@@ -39,9 +45,13 @@ export function PageLink({ kind, id }: PageLinkTarget) {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const button = useRef<HTMLButtonElement>(null);
+  const fallback = useRef(focusFallback);
+  fallback.current = focusFallback;
   useLayoutEffect(() => {
-    if (!busy && error && button.current?.isConnected)
-      button.current.focus({ preventScroll: true });
+    if (!busy && error) {
+      const target = button.current?.checkVisibility() ? button.current : fallback.current?.();
+      if (target?.isConnected) target.focus({ preventScroll: true });
+    }
   }, [busy, error]);
   const live = useRef(true);
   useEffect(() => {

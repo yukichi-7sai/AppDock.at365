@@ -143,6 +143,7 @@ export function AppletCatalogTable({
                       <SettingsDescriptionIcon
                         title={info.displayName}
                         description={info.description ?? info.tagline}
+                        textMode="plain"
                       />
                     )}
                   </span>

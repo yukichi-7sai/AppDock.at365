@@ -2647,6 +2647,11 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
 function settingsDescriptionTexts(page: SettingsPageDefinition, auxiliary: SettingsPageAuxiliary) {
   const texts = [
     ...hostDescriptionTexts(page),
+    ...(auxiliary.commands ?? [])
+      .filter((command) => !command.hidden)
+      .map((command) => command.description ?? ''),
+    ...(auxiliary.notificationTypes ?? []).map((type) => type.description),
+    ...(auxiliary.customCommands?.types ?? []).map((type) => type.description ?? ''),
     ...page.items.flatMap((item) => [
       ...(item.referenceTexts ?? [item.description, ...(item.keywords ?? [])]),
       ...(item.definition ? definitionCommandTexts(item.definition) : []),
@@ -3452,7 +3457,7 @@ function settingsPageActions(
       'command-triggers',
       'custom-commands',
     ].includes(page.id) ||
-    hostDescriptionTexts(page).some((text) => text.includes('[command:')) ||
+    commandTextIds(settingsDescriptionTexts(page, settingsPageAuxiliaryContent(page))).size > 0 ||
     page.kind === 'applet' ||
     page.items.some(
       (item) =>

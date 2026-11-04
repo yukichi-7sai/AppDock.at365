@@ -8,9 +8,11 @@ import { PageLink, usePageReferences } from './PageLink';
 export function DescriptionText({
   text,
   interactive = true,
+  focusFallback,
 }: {
   text: string;
   interactive?: boolean;
+  focusFallback?: () => HTMLElement | null;
 }) {
   const commands = useCommandReferences();
   const pages = usePageReferences();
@@ -21,9 +23,9 @@ export function DescriptionText({
       {token.kind === 'text' ? (
         token.text
       ) : token.kind === 'command' ? (
-        <CommandLink commandId={token.id} />
+        <CommandLink commandId={token.id} focusFallback={focusFallback} />
       ) : (
-        <PageLink {...token} />
+        <PageLink {...token} focusFallback={focusFallback} />
       )}
     </Fragment>
   ));
