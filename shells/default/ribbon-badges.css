@@ -2,8 +2,8 @@
   position: absolute;
   top: 1px;
   right: 2px;
-  background: #c6324a;
-  color: white;
+  background: var(--error);
+  color: var(--on-error);
   border: 1px solid var(--border);
   font:
     600 10px/15px 'Segoe UI',

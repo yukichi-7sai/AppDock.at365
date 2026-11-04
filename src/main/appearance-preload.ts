@@ -9,13 +9,39 @@ function paint() {
   if (!current || !document.documentElement) return;
   const root = document.documentElement;
   root.dataset.theme = current.dark ? 'dark' : 'light';
+  root.style.colorScheme = current.dark ? 'dark' : 'light';
   root.dataset.accent = current.palette;
   root.dataset.overlayShadow = current.overlayShadow === false ? 'off' : 'on';
   root.dataset.notificationBannerShadow = current.notificationBannerShadow === false ? 'off' : 'on';
   root.dataset.notificationDesktopShadow =
     current.notificationDesktopShadow === false ? 'off' : 'on';
   const { accent, soft, text, hover } = current.colors;
+  const theme = current.theme;
   for (const [name, value] of Object.entries({
+    '--bg': theme.background,
+    '--rail': theme.rail,
+    '--side': theme.sidebar,
+    '--panel': theme.panel,
+    '--raised': theme.raised,
+    '--border': theme.border,
+    '--text': theme.text,
+    '--muted': theme.muted,
+    '--faint': theme.faint,
+    '--blue': theme.info,
+    '--purple': theme.decoration,
+    '--error': theme.error,
+    '--warning': theme.warning,
+    '--success': theme.success,
+    '--destructive': theme.error,
+    '--on-error': theme.onError,
+    '--shadow-color': theme.shadow,
+    '--shadow': '0 20px 70px ' + theme.shadow,
+    '--scrim': theme.scrim,
+    '--hero': 'color-mix(in srgb, var(--blue) 5%, var(--panel))',
+    '--settings-group-background': 'color-mix(in srgb, var(--raised) 20%, var(--panel))',
+    '--ribbon-text': theme.text,
+    '--appdock-placeholder': theme.placeholder,
+    '--appdock-scrollbar-thumb': theme.scrollbar,
     '--accent': accent,
     '--accent-soft': soft,
     '--accent-text': text,

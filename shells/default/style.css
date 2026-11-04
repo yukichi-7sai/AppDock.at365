@@ -1,11 +1,5 @@
 :root {
-  color-scheme: dark;
-  --border: #282b35;
   font-family: 'Segoe UI', sans-serif;
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-  --border: #e0e4ed;
 }
 * {
   box-sizing: border-box;
@@ -144,7 +138,7 @@ button:disabled {
 .error {
   position: absolute !important;
   bottom: 0;
-  color: #ff8888 !important;
+  color: var(--error) !important;
 }
 
 /* The host owns the matching viewport width for both display modes. */

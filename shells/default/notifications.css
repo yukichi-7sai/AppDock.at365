@@ -1,22 +1,10 @@
 @import '../../ui/notifications/levels.css';
 :root {
   font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
-  color: #eff0f5;
-  color-scheme: dark;
+  color: var(--text);
   background: transparent;
-  --card: #292731;
-  --border: #6b536d;
-  --muted: #c5c2ce;
-  --button: #393441;
-  --primary: var(--accent);
-}
-:root[data-theme='light'] {
-  color: #242334;
-  color-scheme: light;
-  --card: #fff8ec;
-  --border: #c59744;
-  --muted: #575261;
-  --button: #f1e9dc;
+  --card: var(--panel);
+  --button: var(--raised);
   --primary: var(--accent);
 }
 * {
@@ -45,7 +33,7 @@ body {
   border-radius: 12px;
   background: var(--card);
   padding: 14px 16px;
-  box-shadow: 0 4px 14px #0003;
+  box-shadow: 0 4px 14px var(--shadow-color);
   display: flex;
   align-items: center;
   gap: 16px;

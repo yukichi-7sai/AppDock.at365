@@ -173,7 +173,7 @@ button.settings-list-icon.accent-action:is(:hover, :focus-visible):enabled {
   color: var(--accent-text);
 }
 .settings-list-delete:is(:hover, :focus-visible):not(:disabled) {
-  color: #d24f59;
+  color: var(--error);
 }
 .settings-list .settings-list-toggle {
   display: block;
@@ -191,13 +191,14 @@ button.settings-list-icon.accent-action:is(:hover, :focus-visible):enabled {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--text);
   transition: transform 0.15s;
 }
 .settings-list .settings-list-toggle[aria-checked='true'] {
   background: var(--accent);
 }
 .settings-list .settings-list-toggle[aria-checked='true'] span {
+  background: var(--accent-text);
   transform: translateX(16px);
 }
 .settings-list-empty {

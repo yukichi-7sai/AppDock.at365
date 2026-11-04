@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import { hostResources } from './host-translation-source';
+import { themeColors } from './theme-source';
 import type { IpcMain, WebContents } from 'electron';
 import {
   defaultAccentColor,
@@ -9,7 +10,7 @@ import {
   type AppearanceSnapshot,
 } from '../../shared/appearance';
 
-let read = () => resolveAppearance(defaultAccentColor, false);
+let read = () => resolveAppearance(defaultAccentColor, false, 0, undefined, themeColors(false));
 let current = read();
 let signature = '';
 const surfaces = new Map<WebContents, string>();
@@ -20,6 +21,7 @@ export function appearanceSnapshot(): AppearanceSnapshot {
     next.language,
     next.dark,
     next.colors,
+    next.theme,
     next.overlayBackground,
     next.overlayShadow,
     next.notificationBannerShadow,

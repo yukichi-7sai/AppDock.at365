@@ -1,3 +1,6 @@
+import { defaultTheme } from '#theme-defaults';
+import type { ThemeColors } from './theme';
+
 /** Canonical accent palettes for every trusted local presentation surface. */
 export const accentPalettes = [
   { id: 'mint', title: 'ミント', light: ['#217a65', '#e1f3ec'], dark: ['#7ce1c5', '#243b37'] },
@@ -31,10 +34,7 @@ export type AccentColor = (typeof accentPalettes)[number]['id'] | 'sky-blue' | '
 export const defaultAccentColor: AccentColor = 'mint';
 /** Placeholder text remains distinct from entered values on every registered local UI. */
 export const placeholderCss = `
-:root[data-theme='light'] {
-  --appdock-placeholder: #bfc5d0;
-}
-:root[data-theme='light'] :is(input, textarea)::placeholder {
+:root :is(input, textarea)::placeholder {
   color: var(--appdock-placeholder);
   opacity: 1;
 }
@@ -42,11 +42,7 @@ export const placeholderCss = `
 /** Shared scrollbars for registered local UI surfaces; neutral colors match the host settings. */
 export const scrollbarCss = `
 :root {
-  --appdock-scrollbar-thumb: #8e93a6;
   --appdock-scrollbar-track: transparent;
-}
-:root[data-theme='light'] {
-  --appdock-scrollbar-thumb: #71798a;
 }
 * {
   scrollbar-width: auto;
@@ -101,6 +97,7 @@ export interface AppearanceSnapshot {
   revision: number;
   palette: AccentColor;
   dark: boolean;
+  theme: ThemeColors & { onError: string };
   colors: { accent: string; soft: string; text: string; hover: string };
 }
 export interface AppearanceApi {
@@ -118,17 +115,20 @@ export function resolveAppearance(
   dark: boolean,
   revision = 0,
   custom: CustomAccentColors = defaultCustomAccent,
+  theme: ThemeColors = defaultTheme[dark ? 'dark' : 'light'],
 ): AppearanceSnapshot {
+  const resolvedTheme = { ...theme, onError: readableText(theme.error) };
   if (palette === 'custom') {
     // Keep the saved pair intact. Resolve readable tones only for presentation.
-    const base = dark ? '#20242f' : '#f0f2f6';
-    const soft = toward(custom[dark ? 'dark' : 'light'], dark ? '#101116' : '#ffffff', (color) =>
+    const soft = toward(custom[dark ? 'dark' : 'light'], dark ? '#000000' : '#ffffff', (color) =>
       dark ? luminance(color) <= 0.025 : luminance(color) >= 0.8,
     );
     const accent = toward(
       custom[dark ? 'light' : 'dark'],
       dark ? '#ffffff' : '#000000',
-      (color) => contrast(color, soft) >= 4.5 && contrast(color, base) >= 4.5,
+      (color) =>
+        contrast(color, soft) >= 4.5 &&
+        [theme.background, theme.panel, theme.raised].every((base) => contrast(color, base) >= 4.5),
     );
     const text = contrast(accent, '#000000') >= contrast(accent, '#ffffff') ? '#000000' : '#ffffff';
     const hover = toward(
@@ -136,14 +136,14 @@ export function resolveAppearance(
       text === '#000000' ? '#ffffff' : '#000000',
       (color) => contrast(color, text) >= 4.5,
     );
-    return { revision, palette, dark, colors: { accent, soft, text, hover } };
+    return { revision, palette, dark, theme: resolvedTheme, colors: { accent, soft, text, hover } };
   }
   const definition =
     palette === legacyAccentPalette.id
       ? legacyAccentPalette
       : (accentPalettes.find((item) => item.id === palette) ?? accentPalettes[0]);
   const [accent, soft] = definition[dark ? 'dark' : 'light'];
-  const text = dark ? '#101116' : '#ffffff';
+  const text = readableText(accent);
   const hover =
     '#' +
     [1, 3, 5]
@@ -155,7 +155,17 @@ export function resolveAppearance(
           .padStart(2, '0');
       })
       .join('');
-  return { revision, palette: definition.id, dark, colors: { accent, soft, text, hover } };
+  return {
+    revision,
+    palette: definition.id,
+    dark,
+    theme: resolvedTheme,
+    colors: { accent, soft, text, hover },
+  };
+}
+
+function readableText(background: string): string {
+  return contrast(background, '#000000') >= contrast(background, '#ffffff') ? '#000000' : '#ffffff';
 }
 
 function mix(color: string, target: string, amount: number): string {

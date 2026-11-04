@@ -63,7 +63,7 @@ kbd {
   padding: 16px;
 }
 [role='alert'] {
-  color: #ff9ca5;
+  color: var(--error);
   overflow-wrap: anywhere;
   padding: 8px 20px;
 }

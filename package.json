@@ -1,12 +1,16 @@
 {
   "name": "appdock-at365",
-  "version": "0.138.0",
+  "version": "0.139.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
   "license": "MIT",
   "main": "out/main/main/bootstrap.js",
   "imports": {
+    "#theme-defaults": {
+      "browser": "./src/renderer/theme-defaults.ts",
+      "default": "./out/main/main/core/theme-defaults.js"
+    },
     "#host-translations": {
       "browser": "./src/renderer/host-translation-source.ts",
       "default": "./out/main/main/core/host-translation-source.js"
@@ -83,8 +87,20 @@
       }
     ],
     "extraFiles": [
-      { "from": "resources/translations", "to": "translations", "filter": ["**/*.json"] },
-      { "from": "resources/configs", "to": "configs", "filter": ["**/*.json"] }
+      {
+        "from": "resources/translations",
+        "to": "translations",
+        "filter": [
+          "**/*.json"
+        ]
+      },
+      {
+        "from": "resources/configs",
+        "to": "configs",
+        "filter": [
+          "**/*.json"
+        ]
+      }
     ],
     "win": {
       "target": [

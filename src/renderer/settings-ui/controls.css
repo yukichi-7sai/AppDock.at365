@@ -340,9 +340,9 @@ code {
   width: 29px;
   height: 29px;
   border-radius: 50%;
-  background: #32374a;
-  border: 1px solid #515b76;
-  color: #d2daf7;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -475,10 +475,10 @@ nav .count {
   background: var(--accent);
 }
 .extension-dot.error {
-  background: #e57789;
+  background: var(--error);
 }
 .extension-dot.starting {
-  background: #e1bb72;
+  background: var(--warning);
 }
 .sidebar-footer {
   margin-top: auto;
@@ -591,7 +591,13 @@ main {
   display: flex;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: radial-gradient(ellipse at 85% 55%, #4d6d8c16, transparent 55%), var(--hero);
+  background:
+    radial-gradient(
+      ellipse at 85% 55%,
+      color-mix(in srgb, var(--blue) 9%, transparent),
+      transparent 55%
+    ),
+    var(--hero);
   position: relative;
   overflow: hidden;
 }
@@ -640,7 +646,7 @@ main {
 }
 .orbit {
   position: absolute;
-  border: 1px solid #768ba421;
+  border: 1px solid var(--border);
   border-radius: 50%;
 }
 .orbit-1 {
@@ -656,52 +662,51 @@ main {
 .dock-core {
   width: 87px;
   height: 87px;
-  background: linear-gradient(145deg, #2f3a4d, #19222b);
-  border: 1px solid #8dcbd440;
+  background: linear-gradient(145deg, var(--raised), var(--panel));
+  border: 1px solid var(--border);
   border-radius: 23px;
   transform: rotate(-8deg);
   display: grid;
   place-items: center;
-  box-shadow: 0 0 50px #58acb119;
+  box-shadow: 0 0 50px color-mix(in srgb, var(--success) 10%, transparent);
 }
 .dock-core .brand-mark {
   transform: rotate(0) scale(1.8);
-  --blue: #aac2fa;
 }
 .art-tile {
   position: absolute;
   width: 48px;
   height: 48px;
-  border: 1px solid #8b9cb539;
+  border: 1px solid var(--border);
   background: var(--raised);
   border-radius: 12px;
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 22px #0002;
+  box-shadow: 0 8px 22px var(--shadow-color);
 }
 .art-tile.mail {
   top: 37px;
   right: 36px;
-  color: #c2b1fa;
+  color: var(--purple);
   transform: rotate(12deg);
 }
 .art-tile.clock {
   bottom: 24px;
   right: 93px;
-  color: #97e1c9;
+  color: var(--success);
   transform: rotate(-9deg);
 }
 .art-tile.image {
   top: 81px;
   left: 27px;
-  color: #9eb8fb;
+  color: var(--blue);
   transform: rotate(-13deg);
 }
 .star {
   width: 4px;
   height: 4px;
   position: absolute;
-  background: #9bbbbb;
+  background: var(--muted);
   border-radius: 50%;
 }
 .s1 {
@@ -715,7 +720,7 @@ main {
 .s3 {
   left: 48px;
   bottom: 31px;
-  background: #959ddb;
+  background: var(--purple);
 }
 .green {
   color: var(--accent);
@@ -741,7 +746,7 @@ main {
 .extension-icon.dotnet,
 .extension-icon.native {
   color: var(--purple);
-  background: #69549525;
+  background: color-mix(in srgb, var(--purple) 15%, transparent);
 }
 .state {
   display: inline-flex;
@@ -766,7 +771,7 @@ main {
   border-color: transparent;
 }
 .state.error {
-  color: #e98092;
+  color: var(--error);
 }
 .next-strip {
   display: flex;
@@ -979,7 +984,7 @@ main {
   border-color: var(--accent);
 }
 .toggle[aria-checked='true'] span {
-  background: #fff;
+  background: var(--accent-text);
   transform: translateX(14px);
 }
 .settings-toolbar {
@@ -1007,7 +1012,7 @@ main {
 .tabs button.selected {
   color: var(--text);
   background: var(--panel);
-  box-shadow: 0 1px 3px #0001;
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 .settings-toolbar > span {
   margin-left: auto;
@@ -1104,8 +1109,8 @@ main {
   top: 0;
   z-index: 4;
   margin: 12px 25px 0;
-  background: #592833;
-  color: #ffc7d2;
+  background: color-mix(in srgb, var(--error) 12%, var(--panel));
+  color: var(--error);
   padding: 12px 16px;
   font-size: 12px;
   border-radius: 7px;
@@ -1115,9 +1120,9 @@ main {
   overflow-wrap: anywhere;
 }
 .error-text {
-  border: 1px solid #ba59734a;
-  background: #c14b6312;
-  color: #d97f8d;
+  border: 1px solid color-mix(in srgb, var(--error) 30%, var(--border));
+  background: color-mix(in srgb, var(--error) 7%, var(--panel));
+  color: var(--error);
   padding: 13px;
   border-radius: 7px;
   font-size: 11px;
@@ -1134,7 +1139,7 @@ main {
 .modal-backdrop {
   position: fixed;
   inset: 43px 0 28px;
-  background: #080c1480;
+  background: var(--scrim);
   backdrop-filter: blur(3px);
   display: flex;
   justify-content: center;
@@ -1552,7 +1557,7 @@ main {
 .detail-tabs button[aria-selected='true'] {
   color: var(--accent);
   background: var(--panel);
-  box-shadow: 0 1px 4px #0002;
+  box-shadow: 0 1px 4px var(--shadow-color);
 }
 .applet-detail-main {
   scrollbar-gutter: stable;
@@ -1678,7 +1683,7 @@ summary {
   font-size: 15px;
 }
 .shortcut-conflict {
-  color: #c35d6c;
+  color: var(--error);
   font-size: 12px;
   margin-top: 8px;
 }
@@ -1838,7 +1843,7 @@ summary {
   padding: 20px;
 }
 .image-preview-dialog::backdrop {
-  background: #0009;
+  background: var(--scrim);
 }
 .image-preview-dialog img {
   display: block;
@@ -3780,7 +3785,7 @@ summary {
   margin: 18px 0;
 }
 .codex-settings .codex-error {
-  color: #c35d6c;
+  color: var(--error);
   overflow-wrap: anywhere;
 }
 .codex-settings .codex-message {
@@ -3854,12 +3859,9 @@ summary {
   height: 24px;
   align-items: center;
   justify-content: center;
-  color: #a66a00;
+  color: var(--warning);
   border-radius: 4px;
   cursor: help;
-}
-:root:not([data-theme='light']) .permission-warning-icon {
-  color: #f2c15b;
 }
 .permission-warning-icon svg {
   width: 18px;
@@ -3881,7 +3883,7 @@ summary {
   border-radius: 8px;
   background: var(--panel);
   color: var(--text);
-  box-shadow: 0 4px 16px #0002;
+  box-shadow: 0 4px 16px var(--shadow-color);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.6;

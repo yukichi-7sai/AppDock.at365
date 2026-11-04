@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { themeColors } from './theme-source';
 import {
   ipcMain,
   type BrowserWindow,
@@ -233,7 +234,7 @@ export class ShellBarHost {
       const model = this.options.content.snapshot(bar.region);
       for (const b of [bar.active, bar.pending])
         if (b && !b.view.webContents.isDestroyed()) {
-          b.view.setBackgroundColor(model.dark ? '#0c0d11' : '#edf0f4');
+          b.view.setBackgroundColor(themeColors(model.dark).rail);
           if (b.revision !== model.revision) {
             b.revision = model.revision;
             b.view.webContents.send('shell-bar:changed', model);

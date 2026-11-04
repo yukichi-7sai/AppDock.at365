@@ -1,24 +1,6 @@
 :root {
-  color-scheme: dark;
-  --panel: #171a22;
-  --raised: #20242f;
-  --border: #282b35;
-  --muted: #9ca5b9;
-  --faint: #838da3;
-  --text: #e8edf8;
-  --shadow: 0 20px 65px #0008;
   font-family: 'Segoe UI', sans-serif;
   color: var(--text);
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-  --panel: #fff;
-  --raised: #f1f3f8;
-  --border: #e0e4ed;
-  --muted: #657087;
-  --faint: #647087;
-  --text: #263149;
-  --shadow: 0 20px 65px #18263c30;
 }
 * {
   box-sizing: border-box;
@@ -80,7 +62,7 @@ kbd {
   padding: 16px;
 }
 [role='alert'] {
-  color: #ff9ca5;
+  color: var(--error);
   overflow-wrap: anywhere;
   padding: 8px 20px;
 }

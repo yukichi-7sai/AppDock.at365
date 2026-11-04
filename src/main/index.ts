@@ -48,6 +48,7 @@ import {
   refreshAppearance,
 } from './core/appearance-host';
 import { resolveAppearance } from '../shared/appearance';
+import { themeColors } from './core/theme-source';
 import { inputCommandType, normalizeInputKeys } from '../shared/input-command';
 import { executionAuthorized, type ExecutionPermission } from './core/execution-permissions';
 import { processCommandType } from '../shared/process-launch';
@@ -374,10 +375,16 @@ settings.on('changed', refreshLanguage);
 configureDisplayZoom(() => settings.value.host.zoomFactor);
 configureAppearance(
   () => ({
-    ...resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors, 0, {
-      dark: settings.value.host.customAccentDark,
-      light: settings.value.host.customAccentLight,
-    }),
+    ...resolveAppearance(
+      settings.value.host.accentColor,
+      nativeTheme.shouldUseDarkColors,
+      0,
+      {
+        dark: settings.value.host.customAccentDark,
+        light: settings.value.host.customAccentLight,
+      },
+      themeColors(nativeTheme.shouldUseDarkColors),
+    ),
     overlayBackground: settings.value.host.overlayBackground,
     language: effectiveHostLanguage(),
     overlayShadow: settings.value.host.overlayShadow,
@@ -2385,7 +2392,7 @@ function snapshotCore(): HostSnapshot {
 }
 function refreshWindowTheme() {
   if (window && !window.isDestroyed())
-    window.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#101116' : '#fafbfc');
+    window.setBackgroundColor(themeColors(nativeTheme.shouldUseDarkColors).background);
 }
 function applySettings() {
   try {
@@ -4718,7 +4725,7 @@ async function initialize() {
     minWidth: windowMinimum.width,
     minHeight: windowMinimum.height,
     title: 'AppDock.at365',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#101116' : '#fafbfc',
+    backgroundColor: themeColors(nativeTheme.shouldUseDarkColors).background,
     show: false,
     frame: false,
     icon: windowIcon,

@@ -91,7 +91,7 @@
 }
 .image-browser .library-header-actions .settings-action-button:first-child {
   background: var(--accent);
-  color: var(--accent-text, #fff);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 .image-browser .settings-action-button .settings-action-spinner {

@@ -130,7 +130,7 @@ test('custom tones keep arbitrary saved pairs intact and resolve readable colors
           [accent, soft],
           [accent, text],
           [hover, text],
-          [accent, dark ? '#20242f' : '#f0f2f6'],
+          ...['background', 'panel', 'raised'].map((key) => [accent, result.theme[key]]),
         ])
           assert(contrast(x, y) >= 4.5, `${a}/${b}/${dark}/${x}/${y}`);
       }
@@ -297,6 +297,8 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
     document: { documentElement: root, body },
   });
   assert.equal(root['--accent'], '#245f9e');
+  assert.equal(root['--panel'], initial.theme.panel);
+  assert.equal(body['--border'], initial.theme.border);
   assert.equal(root['--appdock-overlay-filter'], 'none');
   assert.equal(body['--appdock-overlay-filter'], 'none');
   assert.equal(body['--accent'], '#245f9e');
@@ -311,6 +313,7 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   assert.equal(calls, 0, 'reading or replaying the same revision does not notify subscribers');
   ipc.emit('appearance:changed', {}, resolveAppearance('rose', true, 3));
   assert.equal(root.dataset.theme, 'dark');
+  assert.equal(root['--panel'], resolveAppearance('rose', true).theme.panel);
   assert.equal(root['--accent'], '#f2a6c6');
   stop();
   ipc.emit(

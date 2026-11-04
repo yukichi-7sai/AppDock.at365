@@ -85,10 +85,10 @@
   color: var(--blue);
 }
 :is(.logs-page, .notification-center) .log-level.warn {
-  color: #d8b577;
+  color: var(--warning);
 }
 :is(.logs-page, .notification-center) .log-level.error {
-  color: #e37c8f;
+  color: var(--error);
 }
 :is(.logs-page, .notification-center) .log-row > div > span {
   color: var(--faint);
@@ -277,7 +277,7 @@
   text-align: center;
 }
 :is(.logs-page, .notification-center) [role='alert'] {
-  color: #e37c8f;
+  color: var(--error);
   overflow-wrap: anywhere;
 }
 @media (max-width: 600px) {

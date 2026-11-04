@@ -1,11 +1,3 @@
-:root {
-  --rail: #0c0d11;
-  --ribbon-text: #b7bfd1;
-}
-:root[data-theme='light'] {
-  --rail: #edf0f4;
-  --ribbon-text: #535e73;
-}
 .ribbon-surface {
   container: ribbon / inline-size;
   background: var(--rail);

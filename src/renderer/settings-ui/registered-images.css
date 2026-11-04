@@ -89,7 +89,7 @@
 .ribbon-icon-modes input:checked + span {
   background: var(--panel);
   color: var(--text);
-  box-shadow: 0 1px 3px #0002;
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 .ribbon-icon-modes input:focus-visible + span {
   outline: 2px solid var(--accent);
@@ -345,11 +345,11 @@
   height: auto !important;
   object-fit: contain;
   border-radius: 10px;
-  background-color: var(--input-bg, #f1f3f7);
+  background-color: var(--raised);
   background-image: conic-gradient(
-    #80808010 25%,
+    color-mix(in srgb, var(--muted) 6%, transparent) 25%,
     transparent 0 50%,
-    #80808010 0 75%,
+    color-mix(in srgb, var(--muted) 6%, transparent) 0 75%,
     transparent 0
   );
   background-size: 16px 16px;

@@ -68,7 +68,7 @@
   line-height: 1.6;
 }
 .notification-center .center-error {
-  color: #e37583;
+  color: var(--error);
 }
 .notification-center .center-card .muted {
   overflow-wrap: anywhere;

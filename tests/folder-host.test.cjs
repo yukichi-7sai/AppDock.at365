@@ -98,12 +98,15 @@ test('host deployment overwrites distributed translations and configs and keeps 
   fs.writeFileSync(path.join(folder,'host_fr.json'), '{"key":"Custom"}');
   fs.writeFileSync(path.join(f.base,'configs/applets.json'), '{"applets":[]}');
   fs.writeFileSync(path.join(f.base,'configs/custom.json'), '{"custom":true}');
+  fs.writeFileSync(path.join(f.source,'configs/theme.json'), JSON.stringify(require('../resources/configs/theme.json')));
+  fs.writeFileSync(path.join(f.base,'configs/theme.json'), '{"edited":true}');
   ok(['--deploy-host', f.source, f.base]);
   for (const file of ['host.json', 'host_en.json'])
     assert.equal(fs.readFileSync(path.join(folder, file), 'utf8'), fs.readFileSync(path.join(resources, file), 'utf8'));
   assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'host_fr.json'))).key, 'Custom');
   assert.equal(fs.readFileSync(path.join(f.base,'configs/applets.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/applets.json'), 'utf8'));
   assert.equal(fs.readFileSync(path.join(f.base,'configs/custom.json'), 'utf8'), '{"custom":true}');
+  assert.equal(fs.readFileSync(path.join(f.base,'configs/theme.json'), 'utf8'), fs.readFileSync(path.join(f.source,'configs/theme.json'), 'utf8'));
   assert.ok(f.plan().some(item => item.id === 'translations/host.json' && item.kind === 'host-resource'));
   // Files no longer shipped are unbundled too, and must not be pruned.
   fs.unlinkSync(path.join(resources, 'host_en.json'));

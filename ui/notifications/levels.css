@@ -1,34 +1,15 @@
-/* Shared by banner, desktop and notification-center cards for every owner. */
-.level-info {
-  color-scheme: dark;
-  --card: #191b23;
-  --panel: #191b23;
-  --text: #eff0f5;
-  --muted: #a4aabd;
-  --border: color-mix(in srgb, var(--accent) 40%, var(--panel));
+/* Shared semantic colors for banner, desktop and notification-center cards. */
+.level-info,
+.level-warning,
+.level-error {
+  --card: var(--panel);
   --button: var(--accent-soft);
   --notification-accent: var(--accent);
   color: var(--text);
 }
-:root[data-theme='light'] .level-info {
-  color-scheme: light;
-  --card: #fff;
-  --panel: #fff;
-  --text: #242939;
-  --muted: #606a7c;
-  --border: color-mix(in srgb, var(--accent) 40%, var(--panel));
-  --button: var(--accent-soft);
-  --notification-accent: var(--accent);
-}
 .level-warning {
-  --notification-accent: #d6a252;
+  --notification-accent: var(--warning);
 }
 .level-error {
-  --notification-accent: #e37583;
-}
-:root[data-theme='light'] .level-warning {
-  --notification-accent: #886218;
-}
-:root[data-theme='light'] .level-error {
-  --notification-accent: #b63c49;
+  --notification-accent: var(--error);
 }

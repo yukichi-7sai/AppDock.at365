@@ -155,8 +155,8 @@
   align-items: center;
   justify-content: center;
   opacity: var(--gesture-preview-opacity);
-  background: black;
-  color: white;
+  background: var(--panel);
+  color: var(--text);
   font-weight: 900;
 }
 .gesture-preview-classic::before {
@@ -165,7 +165,7 @@
 .gesture-preview-classic .gesture-preview-process {
   font-size: 20px;
   line-height: 28px;
-  color: white;
+  color: var(--text);
   max-width: 460px;
 }
 .gesture-preview-classic .gesture-preview-caption {

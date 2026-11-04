@@ -1,29 +1,7 @@
 :root {
   font-family: Inter, 'Segoe UI', 'Yu Gothic UI', Meiryo, sans-serif;
   font-size: 13px;
-  color-scheme: dark;
-  --rail: #0c0d11;
-  --side: #14151b;
-  --raised: #20232d;
-  --panel: #191b23;
-  --border: #282b35;
-  --text: #eff0f5;
-  --muted: #8e93a6;
-  --faint: #62697e;
-  --blue: #a4b9fc;
   color: var(--text);
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-  --rail: #edf0f4;
-  --side: #f3f5f8;
-  --raised: #f0f2f6;
-  --panel: #fff;
-  --border: #e0e4ed;
-  --text: #242939;
-  --muted: #71798a;
-  --faint: #8c96a9;
-  --blue: #566bb5;
 }
 * {
   box-sizing: border-box;
@@ -179,8 +157,8 @@ kbd {
   background: var(--raised);
 }
 .window-controls .window-close:hover {
-  background: #c74652;
-  color: white;
+  background: var(--error);
+  color: var(--on-error);
 }
 .statusbar {
   position: relative;

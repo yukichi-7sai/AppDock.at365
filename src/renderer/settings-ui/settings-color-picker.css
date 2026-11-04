@@ -1,5 +1,5 @@
 .settings-color-picker {
-  --settings-color-invalid: #e58a9b;
+  --settings-color-invalid: var(--error);
   display: grid;
   gap: 14px;
   width: min(100%, 348px);
@@ -9,9 +9,6 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   background: color-mix(in srgb, var(--raised) 35%, var(--panel));
-}
-:root[data-theme='light'] .settings-color-picker {
-  --settings-color-invalid: #c23b53;
 }
 .settings-color-toolbar,
 .settings-color-inputs {
@@ -69,8 +66,8 @@
   padding: 2px;
   box-sizing: border-box;
   border-radius: 50%;
-  color: #242939;
-  background: #fff;
+  color: var(--text);
+  background: var(--panel);
 }
 .settings-color-none {
   flex: none;

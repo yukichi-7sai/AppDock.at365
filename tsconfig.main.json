@@ -3,7 +3,10 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "paths": { "#host-translations": ["./src/main/core/host-translation-source.ts"] },
+    "paths": {
+      "#host-translations": ["./src/main/core/host-translation-source.ts"],
+      "#theme-defaults": ["./src/main/core/theme-defaults.ts"]
+    },
     "rootDir": "src",
     "outDir": "out/main",
     "strict": true,

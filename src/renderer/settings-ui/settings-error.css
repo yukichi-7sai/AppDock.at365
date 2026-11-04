@@ -1,8 +1,5 @@
 :root {
-  --settings-error-color: #f28b9a;
-}
-:root[data-theme='light'] {
-  --settings-error-color: #b83e52;
+  --settings-error-color: var(--error);
 }
 .settings-status-area {
   display: flex;
