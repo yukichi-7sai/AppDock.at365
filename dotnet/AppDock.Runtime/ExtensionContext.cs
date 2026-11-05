@@ -33,6 +33,15 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private JsonElement configuration = settings;
     private readonly object sync = new();
     public string ExtensionId => id;
+    private readonly LocalizationService localization = new();
+    public ILocalizationService Localization => localization;
+    internal void InitializeLocalization(JsonElement value) => localization.Initialize(value);
+    internal async Task ChangeLocalizationAsync(JsonElement value)
+    {
+        await commandLock.WaitAsync(lifetime);
+        try { await localization.ChangeAsync(value, lifetime); }
+        finally { commandLock.Release(); }
+    }
     internal static readonly AsyncLocal<string?> ExecutionId = new();
     public IAppDockService AppDock => this;
     async Task<JsonElement> IAppDockService.CallAsync(string method, object? parameters, CancellationToken cancellationToken)
@@ -249,6 +258,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     }
     public async ValueTask DisposeAsync()
     {
+        localization.Clear();
         settingsHandlers.Clear();
         notificationHandlers.Clear();
         ScheduledTask[] current; lock (sync) current = schedules.ToArray();

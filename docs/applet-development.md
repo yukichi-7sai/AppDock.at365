@@ -6,6 +6,8 @@ GitHubで配布するAppletは `extension.json` の `updateRepository` に `owne
 
 本体のリボン・バー・通知の描画差し替えは提供しません。通常Appletは公開されたコマンド・設定・ページ・通知APIを使用します。
 
+翻訳対応には[Appletの翻訳基盤](applet-localization.md)を使います。自身のリポジトリと配布フォルダーの`resources/translations/`へ辞書を置き、manifestに`localization`とminimumHostVersion 0.159.0以上を宣言します。Node/.NET/ローカル画面は本体の表示言語を共用し、手動配置では同梱辞書を読み取ります。
+
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。
 
 新しいAppletにも、設定・Storage・登録原素材と共有枠はAppDock.at365.exe隣のdata、認証・Secrets・生成キャッシュは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。設定APIは共有／端末専用の選択に対応し、有効状態は常に端末別です。Appletが直接JSONを読み分けず、既存のSettings APIを使ってください。Storageは端末別を既定とし、共有は明示的なscopeで指定します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。

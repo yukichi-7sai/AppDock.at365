@@ -11,6 +11,7 @@ public interface IPanelActionHandler
 }
 public interface IExtensionContext
 {
+    ILocalizationService Localization => throw new NotSupportedException("Applet localization requires AppDock 0.159.0 or later.");
     string ExtensionId { get; }
     IAppDockService AppDock => throw new NotSupportedException("AppDock operations require AppDock 0.26.36 or later.");
     ICommandService Commands { get; }

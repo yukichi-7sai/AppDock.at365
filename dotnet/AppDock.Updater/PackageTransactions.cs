@@ -53,6 +53,7 @@ internal static partial class Program
                     throw NativeMessages.Error("native.package.resourceOperation", text => new IOException(text));
                 ResourceTarget(item.Destination);
             }
+            else if (item.Kind == "applet-resource") ValidateAppletResource(baseDirectory, item, swaps);
             else if (item.Kind != "applet" || item.Id == "appdock.default-shell" ||
                 !Regex.IsMatch(item.Id, "^[a-z0-9][a-z0-9.-]{0,100}$") ||
                 !Same(Path.GetDirectoryName(item.Destination)!, Path.Combine(baseDirectory, "extensions")))

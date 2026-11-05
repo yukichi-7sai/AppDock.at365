@@ -323,3 +323,13 @@ test('resource edits made after planning prevent update without overwriting the 
   assert(!fs.existsSync(path.join(f.base, 'data/update-transaction.json')));
   f.preserved();
 });
+
+test('host packages cannot claim Applet-owned translation files', (t) => {
+  const f = fixture(t);
+  const file = path.join(f.source, 'translations/applets/fixture.package/applet.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '{}');
+  assert.notEqual(run(['--pack', 'host', f.source, '2.0.1', path.join(f.stage, 'feed')]).status, 0);
+  assert.notEqual(run(['--deploy-host', f.source, f.base]).status, 0);
+  assert.equal(fs.existsSync(path.join(f.base, 'translations')), false);
+});

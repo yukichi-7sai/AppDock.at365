@@ -40,6 +40,243 @@ function applet(folder, version = '1.0.0') {
   );
   fs.writeFileSync(path.join(folder, 'index.js'), `exports.activate = () => {}; // ${version}`);
 }
+function localizedApplet(folder, version = '1.0.0') {
+  applet(folder, version);
+  const file = path.join(folder, 'extension.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      ...JSON.parse(fs.readFileSync(file)),
+      minimumHostVersion: '0.159.0',
+      localization: { defaultLanguage: 'ja' },
+    }),
+  );
+  const dictionaries = path.join(folder, 'resources/translations');
+  fs.mkdirSync(dictionaries, { recursive: true });
+  fs.writeFileSync(
+    path.join(dictionaries, 'applet.json'),
+    JSON.stringify({ title: `基本 ${version}` }),
+  );
+  fs.writeFileSync(
+    path.join(dictionaries, 'applet_en.json'),
+    JSON.stringify({ title: `English ${version}` }),
+  );
+}
+function translationPlan(source, base) {
+  const result = spawnSync(helper, ['--plan-applet-translations', source, base], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+test('dictionary recovery refuses a different owner, destination or source before modifying files', (t) => {
+  const base = fixture(t),
+    source = path.join(base, 'incoming'),
+    destination = path.join(base, 'extensions/fixture.package');
+  localizedApplet(source, '2.0.0');
+  localizedApplet(destination);
+  const owner = {
+    kind: 'applet',
+    operation: 'update',
+    id: 'fixture.package',
+    version: '2.0.0',
+    source,
+    destination,
+    sha256: treeHash(source),
+    previousSha256: treeHash(destination),
+  };
+  const resource = translationPlan(source, base)[0];
+  const original = treeHash(destination);
+  for (const change of [
+    { id: 'foreign.applet' },
+    { destination: path.join(base, 'translations/host.json') },
+    { source: path.join(source, 'index.js') },
+  ]) {
+    const operationId = randomUUID();
+    const swaps = [owner, { ...resource, ...change }].map((item, index) => {
+      const directory = path.join(
+        base,
+        'extensions/.transactions',
+        operationId.replaceAll('-', ''),
+        String(index),
+      );
+      return { item, next: path.join(directory, 'next'), backup: path.join(directory, 'previous') };
+    });
+    fs.writeFileSync(
+      path.join(base, 'data/update-transaction.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        operationId,
+        executable: path.join(base, 'AppDock.at365.exe'),
+        swaps,
+      }),
+    );
+    const result = spawnSync(helper, ['--recover', base], { encoding: 'utf8', windowsHide: true });
+    assert.notEqual(result.status, 0);
+    assert.equal(treeHash(destination), original);
+    assert.equal(fs.existsSync(path.join(base, 'translations')), false);
+  }
+});
+
+test('Applet packages carry dictionaries and plan only their own external files', (t) => {
+  const base = fixture(t),
+    source = path.join(base, 'incoming');
+  localizedApplet(source);
+  const output = path.join(base, 'feed');
+  const pack = spawnSync(helper, ['--pack', 'applet', source, 'unused', output], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  assert.equal(pack.status, 0, pack.stderr);
+  const extracted = path.join(base, 'extracted');
+  assert.equal(
+    spawnSync(helper, ['--extract', path.join(output, 'update.zip'), extracted], {
+      windowsHide: true,
+    }).status,
+    0,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(extracted, 'resources/translations/applet_en.json'), 'utf8'),
+    '{"title":"English 1.0.0"}',
+  );
+  const plans = translationPlan(extracted, base);
+  assert.equal(plans.length, 2);
+  assert.ok(
+    plans.every(
+      (item) =>
+        item.kind === 'applet-resource' &&
+        item.id === 'fixture.package' &&
+        item.operation === 'install',
+    ),
+  );
+  assert.equal(
+    fs.existsSync(path.join(base, 'translations')),
+    false,
+    'planning does not copy files',
+  );
+  for (const item of plans)
+    assert.equal(
+      path.dirname(item.destination),
+      path.join(base, 'translations/applets/fixture.package'),
+    );
+  fs.mkdirSync(path.dirname(plans[0].destination), { recursive: true });
+  fs.writeFileSync(plans[0].destination, '{"edited":true}');
+  fs.writeFileSync(
+    path.join(path.dirname(plans[0].destination), 'applet_fr.json'),
+    '{"custom":true}',
+  );
+  const next = translationPlan(extracted, base);
+  assert.equal(next[0].operation, 'update');
+  assert.equal(next[0].previousSha256, digest(Buffer.from('{"edited":true}')));
+  assert.equal(next.length, 2, 'unbundled user dictionary is not part of the update');
+});
+
+for (const committed of [false, true])
+  for (const phase of committed ? ['all'] : ['before', 'applet', 'first-dictionary', 'all'])
+    test(`Applet and external dictionary recovery stays consistent: ${phase}, committed=${committed}`, (t) => {
+      const base = fixture(t),
+        source = path.join(base, 'incoming'),
+        destination = path.join(base, 'extensions/fixture.package');
+      localizedApplet(source, '2.0.0');
+      localizedApplet(destination);
+      const dictionaryRoot = path.join(base, 'translations/applets/fixture.package');
+      fs.mkdirSync(dictionaryRoot, { recursive: true });
+      fs.writeFileSync(path.join(dictionaryRoot, 'applet.json'), '{"title":"edited old"}');
+      fs.writeFileSync(path.join(dictionaryRoot, 'applet_fr.json'), '{"title":"custom"}');
+      const originalHash = treeHash(destination);
+      const items = [
+        {
+          kind: 'applet',
+          operation: 'update',
+          id: 'fixture.package',
+          version: '2.0.0',
+          source,
+          destination,
+          sha256: treeHash(source),
+          previousSha256: originalHash,
+        },
+        ...translationPlan(source, base),
+      ];
+      const operationId = randomUUID();
+      const swaps = items.map((item, index) => {
+        const directory = path.join(
+          base,
+          'extensions/.transactions',
+          operationId.replaceAll('-', ''),
+          String(index),
+        );
+        fs.mkdirSync(directory, { recursive: true });
+        return {
+          item,
+          next: path.join(directory, 'next'),
+          backup: path.join(directory, 'previous'),
+        };
+      });
+      const count = { before: 0, applet: 1, 'first-dictionary': 2, all: 3 }[phase];
+      for (let index = 0; index < swaps.length; index++) {
+        const { item, next, backup } = swaps[index];
+        fs.cpSync(item.source, next, { recursive: true });
+        if (index >= count) continue;
+        if (item.operation === 'update') fs.renameSync(item.destination, backup);
+        fs.renameSync(next, item.destination);
+      }
+      fs.writeFileSync(
+        path.join(base, 'data/update-transaction.json'),
+        JSON.stringify({
+          schemaVersion: 2,
+          operationId,
+          executable: path.join(base, 'AppDock.at365.exe'),
+          committed,
+          swaps,
+        }),
+      );
+      const recovered = spawnSync(helper, ['--recover', base], {
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.equal(treeHash(destination), committed ? treeHash(source) : originalHash);
+      assert.equal(
+        fs.readFileSync(path.join(dictionaryRoot, 'applet.json'), 'utf8'),
+        committed ? '{"title":"基本 2.0.0"}' : '{"title":"edited old"}',
+      );
+      assert.equal(fs.existsSync(path.join(dictionaryRoot, 'applet_en.json')), committed);
+      assert.equal(
+        fs.readFileSync(path.join(dictionaryRoot, 'applet_fr.json'), 'utf8'),
+        '{"title":"custom"}',
+      );
+    });
+
+test('translation packaging and planning reject broken bases, foreign filenames and junction targets', (t) => {
+  const base = fixture(t),
+    source = path.join(base, 'incoming');
+  localizedApplet(source);
+  const folder = path.join(source, 'resources/translations');
+  fs.writeFileSync(path.join(folder, 'host.json'), '{}');
+  assert.notEqual(
+    spawnSync(helper, ['--pack', 'applet', source, 'unused', path.join(base, 'feed')], {
+      windowsHide: true,
+    }).status,
+    0,
+  );
+  fs.unlinkSync(path.join(folder, 'host.json'));
+  fs.writeFileSync(path.join(folder, 'applet.json'), '{"title":false}');
+  assert.notEqual(
+    spawnSync(helper, ['--plan-applet-translations', source, base], { windowsHide: true }).status,
+    0,
+  );
+  fs.writeFileSync(path.join(folder, 'applet.json'), '{"title":"valid"}');
+  const target = path.join(base, 'translations/applets');
+  fs.mkdirSync(target, { recursive: true });
+  fs.symlinkSync(path.join(base, 'data'), path.join(target, 'fixture.package'), 'junction');
+  assert.notEqual(
+    spawnSync(helper, ['--plan-applet-translations', source, base], { windowsHide: true }).status,
+    0,
+  );
+  fs.unlinkSync(path.join(target, 'fixture.package'));
+});
 function packageUpdater(base, overrides = {}) {
   return new PortableUpdates({
     targets: () => [],

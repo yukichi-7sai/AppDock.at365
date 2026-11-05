@@ -2,6 +2,11 @@ import { hostText } from '../shared/i18n';
 import { configureHostLanguage } from './core/host-translation-source';
 import { effectiveHostLanguage } from '../shared/host-language';
 import { refreshTranslationMetadata } from '../shared/translation-metadata';
+import {
+  appletText,
+  type AppletLocalizationSnapshot,
+  type AppletLocalizationApi,
+} from '../shared/applet-localization';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
@@ -19,6 +24,7 @@ const execution = new AsyncLocalStorage<{ id?: string; invocation: NodeCommandIn
 const activeCommands = new Map<string, { session?: string; controller: AbortController }>();
 const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
+  localization: AppletLocalizationApi;
   registeredImages: {
     import(input: {
       filename?: string;
@@ -149,8 +155,19 @@ let configuration: Record<string, unknown> = {};
 let extension: NodeExtension;
 const settingsHandlers = new Set<Handler>();
 const notificationHandlers = new Set<Handler>();
+const localizationHandlers = new Set<() => unknown | Promise<unknown>>();
+let localization: AppletLocalizationSnapshot = {
+  language: effectiveHostLanguage(),
+  defaultLanguage: 'ja',
+  messages: {},
+};
 const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) => {
   switch (method) {
+    case 'localization.changed': {
+      localization = p;
+      for (const handler of localizationHandlers) await handler();
+      return null;
+    }
     case 'host.language.changed': {
       const language = effectiveHostLanguage(p.language);
       configureHostLanguage(() => language);
@@ -159,8 +176,22 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
     }
     case 'activate': {
       configuration = p.settings;
+      if (p.localization) localization = p.localization;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
+        localization: {
+          get language() {
+            return localization.language;
+          },
+          snapshot: () => structuredClone(localization),
+          t: (key, values) => appletText(localization, key, values),
+          onChanged: (callback) => {
+            localizationHandlers.add(callback);
+            return () => {
+              localizationHandlers.delete(callback);
+            };
+          },
+        },
         customCommands: {
           register: async (typeId, handler) => {
             if (customHandlers.has(typeId) || typeof handler !== 'function')
@@ -392,6 +423,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       return null;
     }
     case 'deactivate':
+      localizationHandlers.clear();
       for (const entry of activeCommands.values()) entry.controller.abort();
       disposables.forEach((d) => d());
       await extension?.deactivate?.();

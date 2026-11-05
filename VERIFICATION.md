@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-11-06 Appletの翻訳基盤（0.159.0 / SDK・Runtime 0.31.0）
+
+- 任意のlocalization宣言、Applet内の基本・追加辞書、EXE隣のtranslations/applets/<ID>への導入・更新時展開を実装した。言語一覧は本体の辞書だけから作り、外部選択言語→同梱選択言語→外部基本→同梱基本の順に項目ごとに補完する。手動配置ではコピーせず同梱辞書を使う。削除時の外部辞書と配布物にない追加翻訳を保持する。現行契約・API・配置例はdocs/applet-localization.mdへ集約した。
+- Node・.NET・nativeの起動要求と言語変更通知、所有Applet限定の読み取りAPI、登録済みローカル画面の共通preloadへ接続した。manifestの表示対象だけを翻訳し、保存値・ID・既定値・利用者入力は解釈しない。翻訳宣言のないAppletは従来の契約を維持する。各Appletリポジトリの翻訳移行は今回の対象外。
+- 発行前に辞書の優先順位、表示とデータの境界、公開API・寿命、所有範囲、導入/更新/復旧と旧Applet互換、版・文書・検査をレビューした。ページとカスタムコマンドの翻訳後の文字数・制御文字制約を補正し、対象回帰で確認した。未解決の阻害指摘なし。公開API・manifest・保存ファイルの追加として本体0.158.4→0.159.0、SDK/Runtime 0.30.0→0.31.0のマイナー更新。AssemblyVersionは維持し、兄弟Appletは未変更・未発行。
+- 固定依存install --frozen-lockfile、書式、型検査、build、.NET host/fixture/Updater build、差分と文書のローカルリンク検査が成功。本体標準回帰はnode --test --test-concurrency=1で1,730/1,730件成功、失敗・取消・スキップ・todo各0、終了0。辞書の部分欠落・変数不一致、停止中の宣言、Node/.NET/nativeの実プロセス、ローカル画面の所有/URL/main-frame境界、他Appletや本体への配置拒否、交換途中5状態の復旧を含む。
+- 実PortableUpdatesの準備・handoffと実Updaterをローカルfeedで通し、導入・個別更新・all更新・削除の4群が成功。同梱/外部の一致、同名辞書の全置換、追加翻訳の保持、削除後の辞書保持を確認した。進行画面だけを無効にし、再起動先は専用の名前変更Updaterの復旧コマンドとした試験で、本体GUIの更新再起動とは区別する。初回は本体用unrefにより試験ランナーが先に終了したため、待機を修正して再実行した。初回の導入結果は全工程の成功には含めない。
+- 開発版・発行済み固定EXEのApplet翻訳GUI各3群、本体翻訳GUI固定EXE5群が成功。日英の即時切り替え、未対応の保存言語から本体基本言語への復帰、停止中Applet、Nodeパネル、同梱/外部辞書の補完、同じページと入力の維持、再起動後の保持を確認した。明暗・通常/900px指定の画面を目視した。初回のGUI失敗はfixtureのui capability・ページ起動宣言の欠落と、保存可能な未対応言語を拒否するとした期待値の誤りで、契約に合わせて修正した。失敗ログは保持する。
+- SDK/Runtimeの影響確認としてWatch・WallpaperSlideshow・WindowsToolsのRelease buildを直列実行し、各回帰が成功（Watch 24/24、WindowsTools 43/43、WallpaperSlideshowは全検査群PASS）。新しくビルドしたWatchのnative RPCで実表示・設定反映・フォントダイアログ取消/確定・停止、WallpaperSlideshowのfake desktop RPCで接続・表示・設定・保存境界・終了を確認した。実Explorerや利用者の壁紙は操作していない。兄弟repoのHEADと入力SHA256をdependencies.jsonへ記録し、作業ツリーはclean。
+- publish.bat終了0、A:\40.ARTIFACT\AppDock.at365へ0.159.0をローカル発行。package/feed/manifest/PE FileVersionは0.159.0、ProductVersionは0.159.0.0。build stage・発行先・共用runtime・更新ZIPの管理101ファイルのSHA256が一致。EXE SHA256=4e7d75ff4a16e03b09e754e7ba50cfd40c36e145175273afb96e220878187181、更新ZIPは175,141,315 bytes、SHA256=91550844bebd994d317d6a8dd5346195943ed73ad1806bf7bc9a23835971705b。既存のViteチャンクサイズ警告は残る。発行後の製品変更はない。
+- 証跡は.artifacts/applet-localization-validation/。標準回帰開始時の入力1,173ファイルと成果物を照合し、後続差分は設計書の検査手順追記、本記録、folder-host試験の既存部分への不要な整形を戻した差分だけ。最終folder-hostは11/11件成功を追加確認した。固定profileはapplet-localization-ui-bNkeas、host-localization-ui-PuQYEl、導入試験はapplet-localization-package-O1Kcx4。専用EXEとstagingは初回中断分も含めプロセス終了後に削除した。共用runtimeと結果・画面・失敗証跡は保持し、通常成功profileは方式別直近3件以内のため追加削除なし。利用者による手動確認、実Appletの翻訳内容、実ネットワークの更新配信は未検証。設計・実装・試験を一体としてローカルコミットし、stage treeとcommit treeを照合する。push・GitHub Release・実利用先deployは行わない。
+
 ## 2026-11-06 操作の許可のMCP起動状態同期（0.158.4）
 
 - 「操作の許可」の補助情報へAutomationServiceの状態を含め、画面はrevision付きの投影を直接表示する。独立したstatus取得と画面内キャッシュを除き、起動完了・停止・失敗・復旧をページ移動なしで反映する。起動中は保存済みONのMCP項目を「起動中…」とし、MCP側の編集だけを無効にする。Applet/MCPの許可値と独立した即時保存は保持する。

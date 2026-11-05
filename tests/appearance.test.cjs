@@ -316,8 +316,8 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
         ipcRenderer: ipc,
         contextBridge: {
           exposeInMainWorld: (key, value) => {
-            assert.equal(key, 'appdockAppearance');
-            api = value;
+            assert.ok(['appdockAppearance', 'appdockLocalization'].includes(key));
+            if (key === 'appdockAppearance') api = value;
           },
         },
       };

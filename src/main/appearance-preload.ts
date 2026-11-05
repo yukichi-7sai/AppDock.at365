@@ -2,6 +2,10 @@
 // Keep runtime imports limited to Electron: sandboxed preloads cannot require local modules.
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AppearanceApi, AppearanceSnapshot } from '../shared/appearance';
+import type {
+  AppletLocalizationPageApi,
+  AppletLocalizationSnapshot,
+} from '../shared/applet-localization';
 
 let current: AppearanceSnapshot | undefined;
 const listeners = new Set<(value: AppearanceSnapshot) => void>();
@@ -83,6 +87,17 @@ const api: AppearanceApi = {
   },
 };
 contextBridge.exposeInMainWorld('appdockAppearance', api);
+const localizationApi: AppletLocalizationPageApi = {
+  snapshot: () => ipcRenderer.invoke('appearance:localization'),
+  t: (key, values) => ipcRenderer.invoke('appearance:localization', key, values),
+  onChanged: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: AppletLocalizationSnapshot) =>
+      callback(value);
+    ipcRenderer.on('applet-localization:changed', handler);
+    return () => ipcRenderer.removeListener('applet-localization:changed', handler);
+  },
+};
+contextBridge.exposeInMainWorld('appdockLocalization', localizationApi);
 void api.snapshot().catch(() => {
   /* The next authorized update supplies current colors. */
 });

@@ -25,11 +25,15 @@ public static class AppletSession
                     case "activate":
                         if (context is not null) throw new InvalidOperationException("Already activated.");
                         context = new ExtensionContext(parameters.GetProperty("id").GetString()!, parameters.GetProperty("settings"), connection, active.Token);
+                        if (parameters.TryGetProperty("localization", out var localization)) context.InitializeLocalization(localization);
                         await applet.ActivateAsync(context, active.Token);
                         Volatile.Write(ref activated, true);
                         return context.Contributions;
                     case "notifications.changed":
                         if (context is not null) await context.ChangeNotificationPolicyAsync();
+                        return null;
+                    case "localization.changed":
+                        if (context is not null) await context.ChangeLocalizationAsync(parameters);
                         return null;
                     case "settings.changed":
                         if (context is not null) await context.ChangeSettingsAsync(parameters);

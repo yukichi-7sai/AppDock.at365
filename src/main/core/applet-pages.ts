@@ -254,7 +254,8 @@ export class AppletSurface {
     });
     this.contentView.addChildView(this.ui);
     registerDisplayZoom(this.ui.webContents);
-    if (!options.remote && options.preload) registerAppearance(this.ui.webContents, options.url);
+    if (!options.remote && options.preload)
+      registerAppearance(this.ui.webContents, options.url, options.appletId);
     if ((options.pageImages || options.sourceImages) && options.key && options.appletId) {
       if (options.pageImages)
         this.images = new PageImageRegistry(

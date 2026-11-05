@@ -1060,6 +1060,20 @@ export class PortableUpdates {
     operationId: string = randomUUID(),
   ) {
     const helper = path.join(temporary, 'AppDock.Updater.exe');
+    const expandedItems = [...items];
+    for (const item of items as { kind: string; operation: string; source?: string }[]) {
+      if (item.kind !== 'applet' || item.operation === 'uninstall') continue;
+      const plan = await execute(
+        helper,
+        ['--plan-applet-translations', item.source!, this.options.baseDirectory],
+        {
+          windowsHide: true,
+          timeout: 120000,
+          maxBuffer: 16 * 1024 * 1024,
+        },
+      );
+      expandedItems.push(...JSON.parse(plan.stdout));
+    }
     const job = {
       schemaVersion,
       operationId,
@@ -1070,7 +1084,7 @@ export class PortableUpdates {
       executable: this.options.executable,
       args: this.options.restartArgs,
       processIds: this.options.processIds(),
-      items,
+      items: expandedItems,
       stateDirectory: this.options.stateDirectory,
       result: path.join(
         this.options.stateDirectory || path.join(this.options.baseDirectory, 'data'),

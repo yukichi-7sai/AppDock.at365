@@ -244,6 +244,7 @@ import { FileWatchAssistance } from './core/file-watch-assistance';
 import { configureHostLanguage } from './core/host-translation-source';
 import { effectiveHostLanguage } from '../shared/host-language';
 import { refreshTranslationMetadata } from '../shared/translation-metadata';
+import { appletTranslations } from './core/applet-localization';
 import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
@@ -387,6 +388,10 @@ configureAppearance(
   }),
   ipcMain,
   ['appdock://host/', pathToFileURL(path.join(app.getAppPath(), 'out/renderer') + path.sep).href],
+  (id) => {
+    const entry = manager?.items.get(id);
+    return entry?.state === 'running' ? appletTranslations(entry.manifest)?.snapshot() : undefined;
+  },
 );
 function applyAudioPlaybackSettings() {
   const enabled = settings.value.host.soundEnabled;

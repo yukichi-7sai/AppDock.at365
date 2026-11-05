@@ -1,6 +1,11 @@
 import { hostText } from '../../shared/i18n';
 import { effectiveHostLanguage } from '../../shared/host-language';
 import { translationDirectory } from './host-translation-source';
+import {
+  loadAppletTranslations,
+  appletTranslations,
+  isLocalizedField,
+} from './applet-localization';
 import { validateAppletCommonValues } from '../../shared/applet-common-settings';
 import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts, enterCommand } from './command-contexts';
@@ -274,7 +279,7 @@ function readManifest(
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.36.8') < 0)
   )
     throw Error(hostText('services.extensions.settingsSectionVersion'));
-  return {
+  const loaded = {
     ...m,
     customCommandTypes,
     settings: settingDefinitions,
@@ -287,6 +292,8 @@ function readManifest(
     sourceKind,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
+  loadAppletTranslations(loaded, folder)?.bind(loaded);
+  return loaded;
 }
 type LoadedManifest = ExtensionManifest & {
   folder: string;
@@ -319,7 +326,7 @@ export interface ExtensionInstance {
   startTimer?: ReturnType<typeof setTimeout>;
   child?: ChildProcessWithoutNullStreams | null;
   peer?: JsonLinePeer | null;
-  settingsDelivery?: { json?: string; language?: string };
+  settingsDelivery?: { json?: string; language?: string; localizationLanguage?: string };
 }
 interface ManagerOptions {
   startAllowed?(id: string): boolean;
@@ -518,6 +525,11 @@ class ExtensionManager extends EventEmitter {
           ?.retiredShellCommand,
         available: e.state === 'running',
       });
+    for (const declared of e.manifest.commands ?? []) {
+      const command = catalog.get(declared.id)!;
+      for (const field of ['title', 'description', 'category'] as const)
+        if (isLocalizedField(declared, field)) command[field] = declared[field]!;
+    }
     for (const command of catalog.values()) {
       const reason = command.retiredShellCommand ? hostText('shell.retired') : undefined;
       if (reason) {
@@ -571,6 +583,17 @@ class ExtensionManager extends EventEmitter {
             if (e.manifest.runtime === 'node' && (delivery.language ?? 'ja') !== language) {
               await e.peer!.request('host.language.changed', { language });
               delivery.language = language;
+            }
+            if (appletTranslations(e.manifest) && delivery.localizationLanguage !== language) {
+              try {
+                await e.peer!.request(
+                  'localization.changed',
+                  appletTranslations(e.manifest)!.snapshot(language),
+                );
+                delivery.localizationLanguage = language;
+              } catch (error: any) {
+                this.log('warn', e.manifest.id, error.message);
+              }
             }
             if (delivery.json === json) continue;
             // A lost reply may have applied the new settings. Reconfirm even on a revert.
@@ -749,11 +772,17 @@ class ExtensionManager extends EventEmitter {
       this.advanceStartup(e, 'activate');
       const values = this.settings.value.extensions[m.id]?.settings ?? {};
       const initial = JSON.stringify(values);
-      const delivery: { json?: string; language?: string } = { language };
+      const delivery: NonNullable<ExtensionInstance['settingsDelivery']> = {
+        language,
+        localizationLanguage: language,
+      };
       e.settingsDelivery = delivery;
       const result = await peer.request('activate', {
         id: m.id,
         settings: values,
+        ...(appletTranslations(m)
+          ? { localization: appletTranslations(m)!.snapshot(language) }
+          : {}),
       });
       if (e.error) throw new Error(e.error);
       this.advanceStartup(e, 'validate');

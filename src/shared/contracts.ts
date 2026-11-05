@@ -211,6 +211,7 @@ export interface PanelAction {
 export interface ExtensionManifest extends Partial<
   import('./applet-common-settings').AppletCommonValues
 > {
+  localization?: import('./applet-localization').AppletLocalizationDeclaration;
   ribbonItems?: import('./ribbon').AppletRibbonItem[];
   customCommandTypes?: import('./custom-commands').CustomCommandType[];
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];

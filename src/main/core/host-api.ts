@@ -37,6 +37,7 @@ import {
   notifyAppletPages,
 } from './applet-pages';
 import { parseDynamicPages } from '../../shared/dynamic-pages';
+import { appletTranslations } from './applet-localization';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -107,6 +108,12 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.localization.get': {
+        const translations = appletTranslations(e.manifest);
+        if (!translations || Object.keys(p).length)
+          throw Error(hostText('services.appletLocalization.unavailable'));
+        return translations.snapshot();
+      }
       case 'host.customCommands.register':
         requireCapability('custom-commands');
         if (!customCommands || !e.runtimeSession || Object.keys(p).some((k) => k !== 'typeId'))

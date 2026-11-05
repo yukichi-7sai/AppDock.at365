@@ -26,7 +26,12 @@ run('dotnet', [
   '-c',
   'Release',
 ]);
-for (const name of ['AppDock.RibbonBadge', 'AppDock.PageProbe', 'AppDock.PageProbe.Native'])
+for (const name of [
+  'AppDock.RibbonBadge',
+  'AppDock.PageProbe',
+  'AppDock.PageProbe.Native',
+  'AppDock.LocalizationProbe',
+])
   run('dotnet', [
     'build',
     'tests/fixtures/dotnet/' + name + '/' + name + '.csproj',

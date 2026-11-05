@@ -57,6 +57,8 @@ helperは範囲・リンク/ジャンクション・ZIP traversal/重複/サイ�
 
 Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のsettings.json/dataへ、端末状態/認証はSDK/ホストのLOCALAPPDATA領域へ置く。一括は適用可能な候補だけをまとめ、失敗/未設定は各行へ残す。
 
+翻訳対応Appletは[Appletの翻訳基盤](applet-localization.md)に従い、同梱辞書を`translations/applets/<Applet ID>/`へ配置する。共通handoffでUpdaterの`--plan-applet-translations`からファイル単位の`applet-resource`を取得し、Appletフォルダーと同じjob/journalへ加える。通常・一括更新と新規導入は同じ処理を使う。復旧時も両方を検証・復元し、削除では外部辞書を保持する。
+
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。metadataで適用候補が見つかったら、取得前にネイティブの「更新して再起動」ダイアログを1回表示する。取消時は更新ファイルを取得しない。実行を選んだ場合だけ全候補を取得・検証し、成功後に再確認せずhelperへ引き渡して1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
 「AppDockについて」のAboutSettingsは最上部の単一情報パネルに本体情報・実行環境・更新操作をまとめる。バージョン横の確認アイコンは本体metadataだけを取得し、現在版の隣に更新版、右側に最終確認日時を表示する。下部は本体+全Appletと本体のみの2つの更新ボタンを同じ大きさで横に並べる。Appletだけの一括更新リンク、独立した本体・実行環境Section、管理ボタンは置かず、Applet数タイルから管理画面へ移動する。「更新の設定」は「設定ファイル」の下へ常時表示し、自動確認・通知・待機時間を設定する。更新元と同じバージョンの再適用は、「高度な設定」の下にある初期状態で閉じた「開発用の設定」へ配置する。Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。更新処理・フッター等のVersionCheck・起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。

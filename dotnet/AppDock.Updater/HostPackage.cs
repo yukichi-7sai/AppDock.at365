@@ -14,13 +14,14 @@ internal static partial class Program
         "snapshot_blob.bin", "v8_context_snapshot.bin", "vk_swiftshader_icd.json",
         "vk_swiftshader.dll", "vulkan-1.dll"
     };
-    private static bool FileItem(string kind) => kind is "host" or "host-file" or "host-resource";
+    private static bool FileItem(string kind) => kind is "host" or "host-file" or "host-resource" or "applet-resource";
     private static bool ResourceDirectory(string name) => name is "translations" or "configs";
     private static void ResourceName(string name)
     {
         SafeName(name);
         if (!name.Contains('/') || !ResourceDirectory(name.Split('/')[0]))
             throw NativeMessages.Error("native.hostPackage.resourceDestination", text => new IOException(text));
+        if (name.StartsWith("translations/applets/", StringComparison.OrdinalIgnoreCase)) throw TranslationError();
     }
     private static void ResourceTarget(string file)
     {
@@ -58,7 +59,10 @@ internal static partial class Program
                 if (FileItem(HostKind(name)) ? !File.Exists(location) : !Directory.Exists(location))
                     throw NativeMessages.Error("native.hostPackage.fileKind", text => new IOException(text));
             }
-            _ = Files(directory, HostLimit);
+            foreach (var file in Files(directory, HostLimit)) {
+                var relative = Path.GetRelativePath(directory, file).Replace('\\', '/');
+                if (ResourceDirectory(relative.Split('/')[0])) ResourceName(relative);
+            }
             using var stream = File.OpenRead(Path.Combine(directory, "AppDock.at365.exe"));
             if (stream.ReadByte() != 'M' || stream.ReadByte() != 'Z' || !File.Exists(Path.Combine(directory, "resources", "app.asar")))
                 throw NativeMessages.Error("native.hostPackage.filesMissing", text => new IOException(text));

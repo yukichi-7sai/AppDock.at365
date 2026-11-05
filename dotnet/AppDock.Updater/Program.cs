@@ -118,7 +118,7 @@ internal static partial class Program
     private static void Move(string source, string destination, string kind)
     {
         NoLinks(source); NoLinks(destination);
-        if (kind == "host-resource") Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        if (kind is "host-resource" or "applet-resource") Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         if (FileItem(kind)) File.Move(source, destination); else Directory.Move(source, destination);
     }
     private static void Delete(string location, string kind)
@@ -363,6 +363,7 @@ internal static partial class Program
             if (m.GetProperty("apiVersion").GetInt32() != 1 || !File.Exists(Path.Combine(source, entry)))
                 throw NativeMessages.Error("native.updater.publishAppletInvalid", text => new IOException(text));
             if (m.TryGetProperty("minimumHostVersion", out var minimum)) minimumHostVersion = minimum.GetString();
+            _ = AppletTranslationFiles(source);
             // Collect before creating the archive, including when output is the source itself.
             files = Files(source).Where(file => Path.GetRelativePath(source, file).Replace('\\', '/') is not ("update.json" or "update.zip")).ToList();
             payload = "update.zip";
@@ -411,6 +412,8 @@ internal static partial class Program
             else if (args.Length == 2 && args[0] == "--recover") Recover(args[1]);
             else if (args.Length == 3 && args[0] == "--recover") Recover(args[1], args[2]);
             else if (args.Length == 5 && args[0] == "--pack") Pack(args[1], args[2], args[3], args[4]);
+            else if (args.Length == 3 && args[0] == "--plan-applet-translations")
+                Console.WriteLine(JsonSerializer.Serialize(PlanAppletTranslations(args[1], args[2]), JsonOptions));
             else if (args.Length == 4 && args[0] == "--plan-host")
                 Console.WriteLine(JsonSerializer.Serialize(PlanHost(args[1], args[2], args[3]), JsonOptions));
             else if (args.Length == 3 && args[0] == "--deploy-host") DeployHost(args[1], args[2]);
