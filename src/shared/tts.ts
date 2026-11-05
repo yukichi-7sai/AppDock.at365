@@ -1,17 +1,84 @@
 import { hostText } from './i18n';
+import { boundedJson } from './custom-commands';
 export interface TtsVoice {
   id: string;
   name: string;
 }
-export interface TtsSettings {
+/** One connection's configuration; independent of selection and playback queue ownership. */
+export interface TtsConnectionSettings {
   baseUrl: string;
   model: string;
   defaultVoice: string;
-  defaultSpeed: number;
+  preset: TtsPresetId;
+  speechPath: string;
+  instructionsMode: 'none' | 'json';
+  instructionsParameter: string;
+  extraBody: Record<string, unknown>;
   speedMode: 'playback' | 'server';
   voicesSource: 'endpoint' | 'manual';
   voicesPath: string;
   manualVoices: TtsVoice[];
+}
+export interface TtsSettings extends TtsConnectionSettings {
+  defaultSpeed: number;
+  defaultInstructions: string;
+}
+export const ttsPresetIds = [
+  'custom',
+  'openai-speech',
+  'qwen3-tts',
+  'mlx-audio',
+  'ollama',
+] as const;
+export type TtsPresetId = (typeof ttsPresetIds)[number];
+type TtsPreset = Pick<
+  TtsConnectionSettings,
+  | 'speechPath'
+  | 'speedMode'
+  | 'voicesSource'
+  | 'voicesPath'
+  | 'instructionsMode'
+  | 'instructionsParameter'
+>;
+const commonPreset: TtsPreset = {
+  speechPath: 'audio/speech',
+  speedMode: 'playback',
+  voicesSource: 'endpoint',
+  voicesPath: 'audio/voices',
+  instructionsMode: 'none',
+  instructionsParameter: 'instructions',
+};
+const presets: Record<Exclude<TtsPresetId, 'custom'>, TtsPreset> = {
+  'openai-speech': { ...commonPreset, voicesSource: 'manual', instructionsMode: 'json' },
+  'qwen3-tts': { ...commonPreset, instructionsMode: 'json', instructionsParameter: 'instruct' },
+  'mlx-audio': {
+    ...commonPreset,
+    voicesSource: 'manual',
+    instructionsMode: 'json',
+    instructionsParameter: 'instruct',
+  },
+  ollama: { ...commonPreset, voicesSource: 'manual' },
+};
+const presetVoiceDefaults: Partial<Record<TtsPresetId, TtsVoice>> = {
+  ollama: { id: 'default', name: 'default' },
+};
+export function applyTtsPreset(value: TtsSettings, preset: TtsPresetId): TtsSettings {
+  const voice = presetVoiceDefaults[preset];
+  return {
+    ...value,
+    ...(preset === 'custom' ? {} : presets[preset]),
+    preset,
+    defaultVoice: value.defaultVoice || voice?.id || '',
+    manualVoices: voice && value.manualVoices.length === 0 ? [{ ...voice }] : value.manualVoices,
+  };
+}
+export function isTtsPresetCustomized(value: TtsSettings): boolean {
+  if (value.preset === 'custom') return false;
+  const voice = presetVoiceDefaults[value.preset];
+  return (
+    Boolean(voice && (!value.defaultVoice || value.manualVoices.length === 0)) ||
+    Object.entries(presets[value.preset]).some(([key, v]) => value[key as keyof TtsPreset] !== v)
+  );
 }
 export interface TtsJob {
   jobId: string;
@@ -26,10 +93,16 @@ export const defaultTtsSettings = (): TtsSettings => ({
   model: '',
   defaultVoice: '',
   defaultSpeed: 1,
+  defaultInstructions: '',
+  preset: 'custom',
+  speechPath: 'audio/speech',
+  instructionsMode: 'none',
+  instructionsParameter: 'instructions',
   speedMode: 'playback',
   voicesSource: 'endpoint',
   voicesPath: 'audio/voices',
   manualVoices: [],
+  extraBody: {},
 });
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -51,6 +124,44 @@ export function ttsVoicesPath(value: string): string {
   if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(value) || value.length > 256)
     throw Error(hostText('settings.tts.voicePath'));
   return value;
+}
+/** Dot-separated object properties, never array indices or executable expressions. */
+export function ttsInstructionsPath(value: string): string[] {
+  const parts = value.split('.');
+  if (
+    !parts.every((part) => /^[A-Za-z_][A-Za-z0-9_-]*$/.test(part)) ||
+    parts.some((part) => ['__proto__', 'prototype', 'constructor'].includes(part)) ||
+    ['model', 'input', 'voice', 'speed', 'response_format'].includes(parts[0])
+  )
+    throw Error(hostText('settings.tts.instructionsParameterInvalid'));
+  return parts;
+}
+/** Extra JSON never overrides speech fields or the configured instruction destination. */
+export function parseTtsExtraBody(
+  value: unknown,
+  instructionsParameter: string,
+): Record<string, unknown> {
+  const invalid = () => {
+    throw Error(hostText('settings.tts.extraBodyInvalid'));
+  };
+  if (!object(value)) return invalid();
+  try {
+    boundedJson(value, Infinity, Infinity, Infinity);
+  } catch {
+    return invalid();
+  }
+  if (
+    ['model', 'input', 'voice', 'speed', 'response_format'].some((key) => Object.hasOwn(value, key))
+  )
+    return invalid();
+  let current = value;
+  const parts = ttsInstructionsPath(instructionsParameter);
+  for (const [index, key] of parts.entries()) {
+    if (!Object.hasOwn(current, key)) break;
+    if (index === parts.length - 1 || !object(current[key])) return invalid();
+    current = current[key] as Record<string, unknown>;
+  }
+  return structuredClone(value);
 }
 export function parseTtsVoices(value: unknown): TtsVoice[] {
   if (!Array.isArray(value)) throw Error(hostText('settings.tts.voiceLimit'));
@@ -90,7 +201,15 @@ export function parseTtsSettings(value: unknown): TtsSettings {
   if (Object.keys(value).some((k) => !Object.hasOwn(defaults, k)))
     throw Error(hostText('settings.tts.fields'));
   const v = { ...defaults, ...value };
-  for (const key of ['baseUrl', 'model', 'defaultVoice', 'voicesPath'] as const)
+  for (const key of [
+    'baseUrl',
+    'model',
+    'defaultVoice',
+    'voicesPath',
+    'speechPath',
+    'defaultInstructions',
+    'instructionsParameter',
+  ] as const)
     if (typeof v[key] !== 'string') throw Error(hostText('settings.tts.strings'));
   if (v.model.length > 200 || v.defaultVoice.length > 200)
     throw Error(hostText('settings.tts.nameLength'));
@@ -100,15 +219,26 @@ export function parseTtsSettings(value: unknown): TtsSettings {
     throw Error(hostText('settings.tts.speedMode'));
   if (!['endpoint', 'manual'].includes(v.voicesSource))
     throw Error(hostText('settings.tts.voiceSource'));
+  if (!ttsPresetIds.includes(v.preset) || !['none', 'json'].includes(v.instructionsMode))
+    throw Error(hostText('settings.tts.connectionOptions'));
+  ttsInstructionsPath(v.instructionsParameter);
   return {
     ...v,
     baseUrl: ttsBaseUrl(v.baseUrl),
     model: v.model.trim(),
     defaultVoice: v.defaultVoice.trim(),
     voicesPath: ttsVoicesPath(v.voicesPath),
+    speechPath: ttsVoicesPath(v.speechPath),
+    extraBody: parseTtsExtraBody(v.extraBody, v.instructionsParameter),
     manualVoices: parseTtsVoices(v.manualVoices),
   } as TtsSettings;
 }
-export type TtsSpeakInput = { text: string; voice?: string; speed?: number; requestId: string };
+export type TtsSpeakInput = {
+  text: string;
+  voice?: string;
+  speed?: number;
+  instructions?: string;
+  requestId: string;
+};
 export type TtsSpeakResult = TtsJob & { completion: 'accepted' };
 export type TtsVoicesResult = { voices: TtsVoice[]; source: 'endpoint' | 'manual' };

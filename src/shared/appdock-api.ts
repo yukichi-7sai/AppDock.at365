@@ -36,6 +36,11 @@ export const appDockOperations = localizedMetadata(() => ({
           minimum: 0.25,
           maximum: 4,
         },
+        instructions: {
+          type: 'string',
+          description:
+            '話し方・感情などのニュアンス。省略時は既定値、空文字は指定なし。送信しない接続設定では無視して読み上げます。',
+        },
         requestId: {
           type: 'string',
           minLength: 1,

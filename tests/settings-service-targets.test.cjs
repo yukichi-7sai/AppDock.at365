@@ -651,6 +651,82 @@ test('TTS updates share validation, are atomic and side-effect free in dryRun, p
   );
   assert.equal(f.writes(), count);
 });
+test('TTS preset applies dependent fields atomically, preserves credentials and accepts explicit custom overrides', (t) => {
+  const f = fixture(t),
+    id = 'service.tts';
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS_KEY');
+  const cipher = fs.readFileSync(f.ttsFile);
+  const before = f.store.value.tts;
+  const operations = [
+    {
+      kind: 'set',
+      changes: {
+        preset: 'openai-speech',
+        defaultInstructions: 'やさしく',
+        instructionsParameter: 'generation.instruct',
+        extraBody: { language: 'Japanese', generation: { temperature: 0.5 } },
+      },
+    },
+  ];
+  f.call('apply', f.request(id, operations, true));
+  assert.equal(f.writes(), 0);
+  assert.equal(f.values(id).preset, 'custom');
+  f.call('apply', f.request(id, operations));
+  assert.equal(f.writes(), 1);
+  const values = f.values(id);
+  assert.equal(values.voicesSource, 'manual');
+  assert.equal(values.instructionsMode, 'json');
+  assert.equal(values.instructionsParameter, 'generation.instruct');
+  assert.equal(values.defaultInstructions, 'やさしく');
+  assert.deepEqual(values.extraBody, { language: 'Japanese', generation: { temperature: 0.5 } });
+  for (const key of ['baseUrl', 'model', 'defaultVoice']) assert.equal(values[key], before[key]);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
+  const count = f.writes();
+  assert.throws(
+    () =>
+      f.call(
+        'apply',
+        f.request(id, [
+          {
+            kind: 'set',
+            changes: {
+              preset: 'ollama',
+              instructionsParameter: '__proto__.x',
+            },
+          },
+        ]),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.equal(f.writes(), count);
+  assert.equal(f.values(id).preset, 'openai-speech');
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { defaultInstructions: '静かに' } }]));
+  assert.equal(f.values(id).instructionsParameter, 'generation.instruct');
+  assert.throws(
+    () =>
+      f.call(
+        'apply',
+        f.request(id, [{ kind: 'set', changes: { extraBody: { input: 'override' } } }]),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.equal(f.values(id).extraBody.language, 'Japanese');
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { preset: 'qwen3-tts' } }]));
+  assert.equal(f.values(id).instructionsParameter, 'instruct');
+  assert.equal(f.values(id).extraBody.language, 'Japanese');
+  const writes = f.writes();
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { preset: 'mlx-audio' } }]));
+  assert.equal(f.writes(), writes + 1);
+  assert.equal(f.values(id).voicesSource, 'manual');
+  assert.equal(f.values(id).instructionsMode, 'json');
+  assert.equal(f.values(id).instructionsParameter, 'instruct');
+  assert.deepEqual(f.values(id).extraBody, values.extraBody);
+  assert.equal(f.values(id).defaultInstructions, '静かに');
+  for (const key of ['baseUrl', 'model', 'defaultVoice'])
+    assert.equal(f.values(id)[key], before[key]);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
+});
+
 test('credential-bound TTS endpoint changes and resets fail closed, while non-secret settings preserve exact cipher bytes', (t) => {
   const f = fixture(t),
     id = 'service.tts';
@@ -1306,6 +1382,41 @@ const ttsList = 'service.tts.manual-voices';
 const voiceRows = (f) => f.call('items.list', { targetId: ttsList, limit: 100 }).items;
 const voiceApply = (f, operations, dryRun = false) =>
   f.call('apply', f.request(ttsList, operations, dryRun));
+
+test('Ollama preset initializes blank voice fields atomically and reapplies a missing list', (t) => {
+  const f = fixture(t),
+    id = 'service.tts';
+  f.store.save(
+    { ...f.store.value, tts: { ...f.store.value.tts, defaultVoice: '', manualVoices: [] } },
+    f.store.revision,
+  );
+  const preset = [{ kind: 'set', changes: { preset: 'ollama' } }];
+  f.call('apply', f.request(id, preset, true));
+  assert.equal(f.writes(), 0);
+  assert.equal(f.store.value.tts.defaultVoice, '');
+  assert.deepEqual(f.store.value.tts.manualVoices, []);
+  f.call('apply', f.request(id, preset));
+  assert.equal(f.writes(), 1);
+  assert.equal(f.values(id).defaultVoice, 'default');
+  assert.deepEqual(
+    voiceRows(f).map((row) => row.values),
+    [{ id: 'default', name: 'default' }],
+  );
+  voiceApply(f, [{ kind: 'remove', itemRef: voiceRows(f)[0].itemRef }]);
+  const writes = f.writes();
+  assert.equal(f.call('apply', f.request(id, preset, true)).changed, true);
+  assert.equal(f.writes(), writes);
+  assert.deepEqual(f.store.value.tts.manualVoices, []);
+  assert.equal(f.call('apply', f.request(id, preset)).changed, true);
+  assert.equal(f.writes(), writes + 1);
+  assert.equal(voiceRows(f)[0].values.id, 'default');
+  assert.equal(f.call('apply', f.request(id, preset)).changed, false);
+  f.call(
+    'apply',
+    f.request(id, [{ kind: 'set', changes: { preset: 'ollama', defaultVoice: 'Zoey' } }]),
+  );
+  assert.equal(f.values(id).defaultVoice, 'Zoey');
+});
 
 test('TTS manual voices use explicit server IDs, owner defaults and independent shared storage', (t) => {
   const f = fixture(t, { device: true }),

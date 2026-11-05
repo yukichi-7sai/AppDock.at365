@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
 import { AutomationError } from './appdock-api';
+import { ttsSpeechRequest } from '../../shared/tts-request';
 import {
   parseTtsSettings,
   parseTtsVoices,
@@ -24,6 +25,30 @@ export const ttsLimits = {
   records: 512,
   retentionMs: 1800000,
 };
+/** Finalize the unknown lengths used by streamed RIFF/WAV responses (e.g. Ollama).
+ * Only the explicit uint32 sentinel is accepted; all other WAV validation stays strict.
+ */
+export function finalizeTtsWave(input: Buffer): Buffer {
+  if (
+    input.length < 44 ||
+    input.toString('ascii', 0, 4) !== 'RIFF' ||
+    input.toString('ascii', 8, 12) !== 'WAVE' ||
+    input.readUInt32LE(4) !== 0xffffffff
+  )
+    return input;
+  const bytes = Buffer.from(input);
+  for (let offset = 12; offset + 8 <= bytes.length;) {
+    const size = bytes.readUInt32LE(offset + 4);
+    if (bytes.toString('ascii', offset, offset + 4) === 'data' && size === 0xffffffff) {
+      bytes.writeUInt32LE(bytes.length - offset - 8, offset + 4);
+      break;
+    }
+    if (size > bytes.length - offset - 8) return input;
+    offset += 8 + size + (size % 2);
+  }
+  bytes.writeUInt32LE(bytes.length - 8, 4);
+  return bytes;
+}
 export function waveDuration(b: Buffer): number {
   const invalid = () => fail('TTS_INVALID_AUDIO', hostText('services.ttsService.invalidWav'));
   if (
@@ -105,6 +130,7 @@ interface InternalJob {
   text?: string;
   voice?: string;
   speed?: number;
+  instructions?: string;
   config?: TtsSettings;
   key?: string;
   abort: AbortController;
@@ -188,9 +214,12 @@ export class TtsService {
     internal?: TtsInternalOptions,
   ): Record<string, unknown> {
     this.authorize(owner, true);
-    const { text, voice, speed, requestId } = input;
+    const { text, voice, speed, instructions, requestId } = input;
     if (
-      Object.keys(input).some((k) => !['text', 'voice', 'speed', 'requestId'].includes(k)) ||
+      Object.keys(input).some(
+        (k) => !['text', 'voice', 'speed', 'instructions', 'requestId'].includes(k),
+      ) ||
+      (instructions !== undefined && typeof instructions !== 'string') ||
       typeof text !== 'string' ||
       !text.trim() ||
       Array.from(text).length > 4096 ||
@@ -203,7 +232,7 @@ export class TtsService {
     )
       fail('INVALID_ARGUMENT', hostText('services.ttsService.requestFormat'));
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify({ text, voice, speed }))
+      .update(JSON.stringify({ text, voice, speed, instructions }))
       .digest('hex');
     this.prune();
     const previous = [...this.jobs.values()].find(
@@ -215,6 +244,10 @@ export class TtsService {
       return { ...previous.view, completion: 'accepted' };
     }
     const config = this.config();
+    const selectedInstructions =
+      config.instructionsMode === 'none'
+        ? ''
+        : ((instructions as string | undefined) ?? config.defaultInstructions);
     const selected = (voice as string | undefined) ?? config.defaultVoice;
     if (!selected) fail('INVALID_ARGUMENT', hostText('services.ttsService.voiceRequired'));
     if ([...this.jobs.values()].filter((j) => !j.ended).length >= this.limits.capacity)
@@ -234,6 +267,7 @@ export class TtsService {
       text: text as string,
       voice: selected,
       speed: (speed as number | undefined) ?? config.defaultSpeed,
+      instructions: selectedInstructions.trim() ? selectedInstructions : '',
       config,
       key,
       abort: new AbortController(),
@@ -285,7 +319,7 @@ export class TtsService {
     clearTimeout(j.startTimer);
     j.ended = Date.now();
     if (error) j.view.error = { code: error.code, message: error.message };
-    j.text = j.voice = j.key = undefined;
+    j.text = j.voice = j.key = j.instructions = undefined;
     j.config = undefined;
     j.speed = undefined;
     j.internal = undefined;
@@ -353,21 +387,21 @@ export class TtsService {
       this.state(j, 'generating');
       const controller = j.abort;
       j.timer = setTimeout(() => controller.abort(), this.limits.generationMs);
-      const bytes = await this.download(
-        j.config!.baseUrl + '/audio/speech',
+      const request = ttsSpeechRequest(j.config!, {
+        text: j.text!,
+        voice: j.voice!,
+        speed: j.speed!,
+        instructions: j.instructions!,
+      });
+      const received = await this.download(
+        request.url,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(j.key ? { Authorization: 'Bearer ' + j.key } : {}),
           },
-          body: JSON.stringify({
-            model: j.config!.model,
-            input: j.text,
-            voice: j.voice,
-            speed: j.config!.speedMode === 'server' ? j.speed : 1,
-            response_format: 'wav',
-          }),
+          body: JSON.stringify(request.body),
           signal: controller.signal,
         },
         this.limits.audioBytes,
@@ -375,6 +409,7 @@ export class TtsService {
       );
       clearTimeout(j.timer);
       if (j.ended !== undefined) return;
+      const bytes = finalizeTtsWave(received);
       const seconds = waveDuration(bytes);
       const playbackSpeed = j.config!.speedMode === 'playback' ? j.speed : 1;
       this.authorize(j.owner, true);

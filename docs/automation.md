@@ -408,7 +408,7 @@ input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しませ�
 
 ## TTS読み上げ
 
-最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
+最低ホスト版0.35.0。任意instructions引数は0.149.0以上。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
 ### 3.1 PC専用設定
 

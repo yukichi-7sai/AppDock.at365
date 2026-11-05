@@ -3,7 +3,16 @@ import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState, useEffect, useRef } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
-import { defaultTtsSettings, type TtsSettings, type TtsVoice } from '../../shared/tts';
+import {
+  defaultTtsSettings,
+  applyTtsPreset,
+  isTtsPresetCustomized,
+  ttsPresetIds,
+  type TtsPresetId,
+  type TtsSettings,
+  type TtsVoice,
+} from '../../shared/tts';
+import { TtsConnectionDetails } from './TtsConnectionDetails';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, SettingsTextarea, SettingsUrlInput } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
@@ -24,8 +33,8 @@ export function TtsSettingsForm({
   const [key, setKey] = useState('');
   const [text, setText] = useState('');
   const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const voiceOptions = value.voicesSource === 'manual' ? value.manualVoices : voices;
   const [models, setModels] = useState<TtsVoice[]>([]);
-  const [manual, setManual] = useState<string>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -46,9 +55,6 @@ export function TtsSettingsForm({
   useEffect(() => {
     setKey('');
   }, [value.baseUrl]);
-  useEffect(() => {
-    setManual(undefined);
-  }, [JSON.stringify(value.manualVoices)]);
   const change = (patch: Partial<TtsSettings>) =>
     editor.edit({ ...editor.value, tts: { ...value, ...patch } });
   const run = async (action: () => Promise<void>) => {
@@ -110,7 +116,48 @@ export function TtsSettingsForm({
       <SettingsSection
         title={translate('settings.ttsSettings.connection')}
         hint={translate('settings.ttsSettings.connectionHint')}
+        description={
+          value.preset === 'openai-speech'
+            ? translate('settings.ttsSettings.presetOpenaiHint')
+            : value.preset === 'qwen3-tts'
+              ? translate('settings.ttsSettings.presetQwenHint')
+              : value.preset === 'mlx-audio'
+                ? translate('settings.ttsSettings.presetMlxHint')
+                : value.preset === 'ollama'
+                  ? translate('settings.ttsSettings.presetOllamaHint')
+                  : undefined
+        }
       >
+        <SettingsField
+          title={translate('settings.ttsSettings.preset')}
+          hint={translate('settings.ttsSettings.presetHint')}
+          description={
+            isTtsPresetCustomized(value) ? translate('settings.ttsSettings.customized') : undefined
+          }
+          {...settingAnchor('tts', 'preset')}
+        >
+          <select
+            aria-label={translate('settings.ttsSettings.preset')}
+            value={value.preset}
+            onChange={(e) => change(applyTtsPreset(value, e.target.value as TtsPresetId))}
+          >
+            {ttsPresetIds.map((id) => (
+              <option key={id} value={id}>
+                {translate(`settings.ttsSettings.preset.${id}`)}
+              </option>
+            ))}
+          </select>
+          {value.preset !== 'custom' && (
+            <SettingsActions>
+              <button
+                disabled={!isTtsPresetCustomized(value)}
+                onClick={() => change(applyTtsPreset(value, value.preset))}
+              >
+                {translate('settings.ttsSettings.presetReset')}
+              </button>
+            </SettingsActions>
+          )}
+        </SettingsField>
         <SettingsField
           title={translate('settings.ttsSettings.url')}
           hint={translate('settings.ttsSettings.urlHint')}
@@ -171,6 +218,7 @@ export function TtsSettingsForm({
             </button>
           </SettingsActions>
         </SettingsField>
+        <TtsConnectionDetails value={value} change={change} setError={setError} />
       </SettingsSection>
       <SettingsSection
         title={translate('settings.ttsSettings.modelsAndVoices')}
@@ -230,22 +278,24 @@ export function TtsSettingsForm({
             onChange={(e) => change({ defaultVoice: e.target.value })}
           />
           <datalist id="tts-voices">
-            {voices.map((v) => (
+            {voiceOptions.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name}
               </option>
             ))}
           </datalist>
-          {voices.length > 0 && (
+          {voiceOptions.length > 0 && (
             <select
               aria-label={translate('settings.ttsSettings.fetchedVoices')}
-              value={voices.some((v) => v.id === value.defaultVoice) ? value.defaultVoice : ''}
+              value={
+                voiceOptions.some((v) => v.id === value.defaultVoice) ? value.defaultVoice : ''
+              }
               onChange={(e) => {
                 if (e.target.value) change({ defaultVoice: e.target.value });
               }}
             >
               <option value="">{translate('settings.ttsSettings.select')}</option>
-              {voices.map((v) => (
+              {voiceOptions.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
                 </option>
@@ -276,6 +326,23 @@ export function TtsSettingsForm({
             onChange={(e) =>
               change({ defaultSpeed: e.target.value.trim() ? Number(e.target.value) : NaN })
             }
+          />
+        </SettingsField>
+        <SettingsField
+          title={translate('settings.ttsSettings.defaultInstructions')}
+          hint={translate('settings.ttsSettings.defaultInstructionsHint')}
+          description={
+            value.instructionsMode === 'none'
+              ? translate('settings.ttsSettings.instructionsDisabled')
+              : undefined
+          }
+          {...settingAnchor('tts', 'defaultInstructions')}
+        >
+          <SettingsTextarea
+            aria-label={translate('settings.ttsSettings.defaultInstructions')}
+            value={value.defaultInstructions}
+            placeholder={translate('settings.ttsSettings.instructionsPlaceholder')}
+            onChange={(e) => change({ defaultInstructions: e.target.value })}
           />
         </SettingsField>
       </SettingsSection>
@@ -331,72 +398,6 @@ export function TtsSettingsForm({
               {translate('settings.ttsSettings.stop')}
             </button>
           </SettingsActions>
-        </SettingsField>
-      </SettingsSection>
-      <SettingsSection
-        title={translate('settings.ttsSettings.advanced')}
-        hint={translate('settings.ttsSettings.advancedHint')}
-        collapsible
-      >
-        <SettingsField
-          title={translate('settings.ttsSettings.speedMode')}
-          {...settingAnchor('tts', 'speedMode')}
-        >
-          <select
-            aria-label={translate('settings.ttsSettings.speedMode')}
-            value={value.speedMode}
-            onChange={(e) => change({ speedMode: e.target.value as TtsSettings['speedMode'] })}
-          >
-            <option value="playback">{translate('settings.ttsSettings.localSpeed')}</option>
-            <option value="server">{translate('settings.ttsSettings.serverSpeed')}</option>
-          </select>
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.ttsSettings.voiceMode')}
-          {...settingAnchor('tts', 'voicesSource')}
-        >
-          <select
-            aria-label={translate('settings.ttsSettings.voiceMode')}
-            value={value.voicesSource}
-            onChange={(e) =>
-              change({ voicesSource: e.target.value as TtsSettings['voicesSource'] })
-            }
-          >
-            <option value="endpoint">{translate('settings.ttsSettings.serverVoices')}</option>
-            <option value="manual">{translate('settings.ttsSettings.manualVoices')}</option>
-          </select>
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.ttsSettings.voicePath')}
-          hint={translate('settings.ttsSettings.voicePathHint')}
-          {...settingAnchor('tts', 'voicesPath')}
-        >
-          <SettingsInput
-            aria-label={translate('settings.ttsSettings.voicePath')}
-            value={value.voicesPath}
-            onChange={(e) => change({ voicesPath: e.target.value })}
-          />
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.ttsSettings.manualList')}
-          hint={translate('settings.ttsSettings.manualListHint')}
-          {...settingAnchor('tts', 'manualVoices')}
-        >
-          <SettingsTextarea
-            aria-label={translate('settings.ttsSettings.manualList')}
-            data-testid="tts-manual-voices"
-            value={manual ?? JSON.stringify(value.manualVoices, null, 2)}
-            onChange={(e) => {
-              const v = e.target.value;
-              setManual(v);
-              try {
-                change({ manualVoices: JSON.parse(v) });
-                setError('');
-              } catch {
-                setError(translate('settings.ttsSettings.manualListInvalid'));
-              }
-            }}
-          />
         </SettingsField>
       </SettingsSection>
     </div>

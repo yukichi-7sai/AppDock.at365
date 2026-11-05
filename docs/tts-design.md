@@ -6,20 +6,26 @@ MCPの[固定設定API](settings-api.md)から通常値と手動ボイス一覧�
 
 共有settings.jsonに任意のttsオブジェクトを追加する。未設定では接続・生成・再生を開始しない。
 
-| キー | 内容・既定値 |
-| --- | --- |
-| `tts.baseUrl` | APIベースURL。未設定は空。例: `http://host:8080/v1` |
-| `tts.model` | モデルID。未設定は空 |
-| `tts.defaultVoice` | 省略時に使うボイスID。未設定は空 |
-| `tts.defaultSpeed` | 0.25～4.0の有限数。既定1.0 |
-| `tts.speedMode` | playback（既定）またはserver。速度の適用先 |
-| `tts.voicesSource` | endpointまたはmanual。既定endpoint |
-| `tts.voicesPath` | ベースURL配下の相対パス。既定audio/voices |
-| `tts.manualVoices` | 手動ボイスのid/name配列。既定空配列 |
+| キー                        | 内容・既定値                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| `tts.baseUrl`               | APIベースURL。未設定は空。例: `http://host:8080/v1`                                             |
+| `tts.model`                 | モデルID。未設定は空                                                                            |
+| `tts.defaultVoice`          | 省略時に使うボイスID。未設定は空                                                                |
+| `tts.defaultSpeed`          | 0.25～4.0の有限数。既定1.0                                                                      |
+| `tts.defaultInstructions`   | 省略時のニュアンス。既定は空文字                                                                |
+| `tts.preset`                | custom（既定）／openai-speech／qwen3-tts／mlx-audio／ollama。詳細値の初期入力に使ったプリセット |
+| `tts.speechPath`            | 音声生成APIの相対パス。既定audio/speech                                                         |
+| `tts.instructionsMode`      | none（既定、送信しない）／json（指定JSON項目へ送信）                                            |
+| `tts.instructionsParameter` | ニュアンスの送信先。既定instructions。入れ子はgeneration.instructのようにドット区切り           |
+| `tts.extraBody`             | 音声生成JSONに追加するオブジェクト。既定{}。例: {"language":"Japanese"}                         |
+| `tts.speedMode`             | playback（既定）またはserver。速度の適用先                                                      |
+| `tts.voicesSource`          | endpointまたはmanual。既定endpoint                                                              |
+| `tts.voicesPath`            | ベースURL配下の相対パス。既定audio/voices                                                       |
+| `tts.manualVoices`          | 手動ボイスのid/name配列。既定空配列                                                             |
 
 URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。モデルとボイスは一覧からの選択と自由入力を提供する。一覧非対応でも直接入力したIDを保存できる。IDの大文字・小文字は維持する。
 
-手動ボイス一覧は最大1,000件。MCPのlist対象からid/nameの追加・部分編集・削除・並べ替えを行える。IDは利用するサーバーの値を入力し、名前を省略するとIDを名前に使う。候補の変更では既定ボイスや通知の指定、取得方式を自動変更しない。既存のJSON編集と同じ検証・保存を使い、暗号化情報を変更しない。行参照・上限・制約は[設定API](settings-api.md#tts手動ボイス一覧)を参照する。
+手動ボイス一覧に固定の件数上限は設けない。MCPのlist対象からid/nameの追加・部分編集・削除・並べ替えを行える。IDは利用するサーバーの値を入力し、名前を省略するとIDを名前に使う。候補の変更では既定ボイスや通知の指定、取得方式を自動変更しない。既存のJSON編集と同じ検証・保存を使い、暗号化情報を変更しない。行参照・制約は[設定API](settings-api.md#tts手動ボイス一覧)を参照する。
 
 APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化方式に合わせてPC専用rootのホスト用秘密領域へ保存する。Applet別SecretsのIDを流用しない。暗号化不可の場合は平文へフォールバックしない。キーの登録・置換・削除はホスト設定画面に限定し、Applet/MCPへ値を返さない。必要な状態表示にはapiKeyConfiguredだけを使う。
 
@@ -29,17 +35,61 @@ APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化
 
 ## 設定画面
 
-「読み上げ」は共通カードを使い、接続先（URL/APIキー）、モデルと声（モデル/既定ボイス/速度）、試聴の順に配置する。速度の適用先・ボイス一覧方式・パス・手動一覧は詳細項目へまとめる。
+「読み上げ」は共通カードを使い、接続先（プリセット/URL/APIキー）、モデルと声（モデル/既定ボイス/速度/既定のニュアンス）、試聴の順に配置する。「サーバーに合わせた詳細設定」は接続先Section内の折りたたみ行へ置く。音声生成パス・速度の適用先・ニュアンスの送信方式/送信先・追加パラメーターJSON・ボイス一覧方式/パス/手動一覧をすべて手動編集できる。
 
-即時保存・入力検証・revision競合・Shell描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「モデル一覧を更新」「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
+### 接続プリセットとカスタム設定
+
+| プリセット                      | 音声生成パス | 速度の適用先 | ニュアンス         | ボイス一覧             |
+| ------------------------------- | ------------ | ------------ | ------------------ | ---------------------- |
+| OpenAI Speech API               | audio/speech | playback     | JSONのinstructions | manual                 |
+| Qwen3-TTS（OpenAI互換サーバー） | audio/speech | playback     | JSONのinstruct     | endpoint、audio/voices |
+| MLX-Audio（OpenAI互換サーバー） | audio/speech | playback     | JSONのinstruct     | manual                 |
+| Ollama                          | audio/speech | playback     | none               | manual                 |
+| カスタム                        | 現在値を維持 | 現在値を維持 | 現在値を維持       | 現在値を維持           |
+
+プリセットの選択と「プリセットの詳細設定に戻す」は共通のapplyTtsPresetで関連値を一度に更新し、既存の設定保存へ一要求で渡す。URL・モデル・登録済みの既定ボイス・速度倍率・既定のニュアンス・登録済みの手動ボイス一覧・追加パラメーター・認証情報を保持する。Ollamaでは既定ボイスが空の場合にdefault、手動一覧が空の場合に[{"id":"default","name":"default"}]をそれぞれ補完する。保存・選択だけでは通信しない。外部設定APIでpresetをsetしたときも同じ初期値を適用し、同じ要求に明示された個別値があればそれを優先する。同じプリセットの再適用で関連値だけが変わる場合も保存する。dryRun・revision・原子的保存を維持する。
+
+手動ボイス一覧は、たとえば `[{"id":"default","name":"標準ボイス"}]` と入力する。idはサーバーへ送る値、nameは画面上の名前で、複数の声は配列の中へカンマで区切って追加する。入力例は欄の説明として常時表示し、Enter／blurで確定、Escapeで取消とする。「手動一覧」を選んでいる間は保存済み一覧を候補へ直接反映し、「既定のボイス」で選択する。候補への反映に一覧更新ボタンは不要。既定のボイス欄へのIDの直接入力も利用でき、一覧への登録は読み上げの必須条件ではない。
+
+手動一覧の空欄・空白のみの入力は、確定時に空配列`[]`として扱う。それ以外はJSON構文の解析後、共通のボイス一覧検証で配列・各項目・ID重複を確認してから編集モデルへ渡す。`{}`や項目の型が不正な入力は欄内だけに保持してエラーを表示し、保存済み一覧と表示中の候補を維持する。正しい内容への修正後は通常どおり保存できる。
+
+Ollamaのdefaultはモデル本来の声を選ぶ値。利用可能な別の声はモデルに依存するため、プリセットで声の候補を固定しない。Ollamaの`ollama show <モデル名>`または`/api/show`で確認したIDを手動一覧へ追加できる。
+
+MLX-AudioはベースURLを`/v1`まで指定し、ニュアンスを`instruct`へ送る。モデル・既定ボイスは固定せず、利用するモデルに対応した値を入力する。公式サーバーの`GET /v1/audio/voices`はmodelクエリが必須で、voice packを持たないモデルでは一覧が空になるため、プリセットは手動一覧を使う。言語などのモデル固有値は追加パラメーターで指定する（公式サーバーの言語フィールドは`lang_code`。受け付ける値やニュアンス対応はモデルによる）。
+
+プリセットは接続先の自動検出や読み込み時の強制規則ではない。保存済みの詳細値を毎回プリセットで上書きせず、異なる値は「カスタマイズ済み」と表示する。JSON編集は各項目の確定値を保存する。既存設定にはcustom/none/空のニュアンスを補い、従来の生成要求を維持する。
+
+Qwen3-TTSの公式Python APIのgenerate_custom_voiceはtext・language・speaker・instructを受け付ける。日本語はlanguage="Japanese"、ニュアンスはinstructで指定する。1.7B CustomVoiceはニュアンス制御に対応するが、0.6B CustomVoiceとBaseは同じ制御を保証しない。AppDockのQwen3-TTSプリセットはinstructを受け付けるOpenAI互換HTTPサーバー向けであり、Python APIへの直接接続や全HTTPサーバーのAPIを保証しない。保存済みのinstructionsParameterは自動変更せず、プリセットの再選択／詳細設定への復元でinstructを反映する。OpenAI Speech APIはニュアンス対応モデルを使用する。OpenAIの2026-10-01告知では従来TTSモデルの2027-01-06終了とRealtime APIへの移行が案内されているが、本プリセットは既存Speech API用で、Realtime通信を実装したものではない。Ollamaは現行の音声APIでinstructionsが未対応のため初期値をnoneとし、将来の対応版や別実装では手動変更できる。
+
+共通instructionsは話し方の文章を渡す契約で、全モデルで同じ声色になることは保証しない。非対応の数値スタイルへ自由文を自動変換せず、本文へ指示を連結しない。instructionsModeがnoneの場合、既定値・呼び出し時の指定のどちらも無視し、ニュアンスを送信せずに読み上げを続ける。保存済みの既定ニュアンスは保持する。instructionsの文字列型検証とrequestIdの重複判定は送信方式にかかわらず適用する。
+
+送信先は英字/アンダースコアで始まり英数字/アンダースコア/ハイフンを含む項目名のドット区切り。空要素、配列添字、prototype関連の項目名、本文等の標準項目（model/input/voice/speed/response_format）との衝突は保存時に拒否する。配列や実行コードの式は扱わない。
+
+### 追加パラメーター
+
+接続先の「追加パラメーター（JSON）」で、音声生成要求のトップレベルへ追加するオブジェクトを設定する。0.150.0以上で利用でき、共通設定APIのservice.tts.extraBodyからもオブジェクトとして読み書きできる。共有設定に保存されるため、認証情報は含めず既存APIキー欄を使う。空の追加設定は{}。Qwen3-TTS CustomVoiceで日本語を指定する例:
+
+```json
+{ "language": "Japanese" }
+```
+
+文字列・有限数・真偽値・null・配列・入れ子のJSONを保持する。固定の項目数上限は設けず、既存の保存／共通通信の制約に従う。循環参照、非JSON値、prototype関連のキーを拒否する。標準のmodel/input/voice/speed/response_formatと、設定されたニュアンス送信先への重複は保存時に拒否する。ニュアンス送信先の途中のオブジェクトを配列・文字列・nullなどで置き換える指定も拒否する。
+
+例として送信先generation.instructと追加設定{"generation":{"temperature":0.7}}は併用でき、temperatureを保持したままinstructを追加する。各ジョブが受付時の追加設定を複製し、本文やニュアンスを追加しても保存済み設定を変更しない。空のinstructions指定は追加設定を保持し、ニュアンスだけを送信しない。UIはEnter/blur確定とEscape取消を使い、不正JSONを保存しない。プリセット選択／詳細リセットでも追加設定を保持する。
+
+### 将来の複数接続への境界
+
+接続単位のTtsConnectionSettings、共通発話入力、HTTP要求を構成するttsSpeechRequest、共通再生キューを分離する。接続用の詳細フォームもTtsConnectionDetailsとして値と変更コールバックだけを受け取る。今回の保存形式は既存ttsオブジェクトを拡張し、接続一覧や選択IDはまだ追加しない。複数接続を導入するときは接続IDで選択し、受付時に一つの接続と認証を確定する。ジョブ途中で別接続の値を混ぜず、再生は既存の単一キューを引き続き使用する。
+
+即時保存・入力検証・revision競合・本体描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「モデル一覧を更新」「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
 
 本体の設定rendererは共通の設定モデル・操作を使用する。秘密値を保存後の表示モデルへ戻さず、キー更新はホスト所有の専用操作に渡す。利用許可は「操作の許可」のApplet/MCP列へ追加する。
 
 ### 音声生成
 
-サーバーのWAVはPCM/floatのRIFF形式を受け付ける。圧縮WAV・RF64等は初期対応外。
+サーバーのWAVはPCM/floatのRIFF形式を受け付ける。圧縮WAV・RF64等は対応外。ストリーミングWAVのRIFF長が0xffffffffの場合だけ、上限内でHTTP受信を完了してから実長へ確定する。data長も0xffffffffなら最終dataチャンクとして実長を設定し、その後は通常と同じ形式・サイズ・時間検査と共通プレイヤーを使う。任意の不正な長さを補正して受け入れない。
 
-末尾スラッシュを正規化したベースURLにaudio/speechを追加してJSONをPOSTする。URL結合で/v1等のベースパスを失わない。
+末尾スラッシュを正規化したベースURLにspeechPath（既定audio/speech）を追加してJSONをPOSTする。URL結合で/v1等のベースパスを失わない。生成パスもボイス一覧パスと同じ相対パス検証を通し、別オリジンへの変更は許可しない。
 
 ```json
 {
@@ -71,9 +121,7 @@ endpointでは同じ接続先・認証でvoicesPathへGETする。初期対応�
 
 ```json
 {
-  "voices": [
-    { "id": "voice-a", "name": "Voice A" }
-  ]
+  "voices": [{ "id": "voice-a", "name": "Voice A" }]
 }
 ```
 
@@ -89,18 +137,20 @@ OpenAI互換はボイス一覧APIの互換性まで保証しない。404/405は�
 
 ## 共通API
 
-次の4操作をappDockOperationsへ追加し、callersはmcp/appletとする。操作名は言語非依存、説明は日本語とする。
+次の4操作をappDockOperationsへ登録し、callersはmcp/appletとする。操作名は言語非依存、説明は日本語とする。instructionsと接続プリセットを利用するAppletはminimumHostVersionを0.149.0以上にする。
 
-| 操作名 | MCPツール名 | 入力 | 結果 |
-| --- | --- | --- | --- |
-| `tts.speak` | `appdock_tts_speak` | text、任意voice/speed、requestId | jobId、state、completion:accepted |
-| `tts.voices.list` | `appdock_tts_list_voices` | なし | voices、source:endpoint/manual |
-| `tts.jobs.get` | `appdock_tts_get_job` | jobId | 状態・時刻・失敗時のエラー |
-| `tts.stop` | `appdock_tts_stop` | jobId | 停止後の状態 |
+| 操作名            | MCPツール名               | 入力                                          | 結果                              |
+| ----------------- | ------------------------- | --------------------------------------------- | --------------------------------- |
+| `tts.speak`       | `appdock_tts_speak`       | text、任意voice/speed/instructions、requestId | jobId、state、completion:accepted |
+| `tts.voices.list` | `appdock_tts_list_voices` | なし                                          | voices、source:endpoint/manual    |
+| `tts.jobs.get`    | `appdock_tts_get_job`     | jobId                                         | 状態・時刻・失敗時のエラー        |
+| `tts.stop`        | `appdock_tts_stop`        | jobId                                         | 停止後の状態                      |
 
 voice/speed省略時は受付時の既定値を使用する。voiceも既定値も空の場合はINVALID_ARGUMENT。未知のプロパティを拒否する。URL・モデル・キーはAPI引数に含めず、設定済み接続先を使う。
 
-requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・同じID・同じ入力の再送は保持期間内に限り既存ジョブを返す。同じIDで入力が異なる場合はTTS_REQUEST_CONFLICT。既定値や設定revisionが変わっても、同じ入力の再送は最初のジョブを返す。再送時も現在の許可を検査する。
+instructions省略時は受付時のdefaultInstructionsを使用し、指定時はその発話だけ上書きする。空文字・空白だけの指定は既定値を使わず、その発話のニュアンス項目を送信しない。型は文字列だけを受け付け、上限は共通通信本文の制限と接続先の仕様に従う。ニュアンスは本文と同様に公開ジョブ・監査ログへ含めず、ジョブ終了時に参照を解放する。通知読み上げと設定の試聴も同じ既定値を使う。
+
+requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・同じID・同じ入力の再送は保持期間内に限り既存ジョブを返す。同じIDで入力が異なる場合はTTS_REQUEST_CONFLICT。instructionsも入力のハッシュへ含め、省略と明示空文字を区別する。既定値や設定revisionが変わっても、同じ入力の再送は最初のジョブを返す。再送時も現在の許可を検査する。
 
 受付と重複判定記録は一体で作成する。容量不足など受付失敗ではジョブを作らない。終了済み記録は最大512件かつ終了後30分までとし、稼働中の記録を追い出さない。期限切れ・再起動をまたぐ重複防止は保証しない。応答消失時に新しいrequestIdで自動再送しない。
 
@@ -112,6 +162,7 @@ const job = await context.appdock.call('tts.speak', {
   text: '処理が完了しました。',
   voice: 'voice-a',
   speed: 1.0,
+  instructions: 'やさしく、落ち着いた口調で',
   requestId: crypto.randomUUID(),
 });
 const current = await context.appdock.call('tts.jobs.get', { jobId: job.jobId });
@@ -123,6 +174,7 @@ var job = await context.AppDock.CallAsync("tts.speak", new {
     text = "処理が完了しました。",
     voice = "voice-a",
     speed = 1.4,
+    instructions = "やさしく、落ち着いた口調で",
     requestId = Guid.NewGuid().ToString()
 }, token);
 var id = job.GetProperty("jobId").GetString();
@@ -150,15 +202,15 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 TTSジョブは生成から再生までを1件ずつ順番に実行し、先行生成や並列生成は行わない。音声を受信するとwaitingPlaybackとなり、通知音・試聴と共通のFIFOへ入る。生成中は再生枠を予約せず、準備できた音から再生する。playingへの遷移と開始期限の解除は実際の再生開始直前に行う。
 
-| 制限 | 初期値 |
-| --- | --- |
-| 稼働中ジョブ | 全体16件。待機・生成・再生を含む |
-| キュー待ち | 受付から10分。超過はfailed |
-| 生成・受信 | 開始から180秒 |
-| 音声受信 | 最大64MiB |
-| 再生可能時間 | デコード後10分以下。超過は再生前に拒否 |
-| 再生監視 | 音声長÷再生速度+30秒。終了通知がなければfailed |
-| デコード後の容量 | PCM/float WAVのみ。推定256MiB以下 |
+| 制限             | 初期値                                         |
+| ---------------- | ---------------------------------------------- |
+| 稼働中ジョブ     | 全体16件。待機・生成・再生を含む               |
+| キュー待ち       | 受付から10分。超過はfailed                     |
+| 生成・受信       | 開始から180秒                                  |
+| 音声受信         | 最大64MiB                                      |
+| 再生可能時間     | デコード後10分以下。超過は再生前に拒否         |
+| 再生監視         | 音声長÷再生速度+30秒。終了通知がなければfailed |
+| デコード後の容量 | PCM/float WAVのみ。推定256MiB以下              |
 
 初期値は内部定数として試験し、変更には実測の根拠を残す。件数・サイズ・時間に加え、デコードによるメモリ増加も検証する。
 
@@ -174,26 +226,32 @@ TTSジョブは生成から再生までを1件ずつ順番に実行し、先行�
 
 受付前の入力・未設定・許可・容量エラーはAPIエラー。受付後の生成・受信・再生失敗はジョブのfailed。自動再生成・再生は行わない。
 
-| コード | 意味 |
-| --- | --- |
-| INVALID_ARGUMENT | 空本文、不正速度、入力上限超過 |
-| TTS_NOT_CONFIGURED | 接続先またはモデル未設定 |
-| API_DISABLED / NOT_READY | 既存APIの許可・起動状態による拒否 |
-| TTS_QUEUE_FULL / TTS_QUEUE_TIMEOUT | 件数超過／待機期限超過 |
-| TTS_REQUEST_CONFLICT | 同じrequestIdで異なる入力 |
-| TTS_AUTH_FAILED / TTS_RATE_LIMITED | HTTP 401/403／429 |
-| TTS_CONNECTION_FAILED / TTS_TIMEOUT | 接続障害／生成・受信期限超過 |
-| TTS_SERVER_ERROR | その他HTTP失敗・サーバー拒否 |
-| TTS_INVALID_AUDIO / TTS_AUDIO_TOO_LARGE | 不正音声／受信上限超過 |
-| TTS_AUDIO_TOO_LONG / TTS_PLAYBACK_FAILED | 再生時間超過／デコード・再生失敗 |
-| TTS_VOICES_UNSUPPORTED / TTS_INVALID_VOICES | 一覧API非対応／一覧形式不正 |
+| コード                                      | 意味                                      |
+| ------------------------------------------- | ----------------------------------------- |
+| INVALID_ARGUMENT                            | 空本文、不正速度、入力上限超過            |
+| TTS_NOT_CONFIGURED                          | 接続先またはモデル未設定                  |
+| API_DISABLED / NOT_READY                    | 既存APIの許可・起動状態による拒否         |
+| TTS_QUEUE_FULL / TTS_QUEUE_TIMEOUT          | 件数超過／待機期限超過                    |
+| TTS_REQUEST_CONFLICT                        | 同じrequestIdで異なる入力                 |
+| TTS_AUTH_FAILED / TTS_RATE_LIMITED          | HTTP 401/403／429                         |
+| TTS_CONNECTION_FAILED / TTS_TIMEOUT         | 接続障害／生成・受信期限超過              |
+| TTS_SERVER_ERROR                            | その他HTTP失敗・サーバー拒否              |
+| TTS_INVALID_AUDIO / TTS_AUDIO_TOO_LARGE     | 不正音声／受信上限超過                    |
+| TTS_AUDIO_TOO_LONG / TTS_PLAYBACK_FAILED    | 再生時間超過／デコード・再生失敗          |
+| TTS_VOICES_UNSUPPORTED / TTS_INVALID_VOICES | 一覧API非対応／一覧形式不正               |
 | TTS_MODELS_UNSUPPORTED / TTS_INVALID_MODELS | 設定ページのモデル一覧API非対応／形式不正 |
 
 一覧取得の5秒期限もTTS_TIMEOUTとする。サーバーのエラー本文には入力テキストが含まれる可能性があるため、そのままUI・MCP・ログへ流さない。公開エラーはHTTP状態などの安全な情報に限る。
 
 ## 外部仕様の参照
 
+- [Ollama Speech](https://github.com/ollama/ollama/blob/main/docs/capabilities/speech.mdx): defaultボイス、モデル別ボイス一覧とAPI。2026-11-05確認。
 - [OpenAI Create speech](https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create): 音声生成、速度、返却形式。互換サーバーの追加API・実装動作は別途確認する。
 - [OpenAI Text to speech](https://developers.openai.com/api/docs/guides/text-to-speech): ボイス・音声形式。
 - [OpenAI List models](https://developers.openai.com/api/reference/resources/models/methods/list): 標準モデル一覧のエンドポイントとdata/id形式。
+- [OpenAI廃止予定](https://developers.openai.com/api/docs/deprecations): 既存Speech APIモデルとRealtime移行の案内。
+- [Ollama Speech](https://docs.ollama.com/capabilities/speech)、[対応表の原文](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx): WAV/PCM、ストリーミング長、速度とinstructionsの対応範囲。
 - 接続するサーバーの/openapi.json、/v1/audio/voices、モデル情報を実装時に再確認する。取得したボイス・ダウンロード済みモデルのスナップショットを製品の固定仕様にしない。
+
+- [Qwen3-TTS公式CustomVoice](https://github.com/QwenLM/Qwen3-TTS#custom-voice)、[公式推論実装](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py): instruct・language・speakerとモデル別ニュアンス対応（2026-11-05確認）。
+- [MLX-Audio公式サーバー実装](https://github.com/Blaizzy/mlx-audio/blob/main/mlx_audio/server.py): SpeechRequestのinstruct・lang_code、audio/speech・models・モデル別audio/voices（2026-11-05確認）。

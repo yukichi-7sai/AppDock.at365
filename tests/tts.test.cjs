@@ -3,10 +3,17 @@ const { test } = require('node:test'),
   http = require('node:http'),
   fs = require('node:fs'),
   path = require('node:path');
-const { TtsService, waveDuration } = require('../out/main/main/core/tts-service');
+const { TtsService, waveDuration, finalizeTtsWave } = require('../out/main/main/core/tts-service');
 const { TtsSecrets } = require('../out/main/main/core/tts-secrets');
-const { parseTtsSettings, defaultTtsSettings } = require('../out/main/shared/tts');
+const {
+  parseTtsSettings,
+  defaultTtsSettings,
+  applyTtsPreset,
+  isTtsPresetCustomized,
+  ttsPresetIds,
+} = require('../out/main/shared/tts');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
+const { ttsSpeechRequest } = require('../out/main/shared/tts-request');
 const { SettingsStore } = require('../out/main/main/core/settings');
 fs.mkdirSync(path.resolve('.artifacts/tts-implementation'), { recursive: true });
 function wave(seconds = 0.02) {
@@ -73,6 +80,268 @@ function setup(t, extra = {}) {
   };
 }
 const input = (id, text = '本文') => ({ text, requestId: id });
+test('connection presets preserve identity and speech defaults; custom edits survive parsing', () => {
+  const original = parseTtsSettings({
+    baseUrl: 'http://local/v1',
+    model: 'saved-model',
+    defaultVoice: 'saved-voice',
+    defaultInstructions: '穏やかに',
+    defaultSpeed: 1.3,
+    manualVoices: [{ id: 'saved-voice', name: 'Saved' }],
+    extraBody: { language: 'Japanese' },
+  });
+  for (const preset of ttsPresetIds) {
+    const value = applyTtsPreset(original, preset);
+    for (const key of [
+      'baseUrl',
+      'model',
+      'defaultVoice',
+      'defaultSpeed',
+      'defaultInstructions',
+      'manualVoices',
+      'extraBody',
+    ])
+      assert.deepEqual(value[key], original[key]);
+    assert.equal(value.preset, preset);
+    assert.equal(isTtsPresetCustomized(value), false);
+  }
+  const custom = parseTtsSettings({
+    ...applyTtsPreset(original, 'qwen3-tts'),
+    instructionsParameter: 'generation.instruct',
+    speechPath: 'speech/create',
+    voicesPath: 'voices',
+  });
+  assert.equal(isTtsPresetCustomized(custom), true);
+  assert.equal(
+    parseTtsSettings(JSON.parse(JSON.stringify(custom))).instructionsParameter,
+    'generation.instruct',
+  );
+  const reset = applyTtsPreset(custom, 'qwen3-tts');
+  assert.equal(reset.instructionsParameter, 'instruct');
+  assert.equal(reset.defaultInstructions, '穏やかに');
+  assert.equal(applyTtsPreset(custom, 'custom').instructionsParameter, 'generation.instruct');
+  for (const instructionsParameter of [
+    'input',
+    'voice.child',
+    'model',
+    'speed',
+    'response_format',
+    '__proto__.polluted',
+    'a.constructor.x',
+    'a.prototype.x',
+    'a..b',
+    '',
+    'a[0]',
+    'a/b',
+  ])
+    assert.throws(() => parseTtsSettings({ instructionsParameter }));
+  for (const value of [
+    { preset: 'unknown' },
+    { instructionsMode: 'unknown' },
+    { defaultInstructions: null },
+    { speechPath: '../speech' },
+    { speechPath: 'https://other/speech' },
+  ])
+    assert.throws(() => parseTtsSettings(value));
+});
+test('Ollama preset fills blank voices while preserving saved selections and independent lists', () => {
+  const defaults = defaultTtsSettings();
+  const initial = applyTtsPreset(defaults, 'ollama');
+  assert.equal(initial.defaultVoice, 'default');
+  assert.deepEqual(initial.manualVoices, [{ id: 'default', name: 'default' }]);
+  assert.equal(isTtsPresetCustomized(initial), false);
+  assert.equal(isTtsPresetCustomized({ ...initial, manualVoices: [] }), true);
+  assert.equal(isTtsPresetCustomized({ ...initial, defaultVoice: '' }), true);
+  assert.equal(defaults.defaultVoice, '');
+  assert.deepEqual(defaults.manualVoices, []);
+  initial.manualVoices[0].name = 'custom label';
+  assert.equal(applyTtsPreset(defaults, 'ollama').manualVoices[0].name, 'default');
+  const selected = applyTtsPreset({ ...defaults, defaultVoice: 'Zoey' }, 'ollama');
+  assert.equal(selected.defaultVoice, 'Zoey');
+  assert.equal(selected.manualVoices[0].id, 'default');
+  const custom = applyTtsPreset(
+    { ...defaults, manualVoices: [{ id: 'Freya', name: 'Saved voice' }] },
+    'ollama',
+  );
+  assert.equal(custom.defaultVoice, 'default');
+  assert.deepEqual(custom.manualVoices, [{ id: 'Freya', name: 'Saved voice' }]);
+  for (const preset of ttsPresetIds.filter((id) => id !== 'ollama')) {
+    const value = applyTtsPreset(defaults, preset);
+    assert.equal(value.defaultVoice, '');
+    assert.deepEqual(value.manualVoices, []);
+  }
+  assert.deepEqual(parseTtsSettings({ preset: 'ollama' }).manualVoices, []);
+});
+for (const preset of ['qwen3-tts', 'mlx-audio'])
+  test(`${preset} maps common instructions to instruct and sends captured custom JSON`, async (t) => {
+    const f = setup(t);
+    const languageKey = preset === 'mlx-audio' ? 'lang_code' : 'language';
+    const extraBody = {
+      [languageKey]: 'Japanese',
+      temperature: 0.7,
+      enabled: false,
+      tags: ['one', 2, null],
+    };
+    const config = applyTtsPreset(
+      parseTtsSettings({
+        baseUrl: 'http://localhost/v1',
+        model: 'custom-voice',
+        defaultVoice: 'Ono_Anna',
+        defaultInstructions: '穏やかに',
+        extraBody,
+      }),
+      preset,
+    );
+    f.config(config);
+    const job = f.s.speak('a', input(preset));
+    config.extraBody[languageKey] = 'English';
+    await wait(() => f.s.get('a', job.jobId).state === 'completed');
+    const body = JSON.parse(f.posts[0].o.body);
+    assert.equal(body.instruct, '穏やかに');
+    assert.equal(String(f.posts[0].u), 'http://localhost/v1/audio/speech');
+    assert.equal(Object.hasOwn(body, 'instructions'), false);
+    assert.equal(body[languageKey], 'Japanese');
+    assert.equal(body.temperature, 0.7);
+    assert.equal(body.enabled, false);
+    assert.deepEqual(body.tags, ['one', 2, null]);
+    if (preset === 'mlx-audio') {
+      assert.deepEqual(await f.s.voices('a'), { source: 'manual', voices: [] });
+      assert.equal(f.posts.length, 1, 'manual voices do not request a model-specific endpoint');
+    }
+    const stored = parseTtsSettings({ preset, instructionsParameter: 'instructions' });
+    assert.equal(
+      stored.instructionsParameter,
+      'instructions',
+      'explicit existing mapping is preserved',
+    );
+    assert.equal(applyTtsPreset(stored, preset).instructionsParameter, 'instruct');
+  });
+test('extra parameters merge beside nested instructions without mutating saved settings', () => {
+  const connection = parseTtsSettings({
+    instructionsMode: 'json',
+    instructionsParameter: 'generation.instruct',
+    extraBody: { language: 'Japanese', generation: { temperature: 0.6, options: [true, null] } },
+  });
+  const speech = { text: '本文', voice: 'voice', speed: 1, instructions: '静かに' };
+  const first = ttsSpeechRequest(connection, speech);
+  assert.deepEqual(first.body.generation, {
+    temperature: 0.6,
+    options: [true, null],
+    instruct: '静かに',
+  });
+  assert.equal(connection.extraBody.generation.instruct, undefined);
+  first.body.generation.options.push(false);
+  const empty = ttsSpeechRequest(connection, { ...speech, instructions: '' });
+  assert.deepEqual(empty.body.generation, { temperature: 0.6, options: [true, null] });
+  assert.equal(empty.body.language, 'Japanese');
+});
+test('extra parameters reject invalid JSON values and conflicts with owned payload fields atomically', () => {
+  const cyclic = {};
+  cyclic.self = cyclic;
+  for (const extraBody of [
+    null,
+    [],
+    'language=Japanese',
+    { nested: undefined },
+    { amount: NaN },
+    { date: new Date() },
+    cyclic,
+    JSON.parse('{"nested":{"__proto__":{}}}'),
+    { nested: { constructor: 'bad' } },
+    ...['model', 'input', 'voice', 'speed', 'response_format'].map((key) => ({
+      [key]: 'override',
+    })),
+    { generation: null },
+    { generation: [] },
+    { generation: 'text' },
+    { generation: { instruct: 'override' } },
+  ])
+    assert.throws(() =>
+      parseTtsSettings({ instructionsParameter: 'generation.instruct', extraBody }),
+    );
+  assert.deepEqual(parseTtsSettings({}).extraBody, {});
+});
+test('speech uses default, per-call and empty instructions with nested mapping and deduplication', async (t) => {
+  const f = setup(t);
+  f.config({
+    instructionsMode: 'json',
+    defaultInstructions: '既定の声色',
+    instructionsParameter: 'generation.instruct',
+    speechPath: 'synthesize',
+  });
+  const first = f.s.speak('a', input('default'));
+  await wait(() => f.s.get('a', first.jobId).state === 'completed');
+  assert.equal(f.posts[0].u, 'http://localhost:8080/v1/synthesize');
+  assert.deepEqual(JSON.parse(f.posts[0].o.body).generation, { instruct: '既定の声色' });
+  const explicit = { ...input('override'), instructions: '明るく' };
+  const second = f.s.speak('a', explicit);
+  await wait(() => f.s.get('a', second.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.posts[1].o.body).generation.instruct, '明るく');
+  assert.equal(f.s.speak('a', explicit).jobId, second.jobId);
+  assert.throws(() => f.s.speak('a', { ...explicit, instructions: '静かに' }), {
+    code: 'TTS_REQUEST_CONFLICT',
+  });
+  f.config({ defaultInstructions: '変更後' });
+  assert.equal(f.s.speak('a', input('default')).jobId, first.jobId);
+  const third = f.s.speak('a', { ...input('empty'), instructions: '' });
+  await wait(() => f.s.get('a', third.jobId).state === 'completed');
+  assert.equal(Object.hasOwn(JSON.parse(f.posts[2].o.body), 'generation'), false);
+  assert(!JSON.stringify(f.s.get('a', second.jobId)).includes('明るく'));
+  assert.equal(f.s.jobs.get(second.jobId).instructions, undefined);
+  assert.throws(() => f.s.speak('a', { ...input('bad'), instructions: 1 }), {
+    code: 'INVALID_ARGUMENT',
+  });
+});
+test('disabled nuance ignores default and per-call instructions while speech and extra parameters remain usable', async (t) => {
+  const f = setup(t);
+  f.config({
+    defaultInstructions: '落ち着いて',
+    instructionsParameter: 'generation.instruct',
+    extraBody: { language: 'Japanese', generation: { temperature: 0.4 } },
+  });
+  for (const [index, instructions] of [undefined, '明るく', '', '   '].entries()) {
+    const request = { ...input('ignored-' + index), instructions };
+    const job = f.s.speak('a', request);
+    await wait(() => f.s.get('a', job.jobId).state === 'completed');
+    const body = JSON.parse(f.posts[index].o.body);
+    assert.equal(body.input, '本文');
+    assert.equal(body.language, 'Japanese');
+    assert.deepEqual(body.generation, { temperature: 0.4 });
+    assert.equal(Object.hasOwn(body, 'instructions'), false);
+    assert.equal(Object.hasOwn(body, 'instruct'), false);
+    assert.equal(f.s.speak('a', request).jobId, job.jobId);
+  }
+  assert.equal(f.posts.length, 4);
+  assert.throws(() => f.s.speak('a', { ...input('bad'), instructions: 1 }), {
+    code: 'INVALID_ARGUMENT',
+  });
+  f.config({ instructionsMode: 'json' });
+  const enabled = f.s.speak('a', input('enabled'));
+  await wait(() => f.s.get('a', enabled.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.posts[4].o.body).generation.instruct, '落ち着いて');
+});
+test('streamed WAV length sentinels are finalized before the common player; malformed sizes still fail', async (t) => {
+  const streaming = wave();
+  streaming.writeUInt32LE(0xffffffff, 4);
+  streaming.writeUInt32LE(0xffffffff, 40);
+  const normalized = finalizeTtsWave(streaming);
+  assert.equal(waveDuration(normalized), 0.02);
+  assert.equal(streaming.readUInt32LE(4), 0xffffffff);
+  const malformed = wave();
+  malformed.writeUInt32LE(0xfffffffe, 40);
+  assert.throws(() => waveDuration(finalizeTtsWave(malformed)), { code: 'TTS_INVALID_AUDIO' });
+  let played = false;
+  const f = setup(t, {
+    fetcher: async () => new Response(streaming, { headers: { 'Content-Type': 'audio/wav' } }),
+    play: async (bytes) => {
+      assert.equal(waveDuration(bytes), 0.02);
+      played = true;
+    },
+  });
+  const job = f.s.speak('a', input('stream'));
+  await wait(() => f.s.get('a', job.jobId).state === 'completed');
+  assert(played);
+});
 test('TTS settings validate endpoints, secrets exclusion, voice list and speed', () => {
   assert.equal(parseTtsSettings().defaultSpeed, 1);
   assert.equal(
@@ -89,9 +358,15 @@ test('TTS settings validate endpoints, secrets exclusion, voice list and speed',
     { defaultSpeed: NaN },
     { defaultSpeed: 0 },
     { apiKey: 'secret' },
+    ...[{}, null, 'default', [null], [{}], [{ id: 'default', name: {} }]].map((manualVoices) => ({
+      manualVoices,
+    })),
     { manualVoices: [{ id: 'x' }, { id: 'x' }] },
   ])
     assert.throws(() => parseTtsSettings(v));
+  assert.deepEqual(parseTtsSettings({ manualVoices: [{ id: 'default' }] }).manualVoices, [
+    { id: 'default', name: 'default' },
+  ]);
 });
 test('WAV validation rejects corrupt, inconsistent and too long audio; supports >30s', () => {
   assert.equal(waveDuration(wave(31)), 31);

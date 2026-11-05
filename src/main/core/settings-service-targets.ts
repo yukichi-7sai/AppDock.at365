@@ -8,7 +8,12 @@ import {
   aiTimeoutLimits,
   type AiConnectionSettings,
 } from '../../shared/ai';
-import { defaultTtsSettings, parseTtsSettings } from '../../shared/tts';
+import {
+  defaultTtsSettings,
+  parseTtsSettings,
+  applyTtsPreset,
+  ttsPresetIds,
+} from '../../shared/tts';
 import { replaceNotificationPreference } from '../../shared/notification-preference-edit';
 import {
   notificationTypeKey,
@@ -79,6 +84,7 @@ interface Target {
   context?: unknown;
   guardRevision?(): string;
   applies?(key: string): string;
+  hasDependentChanges?(before: Settings, after: Settings, key: string): boolean;
 }
 const fail = (code = 'INVALID_ARGUMENT'): never => {
   throw new SettingsTargetError(
@@ -250,6 +256,7 @@ export class SettingsServiceTargets {
         const changed = keys.filter(
           (key) =>
             !sameSetting(before[key], after[key]) ||
+            spec.hasDependentChanges?.(store.value, next, key) ||
             (resets.has(key) &&
               spec.fields.find((field) => field.key === key)?.inherit !== false &&
               original !== undefined &&
@@ -909,6 +916,49 @@ export class SettingsServiceTargets {
       protectedKey = this.options.tts.configurationState().protected;
     const fields: Field[] = [
       {
+        key: 'preset',
+        title: hostText('settings.ttsSettings.preset'),
+        type: 'select',
+        options: ttsPresetIds.map((value) => ({
+          value,
+          label: hostText(`settings.ttsSettings.preset.${value}`),
+        })),
+        default: defaults.preset,
+      },
+      {
+        key: 'speechPath',
+        title: hostText('settings.ttsSettings.speechPath'),
+        type: 'string',
+        maxLength: 256,
+        default: defaults.speechPath,
+      },
+      {
+        key: 'defaultInstructions',
+        title: hostText('settings.ttsSettings.defaultInstructions'),
+        type: 'string',
+        default: defaults.defaultInstructions,
+      },
+      {
+        key: 'instructionsMode',
+        title: hostText('settings.ttsSettings.instructionsMode'),
+        type: 'select',
+        options: options(['none', 'json']),
+        default: defaults.instructionsMode,
+      },
+      {
+        key: 'instructionsParameter',
+        title: hostText('settings.ttsSettings.instructionsParameter'),
+        type: 'string',
+        default: defaults.instructionsParameter,
+      },
+      {
+        key: 'extraBody',
+        title: hostText('settings.ttsSettings.extraBody'),
+        type: 'json',
+        schema: { type: 'object', additionalProperties: true },
+        default: defaults.extraBody,
+      },
+      {
         key: 'baseUrl',
         title: hostText('settings.ttsSettings.url'),
         type: 'string',
@@ -962,6 +1012,8 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.tts',
+      hasDependentChanges: (before, after, key) =>
+        key === 'preset' && !sameSetting(before.tts, after.tts),
       ui: settingsUiFields('tts'),
       title: hostText('settings.ttsSettings.title'),
       category: 'tts',
@@ -969,7 +1021,12 @@ export class SettingsServiceTargets {
       values: (settings) => project(parseTtsSettings(settings.tts), fields),
       overrides: (raw) => project(raw.tts, fields),
       replace: (settings, changes, reset) => {
-        const tts = parseTtsSettings(settings.tts);
+        let tts = parseTtsSettings(settings.tts);
+        if (
+          typeof changes.preset === 'string' &&
+          ttsPresetIds.includes(changes.preset as typeof tts.preset)
+        )
+          tts = applyTtsPreset(tts, changes.preset as typeof tts.preset);
         updateRecord(tts as unknown as RecordValue, changes, reset, fields);
         settings.tts = parseTtsSettings(tts);
         return settings;
