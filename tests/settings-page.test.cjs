@@ -328,7 +328,6 @@ test('invalid input never enters projection; valid page writes persist with priv
   assert.equal(f.saved.value.extensions['private.other'].settings.secret, 'private-value');
   assert.equal(f.page.snapshot().schemaVersion, 2);
   assert.equal(JSON.stringify(f.page.snapshot()).includes('private-value'), false);
-  assert.equal('dirty' in f.page.snapshot().content.editing, false);
   await assert.rejects(f.act({ kind: 'edit', action: { type: 'save' } }), /不正/);
   await f.act({ kind: 'edit', action: { type: 'mode', value: 'json' } });
   await assert.rejects(
@@ -363,7 +362,6 @@ test('search is metadata-only and persistent; explicit movement switches page an
   assert.equal(f.navigation.commandTarget, undefined);
   const move = f.page.snapshot().content.move;
   assert.equal(f.editor.snapshot().pageId, 'applet:fixture.a.b');
-  assert.equal('dirty' in f.editor.snapshot(), false);
   await f.act({ kind: 'move', itemId: results[0].id });
   const latest = f.page.snapshot().content.move;
   await assert.rejects(f.act({ kind: 'moved', requestId: move.id, pageId: move.pageId }), /古く/);

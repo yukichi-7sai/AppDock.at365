@@ -103,7 +103,8 @@ async function select(title, heading = title) {
     .locator('.settings-categories')
     .getByRole('button', { name: title, exact: true })
     .click();
-  await host.getByRole('heading', { name: heading, level: 1, exact: true }).waitFor();
+  if (title === 'AppDockについて') await host.getByTestId('about-overview').waitFor();
+  else await host.getByRole('heading', { name: heading, level: 1, exact: true }).waitFor();
   await settleSettings(host);
 }
 async function hints(enabled) {
@@ -158,7 +159,6 @@ async function appearance() {
     visible ? 1 : 0,
   );
   assert.equal(await common.locator('.settings-hint-trigger').count(), visible ? 4 : 0);
-  assert.equal(await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(), 0);
   return common;
 }
 async function checkSectionTitles() {
@@ -191,7 +191,7 @@ async function checkSectionTitles() {
     await host.waitForFunction((theme) => document.documentElement.dataset.theme === theme, theme);
     await select('表示');
     const reference = await host
-      .locator('.settings-section > header h2')
+      .locator('.settings-field-label strong')
       .first()
       .evaluate((el) => getComputedStyle(el).color);
     for (const width of [1280, 760]) {
@@ -214,25 +214,17 @@ async function checkSectionTitles() {
         await select(title);
         await checkToggles(theme, width, title);
         if (title === '表示') {
-          assert.equal(
-            await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(),
-            0,
-          );
           const hintToggle = host.getByRole('switch', { name: 'ヒントの表示', exact: true });
           const initialHints = (await snapshot()).settings.value.host.showHints;
           for (const expected of [!initialHints, initialHints]) {
             await hintToggle.click();
             await settleSettings(host);
             assert.equal((await snapshot()).settings.value.host.showHints, expected);
-            assert.equal(
-              await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(),
-              0,
-            );
             await checkToggles(theme, width, '表示/' + expected);
           }
           await host.screenshot({ path: path.join(profile, `layout-${theme}-${width}.png`) });
           checks.push(
-            `${theme}/${width}: standalone toggles align left and persist ON/OFF; removed Shell controls remain absent with hints ON/OFF`,
+            `${theme}/${width}: standalone toggles align left and persist ON/OFF with hints ON/OFF`,
           );
         }
         const read = async (state) => {

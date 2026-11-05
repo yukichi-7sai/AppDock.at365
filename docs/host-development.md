@@ -102,7 +102,7 @@ Windows portable起動用EXEの`FileDescription`は、electron-builderが`packag
 | 型・React・main | `pnpm run typecheck` / `pnpm run build` |
 | SDK・Runtime | `pnpm run build:dotnet`、該当Appletの再ビルド。SDKとRuntimeを参照するnative EXEも再publish |
 | 設定・RPC・ライフサイクル | `pnpm test`。[core](../tests/core.test.cjs)、[lifecycle](../tests/lifecycle.test.cjs)、[Applet設定](../tests/applet-settings.test.cjs)の該当箇所 |
-| UI・保存・コマンド | `pnpm run test:ui` / `pnpm run test:preferences`、該当AppletのUIテスト |
+| 本体の画面・保存・コマンド | `pnpm run test:ui`（workspaceの操作と再起動保存）、[設定・Applet等の担当試験](testing.md#適切な層を選ぶ) |
 | 配布・依存ランタイム | `pnpm run dist`、完成EXEを別テストフォルダーへコピーしたsmoke |
 
 API追加のテストは、正常系に加え、capability不足、不正型／範囲、他Applet領域への指定、停止後の要求、保存失敗を変更内容に応じて確認します。プロセス関連は無効化・再起動・ホスト終了・異常終了と、他Appletが継続することを確認します。Nodeと.NETに共通APIを足した場合は双方の実プロセスで往復させます。

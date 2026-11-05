@@ -189,7 +189,6 @@ async function gmail(s) {
   assert.equal((await b.snapshot()).dataDirectory, pb.local);
   assert.equal((await a.snapshot()).sharedDirectory, path.join(pa.base, 'data'));
   assert.equal((await b.snapshot()).sharedDirectory, path.join(pb.base, 'data'));
-  assert.equal(Object.hasOwn(await b.snapshot(), 'legacyLocalData'), false);
   assert.equal(fs.readFileSync(oldMarker, 'utf8'), 'old data must stay untouched');
   assert.equal(fs.existsSync(path.join(pa.base, '.appdock')), false);
   assert.equal(fs.existsSync(path.join(pa.base, 'data', 'chromium')), false);
@@ -297,11 +296,13 @@ async function gmail(s) {
       groups: [{ id: 'photos', name: '写真', images: [{ file: 'fixture.png' }] }],
     };
   });
+  const avatar = (await a.snapshot()).settings.value.extensions['fixture.profile'].settings.avatar;
+  assert(avatar?.file);
   deliverShared(a, b);
   await until(
     async () =>
       (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.avatar?.file ===
-      'fixture.png',
+      avatar.file,
     'image ref',
   );
   const imageSnapshot = () => b.dock.evaluate(() => window.dock.imageLibrary.snapshot());
@@ -310,7 +311,10 @@ async function gmail(s) {
       (await imageSnapshot()).images.some((i) => i.ref.file === 'fixture.png' && i.available),
     'image receipt',
   );
-  const before = (await imageSnapshot()).images.find((i) => i.ref.file === 'fixture.png').thumbnail;
+  const imagePreview = () =>
+    b.dock.evaluate(() => window.dock.imageLibrary.preview({ file: 'fixture.png' }));
+  const before = await imagePreview();
+  assert(before);
   // A second valid PNG changes pixels without changing the logical reference.
   const pixel = Buffer.from(
     await b.dock.evaluate(() => {
@@ -325,12 +329,11 @@ async function gmail(s) {
   );
   fs.writeFileSync(imageFile, pixel);
   deliverFile(imageFile, path.join(pb.base, 'data/assets/images/fixture.png'));
-  await until(
-    async () =>
-      (await imageSnapshot()).images.find((i) => i.ref.file === 'fixture.png')?.thumbnail !==
-      before,
-    'image-only update',
-  );
+  await until(async () => {
+    await imageSnapshot();
+    const current = await imagePreview();
+    return current && current !== before;
+  }, 'image-only update');
   assert.equal((await imageSnapshot()).groups[0].images[0].file, 'fixture.png');
   checks.push('common image refs/groups synchronize and image-only receipt refreshes the preview');
   await uiA.locator('.sound-file').scrollIntoViewIfNeeded();

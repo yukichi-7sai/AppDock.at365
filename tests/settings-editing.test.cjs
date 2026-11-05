@@ -149,9 +149,6 @@ test('hint visibility defaults on, preserves false, validates input and stays in
   assert.equal(saved.host.showHints, false);
   assert.deepEqual(saved.tts, settings.tts);
   assert.ok(searchSettings(pages, 'ヒントの表示').some((r) => r.key === 'showHints'));
-  assert.ok(
-    page.items.filter((i) => i.key.startsWith('shellProviders.')).every((i) => !i.description),
-  );
 });
 
 test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {
@@ -169,7 +166,6 @@ test('valid edits save immediately; invalid JSON/numbers and save failures never
   );
   assert.equal(f.saves, 0);
   assert.equal('text' in f.session.snapshot(), false);
-  assert.equal('dirty' in f.session.snapshot(), false);
   await f.act({
     type: 'partial-text',
     pageId: 'appearance',

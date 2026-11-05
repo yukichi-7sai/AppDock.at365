@@ -177,22 +177,6 @@ exports.deactivate = () => record('stop');
     );
     assert.equal(await overview.getByTestId('about-applet-count').innerText(), '2');
     assert.equal(
-      await page.getByRole('heading', { name: '実行環境の詳細', exact: true }).count(),
-      0,
-    );
-    assert.equal(await overview.locator('.settings-section').count(), 0);
-    for (const removed of [
-      'AppDockへようこそ',
-      '現在のバージョン',
-      '最新のバージョンです。',
-      '実行環境',
-      'まとめて更新',
-      '本体の更新',
-      'Appletを一括更新',
-      'Appletの管理と更新',
-    ])
-      assert.equal(await overview.getByText(removed, { exact: true }).count(), 0, removed);
-    assert.equal(
       await overview
         .getByText('アプリ・コマンド・毎日の操作を、ひとつの場所に。', { exact: true })
         .count(),
@@ -382,15 +366,6 @@ exports.deactivate = () => record('stop');
         : 'development update execution is deferred to the fixed EXE',
     );
     await setOptionsOpen(true);
-    assert.equal(
-      await page
-        .getByText(
-          '起動時は更新情報の確認だけを行います。配布ファイルのダウンロードや適用は行いません。同じ版の再適用を許可しても古い版には戻しません。',
-          { exact: true },
-        )
-        .count(),
-      0,
-    );
     const auto = page.getByRole('switch', { name: 'AppDockの更新を自動で確認', exact: true });
     assert.equal(await auto.getAttribute('aria-checked'), 'true');
     await auto.click();

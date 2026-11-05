@@ -621,21 +621,8 @@ async function selectedBorder(label) {
     );
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await until(() => host.locator('.settings-categories').isVisible(), 'settings');
-    assert.equal(
-      await host
-        .locator('.settings-categories')
-        .getByRole('button', { name: '画像ライブラリー', exact: true })
-        .count(),
-      0,
-    );
-    assert.equal(
-      await host.getByRole('button', { name: '画像ライブラリーを開く', exact: true }).count(),
-      0,
-    );
     await open();
-    checks.push(
-      'settings no longer contains a library category or link; the independent page remains available',
-    );
+    checks.push('the image library can be reopened from settings');
     checks.push(
       await require('./image-gallery-interactions-check.cjs').checkGalleryInteractions({
         page,

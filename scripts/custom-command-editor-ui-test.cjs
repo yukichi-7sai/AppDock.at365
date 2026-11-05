@@ -114,7 +114,8 @@ async function fixture(name) {
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const definitions = async () => (await snapshot()).settings.value.customCommands.items;
 const diskDefinitions = () =>
-  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).customCommands.items;
+  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'))
+    .customCommands.items;
 (async () => {
   let release;
   try {
@@ -133,7 +134,10 @@ const diskDefinitions = () =>
       items: fixtures.map(({ id, name }) => ({ id, name, description: '' })),
     };
     settings.customCommands = { version: 2, items: [] };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(settings),
+    );
     const defaultConnection = require('../out/main/shared/mcp-client').defaultMcpConnection;
     fs.writeFileSync(
       path.join(local, 'mcp-client.json'),
@@ -410,7 +414,7 @@ const diskDefinitions = () =>
       profile,
       name: 'mcp-layout',
     });
-    for (const width of [520, 360]) {
+    for (const width of [900]) {
       await page.setViewportSize({ width, height: 650 });
       const bounds = await dialog.evaluate((el) => ({
         right: el.getBoundingClientRect().right,
@@ -484,6 +488,8 @@ const diskDefinitions = () =>
     await add('appdock.input.sendKeys');
     await dialog.getByLabel('名前', { exact: true }).fill('Saved keys');
     const capture = dialog.getByRole('button', { name: '送信キーを入力', exact: true });
+    await capture.click();
+    await capture.getByText('押して入力', { exact: true }).waitFor();
     await capture.dispatchEvent('keydown', {
       key: 't',
       code: 'KeyT',
@@ -491,10 +497,6 @@ const diskDefinitions = () =>
       shiftKey: true,
     });
     assert.deepEqual(await capture.locator('kbd').allTextContents(), ['Ctrl', 'Shift', 'T']);
-    assert.equal(
-      await capture.locator('..').locator('..').locator('.settings-field-label > p').count(),
-      0,
-    );
     await dialog.locator('.shortcut-special-trigger').click();
     await require('./custom-command-layout-checks.cjs')({
       page,
@@ -510,9 +512,7 @@ const diskDefinitions = () =>
     assert.equal(a.state.calls + b.state.calls, 0, 'editing never executes downstream tools');
     assert.deepEqual(diskDefinitions(), await definitions());
     assert.deepEqual(errors, []);
-    checks.push(
-      'send-key description removed, DOM-only recording and persistence; no downstream execution',
-    );
+    checks.push('DOM-only key recording and persistence; no downstream execution');
     success = true;
   } catch (error) {
     fs.writeFileSync(path.join(profile, 'error.txt'), error.stack);

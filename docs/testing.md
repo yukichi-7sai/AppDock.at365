@@ -19,6 +19,10 @@ AppDock本体とAppletのテストを追加・修正・整理するときの判�
 
 ## 適切な層を選ぶ
 
+`dev.bat run test:ui [固定EXE]`は`scripts/workspace-ui-test.cjs`を実行し、本体バー・リボン・パレットの操作、無効なセッションと旧専用コマンドの拒否、テーマ・再起動後の保存を確認する。廃止した画面・API・文言の不在だけを確認する検査は継続しない。旧入力を受けたときのデータ保護、権限・不正操作の拒否は現行の契約として維持する。
+
+旧総合GUIの担当は専用試験へ集約する。Appletの開始・停止と再起動後の有効状態は`applet-information-ui-test.cjs`、Node/.NETの設定APIは`applet-api-ui-test.cjs`、Storage・Secretsの往復は`data-settings-ui-test.cjs`、フォーム／不正JSONの保存は`settings-input-ui-test.cjs`と`applet-settings-ui-test.cjs`、外部設定の受信・破損・復旧は`settings-sync-ui-test.cjs`、コマンドパレットは`command-palette-ui-test.cjs`を使う（各スクリプトは`scripts/`）。
+
 `tests/mcp-result-retention.test.cjs`は、結果なし/処理中だけの空待機、保持期限の境界、複数結果の期限順序、時計変更時の取得と終了時の予約解除を検査する。`tests/notification-sound-lifetime.test.cjs`は、取得待ちでの周期確認なし、発行元停止時の即時取消と他の発行元の継続、ロック保留、OFF/ONと遅延応答、取消購読の解放を検査する。`scripts/audio-playback-ui-test.cjs [固定EXE]`は既存の無音WAV再生/保存/取消に加え、実Appletの再起動・異常終了からの音声取消と新世代の再生受付を確認する。
 
 - 値の検証、計画、条件、保存データの保護は、可能なら`tests/*.test.cjs`の小さな入力と出力で確認する。純粋関数の全組み合わせをGUIでも繰り返さない。
@@ -140,4 +144,4 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 現行soundsの一覧監視は`tests/file-watch-sounds.test.cjs`で初期照合・OFF時の無走査・通知欠落と完了待ち・走査中の通知・watch失敗・停止後の結果拒否・開始の重複を確認する。`tests/registered-sounds.test.cjs`と`tests/sound-assets.test.cjs`は既存のWAV検証・同名登録・保存先を担当する。`scripts/file-watch-sounds-ui-test.cjs [固定EXE]`は隔離した実Electronで通常watch、補助OFF/ON、抑止した通知の回復、選択値と素材の保持、停止/再開時の登録寿命を確認する。外部サービスと実スピーカー再生は使わない。
 
-`tests/file-watch-assistance.test.cjs`は共通ループ、`tests/file-observer.test.cjs`と`tests/settings-observer-race.test.cjs`は安定確認・通知欠落・保存競合、`tests/file-watch-images.test.cjs`は画像の祖先watch・差分確認・走査中イベント、`tests/file-watch-rosters.test.cjs`は名簿の登録寿命と通知欠落時の受信、`tests/file-watch-settings.test.cjs`は設定の既定/検証/保存を担当する。`scripts/file-watch-assistance-ui-test.cjs [固定EXE]`は設定のON/OFF・数値確定/取消/失敗・通常watch継続・広狭幅・旧残存チェックの非実行とデータ保持を確認する。旧残存チェック専用の単体/GUI試験は機構とともに削除し、共通の警告episodeは`tests/warning-reporter.test.cjs`へ残す。
+`tests/file-watch-assistance.test.cjs`は共通ループ、`tests/file-observer.test.cjs`と`tests/settings-observer-race.test.cjs`は安定確認・通知欠落・保存競合、`tests/file-watch-images.test.cjs`は画像の祖先watch・差分確認・走査中イベント、`tests/file-watch-rosters.test.cjs`は名簿の登録寿命と通知欠落時の受信、`tests/file-watch-settings.test.cjs`は設定の既定/検証/保存を担当する。`scripts/file-watch-assistance-ui-test.cjs [固定EXE]`は設定のON/OFF・数値確定/取消/失敗・通常watch継続・広狭幅・既存データ保持を確認する。共通の警告episodeは`tests/warning-reporter.test.cjs`が担当する。

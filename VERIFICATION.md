@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-11-05 廃止機能の不在検査と旧総合GUIの整理（製品変更なし）
+
+- cleanなmain `9752800`から開始し、`pull --ff-only`は更新なし。旧Shellの設定・API・HTML、旧ホームの入口、旧Applet詳細タブ、旧保存状態／警告、移動済みの設定項目・ボタン・文言が「存在しないことだけ」を確認する検査を除去した。旧入力によるデータ破壊の防止、実行できない旧コマンド／経路の拒否、非公開API・古いセッションの拒否、即時保存・不正入力・再起動後の保持は維持した。
+- 廃止したApplet詳細画面を前提とする`scripts/ui-test.cjs`を削除し、`test:ui`を現行の`workspace-ui-test.cjs`へ接続した。開始・停止、Node/.NET設定API、Storage・Secrets、フォームとJSON、受信・復旧、パレットの担当となる既存試験を`docs/testing.md`へ記録した。旧Shell専用fixtureと切替処理も検索・通知センターの試験から除去した。
+- 残すGUIを実行し、テスト側の旧参照を現行仕様へ更新した。画像プレビューとグループメニュー、設定セクション／Aboutの待機先、検索comboboxの名前、Storageの共通ヘルパー、ホスト所有の通知センターと通知編集ダイアログを使う。通知操作前の本体表示と送信キー入力の準備完了を待つ。設定同期は実際に保存された割当画像参照を比較し、遅延生成されるプレビューをAPIから読み出す。通知の装飾色の完全一致を外し、意味レベル・文字とボタンのコントラスト・実操作を保持した。コマンド編集の画面内到達性は製品の最小幅900以上で確認し、狭幅での入力保持検査は残した。
+- ビルド、関連7ファイル117単体テスト、変更19スクリプトの構文、書式、差分検査が成功。単体はnotification-center、settings-editing、settings-page、core、host-pages、shortcut-pages、settings-service-targetsを実行した。固定EXEではworkspace、About、Applet管理`--management-only`、host-pages、file-watch-assistance、settings-hints`--sections-only`、settings-search、shell-bars`--notifications-only`、tray-menu、notification-settings、notification-center、notification-colors、image-gallery、custom-command-editorの14範囲が成功。開発版settings-syncも隔離した2配置・Gmailのローカルfixtureで11群成功した。全製品回帰、実利用者の手動確認、実Gmail／実同期サービスの疎通は今回の対象外。
+- 初回のApplet管理全体試験は、導入時に「更新ミニプログラムを開始できませんでした」となり、新プロセスの復元待ちで失敗した。導入・更新処理は変更しておらず、今回の変更に対応する管理画面16群を専用モードで再実行して成功した。全体試験を成功扱いしていない。旧セレクター・保存先・画像参照・非表示Window・未準備のキー入力・対応外の幅・装飾色比較による失敗も元ログとprofileを保持し、該当試験の修正後成功を別ログへ記録した。構文検査用の一括コマンドはWindowsの引用符解釈で失敗したため、ファイル別`node --check`で19件を再確認した。
+- 製品ソース、設定／保存形式、公開API、依存とlockfileは変更していない。版更新・再発行は行わず、既存0.148.3の固定EXEを共用ランタイムで使用した。EXE SHA256=`db5b6166facfcc70e679d6ea0bf505f4bc5cfb54a6449d37398738075d7aef66`。配布元と共用runtimeの管理101ファイルが実行時manifestのSHA256に一致することを最終照合した。
+- 証跡は`.artifacts/retired-test-cleanup-20261105/`。入力hash、全実行ログ／終了コード、最終成功範囲、修正理由とレビューを保存する。成功後の後続変更は各試験への影響を照合し、通知設定とコマンド編集は最終版で再実行した。製品変更がないため無関係な回帰を再実行しない。書式だけの変更と文書追記を分けて最終入力を照合し、コミット照合は`.artifacts/commit-validation-retired-test-cleanup-20261105/`へ記録する。
+- 関連プロセス0を確認し、今回の通知fixtureへ配置した専用.NET実行物90ファイル（論理3,686,050 bytes）を削除した。結果・ログ・画像等1,238ファイルのSHA256不変を確認した。今回の成功結果と失敗診断を検証証跡として保持し、profile全体の削除は0。共用runtime・固定build・配布元を保持する。差分レビューでは製品コードへの波及と保持契約を確認し、今回の整理を妨げる指摘なし。依頼されたコミットと通常pushを対象とし、Release・実利用先deployは行わない。
+
 ## 2026-11-05 本体翻訳辞書の未使用キー整理と昇順化（0.148.3）
 
 - cleanなmain `e009637`から開始し、追跡先への`pull --ff-only`は更新なし。製品499ファイルの文字列・テンプレート参照を解析し、動的呼出しの型／分岐、音・テキスト用変換、.NETとUpdaterへの引き継ぎも照合した。未使用211キーとテスト専用1キーの計212キーを削除し、4,153→3,941キーへ整理。残る全値の一致とキーの辞書順昇順を確認した。

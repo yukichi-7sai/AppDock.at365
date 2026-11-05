@@ -477,13 +477,12 @@ async function until(fn, name) {
     assert.equal(typeof previewFailure.result.error, 'string');
     assert.equal(previewFailure.pageError, '');
     checks.push('preview-failures-return-to-dialog-without-page-error');
-    assert.equal(await page.getByRole('tablist', { name: 'Applet詳細の切り替え' }).count(), 0);
     const snapshot = await page.evaluate(() => window.dock.snapshot());
     assert(
       snapshot.extensions.some((a) => a.collection),
       'Web site fixture exists outside package rows',
     );
-    checks.push('provider-included-sites-excluded-and-old-details-removed');
+    checks.push('provider-included-sites-excluded');
     await move('test.b', 'コマンドトリガー');
     await page.locator('.command-provider-filter').waitFor();
     await page.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true }).focus();

@@ -39,7 +39,7 @@
     "dist:host": "pnpm run build:dotnet && pnpm run build:updater && pnpm run build && node scripts/build-portable.cjs && node scripts/publish-host.cjs",
     "pack:starter": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-starter.ps1",
     "smoke": "node scripts/smoke.cjs",
-    "test:ui": "pnpm run build:test-extensions && node scripts/ui-test.cjs",
+    "test:ui": "node scripts/workspace-ui-test.cjs",
     "test:navigation": "pnpm run build:test-extensions && node scripts/navigation-ui-test.cjs",
     "test:preferences": "pnpm run build:test-extensions && node scripts/preferences-ui-test.cjs",
     "test:hotkeys": "pnpm run build:test-extensions && node scripts/hotkeys-ui-test.cjs",

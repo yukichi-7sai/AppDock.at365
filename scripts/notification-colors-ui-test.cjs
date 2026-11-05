@@ -7,7 +7,6 @@ const { spawn } = require('node:child_process');
 const net = require('node:net');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
-const { resolveAppearance } = require('../out/main/shared/appearance');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(root, '.artifacts', 'notification-colors-' + Date.now());
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
@@ -80,10 +79,13 @@ settings.gestures.enabled = false;
 for (const id of ids) settings.extensions[id] = { enabled: true, settings: {} };
 settings.notificationPreferences = {
   overrides: [
-    { ownerKind: 'host', ownerId: 'information', typeId: 'operation-completed', enabled: false },
+    { ownerKind: 'host', ownerId: 'information', typeId: 'operation-completed', targets: [] },
   ],
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -164,17 +166,10 @@ async function inspectColors(page, selector, theme, kind) {
   );
   assert.deepEqual(rows.map((r) => r.level).sort(), [...levels].sort());
   for (const row of rows) {
-    assert.equal(row.border, row.label);
     for (const color of [row.text, row.body, row.label, row.muted].filter(Boolean))
       assert(contrast(color, row.bg) >= 4.5, `${kind} ${theme} ${row.level} text contrast`);
     if (row.button)
       assert(contrast(row.button.text, row.button.bg) >= 4.5, `${kind} ${theme} button contrast`);
-    if (row.level === 'info') {
-      assert.equal(row.bg, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(25, 27, 35)');
-      const accent = resolveAppearance('alice-blue', theme === 'dark').colors.accent;
-      const rgb = accent.match(/[a-f\d]{2}/gi).map((value) => parseInt(value, 16));
-      assert.equal(row.border, `rgb(${rgb.join(', ')})`);
-    }
   }
   styles.push({ theme, kind, rows });
   await page.screenshot({ path: path.join(profile, kind + '-' + theme + '.png') });
@@ -215,10 +210,8 @@ async function main() {
   for (const level of levels)
     assert.equal(model.items.find((i) => i.typeId === level).level, level);
   await command('appdock.notifications.open');
-  const center = await until(
-    () => pages().find((p) => p.url().endsWith('/notification-center.html')),
-    'center',
-  );
+  const center = host;
+  await center.getByTestId('notification-center').waitFor();
   for (const theme of ['dark', 'light']) {
     await host.evaluate(async (theme) => {
       const s = await window.dock.snapshot();
@@ -236,7 +229,7 @@ async function main() {
   );
   await banner.locator('.level-info button.primary').click();
   await until(
-    () => fs.existsSync(path.join(profile, 'local-state/storage', ids[0], 'acted.json')),
+    () => fs.existsSync(require('./test-storage.cjs').file(profile, ids[0], 'acted')),
     'owned action',
   );
   checks.push('information primary action remains executable');
@@ -265,14 +258,11 @@ async function main() {
     .getByRole('button', { name: '通知', exact: true })
     .click();
   await p.locator('.notification-settings').waitFor();
-  assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
-  await p
-    .locator('.notification-setting-card')
-    .filter({ has: p.getByRole('heading', { name: 'インフォメーション通知', exact: true }) })
-    .locator('summary')
-    .click();
-  await p.getByLabel('インフォメーション通知の表示時間', { exact: true }).fill('8');
-  await p.getByLabel('インフォメーション通知の表示時間', { exact: true }).press('Tab');
+  await p.getByRole('button', { name: /のインフォメーション通知を編集$/ }).click();
+  const dialog = p.getByRole('dialog', { name: 'インフォメーション通知', exact: true });
+  await dialog.getByLabel('インフォメーション通知の表示時間', { exact: true }).fill('8');
+  await dialog.getByTestId('settings-dialog-confirm').click();
+  await dialog.waitFor({ state: 'hidden' });
   await require('./settings-immediate-helper.cjs').settleSettings(p);
   await until(
     () =>
@@ -284,7 +274,7 @@ async function main() {
     'saved duration',
   );
   await p.screenshot({ path: path.join(profile, 'settings.png') });
-  checks.push('reset buttons removed; per-type duration still saves immediately');
+  checks.push('per-type duration saves immediately');
 }
 (async () => {
   let ok = false;

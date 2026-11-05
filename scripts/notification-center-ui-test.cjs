@@ -468,37 +468,6 @@ async function close() {
     checks.push(
       'one AppDock source includes update/error owners in active and history; Applet filtering stays independent',
     );
-    // A retired page assignment must stay inert and preserve ordinary Shell operation.
-    if (!portable) {
-      const p = path.join(profile, 'extensions/fixture.center');
-      fs.mkdirSync(p, { recursive: true });
-      // Installed before restart below, so discovery never starts an Applet merely for history.
-      fs.writeFileSync(path.join(p, 'worker.cjs'), 'exports.activate=async()=>{};');
-      fs.writeFileSync(
-        path.join(p, 'notification-center.html'),
-        '<!doctype html><p>Retired page Shell must never start</p>',
-      );
-      fs.writeFileSync(
-        path.join(p, 'extension.json'),
-        JSON.stringify({
-          apiVersion: 1,
-          id: 'fixture.center',
-          name: 'Center Shell',
-          version: '1.0.0',
-          runtime: 'node',
-          entry: 'worker.cjs',
-          minimumHostVersion: '0.31.0',
-          capabilities: ['shell'],
-          shell: { apiVersion: 1, views: { 'page.notifications': 'notification-center.html' } },
-        }),
-      );
-      await host.evaluate(async () => {
-        const state = await window.dock.snapshot();
-        state.settings.value.extensions['fixture.center'] = { enabled: true, settings: {} };
-        state.settings.value.host.shellProviders = { 'page.notifications': 'fixture.center' };
-        await window.dock.saveSettings(state.settings.value, state.settings.revision);
-      });
-    }
     await close();
     await launch();
     center = await openCenter();
@@ -526,17 +495,7 @@ async function close() {
     checks.push(
       'restart discards active and ended session notifications, badge is absent at zero, old history file stays untouched and update receipt prevents replay',
     );
-    if (!portable) {
-      assert.equal(center, host);
-      assert(!pages().some((p) => p.url().includes('/fixture.center/')));
-      assert.equal((await host.evaluate(() => window.dock.snapshot())).shellRegions, undefined);
-      assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders,
-        undefined,
-      );
-      assert.equal((await model()).content.filters.text, 'Native');
-      checks.push('retired center assignment is ignored without loading a page Shell');
-    }
+    assert.equal((await model()).content.filters.text, 'Native');
     success = true;
   } catch (e) {
     console.error(e);

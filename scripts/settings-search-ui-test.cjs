@@ -19,9 +19,7 @@ settings.host.closeToTray = false;
 require('./profile-settings-fixture.cjs').installProfileSettings(profile, settings);
 require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
 settings.extensions['fixture.settings'] = { enabled: false, settings: {} };
-settings.appletOrder = ['fixture.settings', 'fixture.stalled-settings'];
-for (const id of ['fixture.settings-shell', 'fixture.stalled-settings'])
-  settings.extensions[id] = { enabled: true, settings: {} };
+settings.appletOrder = ['fixture.settings'];
 fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(settings),
@@ -57,33 +55,6 @@ fs.writeFileSync(
   }),
 );
 fs.writeFileSync(path.join(fixture, 'index.js'), 'module.exports = {};');
-const external = path.join(profile, 'extensions', 'fixture.settings-shell');
-fs.mkdirSync(external, { recursive: true });
-fs.writeFileSync(path.join(external, 'worker.cjs'), 'exports.activate=async()=>{};');
-const manifest = {
-  apiVersion: 1,
-  version: '1.0.0',
-  runtime: 'node',
-  entry: 'worker.cjs',
-  capabilities: ['shell'],
-};
-manifest.id = 'fixture.settings-shell';
-manifest.name = 'Settings shell fixture';
-manifest.minimumHostVersion = '0.33.0';
-manifest.shell = { apiVersion: 1, views: { 'page.settings': 'settings.html' } };
-fs.writeFileSync(
-  path.join(external, 'settings.html'),
-  '<body>Legacy settings must not be opened</body>',
-);
-fs.writeFileSync(path.join(external, 'extension.json'), JSON.stringify(manifest));
-const stalled = path.join(profile, 'extensions', 'fixture.stalled-settings');
-fs.mkdirSync(stalled, { recursive: true });
-fs.writeFileSync(
-  path.join(stalled, 'extension.json'),
-  JSON.stringify({ ...manifest, id: 'fixture.stalled-settings', name: 'Stalled settings' }),
-);
-fs.writeFileSync(path.join(stalled, 'worker.cjs'), 'exports.activate=async()=>{};');
-fs.writeFileSync(path.join(stalled, 'settings.html'), '<body>Not ready</body>');
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 async function until(fn, label) {
   const end = Date.now() + 20000;
@@ -143,46 +114,12 @@ async function until(fn, label) {
     }
   }
   const settingsPage = () => require('./settings-host-helper.cjs').settingsPage(host);
-  const provider = async (id) => {
-    await host.evaluate(async (id) => {
-      const s = await window.dock.snapshot();
-      await window.dock.saveSettings(
-        {
-          ...s.settings.value,
-          host: {
-            ...s.settings.value.host,
-            shellProviders: Object.fromEntries(
-              [
-                'ribbon',
-                'overlay.command-palette',
-                'page.home',
-                'page.logs',
-                'page.notifications',
-                'page.settings',
-                'notification.banner',
-                'notification.desktop',
-              ].map((region) => [region, id]),
-            ),
-          },
-        },
-        s.settings.revision,
-      );
-    }, id);
-  };
   const modelOf = (p) =>
     p.evaluate(() =>
       window.dock.settingsPage.get(
         document.querySelector('.settings-surface').dataset.settingsConnection,
       ),
     );
-  const providerPage = (id) =>
-    until(async () => {
-      const p = await settingsPage();
-      try {
-        if (!(await context.pages()).some((surface) => surface.url().endsWith('/settings.html')))
-          return p;
-      } catch {}
-    }, `provider ${id}`);
   const checks = [];
   const itemId = require('../out/main/shared/settings-catalog').settingsItemId;
   const op = (page, operation) =>
@@ -438,24 +375,13 @@ async function until(fn, label) {
     await op(shell, { kind: 'select', pageId: 'appearance' });
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
     await search().fill('テーマ');
-    // The fixture switches legacy assignments through the host API after input settles.
     await until(
       async () => (await modelOf(shell)).content.query === 'テーマ',
-      'search accepted before provider replacement',
+      'search accepted before selecting a result',
     );
     checks.push(
       'live added WebApplet indexed, individual body anchors, deleted target removed and stale movement rejected',
     );
-    await provider('fixture.settings-shell');
-    shell = await providerPage('fixture.settings-shell');
-    assert.equal(await search().inputValue(), 'テーマ');
-    assert.equal(
-      context.pages().some((p) => p.url().endsWith('/settings.html')),
-      false,
-    );
-    checks.push('settings remain in the host document; legacy Shell HTML is never loaded');
-    await provider('fixture.stalled-settings');
-    shell = await providerPage('appdock.default-shell');
     assert.equal(await search().inputValue(), 'テーマ');
     await shell.getByRole('option', { name: /テーマ/ }).click();
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
@@ -475,8 +401,8 @@ async function until(fn, label) {
     } else await shell.screenshot({ path: path.join(profile, 'search-portable.png') });
     checks.push(
       app
-        ? 'query and selection survive legacy provider assignments; narrow 900/700 and reduced motion'
-        : 'fixed EXE query survives inert legacy provider assignments; reduced motion',
+        ? 'search result selection, narrow 900/700 and reduced motion'
+        : 'fixed EXE search result selection and reduced motion',
     );
     const result = {
       success: true,

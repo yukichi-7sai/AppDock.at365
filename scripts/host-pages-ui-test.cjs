@@ -304,8 +304,6 @@ async function geometry() {
       return;
     }
     await defaultPage();
-    const ribbon = await require('./shell-overlay-helper.cjs').ribbonPage(host);
-    assert.equal(await ribbon.locator('[data-ribbon-id="home"]').count(), 0);
     await assert.rejects(() => host.evaluate(() => window.dock.navigate('home')), /Unknown route/);
     await assert.rejects(() =>
       host.evaluate(() => window.dock.pages.open({ id: 'retired', kind: 'home' })),
@@ -335,10 +333,11 @@ async function geometry() {
     await until(async () => (await model()).content.filters.source === '', 'clear source');
     assert.equal((await model()).content.filters.text, 'host-page-mark');
     checks.push(
-      'startup selects version information, home is absent and rejected; palette pins execute and logs retain their filters',
+      'startup selects version information and rejects invalid home routes; palette pins execute and logs retain their filters',
     );
     await open('image-library');
-    const previewButton = host.getByRole('button', { name: 'preview.pngを拡大', exact: true });
+    await host.locator('.library-page .ad-gallery-card .ad-gallery-image').first().click();
+    const previewButton = host.getByRole('button', { name: 'プレビュー', exact: true });
     await previewButton.click();
     const dialog = host.getByRole('dialog', { name: 'preview.png', exact: true });
     await dialog.waitFor();
@@ -399,7 +398,7 @@ async function geometry() {
     checks.push('image group editor cancels without saving and returns to its opener');
     const menuButton = host.getByRole('button', { name: 'Focus groupの操作', exact: true });
     for (const [item, title] of [
-      ['名前を変更', '画像グループの名前を変更'],
+      ['グループ名を変更', '画像グループの名前を変更'],
       ['画像を並べ替え', '画像を並べ替え'],
     ]) {
       await menuButton.click();
@@ -431,20 +430,9 @@ async function geometry() {
         await open(kind);
         await geometry();
         await host.screenshot({ path: path.join(profile, `${kind}-${theme}.png`) });
-        const state = await host.evaluate(() => window.dock.snapshot());
-        assert.equal(state.shellRegions, undefined);
-        assert(
-          !app
-            .context()
-            .pages()
-            .some((p) => /\/(home|logs|image-library|notification-center)\.html$/.test(p.url())),
-        );
-        assert.equal(await host.evaluate(() => typeof window.appdockPage), 'undefined');
       }
     }
-    checks.push(
-      'version information and all three host pages render in both themes; retired page Shell regions and documents never start',
-    );
+    checks.push('version information and all three host pages render in both themes');
     for (const zoom of [1, 1.5, 2]) {
       await app.evaluate(({ BrowserWindow }, zoom) => {
         const w = BrowserWindow.getAllWindows().find((w) =>
@@ -581,8 +569,6 @@ async function geometry() {
     );
     const final = await host.evaluate(() => window.dock.snapshot());
     assert.equal(final.version, require('../package.json').version);
-    assert(!final.extensions.some((a) => a.id === 'appdock.default-shell'));
-    assert.equal(final.settings.value.host.shellProviders, undefined);
     assert.deepEqual(final.settings.value.ribbon.order, settings.ribbon.order);
     assert.deepEqual(final.settings.value.keybindings, settings.keybindings);
     assert.deepEqual(final.settings.value.pinnedCommands, settings.pinnedCommands);

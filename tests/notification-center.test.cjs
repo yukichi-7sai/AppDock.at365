@@ -43,7 +43,7 @@ function setup(t, applets = []) {
     act({ type: 'filters', filters: { ...model().filters, tab: 'history' } });
   return { dir, file, service, controller, input, publish, act, model, historyTab };
 }
-test('center-only policy is accepted; obsolete unsaved warning is absent', () => {
+test('center-only policy is accepted', () => {
   const s = createDefaultSettings(),
     kind = {
       ...p.notificationCatalog([])[0],
@@ -57,10 +57,6 @@ test('center-only policy is accepted; obsolete unsaved warning is absent', () =>
   };
   assert.equal(p.resolveNotificationPolicy(kind, s).enabled, true);
   assert.deepEqual(p.resolveNotificationPolicy(kind, s).targets, []);
-  assert.equal(
-    p.notificationCatalog([]).some((t) => t.typeId === 'unsaved-changes'),
-    false,
-  );
 });
 
 test('source filter groups host modules without merging identically named Applets or changing notification ownership', async (t) => {

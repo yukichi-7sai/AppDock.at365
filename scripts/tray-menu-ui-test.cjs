@@ -190,18 +190,9 @@ const checks = [];
     assert(!s.settings.value.trayCommands.includes('appdock.quit'));
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByTestId('settings-index').waitFor();
-    await nav('一般').click();
-    assert.equal(
-      await page
-        .getByRole('button', { name: 'トレイクリックのコマンドを選択', exact: true })
-        .count(),
-      0,
-    );
-    await nav('ショートカットキー').click();
-    assert.equal(await page.getByRole('checkbox', { name: /トレイに表示/ }).count(), 0);
     await nav('タスクトレイ').click();
     assert.equal(await commandRow('missing.run').count(), 1);
-    checks.push('legacy migration, unavailable IDs retained, dedicated page and removed checkbox');
+    checks.push('legacy migration, unavailable IDs retained and dedicated page');
     await button('＋ グループ').click();
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
     const groupId = await page.locator('.tray-editor-row.selected').getAttribute('data-tray-item');
@@ -262,7 +253,9 @@ const checks = [];
     await save();
     await button('コマンドを追加…').click();
     const addPalette = require('./command-selection-helper.cjs').selectionDialog(page);
-    await addPalette.getByRole('combobox').fill('appdock.quit');
+    await addPalette
+      .getByRole('combobox', { name: 'コマンドを検索', exact: true })
+      .fill('appdock.quit');
     assert.equal(await addPalette.locator('[data-command-id="appdock.quit"]').count(), 0);
     await addPalette.getByRole('combobox', { name: 'コマンドを検索' }).press('Escape');
     await addPalette.waitFor({ state: 'hidden' });

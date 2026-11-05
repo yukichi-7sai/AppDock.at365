@@ -88,7 +88,6 @@ for (const [kind, id] of Object.entries(ids))
 initial.notificationPreferences = {
   overrides: [
     { ownerKind: 'applet', ownerId: 'not.installed', typeId: 'retained', enabled: false },
-    // Command-result banners must not crowd the Applet notices under test out of the viewport.
     {
       ownerKind: 'host',
       ownerId: 'information',
@@ -178,13 +177,14 @@ async function launch() {
     );
   });
   await require('./shell-overlay-helper.cjs').startupPage(host);
+  await host.evaluate(() => window.dock.executeCommand('appdock.open'));
   await host.waitForFunction(
     () => document.querySelector('.shell')?.getAttribute('data-route') === 'settings',
   );
 }
 const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
 const storage = (id, key) => {
-  const f = path.join(profile, 'data/storage', id, key + '.json');
+  const f = require('./test-storage.cjs').file(profile, id, key);
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 };
 const saved = () =>
@@ -262,16 +262,7 @@ async function close() {
   try {
     await launch();
     let p = await settingsPage();
-    assert.equal(
-      await p.getByRole('switch', { name: '旧方式の通知を通知', exact: true }).count(),
-      0,
-    );
-    assert.equal(
-      await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
-      0,
-    );
     await p.getByText('Stopped notice', { exact: true }).waitFor();
-    assert.equal(await p.getByRole('switch', { name: /noticeを通知$/ }).count(), 0);
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
     await p
       .locator('strong')
@@ -288,7 +279,7 @@ async function close() {
     );
     await cancel(dialog);
     checks.push(
-      'static catalog includes host types without obsolete settings warning, stopped Applet and retained unknown types; desktop and Windows enabled',
+      'static catalog includes host types, stopped Applet and retained unknown types; desktop and Windows enabled',
     );
     await command(ids.node + '.publish');
     await command(ids.native + '.publish');
@@ -392,10 +383,6 @@ async function close() {
     );
     await dialog.getByLabel('Native noticeの表示時間', { exact: true }).fill('');
     await apply(p, dialog);
-    assert.equal(
-      await p.getByRole('switch', { name: 'Appletからの通知を許可', exact: true }).count(),
-      0,
-    );
     await command(ids.native + '.publish');
     assert.equal(storage(ids.native, 'result').status, 'accepted');
     await until(() => storage(ids.native, 'changed') === true, 'native policy event');
@@ -413,7 +400,6 @@ async function close() {
       'search anchor',
     );
     await p.getByLabel('設定を検索', { exact: true }).fill('');
-    assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
     dialog = await edit(p, 'Node notice');
     await dialog.getByLabel('Node noticeの表示時間', { exact: true }).fill('12');
     await apply(p, dialog);
@@ -436,7 +422,7 @@ async function close() {
     await p.waitForFunction(() => document.documentElement.dataset.theme === 'light');
     await p.screenshot({ path: path.join(profile, 'notifications-light.png') });
     checks.push(
-      'search reaches a stable kind anchor, reset buttons are absent, individual edits preserve other kinds, both themes render',
+      'search reaches a stable kind anchor, individual edits preserve other kinds, both themes render',
     );
     await close();
     await launch();

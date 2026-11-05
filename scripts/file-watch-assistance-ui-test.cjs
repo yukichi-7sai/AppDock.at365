@@ -80,9 +80,6 @@ async function main() {
   }
   host.setDefaultTimeout(15000);
   await until(async () => (await snapshot()).startupReady, 'startup ready');
-  assert.equal(Object.hasOwn(await snapshot(), 'legacyLocalData'), false);
-  assert(!(await snapshot()).logs.some((entry) => entry.message.includes('LEGACY_LOCAL_DATA')));
-  checks.push('retired residual-data status and automatic warning are absent');
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   const ui = settingsAwarePage(host);
   await ui.getByRole('button', { name: '一般', exact: true }).click();

@@ -53,7 +53,6 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(folder, 'worker.cjs'),
   `exports.activate=async c=>{
-  if(c.shell!==undefined) throw Error('Retired Shell API remains');
   c.commands.register('fixture.legacy.normal','Normal',()=>c.storage.set('normal',true));
   c.commands.register('fixture.legacy.retired','Retired',()=>c.storage.set('retired',true));
 };`,
@@ -76,18 +75,6 @@ const result = { profile, success: false, checks };
         (await snapshot()).extensions.find((e) => e.id === 'fixture.legacy')?.state === 'running',
       'ordinary legacy Applet starts',
     );
-    let state = await snapshot();
-    assert(!state.extensions.some((e) => e.id === 'appdock.default-shell'));
-    assert.equal(state.shell, undefined);
-    assert.equal(state.shellRegions, undefined);
-    assert.equal(state.settings.value.host.shellProvider, undefined);
-    assert.equal(state.settings.value.host.shellProviders, undefined);
-    assert(
-      !instance.app
-        .context()
-        .pages()
-        .some((p) => p.url().includes('fixture.legacy')),
-    );
     await command('fixture.legacy.normal');
     await assert.rejects(command('fixture.legacy.retired'), /Shell/);
     await assert.rejects(command('fixture.legacy.alias'), /Shell/);
@@ -96,14 +83,12 @@ const result = { profile, success: false, checks };
       false,
     );
     checks.push(
-      'startup ignores legacy providers; no built-in Applet or Shell API; normal command works and retired command is rejected',
+      'legacy settings allow normal Applet commands; retired commands and aliases are rejected without execution',
     );
     await command('appdock.settings.appearance.open');
     await host.getByTestId('settings-page:appearance').waitFor();
-    assert.equal(await host.getByRole('region', { name: 'Shellの変更', exact: true }).count(), 0);
     const title = await barPage(host, 'titlebar');
     const ribbon = await ribbonPage(host);
-    assert.equal(await ribbon.evaluate(() => typeof window.appdockShell), 'undefined');
     assert.equal(await title.evaluate(() => typeof window.appdockBar.getSettings), 'undefined');
     const session = await title.evaluate(() => window.appdockBar.connect());
     await assert.rejects(
@@ -122,9 +107,7 @@ const result = { profile, success: false, checks };
     await closingAction(palette.keyboard.press('Escape'));
     await ribbon.getByRole('button', { name: 'ログ', exact: true }).click();
     await until(async () => (await snapshot()).navigation.route === 'logs', 'ribbon navigation');
-    checks.push(
-      'appearance has no Shell settings; private bridges reject stale sessions; title palette and ribbon navigation work',
-    );
+    checks.push('private bridges reject stale sessions; title palette and ribbon navigation work');
     for (const theme of ['light', 'dark']) {
       await instance.save({ host: { theme } });
       await title.waitForFunction(
@@ -141,7 +124,7 @@ const result = { profile, success: false, checks };
     await instance.close();
     instance = undefined;
     instance = await launch(profile, portable);
-    state = await instance.main.evaluate(() => window.dock.snapshot());
+    const state = await instance.main.evaluate(() => window.dock.snapshot());
     assert.equal(state.settings.value.host.showStatusBar, false);
     assert.equal(state.settings.value.host.theme, 'dark');
     assert.equal(state.settings.value.extensions['fixture.legacy'].settings.retained, 'value');
@@ -157,19 +140,9 @@ const result = { profile, success: false, checks };
       const root = app.getAppPath();
       return {
         workspace: fs.existsSync(path.join(root, 'out/renderer/workspace/index.html')),
-        legacyInternal: fs.existsSync(path.join(root, 'out/shells/default/extension.json')),
-        legacyResource: fs.existsSync(
-          path.join(process.resourcesPath, 'shells/default/extension.json'),
-        ),
       };
     });
     assert.equal(result.payload.workspace, true);
-    if (portable)
-      assert.deepEqual(result.payload, {
-        workspace: true,
-        legacyInternal: false,
-        legacyResource: false,
-      });
     result.success = true;
   } catch (error) {
     result.error = String(error.stack || error);

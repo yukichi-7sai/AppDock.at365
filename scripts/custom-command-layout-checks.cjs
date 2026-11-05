@@ -7,8 +7,6 @@ module.exports = async ({ page, dialog, profile, name, stack = false }) => {
   for (const viewport of [
     { width: 1320, height: 1050 },
     { width: 900, height: 640 },
-    { width: 520, height: 640 },
-    { width: 360, height: 650 },
   ]) {
     await page.setViewportSize(viewport);
     const commonSwitch = dialog.getByTestId('custom-command-section:common');
@@ -44,12 +42,6 @@ module.exports = async ({ page, dialog, profile, name, stack = false }) => {
         actionHorizontalOverflow: action.scrollWidth > action.clientWidth + 1,
         listHeight: element.querySelector('.stack-entry-list')?.clientHeight,
         conditionHeight: element.querySelector('.stack-condition-panel')?.clientHeight,
-        listOverflow:
-          element.querySelector('.stack-entry-list') &&
-          getComputedStyle(element.querySelector('.stack-entry-list')).overflowY,
-        conditionOverflow:
-          element.querySelector('.stack-condition-panel') &&
-          getComputedStyle(element.querySelector('.stack-condition-panel')).overflowY,
       };
     });
     assert.equal(layout.bodyOverflow, 'hidden');
@@ -62,11 +54,7 @@ module.exports = async ({ page, dialog, profile, name, stack = false }) => {
     if (!narrow) assert(parseFloat(layout.commonBorder) > 0);
     assert(layout.actionHeight > 130 && !layout.actionHorizontalOverflow, JSON.stringify(layout));
     if (stack) {
-      assert.equal(layout.actionOverflow, viewport.width <= 520 ? 'auto' : 'hidden');
-      if (viewport.width <= 520) {
-        assert.equal(layout.listOverflow, 'visible');
-        assert.equal(layout.conditionOverflow, 'visible');
-      }
+      assert.equal(layout.actionOverflow, 'hidden');
       assert(layout.listHeight > 35 && layout.conditionHeight > 65, JSON.stringify(layout));
     } else assert.equal(layout.actionOverflow, 'auto');
     if (viewport.height > 900) assert(layout.height > 850 && layout.height <= 900);

@@ -267,14 +267,13 @@ async function close() {
         assert.equal(await bell.getAttribute('data-active'), expected ? 'true' : null);
       };
       await count(0);
-      assert.equal(await host.evaluate(() => typeof window.dock.focusNotifications), 'undefined');
       await command('appdock.logs.open');
       await bell.click();
       await until(
         async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
         'empty bell opens center',
       );
-      result.checks.push('empty bell opens the center and removed banner focus entry is absent');
+      result.checks.push('empty bell opens the center');
       for (const theme of ['light', 'dark']) {
         await save({ theme });
         await title.waitForFunction(
@@ -349,7 +348,7 @@ async function close() {
       await host.evaluate(() => window.dock.toggleExtension('fixture.bell', false));
       await count(0);
       result.checks.push(
-        'visible banner does not receive bell focus; removed notification focus event is absent; owner stop clears count',
+        'bell opens and focuses the center while a banner is visible; owner stop clears count',
       );
       result.success = true;
       return;
