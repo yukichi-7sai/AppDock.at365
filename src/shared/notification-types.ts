@@ -1,4 +1,3 @@
-import { selectedTtsServer } from './tts';
 import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { soundLibraryReference } from './library-assets';
@@ -34,8 +33,8 @@ export interface NotificationPreference extends NotificationOwner {
   mcpEvents?: boolean;
 }
 export interface NotificationSpeechSettings {
-  voice?: string;
-  speed?: number;
+  connectionId?: string;
+  instructions?: string;
 }
 export interface NotificationPreferences {
   speech?: NotificationSpeechSettings;
@@ -208,7 +207,13 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
   if (
     speech !== undefined &&
     (!object(speech) ||
-      Object.keys(speech).some((k) => !['voice', 'speed'].includes(k)) ||
+      Object.keys(speech).some(
+        (k) => !['connectionId', 'instructions', 'voice', 'speed'].includes(k),
+      ) ||
+      (speech.connectionId !== undefined &&
+        (typeof speech.connectionId !== 'string' ||
+          !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(speech.connectionId))) ||
+      (speech.instructions !== undefined && typeof speech.instructions !== 'string') ||
       (speech.voice !== undefined &&
         (typeof speech.voice !== 'string' || !speech.voice.trim() || speech.voice.length > 200)) ||
       (speech.speed !== undefined &&
@@ -232,7 +237,15 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
     throw Error(hostText('settings.notificationSettings.invalidSound'));
   return {
     overrides: rows,
-    ...(speech === undefined ? {} : { speech: structuredClone(speech) }),
+    // Retired voice/speed overrides do not invalidate other notification preferences.
+    ...(speech === undefined
+      ? {}
+      : {
+          speech: {
+            ...(speech.connectionId === undefined ? {} : { connectionId: speech.connectionId }),
+            ...(speech.instructions?.trim() ? { instructions: speech.instructions } : {}),
+          },
+        }),
     ...(sound === undefined ? {} : { sound: structuredClone(sound) }),
   };
 }
@@ -412,16 +425,11 @@ export function validateNotificationPreferenceChanges(
   }
 }
 
-export function resolveNotificationSpeech(
-  settings: Settings,
-  defaults:
-    | Pick<import('./tts').TtsSettings, 'defaultVoice' | 'defaultSpeed'>
-    | undefined = selectedTtsServer(settings.tts),
-) {
+export function resolveNotificationSpeech(settings: Settings) {
   const override = settings.notificationPreferences?.speech;
   return {
-    voice: override?.voice ?? defaults?.defaultVoice ?? '',
-    speed: override?.speed ?? defaults?.defaultSpeed ?? 1,
+    connectionId: override?.connectionId ?? settings.tts?.defaultConnectionId,
+    ...(override?.instructions?.trim() ? { instructions: override.instructions } : {}),
   };
 }
 export function notificationSpeechEnabled(

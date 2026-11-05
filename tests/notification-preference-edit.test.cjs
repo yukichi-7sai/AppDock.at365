@@ -26,7 +26,10 @@ test('untouched notification dialog preserves inherited defaults without writing
 
 test('one notification save preserves concurrent unrelated rows, global speech and settings', () => {
   const { settings, catalog, type, row } = setup();
-  settings.notificationPreferences.speech = { voice: 'external-voice', speed: 1.5 };
+  settings.notificationPreferences.speech = {
+    connectionId: 'external-server',
+    instructions: '通知用',
+  };
   settings.notificationPreferences.overrides = [
     { ownerKind: 'applet', ownerId: 'missing', typeId: 'old', speak: true },
     {

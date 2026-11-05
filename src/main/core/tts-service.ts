@@ -6,6 +6,11 @@ import {
   parseTtsSettings,
   parseTtsVoices,
   parseTtsModels,
+  selectedTtsServer,
+  ttsServerSpeech,
+  type TtsConfiguration,
+  type TtsConnectionsResult,
+  type TtsServer,
   type TtsSettings,
   type TtsVoice,
   type TtsJob,
@@ -168,8 +173,8 @@ export class TtsService {
   private limits: typeof ttsLimits;
   constructor(
     private options: {
-      settings(): TtsSettings;
-      key(baseUrl: string): string | undefined;
+      settings(): TtsConfiguration;
+      key(server: TtsServer): string | undefined;
       canUse(owner: string, speak: boolean): boolean;
       play(
         bytes: Buffer,
@@ -187,8 +192,29 @@ export class TtsService {
     this.signature = JSON.stringify(options.settings());
     this.limits = { ...ttsLimits, ...options.limits };
   }
-  private config(requireModel = true, configuration?: { settings: TtsSettings }) {
-    const config = parseTtsSettings(configuration?.settings ?? this.options.settings());
+  private connection(id?: string) {
+    const server = selectedTtsServer(this.options.settings(), id);
+    if (!server)
+      return fail(
+        id === undefined ? 'TTS_NOT_CONFIGURED' : 'NOT_FOUND',
+        hostText('settings.ttsServers.missingServer'),
+      );
+    return server;
+  }
+  connections(owner: string): TtsConnectionsResult {
+    this.authorize(owner, false);
+    const config = this.options.settings();
+    return {
+      connections: config.connections.map(({ id, name }) => ({ id, name })),
+      ...(config.defaultConnectionId === undefined
+        ? {}
+        : { defaultConnectionId: config.defaultConnectionId }),
+    };
+  }
+  private config(requireModel = true, configuration?: { settings: TtsSettings }, id?: string) {
+    const config = parseTtsSettings(
+      configuration?.settings ?? ttsServerSpeech(this.connection(id)),
+    );
     if (!config.baseUrl || (requireModel && !config.model))
       fail('TTS_NOT_CONFIGURED', hostText('services.ttsService.configure'));
     return config;
@@ -215,10 +241,10 @@ export class TtsService {
     internal?: TtsInternalOptions,
   ): Record<string, unknown> {
     this.authorize(owner, true);
-    const { text, voice, speed, instructions, requestId } = input;
+    const { text, connectionId, instructions, requestId } = input;
     if (
       Object.keys(input).some(
-        (k) => !['text', 'voice', 'speed', 'instructions', 'requestId'].includes(k),
+        (k) => !['text', 'connectionId', 'instructions', 'requestId'].includes(k),
       ) ||
       (instructions !== undefined && typeof instructions !== 'string') ||
       typeof text !== 'string' ||
@@ -227,17 +253,16 @@ export class TtsService {
       typeof requestId !== 'string' ||
       !requestId ||
       requestId.length > 100 ||
-      (voice !== undefined && (typeof voice !== 'string' || !voice.trim() || voice.length > 200)) ||
-      (speed !== undefined &&
-        (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0.25 || speed > 4))
+      (connectionId !== undefined &&
+        (typeof connectionId !== 'string' ||
+          !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(connectionId)))
     )
       fail('INVALID_ARGUMENT', hostText('services.ttsService.requestFormat'));
     const fingerprint = createHash('sha256')
       .update(
         JSON.stringify({
           text,
-          voice,
-          speed,
+          connectionId,
           instructions,
           configuration: internal?.configuration?.settings,
         }),
@@ -252,7 +277,7 @@ export class TtsService {
         fail('TTS_REQUEST_CONFLICT', hostText('services.ttsService.requestIdConflict'));
       return { ...previous.view, completion: 'accepted' };
     }
-    const config = this.config(true, internal?.configuration);
+    const config = this.config(true, internal?.configuration, connectionId as string | undefined);
     const selectedInstructions =
       config.instructionsMode === 'none'
         ? ''
@@ -262,13 +287,13 @@ export class TtsService {
           ]
             .filter((part) => part.trim())
             .join('\n');
-    const selected = (voice as string | undefined) ?? config.defaultVoice;
-    if (!selected) fail('INVALID_ARGUMENT', hostText('services.ttsService.voiceRequired'));
     if ([...this.jobs.values()].filter((j) => !j.ended).length >= this.limits.capacity)
       fail('TTS_QUEUE_FULL', hostText('services.ttsService.queueLimit'));
     let key: string | undefined;
     try {
-      key = internal?.configuration ? internal.configuration.key : this.options.key(config.baseUrl);
+      key = internal?.configuration
+        ? internal.configuration.key
+        : this.options.key(this.connection(connectionId as string | undefined));
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -279,8 +304,8 @@ export class TtsService {
       requestId: requestId as string,
       fingerprint,
       text: text as string,
-      voice: selected,
-      speed: (speed as number | undefined) ?? config.defaultSpeed,
+      voice: config.defaultVoice,
+      speed: config.defaultSpeed,
       instructions: selectedInstructions,
       config,
       key,
@@ -535,7 +560,7 @@ export class TtsService {
     }
     let key: string | undefined;
     try {
-      key = configuration ? configuration.key : this.options.key(config.baseUrl);
+      key = configuration ? configuration.key : this.options.key(this.connection());
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -574,7 +599,7 @@ export class TtsService {
     configuration?: { settings: TtsSettings; key?: string },
   ): Promise<{ voices: TtsVoice[]; source: 'endpoint' | 'manual' }> {
     this.authorize(owner, false);
-    const config = parseTtsSettings(configuration?.settings ?? this.options.settings());
+    const config = parseTtsSettings(configuration?.settings ?? ttsServerSpeech(this.connection()));
     if (config.voicesSource === 'manual')
       return Promise.resolve({ voices: config.manualVoices, source: 'manual' });
     if (!config.baseUrl)
@@ -586,7 +611,7 @@ export class TtsService {
     }
     let key: string | undefined;
     try {
-      key = configuration ? configuration.key : this.options.key(config.baseUrl);
+      key = configuration ? configuration.key : this.options.key(this.connection());
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }

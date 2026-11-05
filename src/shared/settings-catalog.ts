@@ -165,13 +165,13 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       hostText('settings.notificationSettings.soundHint'),
     ],
     [
-      'speech.voice',
-      hostText('settings.settings-catalog.notificationVoice'),
+      'speech.connectionId',
+      hostText('settings.notificationSettings.connection'),
       hostText('settings.settings-catalog.notificationInherit'),
     ],
     [
-      'speech.speed',
-      hostText('settings.settings-catalog.notificationSpeed'),
+      'speech.instructions',
+      hostText('settings.notificationSettings.instructions'),
       hostText('settings.settings-catalog.notificationInherit'),
     ],
     [

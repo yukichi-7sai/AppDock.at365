@@ -222,8 +222,8 @@ test('notification and update service settings read, write and reset the selecte
     {
       pageId: 'notifications',
       targetId: 'service.notifications.speech',
-      key: 'voice',
-      value: 'local-voice',
+      key: 'instructions',
+      value: 'local-instructions',
     },
     { pageId: 'about', targetId: 'service.updates', key: 'startupDelaySeconds', value: 42 },
   ]) {
@@ -925,19 +925,34 @@ test('notification updates enforce required targets and lifetime rules, preserve
 test('notification speech inherits TTS values; schema changes and missing/stopped providers retain safe behavior', (t) => {
   const f = fixture(t),
     speech = 'service.notifications.speech';
-  assert.equal(f.values(speech).voice, 'voice');
+  assert.equal(f.values(speech).connectionId, 'default');
+  f.call('apply', f.request(speech, [{ kind: 'set', changes: { connectionId: 'default' } }]));
+  assert.equal(f.store.value.notificationPreferences.speech.connectionId, 'default');
+  assert.equal(f.read(speech, ['connectionId']).fields[0].inherited, false);
+  f.call('apply', f.request('service.tts', [{ kind: 'reset', keys: ['defaultConnectionId'] }]));
+  assert.equal(
+    f.values(speech).connectionId,
+    'default',
+    'explicit selection survives a default change',
+  );
   f.call(
     'apply',
-    f.request(speech, [{ kind: 'set', changes: { voice: 'notification voice', speed: 2 } }]),
+    f.request('service.tts', [{ kind: 'set', changes: { defaultConnectionId: 'default' } }]),
   );
-  assert.equal(f.values(speech).speed, 2);
-  f.call('apply', f.request(speech, [{ kind: 'reset', keys: ['voice', 'speed'] }]));
-  assert.equal(f.values(speech).voice, 'voice');
-  assert.equal(f.read(speech, ['voice']).fields[0].inherited, true);
-  const stale = f.request(speech, [{ kind: 'set', changes: { speed: 1.3 } }]);
-  f.call('apply', f.request('service.tts', [{ kind: 'set', changes: { defaultSpeed: 1.7 } }]));
+  f.call(
+    'apply',
+    f.request(speech, [
+      { kind: 'set', changes: { connectionId: 'default', instructions: '通知用' } },
+    ]),
+  );
+  assert.equal(f.values(speech).instructions, '通知用');
+  f.call('apply', f.request(speech, [{ kind: 'reset', keys: ['connectionId', 'instructions'] }]));
+  assert.equal(f.values(speech).connectionId, 'default');
+  assert.equal(f.read(speech, ['connectionId']).fields[0].inherited, true);
+  const stale = f.request(speech, [{ kind: 'set', changes: { instructions: '変更' } }]);
+  f.call('apply', f.request('service.tts', [{ kind: 'reset', keys: ['defaultConnectionId'] }]));
   assert.throws(() => f.call('apply', stale), { code: 'SCHEMA_CONFLICT' });
-  assert.equal(f.values(speech).speed, 1.7);
+  assert.equal(f.values(speech).connectionId, undefined);
   const type = f.types[0],
     id = f.notification(type),
     request = f.request(id, [{ kind: 'set', changes: { speak: true } }]);
@@ -1596,7 +1611,7 @@ test('TTS list ID edits and removals preserve defaults, notification references,
     { id: 'VoiceA', name: ' Same ' },
     { id: 'VoiceB', name: ' Same ' },
   ];
-  next.notificationPreferences.speech = { voice: 'VoiceA' };
+  next.notificationPreferences.speech = { connectionId: 'default', instructions: '通知用' };
   f.store.save(next, f.store.revision);
   let rows = voiceRows(f);
   assert.notEqual(rows[0].itemRef, rows[1].itemRef);
@@ -1611,7 +1626,10 @@ test('TTS list ID edits and removals preserve defaults, notification references,
   );
   voiceApply(f, [{ kind: 'remove', itemRef: rows[0].itemRef }]);
   assert.equal(f.store.value.tts.connections[0].defaultVoice, 'VoiceA');
-  assert.equal(f.store.value.notificationPreferences.speech.voice, 'VoiceA');
+  assert.deepEqual(f.store.value.notificationPreferences.speech, {
+    connectionId: 'default',
+    instructions: '通知用',
+  });
   assert.equal(f.store.value.tts.connections[0].voicesSource, 'endpoint');
   assert.equal(f.store.value.tts.connections[0].model, 'model');
   voiceApply(f, [{ kind: 'remove', itemRef: voiceRows(f)[0].itemRef }]);
@@ -1818,8 +1836,7 @@ test('TTS manual candidate reads use the edited list without network, credential
     f.store.revision,
   );
   const service = new TtsService({
-    settings: () =>
-      require('../out/main/shared/tts').ttsServerSpeech(f.store.value.tts.connections[0]),
+    settings: () => f.store.value.tts,
     canUse: () => true,
     key: () => {
       throw Error('Unexpected credential read');

@@ -60,6 +60,15 @@ function setup(t, extra = {}) {
       return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
     },
     ...extra,
+    settings: () => {
+      const value = extra.settings?.() ?? config;
+      return value.connections
+        ? value
+        : {
+            connections: [{ ...value, id: 'default', name: 'Fixture' }],
+            defaultConnectionId: 'default',
+          };
+    },
     play: async (b, d, signal, speed, beforePlay) => {
       beforePlay?.();
       await extra.play?.(b, d, signal, speed, beforePlay);
@@ -80,6 +89,76 @@ function setup(t, extra = {}) {
   };
 }
 const input = (id, text = '本文') => ({ text, requestId: id });
+test('registered server selection binds model, voice, speed and key while instructions remain per call', async (t) => {
+  const server = (id, voice, speed) => ({
+    ...defaultTtsSettings(),
+    id,
+    name: 'Same name',
+    baseUrl: 'http://same/v1',
+    model: id,
+    defaultVoice: voice,
+    defaultSpeed: speed,
+    speedMode: 'server',
+    instructionsMode: 'json',
+    alwaysInstructions: '常時',
+    defaultInstructions: '既定',
+  });
+  const config = {
+    connections: [server('first', 'voice-a', 1.1), server('second', '', 1.7)],
+    defaultConnectionId: 'first',
+  };
+  const f = setup(t, { settings: () => config, key: (value) => 'key-' + value.id });
+  assert.deepEqual(f.s.connections('a'), {
+    connections: [
+      { id: 'first', name: 'Same name' },
+      { id: 'second', name: 'Same name' },
+    ],
+    defaultConnectionId: 'first',
+  });
+  assert.equal(f.posts.length, 0);
+  for (const override of [
+    { voice: 'other' },
+    { speed: 1.4 },
+    { connectionId: '' },
+    { connectionId: '../first' },
+  ])
+    assert.throws(() => f.s.speak('a', { ...input('invalid'), ...override }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  assert.throws(() => f.s.speak('a', { ...input('missing'), connectionId: 'missing' }), {
+    code: 'NOT_FOUND',
+  });
+  const request = { ...input('selected'), connectionId: 'second', instructions: '今回' };
+  const job = f.s.speak('a', request);
+  await wait(() => f.s.get('a', job.jobId).state === 'completed');
+  assert.equal(f.posts[0].o.headers.Authorization, 'Bearer key-second');
+  assert.equal(config.defaultConnectionId, 'first');
+  const body = JSON.parse(f.posts[0].o.body);
+  assert.equal(body.model, 'second');
+  assert.equal(body.speed, 1.7);
+  assert.equal(Object.hasOwn(body, 'voice'), false);
+  assert.equal(body.instructions, '常時\n今回');
+  assert.throws(() => f.s.speak('a', { ...request, connectionId: 'first' }), {
+    code: 'TTS_REQUEST_CONFLICT',
+  });
+  config.connections.pop();
+  assert.equal(f.s.speak('a', request).jobId, job.jobId);
+  const normal = f.s.speak('a', input('normal'));
+  await wait(() => f.s.get('a', normal.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.posts[1].o.body).voice, 'voice-a');
+  assert.equal(f.posts[1].o.headers.Authorization, 'Bearer key-first');
+  delete config.defaultConnectionId;
+  assert.throws(() => f.s.speak('a', input('no-default')), { code: 'TTS_NOT_CONFIGURED' });
+  const explicit = f.s.speak('a', {
+    ...input('explicit'),
+    connectionId: 'first',
+    instructions: '',
+  });
+  await wait(() => f.s.get('a', explicit.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.posts[2].o.body).instructions, '常時');
+  f.deny();
+  assert.throws(() => f.s.connections('a'), { code: 'API_DISABLED' });
+});
 test('connection presets preserve identity and speech defaults; custom edits survive parsing', () => {
   const original = parseTtsSettings({
     baseUrl: 'http://local/v1',
@@ -633,7 +712,7 @@ test('keys are encrypted, bound to endpoint, never fall back to plaintext and de
   assert.throws(() => denied.setKey({ id: 'two', baseUrl: 'http://host/v1' }, 'secret'));
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).entries, {});
 });
-test('common dispatcher publishes four tools and enforces dedicated permissions and owner', async (t) => {
+test('common dispatcher publishes TTS tools and enforces dedicated permissions and owner', async (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/tts-implementation/api-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const store = new SettingsStore(path.join(dir, 'settings.json'));
@@ -736,6 +815,7 @@ test('playback/server speed modes apply speed exactly once', async (t) => {
         model: 'm',
         defaultVoice: 'v',
         speedMode: mode,
+        defaultSpeed: 1.4,
       }),
       fetcher: async (_u, o) => {
         sent = JSON.parse(o.body).speed;
@@ -745,7 +825,7 @@ test('playback/server speed modes apply speed exactly once', async (t) => {
         played = speed;
       },
     });
-    const job = f.s.speak('a', { ...input(mode), speed: 1.4 });
+    const job = f.s.speak('a', input(mode));
     await wait(() => f.s.get('a', job.jobId).state === 'completed');
     assert.equal(sent, mode === 'server' ? 1.4 : 1);
     assert.equal(played, mode === 'playback' ? 1.4 : 1);
@@ -755,7 +835,7 @@ test('playback/server speed modes apply speed exactly once', async (t) => {
 test('model discovery preserves base path and endpoint-bound auth without requiring a model', async (t) => {
   const requests = [];
   const f = setup(t, {
-    key: (url) => (url === 'http://localhost:8080/v1' ? 'fixture-key' : undefined),
+    key: (server) => (server.baseUrl === 'http://localhost:8080/v1' ? 'fixture-key' : undefined),
     fetcher: async (url, options) => {
       requests.push({ url, options });
       return Response.json({

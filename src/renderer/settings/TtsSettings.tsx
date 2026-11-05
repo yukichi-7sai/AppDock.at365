@@ -53,6 +53,7 @@ export function TtsSettingsForm({
     config.defaultConnectionId ?? config.connections[0]?.id ?? '',
   );
   const previewServer = selectedTtsServer(config, previewId);
+  const [previewInstructions, setPreviewInstructions] = useState('');
   useEffect(() => {
     if (!config.connections.some((c) => c.id === previewId))
       setPreviewId(config.defaultConnectionId ?? config.connections[0]?.id ?? '');
@@ -289,9 +290,21 @@ export function TtsSettingsForm({
           </select>
         </SettingsField>
         <SettingsField
+          title={translate('settings.ttsSettings.previewInstructions')}
+          hint={translate('settings.ttsSettings.previewInstructionsHint')}
+        >
+          <SettingsTextarea
+            aria-label={translate('settings.ttsSettings.previewInstructions')}
+            commitOn="input"
+            rows={2}
+            value={previewInstructions}
+            onChange={(event) => setPreviewInstructions(event.target.value)}
+          />
+        </SettingsField>
+        <SettingsField
           title={translate('settings.ttsSettings.text')}
           description={
-            !previewServer?.baseUrl || !previewServer?.model || !previewServer?.defaultVoice
+            !previewServer?.baseUrl || !previewServer?.model
               ? translate('settings.ttsSettings.previewRequirements')
               : (previewState ?? translate('settings.ttsSettings.previewReady'))
           }
@@ -313,12 +326,16 @@ export function TtsSettingsForm({
                 active ||
                 !text.trim() ||
                 !previewServer?.baseUrl ||
-                !previewServer?.model ||
-                !previewServer?.defaultVoice
+                !previewServer?.model
               }
               onClick={() =>
                 void run(async () => {
-                  await invoke('ttsPreview', [text, crypto.randomUUID(), previewServer?.id]);
+                  await invoke('ttsPreview', [
+                    text,
+                    crypto.randomUUID(),
+                    previewServer?.id,
+                    previewInstructions.trim() ? previewInstructions : undefined,
+                  ]);
                 })
               }
             >

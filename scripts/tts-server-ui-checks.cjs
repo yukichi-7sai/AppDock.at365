@@ -180,6 +180,38 @@ module.exports = async function ({
   );
 
   dialog = await edit('Secondary');
+  await field(dialog, '声', '');
+  await field(dialog, 'いつも加える話し方', '常時の話し方');
+  await field(dialog, '指定がないときの話し方', '登録の話し方');
+  await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+  await dialog.getByLabel('ニュアンスの送信方式', { exact: true }).selectOption('json');
+  await save(dialog);
+  const beforePreview = (await snapshot()).settings.value.tts;
+  for (const instructions of ['試聴だけの話し方', '']) {
+    await page.getByLabel('試聴の話し方', { exact: true }).fill(instructions);
+    const count = requests.length;
+    await page.getByRole('button', { name: '試聴する', exact: true }).click();
+    await until(() => requests.length > count, 'blank voice preview request');
+    await until(async () => {
+      const model = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
+      return model.content.auxiliary.tts.jobs.at(-1)?.state === 'completed';
+    }, 'blank voice preview completion');
+    assert.equal(Object.hasOwn(requests.at(-1).body, 'voice'), false);
+    assert.equal(
+      requests.at(-1).body.instructions,
+      '常時の話し方\n' + (instructions || '登録の話し方'),
+    );
+    assert.deepEqual((await snapshot()).settings.value.tts, beforePreview);
+  }
+  checks.push(
+    'blank voice previews omit voice; preview instructions override or inherit without changing saved server settings',
+  );
+
+  dialog = await edit('Secondary');
   await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
   await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('manual');
   assert.equal(await dialog.getByLabel('ボイス一覧のパス', { exact: true }).isVisible(), false);
@@ -267,6 +299,8 @@ module.exports = async function ({
     await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
     await defaultSelect.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, theme + '-defaults.png') });
+    await page.getByLabel('試聴の話し方', { exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(profile, theme + '-preview.png') });
     dialog = await edit('Primary');
     await dialog.getByRole('tab', { name: '接続', exact: true }).focus();
     await dialog.getByRole('tab', { name: '接続', exact: true }).press('ArrowRight');
@@ -314,6 +348,7 @@ module.exports = async function ({
     manualVoices: [{ id: 'voice-a', name: 'Voice A' }],
   });
   dialog = await edit('Primary');
+  await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
   await until(
     async () =>
       (await dialog.getByLabel('いつも加える話し方', { exact: true }).inputValue()) ===

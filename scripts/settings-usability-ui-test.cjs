@@ -147,7 +147,12 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     };
     await editTts();
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
-    await choose('モデル', 'model-b');
+    await until(
+      () => page.getByRole('button', { name: 'モデルの候補を表示', exact: true }).isEnabled(),
+      'model candidates ready before editing',
+    );
+    await page.getByLabel('モデル', { exact: true }).fill('mod');
+    await page.getByRole('option', { name: 'model-b', exact: true }).click();
     assert.equal((await snapshot()).settings.value.tts.connections[0].model, '');
     await saveTts();
     await until(
@@ -246,30 +251,37 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     checks.push('speech is a destination; center-only clears visual and speech targets atomically');
     await page.getByTestId('notification-delivery').locator(':scope > summary').click();
     await page.getByTestId('notification-speech').locator(':scope > summary').click();
-    await page.getByLabel('通知の速度に共通設定を使う').uncheck();
+    const notificationConnection = page.getByLabel('使用する音声サーバー', { exact: true });
+    const notificationInstructions = page.getByLabel('通知用の話し方', { exact: true });
+    await notificationConnection.selectOption('default');
+    await notificationInstructions.fill('通知の話し方');
+    await notificationInstructions.press('Enter');
     await settleSettings(page);
-    await page.getByLabel('通知用の読み上げ速度').fill('1.2');
-    await page.getByLabel('通知用の読み上げ速度').press('Enter');
+    assert.deepEqual((await snapshot()).settings.value.notificationPreferences.speech, {
+      connectionId: 'default',
+      instructions: '通知の話し方',
+    });
+    await notificationConnection.selectOption('');
     await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, 1.2);
-    await page.getByLabel('通知の速度に共通設定を使う').check();
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, undefined);
-    checks.push('notification speech settings inherit independently');
-    await page.getByLabel('通知の声に共通設定を使う').uncheck();
-    await settleSettings(page);
-    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    const voiceInput = page.getByLabel('通知用のボイスID', { exact: true });
-    await voiceInput.fill('voice');
-    await voiceInput.press('ArrowDown');
-    await voiceInput.press('Enter');
-    await voiceInput.blur();
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.notificationPreferences.speech.voice, 'voice-a');
-    assert.equal(await voiceInput.inputValue(), 'voice-a');
-    checks.push(
-      'selecting the current voice candidate replaces unfinished text without saving it on blur',
+    assert.equal(
+      (await snapshot()).settings.value.notificationPreferences.speech.connectionId,
+      undefined,
     );
+    assert.equal(
+      (await snapshot()).settings.value.notificationPreferences.speech.instructions,
+      '通知の話し方',
+    );
+    checks.push(
+      'notification server inheritance changes independently of notification instructions',
+    );
+    await notificationInstructions.fill('');
+    await notificationInstructions.press('Enter');
+    await settleSettings(page);
+    assert.equal(
+      (await snapshot()).settings.value.notificationPreferences.speech.instructions,
+      undefined,
+    );
+    checks.push('empty notification instructions restore the selected server defaults');
     await page
       .getByTestId('notification-speech')
       .getByRole('button', { name: '設定を開く', exact: true })

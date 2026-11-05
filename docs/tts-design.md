@@ -10,7 +10,7 @@ MCPの[固定設定API](settings-api.md)から通常値と手動ボイス一覧�
 | --------------------------- | ----------------------------------------------------------------------------------------------- |
 | `tts.connections[].baseUrl`               | APIベースURL。未設定は空。例: `http://host:8080/v1`                                             |
 | `tts.connections[].model`                 | モデルID。未設定は空                                                                            |
-| `tts.connections[].defaultVoice`          | 省略時に使うボイスID。未設定は空                                                                |
+| `tts.connections[].defaultVoice`          | この登録で使うボイスID。空欄は音声要求のvoiceを省略                                                                |
 | `tts.connections[].defaultSpeed`          | 0.25～4.0の有限数。既定1.0                                                                      |
 | `tts.connections[].defaultInstructions`   | 省略時のニュアンス。既定は空文字                                                                |
 | `tts.connections[].alwaysInstructions`    | 毎回付与するニュアンス。既定は空文字                                                |
@@ -38,7 +38,7 @@ APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化
 
 「音声生成AI」は登録サーバー一覧、既定のサーバー、試聴の順に配置する。一覧は登録名・URL・プリセット・モデルと声を表示し、追加・編集・削除・並べ替えを共通部品で行う。追加／編集ダイアログに登録名、接続先、APIキー、モデルと声をまとめ、OKで登録単位に保存する。キャンセルは秘密情報も含めて破棄する。最初の登録は既定に選び、以後の追加は既定を変えない。既定サーバーの削除確認では代わりのサーバーまたは未選択を選び、一括保存する。
 
-設定ページでは「既定のサーバー」だけを選択し、選択先のモデル・ボイス・速度・常時付与と既定ニュアンスを通常の読み上げに使用する。これらの値は各サーバーの追加／編集ダイアログだけで編集し、OKで保存する。既定のサーバーを切り替えても各登録の値は変更しない。試聴には独立した一時的なサーバー選択を置き、既定を変更しない。
+設定ページでは「既定のサーバー」だけを選択し、選択先のモデル・ボイス・速度・常時付与と既定ニュアンスを通常の読み上げに使用する。これらの値は各サーバーの追加／編集ダイアログだけで編集し、OKで保存する。既定のサーバーを切り替えても各登録の値は変更しない。試聴には独立した一時的なサーバー選択と「試聴の話し方」を置き、既定や登録内容を変更しない。試聴の話し方が空欄なら選択先の既定を使用し、入力時はその試聴だけ上書きする。「いつも加える話し方」はどちらでも加わる。
 
 追加／編集ダイアログは「接続」「声・話し方」「詳細設定」の3タブで構成する。接続には登録名・サーバーの種類・URL・APIキー、声・話し方にはモデル・声・速度・常時付与と既定の話し方、詳細設定には音声生成パス・速度の適用先・ニュアンスの送信方式/送信先・ボイス一覧方式/パス/手動一覧・追加パラメーターJSONを配置する。カードや折りたたみを入れ子にせず、広幅では関連する短い項目を横並び、狭幅では縦並びにする。見出し・タブ・共通の確定/取消を本文のスクロールから分け、本文だけをスクロールする。
 
@@ -94,7 +94,7 @@ MCP・Node/.NET Applet・試聴・通知読み上げは共通TtsServiceで一度
 
 ### 複数接続と共通再生
 
-接続単位のTtsConnectionSettings、共通発話入力、HTTP要求を構成するttsSpeechRequest、共通再生キューを分離する。接続用の詳細フォームもTtsConnectionDetailsとして値と変更コールバックだけを受け取る。接続は登録IDで選択し、受付時に一つの接続と認証を確定する。公開tts.speak／SDK／MCPと通知読み上げは既定の登録を使い、公開発話APIにサーバー指定を追加しない。設定画面の試聴・候補取得だけが内部で選択した登録の設定とキーを渡す。ジョブ途中で別接続の値を混ぜず、再生は既存の単一キューを引き続き使用する。
+接続単位のTtsConnectionSettings、共通発話入力、HTTP要求を構成するttsSpeechRequest、共通再生キューを分離する。接続用の詳細フォームもTtsConnectionDetailsとして値と変更コールバックだけを受け取る。接続は登録IDで選択し、受付時に一つの接続と認証を確定する。公開tts.speak／SDK／MCPは任意のconnectionIdで登録を選び、省略時だけ既定の登録を使う。通知は通知設定の選択先、試聴は試聴欄の選択先を使う。明示した登録が削除済み／不明ならNOT_FOUNDとし、既定へ切り替えない。サーバーの選択は保存済みの既定値を変更しない。同じURLの登録もIDごとのモデル・声・速度・話し方と認証を組み合わせる。ジョブ途中で別接続の値を混ぜず、再生は既存の単一キューを引き続き使用する。
 
 即時保存・入力検証・revision競合・本体描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「モデル一覧を更新」「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
 
@@ -128,7 +128,7 @@ URLはhttp/httpsのみ。URL内の認証情報・クエリー・フラグメン�
 
 設定ページの`ttsModels`操作から、同じ接続先・認証でベースURL配下の`models`へGETする。モデル未設定でも取得できる。標準の`{data:[{id,name?}]}`とQwen3-TTSの`{models:[{name,id?,downloaded?}]}`を明示的に受け付ける。後者は`id`がなければ`name`をIDとし、`downloaded:false`を候補から除く。モデルのダウンロードや自動選択は行わない。標準一覧に音声以外のモデルが含まれる場合、選択は利用者が判断する。
 
-取得期限5秒、応答1MiB、1000件の制限と重複ID/型検証を適用する。404/405は一覧非対応として手入力を案内する。他の通信障害と区別し、失敗や空一覧で保存済みモデルを消さない。接続先に紐付く認証、リダイレクト拒否、秘密情報を含めないエラーをボイス一覧と共有する。同一所有者の並行取得をまとめ、ボイス一覧とは独立させる。設定・キー・許可変更と終了で中断し、UIでも古い接続条件の応答を採用しない。永続キャッシュと新しい設定項目は追加しない。モデル一覧は設定ページ用の操作で、既存4種類のApplet/MCP TTS APIは変更しない。
+取得期限5秒、応答1MiB、1000件の制限と重複ID/型検証を適用する。404/405は一覧非対応として手入力を案内する。他の通信障害と区別し、失敗や空一覧で保存済みモデルを消さない。接続先に紐付く認証、リダイレクト拒否、秘密情報を含めないエラーをボイス一覧と共有する。同一所有者の並行取得をまとめ、ボイス一覧とは独立させる。設定・キー・許可変更と終了で中断し、UIでも古い接続条件の応答を採用しない。永続キャッシュと新しい設定項目は追加しない。モデル一覧は設定ページ用の操作とし、Applet/MCP向けには公開しない。
 
 ### ボイス一覧
 
@@ -146,26 +146,27 @@ id必須、name省略時はIDを表示名とする。空ID・重複ID・不正�
 
 OpenAI互換はボイス一覧APIの互換性まで保証しない。404/405は一覧非対応として返し、認証・接続障害と区別する。自動で別パスやmanualへ切り替えない。manualでは設定一覧を返し、ネットワークへ接続しない。正常な空一覧と取得失敗を区別する。
 
-一覧にないボイスIDもspeakで明示指定できる。一覧取得を生成の前提にしない。実際に利用可能かは生成応答で判断する。
+一覧にないボイスIDもサーバー設定へ直接入力できる。一覧取得を生成の前提にしない。声が空欄ならHTTP要求のvoiceを省略し、サーバー側の既定を使用する。声を必須とするサーバーの拒否は通常の生成エラーとして返す。試聴・通知・公開発話で同じ扱いとする。
 
 永続キャッシュは作らない。取得期限は5秒、応答上限1MiB・1000件。共有可能な同時取得はまとめ、設定変更前の結果を変更後の一覧として表示しない。
 
 ## 共通API
 
-次の4操作をappDockOperationsへ登録し、callersはmcp/appletとする。操作名は言語非依存、説明は日本語とする。instructionsと接続プリセットを利用するAppletはminimumHostVersionを0.149.0以上にする。
+次の5操作をappDockOperationsへ登録し、callersはmcp/appletとする。操作名は言語非依存、説明は日本語とする。サーバー選択を含む現行の発話APIを使うAppletはminimumHostVersionを0.156.0以上にする。
 
 | 操作名            | MCPツール名               | 入力                                          | 結果                              |
 | ----------------- | ------------------------- | --------------------------------------------- | --------------------------------- |
-| `tts.connections[].speak`       | `appdock_tts_speak`       | text、任意voice/speed/instructions、requestId | jobId、state、completion:accepted |
-| `tts.connections[].voices.list` | `appdock_tts_list_voices` | なし                                          | voices、source:endpoint/manual    |
-| `tts.connections[].jobs.get`    | `appdock_tts_get_job`     | jobId                                         | 状態・時刻・失敗時のエラー        |
-| `tts.connections[].stop`        | `appdock_tts_stop`        | jobId                                         | 停止後の状態                      |
+| `tts.speak`       | `appdock_tts_speak`       | text、任意connectionId/instructions、requestId | jobId、state、completion:accepted |
+| `tts.connections.list` | `appdock_tts_list_connections` | なし | connections:[{id,name}]、任意defaultConnectionId |
+| `tts.voices.list` | `appdock_tts_list_voices` | なし                                          | voices、source:endpoint/manual    |
+| `tts.jobs.get`    | `appdock_tts_get_job`     | jobId                                         | 状態・時刻・失敗時のエラー        |
+| `tts.stop`        | `appdock_tts_stop`        | jobId                                         | 停止後の状態                      |
 
-voice/speed省略時は受付時の既定値を使用する。voiceも既定値も空の場合はINVALID_ARGUMENT。未知のプロパティを拒否する。URL・モデル・キーはAPI引数に含めず、設定済み接続先を使う。
+声・速度は受付時に選んだ登録のdefaultVoice/defaultSpeedを使用し、公開発話引数のvoice/speedはINVALID_ARGUMENTで拒否する。URL・モデル・キーも引数に含めない。connectionId省略時に既定未選択ならTTS_NOT_CONFIGURED、明示したIDが不明ならNOT_FOUNDとする。登録一覧はID・表示名・既定IDだけを返し、接続先や認証を返さず通信しない。既存のtts.voices.listは設定用の候補確認として既定サーバーの一覧を返す。
 
 instructions省略時は受付時のdefaultInstructionsを使用し、指定時はその発話だけ上書きする。空文字・空白だけの指定は既定値を使わない。0.154.0以上では、いずれの場合も設定されたalwaysInstructionsを前に付与する。常時付与分も空ならニュアンス項目を送信しない。型は文字列だけを受け付け、上限は共通通信本文の制限と接続先の仕様に従う。ニュアンスは本文と同様に公開ジョブ・監査ログへ含めず、ジョブ終了時に参照を解放する。通知読み上げと設定の試聴も同じ合成規則を使う。
 
-requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・同じID・同じ入力の再送は保持期間内に限り既存ジョブを返す。同じIDで入力が異なる場合はTTS_REQUEST_CONFLICT。instructionsも入力のハッシュへ含め、省略と明示空文字を区別する。既定値や設定revisionが変わっても、同じ入力の再送は最初のジョブを返す。再送時も現在の許可を検査する。
+requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・同じID・同じ入力の再送は保持期間内に限り既存ジョブを返す。同じIDで入力が異なる場合はTTS_REQUEST_CONFLICT。connectionIdとinstructionsも入力のハッシュへ含め、省略と明示指定を区別する。既定値や設定revisionが変わっても、同じ入力の再送は最初のジョブを返す。再送時も現在の許可を検査する。
 
 受付と重複判定記録は一体で作成する。容量不足など受付失敗ではジョブを作らない。終了済み記録は最大512件かつ終了後30分までとし、稼働中の記録を追い出さない。期限切れ・再起動をまたぐ重複防止は保証しない。応答消失時に新しいrequestIdで自動再送しない。
 
@@ -175,8 +176,7 @@ jobIdは起動単位の推測困難なIDとする。状態には本文・キー�
 // appdock-api capabilityと読み上げの許可が必要。
 const job = await context.appdock.call('tts.speak', {
   text: '処理が完了しました。',
-  voice: 'voice-a',
-  speed: 1.0,
+  connectionId: 'registered-server-id',
   instructions: 'やさしく、落ち着いた口調で',
   requestId: crypto.randomUUID(),
 });
@@ -187,8 +187,7 @@ await context.appdock.call('tts.stop', { jobId: job.jobId });
 ```csharp
 var job = await context.AppDock.CallAsync("tts.speak", new {
     text = "処理が完了しました。",
-    voice = "voice-a",
-    speed = 1.4,
+    connectionId = "registered-server-id",
     instructions = "やさしく、落ち着いた口調で",
     requestId = Guid.NewGuid().ToString()
 }, token);

@@ -109,9 +109,8 @@ export interface SettingsPageAuxiliary {
     jobs: import('./tts').TtsJob[];
   };
   notificationSpeech?: {
-    defaults: { defaultVoice: string; defaultSpeed: number };
-    configured: boolean;
-    voiceListRevision: number;
+    connections: { id: string; name: string; configured: boolean }[];
+    defaultConnectionId?: string;
     jobs: import('./tts').TtsJob[];
   };
   notificationTypes?: import('./notification-types').NotificationTypeEntry[];

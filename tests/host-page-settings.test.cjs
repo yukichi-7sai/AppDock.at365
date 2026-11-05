@@ -23,7 +23,7 @@ function fixture(t, legacy) {
   const base = fs.mkdtempSync(path.join(root, 'case-'));
   const file = path.join(base, 'settings.json');
   const shared = createDefaultSettings();
-  shared.notificationPreferences = { overrides: [], speech: { voice: 'shared' } };
+  shared.notificationPreferences = { overrides: [], speech: { instructions: 'shared' } };
   fs.writeFileSync(file, JSON.stringify(shared));
   if (legacy) {
     const device = initialDeviceSettings('PC-A', shared);
@@ -61,7 +61,10 @@ function change(value, pageId, alternate = false) {
     next.host.notificationDesktopShadow = alternate;
     next.notificationPreferences = {
       overrides: [],
-      speech: { voice: alternate ? 'incoming' : 'local', speed: alternate ? 0.75 : 1.5 },
+      speech: {
+        instructions: alternate ? 'incoming' : 'local',
+        connectionId: alternate ? 'second' : 'first',
+      },
     };
   } else if (pageId === 'ribbon') {
     next.host.ribbonDisplayMode = alternate ? 'expanded' : 'compact';
@@ -98,21 +101,21 @@ test('legacy PC overrides without a saved mode stay dormant while all pages foll
     assert.equal(store.hostPageLocalSettings(pageId), false, pageId);
   assert.equal(store.value.host.notificationBannerPosition, shared.host.notificationBannerPosition);
   assert.equal(store.value.host.showStatusBar, shared.host.showStatusBar);
-  assert.equal(store.value.notificationPreferences.speech.voice, 'shared');
+  assert.equal(store.value.notificationPreferences.speech.instructions, 'shared');
   assert.equal(disk(store.device.file).host.notificationBannerPosition, undefined);
   const before = fs.readFileSync(store.device.file, 'utf8');
   store.reload();
   assert.equal(fs.readFileSync(store.device.file, 'utf8'), before);
   const incoming = disk(file);
-  incoming.notificationPreferences.speech.voice = 'incoming';
+  incoming.notificationPreferences.speech.instructions = 'incoming';
   fs.writeFileSync(file, JSON.stringify(incoming));
   store.reload();
-  assert.equal(store.value.notificationPreferences.speech.voice, 'incoming');
+  assert.equal(store.value.notificationPreferences.speech.instructions, 'incoming');
   store.setHostPageLocalSettings('notifications', true, store.revision);
   store.setHostPageLocalSettings('statusbar', true, store.revision);
   assert.equal(store.value.host.notificationBannerPosition, 'bottom-right');
   assert.equal(store.value.host.showStatusBar, false);
-  assert.equal(store.value.notificationPreferences.speech.voice, 'shared');
+  assert.equal(store.value.notificationPreferences.speech.instructions, 'shared');
 });
 
 test('a new PC adopts later shared changes before first enabling local palette settings', (t) => {

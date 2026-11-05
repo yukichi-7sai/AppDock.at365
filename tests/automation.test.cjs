@@ -840,6 +840,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     assert(tools.some((tool) => tool.name === name));
   for (const name of [
     'appdock_tts_speak',
+    'appdock_tts_list_connections',
     'appdock_tts_list_voices',
     'appdock_tts_get_job',
     'appdock_tts_stop',

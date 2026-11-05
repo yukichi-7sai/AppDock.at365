@@ -163,10 +163,17 @@ test('muted TTS still generates and completes without claiming playback or block
   let generated = 0;
   const tts = new TtsService({
     settings: () => ({
-      ...defaultTtsSettings(),
-      baseUrl: 'http://localhost/v1',
-      model: 'fixture',
-      defaultVoice: 'fixture',
+      defaultConnectionId: 'default',
+      connections: [
+        {
+          ...defaultTtsSettings(),
+          id: 'default',
+          name: 'Fixture',
+          baseUrl: 'http://localhost/v1',
+          model: 'fixture',
+          defaultVoice: 'fixture',
+        },
+      ],
     }),
     key: () => undefined,
     canUse: () => true,
@@ -194,10 +201,17 @@ test('TTS generation leaves audio free; waiting playback retains start deadline 
   let downloaded;
   const tts = new TtsService({
     settings: () => ({
-      ...defaultTtsSettings(),
-      baseUrl: 'http://localhost/v1',
-      model: 'fixture',
-      defaultVoice: 'fixture',
+      defaultConnectionId: 'default',
+      connections: [
+        {
+          ...defaultTtsSettings(),
+          id: 'default',
+          name: 'Fixture',
+          baseUrl: 'http://localhost/v1',
+          model: 'fixture',
+          defaultVoice: 'fixture',
+        },
+      ],
     }),
     key: () => undefined,
     canUse: () => true,

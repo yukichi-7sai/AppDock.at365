@@ -2,10 +2,8 @@ import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
-import type { TtsVoice } from '../../shared/tts';
-import { resolveNotificationSpeech } from '../../shared/notification-types';
 import type { FormEditor } from './SettingsForm';
 import type {
   NotificationPreference,
@@ -22,10 +20,9 @@ import { settingsItemId } from '../../shared/settings-catalog';
 import { NotificationTypeDialog } from './NotificationTypeDialog';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsListLayout, ListIcon } from '../settings-ui/SettingsListTable';
-import { SettingsInput } from '../settings-ui/SettingsInput';
+import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import type { NotificationBannerPosition } from '../../shared/notifications';
-import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { Toggle } from '../settings-ui/Toggle';
 import {
   SettingsSection,
@@ -67,23 +64,14 @@ export function NotificationSettings({
   const settings = editor.value;
   const speech = settings.notificationPreferences?.speech ?? {};
   const sound = settings.notificationPreferences?.sound;
-  const effective = resolveNotificationSpeech(settings, auxiliary?.defaults);
-  const voiceListRevision = useRef(auxiliary?.voiceListRevision);
-  voiceListRevision.current = auxiliary?.voiceListRevision;
-  const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const connectionId = speech.connectionId ?? auxiliary?.defaultConnectionId;
+  const configured = auxiliary?.connections.find((c) => c.id === connectionId)?.configured;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const [voiceOverride, setVoiceOverride] = useState(false);
-  useEffect(() => {
-    setVoices([]);
-  }, [auxiliary?.voiceListRevision]);
-  useEffect(() => {
-    setVoiceOverride(false);
-  }, [speech.voice]);
-  const changeSpeech = (key: 'voice' | 'speed', value?: string | number) => {
+  const changeSpeech = (key: 'connectionId' | 'instructions', value?: string) => {
     const next = { ...speech };
     if (value === undefined) delete next[key];
-    else (next as any)[key] = value;
+    else next[key] = value;
     editor.edit({
       ...settings,
       notificationPreferences: {
@@ -314,10 +302,10 @@ export function NotificationSettings({
         <SettingsSection
           title={translate('settings.notificationSettings.speech')}
           data-testid="notification-speech"
-          description={translate('settings.notificationSettings.currentVoiceAndSpeed', {
-            value: effective.voice || translate('settings.notificationSettings.unset'),
-            speed: effective.speed,
-          })}
+          description={
+            auxiliary?.connections.find((c) => c.id === connectionId)?.name ??
+            translate('settings.notificationSettings.unset')
+          }
           variant="row"
           collapsible
         >
@@ -332,83 +320,53 @@ export function NotificationSettings({
             </SettingsActions>
           </SettingsField>
           <SettingsField
-            title={translate('settings.notificationSettings.voice')}
-            description={translate('settings.notificationSettings.currentVoice', {
-              value: effective.voice || translate('settings.notificationSettings.unset'),
-            })}
-            hint={translate('settings.notificationSettings.voiceHint')}
-            {...settingAnchor('notifications', 'speech.voice')}
+            title={translate('settings.notificationSettings.connection')}
+            hint={translate('settings.notificationSettings.connectionHint')}
+            {...settingAnchor('notifications', 'speech.connectionId')}
           >
-            <SettingsActions>
-              <Toggle
-                label={translate('settings.notificationSettings.inheritVoice')}
-                checked={speech.voice === undefined && !voiceOverride}
-                onChange={(inherit) => {
-                  setVoiceOverride(!inherit);
-                  if (inherit) changeSpeech('voice');
-                  else if (effective.voice) changeSpeech('voice', effective.voice);
-                }}
-              />
-              <span>{translate('settings.notificationSettings.inherit')}</span>
-            </SettingsActions>
-            {(speech.voice !== undefined || voiceOverride) && (
-              <>
-                <SettingsCombobox
-                  label={translate('settings.notificationSettings.voiceId')}
-                  value={speech.voice ?? ''}
-                  onChange={(value) => changeSpeech('voice', value)}
-                  options={voices}
-                />
-                <SettingsActions>
-                  <button
-                    disabled={busy || pending}
-                    onClick={() => {
-                      const revision = auxiliary?.voiceListRevision;
-                      void run('notificationVoices').then((v) => {
-                        if (v && revision === voiceListRevision.current) setVoices(v.voices);
-                      });
-                    }}
-                  >
-                    {translate('settings.notificationSettings.refreshVoices')}
-                  </button>
-                </SettingsActions>
-              </>
-            )}
+            <select
+              aria-label={translate('settings.notificationSettings.connection')}
+              value={speech.connectionId ?? ''}
+              onChange={(event) => changeSpeech('connectionId', event.target.value || undefined)}
+            >
+              <option value="">
+                {translate('settings.notificationSettings.defaultConnection')}
+              </option>
+              {speech.connectionId &&
+                !auxiliary?.connections.some((c) => c.id === speech.connectionId) && (
+                  <option value={speech.connectionId}>
+                    {translate('settings.ttsServers.missingServer')}
+                  </option>
+                )}
+              {auxiliary?.connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {connection.name}
+                </option>
+              ))}
+            </select>
           </SettingsField>
           <SettingsField
-            title={translate('settings.notificationSettings.speed')}
-            description={translate('settings.notificationSettings.currentSpeed', {
-              speed: effective.speed,
-            })}
-            hint={translate('settings.notificationSettings.speedHint')}
-            {...settingAnchor('notifications', 'speech.speed')}
+            title={translate('settings.notificationSettings.instructions')}
+            hint={translate('settings.notificationSettings.instructionsHint')}
+            {...settingAnchor('notifications', 'speech.instructions')}
           >
-            <SettingsActions>
-              <Toggle
-                label={translate('settings.notificationSettings.inheritSpeed')}
-                checked={speech.speed === undefined}
-                onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
-              />
-              <span>{translate('settings.notificationSettings.inherit')}</span>
-            </SettingsActions>
-            {speech.speed !== undefined && (
-              <SettingsInput
-                type="number"
-                min={0.25}
-                max={4}
-                step={0.05}
-                aria-label={translate('settings.notificationSettings.speechSpeed')}
-                value={speech.speed}
-                onChange={(e) =>
-                  changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
-                }
-              />
-            )}
+            <SettingsTextarea
+              aria-label={translate('settings.notificationSettings.instructions')}
+              value={speech.instructions ?? ''}
+              rows={2}
+              placeholder={translate('settings.notificationSettings.instructionsPlaceholder')}
+              onChange={(event) =>
+                changeSpeech(
+                  'instructions',
+                  event.target.value.trim() ? event.target.value : undefined,
+                )
+              }
+            />
           </SettingsField>
           <SettingsField
             title={translate('settings.notificationSettings.preview')}
             description={
-              !auxiliary?.configured || !effective.voice
+              !configured
                 ? translate('settings.notificationSettings.previewRequirements')
                 : (previewState ?? translate('settings.notificationSettings.previewHint'))
             }
@@ -417,9 +375,7 @@ export function NotificationSettings({
             <SettingsActions {...settingAnchor('notifications', 'speech.preview')}>
               <button
                 className="primary"
-                disabled={
-                  busy || pending || previewActive || !auxiliary?.configured || !effective.voice
-                }
+                disabled={busy || pending || previewActive || !configured}
                 onClick={() => void run('notificationPreview', [crypto.randomUUID()])}
               >
                 {translate('settings.notificationSettings.previewAction')}
@@ -528,7 +484,7 @@ export function NotificationSettings({
                   </td>
                   <td className="settings-list-wrap">
                     {row?.speak === true ? 'ON' : 'OFF'}
-                    {row?.speak === true && (!auxiliary?.configured || !effective.voice) && (
+                    {row?.speak === true && !configured && (
                       <small>
                         {translate('settings.notificationSettings.speechSettingsRequirements')}
                       </small>
@@ -570,7 +526,7 @@ export function NotificationSettings({
             type={editing.type}
             original={editing.original}
             settings={settings}
-            speechConfigured={!!auxiliary?.configured && !!effective.voice}
+            speechConfigured={!!configured}
             invoke={invoke}
             onClose={() => setEditing(null)}
             select={select}

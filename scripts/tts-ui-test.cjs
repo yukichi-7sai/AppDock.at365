@@ -138,7 +138,7 @@ async function configure(patch) {
           id,
           name: id,
           version: '1.0.0',
-          minimumHostVersion: '0.154.0',
+          minimumHostVersion: '0.156.0',
           runtime: dotnet ? 'dotnet' : 'node',
           entry: dotnet ? 'AppDock.Extensions.TtsProbe.dll' : 'index.cjs',
           ...(dotnet ? { type: 'AppDock.Extensions.TtsProbe.TtsProbe' } : {}),
@@ -158,7 +158,7 @@ async function configure(patch) {
       else
         fs.writeFileSync(
           path.join(dir, 'index.cjs'),
-          `exports.activate=async c=>c.commands.register('fixture.tts-node.speak','TTS probe',async()=>{let r;try{await c.appdock.call('tts.voices.list');const j=await c.appdock.call('tts.speak',{text:'SDK音声テスト。',speed:1.4,instructions:'Nodeのニュアンス',requestId:require('node:crypto').randomUUID()});r={ok:true,...await c.appdock.call('tts.jobs.get',{jobId:j.jobId})};}catch(e){r={code:e.code};}await c.log.info('tts-probe:'+JSON.stringify(r));});`,
+          `exports.activate=async c=>c.commands.register('fixture.tts-node.speak','TTS probe',async()=>{let r;try{await c.appdock.call('tts.connections.list');const j=await c.appdock.call('tts.speak',{text:'SDK音声テスト。',connectionId:'default',instructions:'Nodeのニュアンス',requestId:require('node:crypto').randomUUID()});r={ok:true,...await c.appdock.call('tts.jobs.get',{jobId:j.jobId})};}catch(e){r={code:e.code};}await c.log.info('tts-probe:'+JSON.stringify(r));});`,
         );
     }
     fs.writeFileSync(
@@ -329,6 +329,16 @@ async function configure(patch) {
       tools.find((t) => t.name === 'appdock_tts_speak').inputSchema.properties.instructions.type,
       'string',
     );
+    const speakSchema = tools.find((t) => t.name === 'appdock_tts_speak').inputSchema;
+    assert.equal(speakSchema.properties.voice, undefined);
+    assert.equal(speakSchema.properties.speed, undefined);
+    assert.equal(speakSchema.properties.connectionId.type, 'string');
+    const connections = await call('appdock_tts_list_connections');
+    assert.deepEqual(
+      connections.connections,
+      (await snapshot()).settings.value.tts.connections.map(({ id, name }) => ({ id, name })),
+    );
+    assert.equal(connections.defaultConnectionId, 'default');
     const listedVoices = await call('appdock_tts_list_voices');
     assert.equal(listedVoices.source, 'manual');
     assert.deepEqual(
@@ -337,7 +347,7 @@ async function configure(patch) {
     );
     const a = await call('appdock_tts_speak', {
       text: 'MCP音声テスト。',
-      speed: 1.4,
+      connectionId: 'default',
       requestId: 'mcp-a',
       instructions: 'MCPのニュアンス',
     });
@@ -345,7 +355,7 @@ async function configure(patch) {
       (
         await call('appdock_tts_speak', {
           text: 'MCP音声テスト。',
-          speed: 1.4,
+          connectionId: 'default',
           requestId: 'mcp-a',
           instructions: 'MCPのニュアンス',
         })
@@ -372,12 +382,13 @@ async function configure(patch) {
       name: 'appdock_tts_speak',
       arguments: {
         text: 'MCP音声テスト。',
-        speed: 1.4,
+        connectionId: 'default',
         requestId: 'mcp-a',
         instructions: '別のニュアンス',
       },
     });
     assert(conflicting.isError);
+    assert.equal(conflicting.structuredContent.code, 'TTS_REQUEST_CONFLICT');
     checks.push('MCP voice, speech, status and deduplication');
     await setNuanceMode('none');
     const previewJobs = async () =>
@@ -465,10 +476,10 @@ async function configure(patch) {
       });
       await host.evaluate(() => window.dock.automation({ kind: 'setTts', allowed: true }));
       for (const voice of ['yui', 'yui-quietgirl']) {
+        await configure({ defaultVoice: voice, defaultSpeed: 1.4 });
         const j = await call('appdock_tts_speak', {
           text: '音声連携の動作確認です。',
-          voice,
-          speed: 1.4,
+          connectionId: 'default',
           requestId: 'real-' + voice,
         });
         const ended = await until(

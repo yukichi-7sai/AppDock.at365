@@ -194,10 +194,22 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
     current,
   );
   const speech = 'service.notifications.speech';
-  await apply(speech, [{ kind: 'set', changes: { voice: 'separate voice', speed: 2 } }]);
-  await apply(speech, [{ kind: 'reset', keys: ['voice', 'speed'] }]);
-  assert.equal((await vals(speech)).speed, 1.25);
-  assert.equal((await read(speech, ['speed'])).fields[0].inherited, true);
+  await apply(speech, [
+    { kind: 'set', changes: { connectionId: 'default', instructions: '通知用の話し方' } },
+  ]);
+  assert.equal((await vals(speech)).instructions, '通知用の話し方');
+  await select('通知');
+  await page.getByTestId('notification-delivery').locator(':scope > summary').click();
+  await page.getByTestId('notification-speech').locator(':scope > summary').click();
+  await until(
+    async () =>
+      (await page.getByLabel('使用する音声サーバー', { exact: true }).inputValue()) === 'default' &&
+      (await page.getByLabel('通知用の話し方', { exact: true }).inputValue()) === '通知用の話し方',
+    'notification UI received MCP save',
+  );
+  await apply(speech, [{ kind: 'reset', keys: ['connectionId', 'instructions'] }]);
+  assert.equal((await vals(speech)).connectionId, 'default');
+  assert.equal((await read(speech, ['connectionId'])).fields[0].inherited, true);
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
   checks.push(
     'service notification partial/reset editing preserves rules and other rows; speech falls back to TTS and tool definitions remain fixed',

@@ -38,6 +38,8 @@ AppDock本体とAppletのテストを追加・修正・整理するときの判�
 
 旧総合GUIの担当は専用試験へ集約する。Appletの開始・停止と再起動後の有効状態は`applet-information-ui-test.cjs`、Node/.NETの設定APIは`applet-api-ui-test.cjs`、Storage・Secretsの往復は`data-settings-ui-test.cjs`、フォーム／不正JSONの保存は`settings-input-ui-test.cjs`と`applet-settings-ui-test.cjs`、外部設定の受信・破損・復旧は`settings-sync-ui-test.cjs`、コマンドパレットは`command-palette-ui-test.cjs`を使う（各スクリプトは`scripts/`）。
 
+通知のサーバー・話し方は`notification-speech-ui-test.cjs`で生成要求と継承・削除後の復旧、`settings-hints-ui-test.cjs --assignment-speech-only`で明暗・幅別の説明表示と保存・解除・設定リンクを確認する。後者の呼出しオプションは既存名を維持するが、廃止した割り当て専用カードの見出し・余白一致・検索名は検査しない。現在の割り当ての追加・取消・フォーカス復帰・検索は`command-triggers-ui-test.cjs --usability-only`、共通入力の確定・取消は`settings-input-ui-test.cjs`が担当する。通知からなくなったボイス候補の未確定入力と選択の競合は、`settings-usability-ui-test.cjs`のTTSモデル候補で確認する。
+
 `tests/mcp-result-retention.test.cjs`は、結果なし/処理中だけの空待機、保持期限の境界、複数結果の期限順序、時計変更時の取得と終了時の予約解除を検査する。`tests/notification-sound-lifetime.test.cjs`は、取得待ちでの周期確認なし、発行元停止時の即時取消と他の発行元の継続、ロック保留、OFF/ONと遅延応答、取消購読の解放を検査する。`scripts/audio-playback-ui-test.cjs [固定EXE]`は既存の無音WAV再生/保存/取消に加え、実Appletの再起動・異常終了からの音声取消と新世代の再生受付を確認する。
 
 `tests/process-launch.test.cjs`は、実プロセスの引数・作業ディレクトリ、cmd/PowerShellの明示実行、サービス終了・親プロセス終了後の子プロセスの継続、新規起動の拒否を確認する。fixtureは一時ファイルへの書き込みを完了してから結果ファイルへrenameし、作成直後の空・書き込み途中の内容を完了結果として読まない。起動受付と実行結果の確認は分ける。

@@ -73,6 +73,9 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
+    initial.updates.checkHostOnAboutOpen = false;
+    initial.updates.checkHostOnStartup = false;
+    initial.updates.checkAppletsOnStartup = false;
     initial.host.hardwareAcceleration = false;
     initial.keybindings = [];
     initial.gestures.enabled = false;
@@ -90,6 +93,17 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       ],
       defaultConnectionId: 'default',
     };
+    initial.tts.connections.push({
+      ...initial.tts.connections[0],
+      id: 'notification',
+      name: '通知用',
+      model: 'notification-model',
+      defaultVoice: 'notice',
+      defaultSpeed: 1.6,
+      instructionsMode: 'json',
+      alwaysInstructions: '常時の話し方',
+      defaultInstructions: '既定の話し方',
+    });
     const id = 'fixture.speech';
     const folder = path.join(profile, 'extensions', id);
     fs.mkdirSync(folder, { recursive: true });
@@ -194,42 +208,21 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     checks.push('default OFF');
     await page.getByTestId('notification-delivery').locator(':scope > summary').click();
     await page.getByTestId('notification-speech').locator(':scope > summary').click();
-    await page.getByLabel('通知の声に共通設定を使う').uncheck();
+    const connection = page.getByLabel('使用する音声サーバー', { exact: true });
+    const instructions = page.getByLabel('通知用の話し方', { exact: true });
+    await connection.selectOption('notification');
     await settleSettings(page);
-    const voice = page.getByRole('combobox', { name: '通知用のボイスID', exact: true });
-    const toggle = page.getByRole('button', { name: '通知用のボイスIDの候補を表示', exact: true });
-    assert.equal(await toggle.isDisabled(), true);
-    await voice.fill('custom-voice');
-    await voice.press('Enter');
+    await instructions.fill('通知の話し方');
+    await instructions.press('Enter');
     await settleSettings(page);
-    assert.equal(savedNotifications().speech.voice, 'custom-voice');
-    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    await until(async () => !(await toggle.isDisabled()), 'voice catalog');
-    await toggle.click();
-    const list = page.getByRole('listbox', { name: '通知用のボイスIDの候補', exact: true });
-    assert.equal(await list.getByRole('option').count(), 2);
-    await list.getByRole('option', { name: 'second Second voice', exact: true }).click();
-    await settleSettings(page);
-    assert.equal(await voice.inputValue(), 'second');
-    assert.equal(savedNotifications().speech.voice, 'second');
-    await voice.fill('not');
-    await voice.press('ArrowDown');
-    await voice.press('Enter');
-    await settleSettings(page);
-    assert.equal(await voice.inputValue(), 'notice');
-    await toggle.click();
-    await voice.press('Escape');
-    assert.equal(await voice.getAttribute('aria-expanded'), 'false');
-    assert.equal(await voice.inputValue(), 'notice');
-    await toggle.click();
-    await voice.press('ArrowUp');
-    await voice.press('Enter');
-    await settleSettings(page);
-    assert.equal(await voice.inputValue(), 'second');
-    await voice.fill('notice');
-    await voice.press('Tab');
-    assert.equal(await voice.getAttribute('aria-expanded'), 'false');
-    for (const theme of ['light', 'dark']) {
+    await instructions.fill('取り消す話し方');
+    await instructions.press('Escape');
+    assert.equal(await instructions.inputValue(), '通知の話し方');
+    assert.equal((await snapshot()).settings.value.tts.defaultConnectionId, 'default');
+    for (const [theme, width, height] of [
+      ['light', 1720, 1000],
+      ['dark', 900, 620],
+    ]) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
         await window.dock.saveSettings(
@@ -237,51 +230,27 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
           s.settings.revision,
         );
       }, theme);
+      await inspect(
+        mainPort,
+        electronExpression +
+          '.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith("appdock://host/")).setSize(' +
+          width +
+          ',' +
+          height +
+          ')',
+      );
       await until(
         () => page.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
         'theme',
       );
-      for (const width of [1280, 760]) {
-        await inspect(
-          mainPort,
-          electronExpression +
-            `.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).setSize(${width}, 850)`,
-        );
-        await toggle.click();
-        await list.waitFor();
-        const bounds = await page.evaluate(() => {
-          const input = document.querySelector('[aria-label="通知用のボイスID"]');
-          const list = document.querySelector(
-            '[role="listbox"][aria-label="通知用のボイスIDの候補"]',
-          );
-          const i = input.getBoundingClientRect(),
-            l = list.getBoundingClientRect();
-          return {
-            aligned: Math.abs(i.left - l.left) < 2 && Math.abs(i.width - l.width) < 2,
-            separate: l.top >= i.bottom || l.bottom <= i.top,
-            inside: l.left >= 0 && l.top >= 0 && l.right <= innerWidth && l.bottom <= innerHeight,
-            overlap: [
-              ...document.querySelectorAll('.notification-settings .settings-actions'),
-            ].some((actions) => {
-              const a = actions.getBoundingClientRect();
-              return a.height && a.top < i.bottom && a.bottom > i.top;
-            }),
-          };
-        });
-        assert.deepEqual(bounds, { aligned: true, separate: true, inside: true, overlap: false });
-        await page.screenshot({ path: path.join(profile, `voices-${theme}-${width}.png`) });
-        await voice.press('Escape');
-      }
+      await instructions.scrollIntoViewIfNeeded();
+      assert.equal(await connection.inputValue(), 'notification');
+      assert.equal(await instructions.inputValue(), '通知の話し方');
+      await page.screenshot({ path: path.join(profile, 'speech-' + theme + '.png') });
     }
     checks.push(
-      'editable voice suggestions: manual/click/keyboard saves, Escape/Tab, light/dark 1280/760 aligned popup and no action-row overlap',
+      'server selection and notification instructions save independently, Escape cancels, light/wide and dark/narrow retain controls',
     );
-    await settleSettings(page);
-    await page.getByLabel('通知の速度に共通設定を使う').uncheck();
-    await settleSettings(page);
-    await page.getByLabel('通知用の読み上げ速度').fill('1.6');
-    await page.getByLabel('通知用の読み上げ速度').press('Enter');
-    await settleSettings(page);
     const beforeNotificationEdit = (await snapshot()).settings.value.notificationPreferences;
     await noticeRow.getByRole('button', { name: /Speech noticeを編集$/ }).click();
     const notificationDialog = page.getByRole('dialog');
@@ -294,10 +263,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await notificationDialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
     const saved = savedNotifications();
-    assert.deepEqual(saved.speech, { voice: 'notice', speed: 1.6 });
+    assert.deepEqual(saved.speech, { connectionId: 'notification', instructions: '通知の話し方' });
     assert.equal(saved.overrides.find((r) => r.ownerId === id).speak, true);
     checks.push(
-      'voice/speed save immediately; notification speech saves only after dialog confirmation',
+      'server/instructions save immediately; notification type speech saves only after dialog confirmation',
     );
     await execute(id + '.update');
     await new Promise((r) => setTimeout(r, 350));
@@ -308,13 +277,16 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await until(() => requests.length === 1, 'notification TTS');
     assert.equal(requests[0].voice, 'notice');
     assert.equal(requests[0].speed, 1.6);
-    assert.equal(requests[0].model, 'fixture');
+    assert.equal(requests[0].model, 'notification-model');
+    assert.equal(requests[0].instructions, '常時の話し方\n通知の話し方');
     assert.equal(requests[0].input, 'Fixture notice。Notification body');
     await until(async () => {
       const logs = (await snapshot()).logs;
       return logs.some((l) => JSON.stringify(l).includes('state=completed'));
     }, 'playback completed');
-    checks.push('automatic center-only speech with common endpoint and notification voice/speed');
+    checks.push(
+      'automatic center-only speech uses the selected server voice/speed and notification instructions',
+    );
     await execute(id + '.update');
     await new Promise((r) => setTimeout(r, 350));
     assert.equal(requests.length, 1);
@@ -333,7 +305,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       const speech = { ...s.settings.value.notificationPreferences.speech };
-      delete speech.voice;
+      delete speech.connectionId;
       await window.dock.saveSettings(
         {
           ...s.settings.value,
@@ -342,13 +314,14 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         s.settings.revision,
       );
     });
-    await until(
-      () => page.getByLabel('通知の声に共通設定を使う').isChecked(),
-      'external voice inheritance',
+    await until(async () => (await connection.inputValue()) === '', 'external server inheritance');
+    checks.push(
+      'external server reset updates the selection and retains notification instructions',
     );
-    checks.push('external saved voice reset updates inheritance without stale local override');
     await settleSettings(page);
-    await page.getByLabel('通知の速度に共通設定を使う').check();
+    assert.equal(await instructions.inputValue(), '通知の話し方');
+    await instructions.fill('');
+    await instructions.press('Enter');
     await settleSettings(page);
     await execute(id + '.end');
     await execute(id + '.publish');
@@ -412,13 +385,14 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
                   model: '1.7B-Base',
                   defaultVoice: 'yui',
                   speedMode: 'playback',
+                  defaultSpeed: 1.4,
                 },
               ],
               defaultConnectionId: 'default',
             },
             notificationPreferences: {
               ...s.settings.value.notificationPreferences,
-              speech: { voice: 'yui', speed: 1.4 },
+              speech: {},
             },
           },
           s.settings.revision,
@@ -442,7 +416,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         'real server Japanese notification completed at 1.4 in ' + (Date.now() - start) + 'ms',
       );
     }
-    await page.getByLabel('通知の声に共通設定を使う').uncheck();
+    await connection.selectOption('notification');
     await settleSettings(page);
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
@@ -450,25 +424,26 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         {
           ...s.settings.value,
           tts: {
-            connections: [
-              {
-                id: 'default',
-                name: 'Fixture',
-                ...s.settings.value.tts.connections[0],
-                model: 'fixture-updated',
-              },
-            ],
-            defaultConnectionId: 'default',
+            ...s.settings.value.tts,
+            connections: s.settings.value.tts.connections.filter((c) => c.id !== 'notification'),
           },
         },
         s.settings.revision,
       );
     });
-    await until(() => toggle.isDisabled(), 'TTS change invalidates cached voices');
-    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    await until(async () => !(await toggle.isDisabled()), 'voices reload after TTS change');
+    await until(
+      () => page.getByRole('button', { name: '通知の読み上げを試聴', exact: true }).isDisabled(),
+      'deleted server cannot preview',
+    );
+    assert.equal(await connection.inputValue(), 'notification');
+    await connection.selectOption('');
+    await settleSettings(page);
+    assert.equal(
+      await page.getByRole('button', { name: '通知の読み上げを試聴', exact: true }).isEnabled(),
+      true,
+    );
     checks.push(
-      'TTS configuration change invalidates the voice catalog; unrelated voice/speed/theme saves retain it',
+      'deleted explicit server stays visible without falling back; choosing the default recovers preview',
     );
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     fs.writeFileSync(path.join(profile, 'process.log'), output);

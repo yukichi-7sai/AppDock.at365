@@ -9,7 +9,7 @@ export function ttsSpeechRequest(
     ...structuredClone(connection.extraBody),
     model: connection.model,
     input: speech.text,
-    voice: speech.voice,
+    ...(speech.voice ? { voice: speech.voice } : {}),
     speed: connection.speedMode === 'server' ? speech.speed : 1,
     response_format: 'wav',
   };

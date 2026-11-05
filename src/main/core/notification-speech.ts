@@ -11,7 +11,7 @@ import type { NotificationAvailability } from './notification-availability';
 import type { TtsService } from './tts-service';
 export const notificationSpeechStartMs = 60000;
 type Record = Omit<NotificationPublication, 'title' | 'body'> & {
-  input?: { text: string; voice: string; speed: number; requestId: string };
+  input?: import('../../shared/tts').TtsSpeakInput;
   jobId?: string;
   done: boolean;
   ended: boolean;

@@ -6,464 +6,480 @@ import { customCommandOperations } from './custom-commands';
 import { processLaunchOperations } from './process-launch';
 import { settingsOperations } from './settings-operations';
 // One operation catalog drives MCP tools and both Applet SDK entry points.
-export const appDockOperations = localizedMetadata(() => ({
-  ...aiOperations,
-  ...mcpClientOperations,
-  ...customCommandOperations,
-  ...processLaunchOperations,
-  ...settingsOperations,
-  'tts.speak': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read', 'execute', 'useTts'],
-    name: 'appdock_tts_speak',
-    description:
-      'テキストから音声を生成し、このPCで順番に再生します。受付後jobIdを返します。完了はtts.jobs.getで確認してください。同じrequestIdの再送は保持期間内だけ重複を防ぎます。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 4096,
-        },
-        voice: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 200,
-        },
-        speed: {
-          type: 'number',
-          minimum: 0.25,
-          maximum: 4,
-        },
-        instructions: {
-          type: 'string',
-          description:
-            '話し方・感情などのニュアンス。省略時は既定値、空文字・空白のみは既定値を使いません。設定された常時付与分は毎回追加します。送信しない接続設定ではすべて無視して読み上げます。',
-        },
-        requestId: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 100,
-        },
-      },
-      required: ['text', 'requestId'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-  },
-  'tts.voices.list': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read', 'useTts'],
-    name: 'appdock_tts_list_voices',
-    description:
-      '設定されたTTSサーバーまたは手動設定からボイスID・表示名の一覧を取得します。一覧非対応と空一覧を区別します。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-  },
-  'tts.jobs.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_tts_get_job',
-    description: '自分の読み上げジョブの状態を取得します。本文・APIキー・音声は返しません。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        jobId: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 100,
-        },
-      },
-      required: ['jobId'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'tts.stop': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read', 'execute'],
-    name: 'appdock_tts_stop',
-    description:
-      '自分の読み上げジョブを停止します。サーバー内の生成処理まで停止できたことは保証しません。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        jobId: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 100,
-        },
-      },
-      required: ['jobId'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-
-  'ui.ribbon.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_ribbon_view',
-    description:
-      'リボンの描画モデル・選択状態・操作IDを取得します。編集用ribbon.getとは独立したepoch/revisionです。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contextId: { type: 'string', enum: ['primary'] },
-        schemaVersion: { type: 'integer', enum: [1, 2] },
-      },
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'ui.assets.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_ui_asset',
-    description: '描画モデルで公開されたassetIdからPNG/WebPのdata URLを取得します。',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string', maxLength: 64 } },
-      required: ['id'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'ui.actions.invoke': {
-    callers: ['mcp', 'applet'],
-    permissions: ['execute'],
-    name: 'appdock_invoke_ui_action',
-    description:
-      '描画モデルのactionIdを実行します。epochと一意なrequestIdが必要です。同じIDの再送は512件の受付記録内で重複実行しません。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contextId: { type: 'string', enum: ['primary'] },
-        epoch: { type: 'string', maxLength: 100 },
-        requestId: { type: 'string', minLength: 1, maxLength: 100 },
-        actionId: { type: 'string', maxLength: 250 },
-      },
-      required: ['epoch', 'requestId', 'actionId'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-  },
-  'input.sendKeys': {
-    callers: ['applet'],
-    permissions: ['sendInput'],
-    name: 'appdock_send_keys',
-    description: 'アクティブなウィンドウへキーを送信します。',
-    inputSchema: {
-      type: 'object',
-      properties: { keys: { type: 'string', minLength: 1, maxLength: 100 } },
-      required: ['keys'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-  },
-  'input.appCommand': {
-    callers: ['applet'],
-    permissions: ['sendInput'],
-    name: 'appdock_send_app_command',
-    description: 'アクティブなウィンドウへ操作メッセージを送信します。',
-    inputSchema: {
-      type: 'object',
-      properties: { action: { type: 'string', enum: ['back', 'forward', 'reload'] } },
-      required: ['action'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-  },
-  'system.getInfo': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_info',
-    description: 'AppDockの版・接続先・対応APIを取得します。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'applets.list': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_list_applets',
-    description: 'Appletの基本情報と稼働状態を取得します。設定や認証情報は含みません。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'settings.getSchema': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_settings_schema',
-    description: '公開された設定の型・適用タイミングを取得します。appletId省略時は本体設定です。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        appletId: {
-          type: 'string',
-          maxLength: 200,
-        },
-      },
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'settings.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_settings',
-    description:
-      '公開された設定と変更番号を取得します。appletId省略時は本体設定です。変更前に呼んでください。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        appletId: {
-          type: 'string',
-          maxLength: 200,
-        },
-      },
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'applets.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_applet',
-    description:
-      '指定したAppletの説明・状態・エラー概要・外部公開コマンドを取得します。認証情報や全設定は含みません。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: {
-          type: 'string',
-          maxLength: 200,
-        },
-      },
-      required: ['id'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'commands.list': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_list_commands',
-    description:
-      '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'commands.execute': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_execute_command',
-    description:
-      'commands.listのinputSchemaに従いidとargsで実行します。設定変更とAppletの有効・無効は設定変更許可、独立した動作やApplet再起動はコマンド実行許可が必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: {
-          type: 'string',
-          maxLength: 200,
-        },
-        args: {
+export const appDockOperations = localizedMetadata(
+  () =>
+    ({
+      ...aiOperations,
+      ...mcpClientOperations,
+      ...customCommandOperations,
+      ...processLaunchOperations,
+      ...settingsOperations,
+      'tts.speak': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read', 'execute', 'useTts'],
+        name: 'appdock_tts_speak',
+        description:
+          'テキストから音声を生成し、このPCで順番に再生します。受付後jobIdを返します。完了はtts.jobs.getで確認してください。同じrequestIdの再送は保持期間内だけ重複を防ぎます。',
+        inputSchema: {
           type: 'object',
-          description: 'commands.listで取得したinputSchemaに従う引数',
+          properties: {
+            text: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 4096,
+            },
+            connectionId: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+              pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$',
+              description:
+                '登録済み音声サーバーのID。省略時は既定のサーバーを使用します。声・速度は選択したサーバーの設定を使用し、既定のサーバーは変更しません。',
+            },
+            instructions: {
+              type: 'string',
+              description:
+                '話し方・感情などのニュアンス。省略時は既定値、空文字・空白のみは既定値を使いません。設定された常時付与分は毎回追加します。送信しない接続設定ではすべて無視して読み上げます。',
+            },
+            requestId: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+            },
+          },
+          required: ['text', 'requestId'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
         },
       },
-      required: ['id'],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-  },
-  'shortcuts.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_shortcuts',
-    description:
-      'キージェスチャーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktop、globalはwhen.excludedProcessesに対応します。各トリガーのexcludedProcessesに割り当ての除外を追加し、いずれかに一致すれば実行しません。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesは現在の公開inputSchemaに従います。入力別のinputExecutionModesは全体のexecutionModeを上書きし、未指定の入力は全体設定を使用します。判定対象は押下時の前面ウィンドウです。情報取得と設定変更の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。' +
-      hostText('settings.commandTriggerOptions.apiHint'),
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'touchpadGestures.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_touchpad_gestures',
-    description:
-      'タッチパッドの割り当て・接続用キー・Windowsとの接続状態・revisionを取得します。updateはAppDock設定だけを保存します。Windowsの変更にはset-enabledまたはreconnectを明示的に実行します。' +
-      hostText('settings.commandTriggerOptions.apiHint'),
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'gestures.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_gestures',
-    description:
-      'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。情報取得と設定変更の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。' +
-      hostText('settings.commandTriggerOptions.apiHint'),
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'ribbon.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_ribbon',
-    description:
-      'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。情報取得と設定変更の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  'tray.get': {
-    callers: ['mcp', 'applet'],
-    permissions: ['read'],
-    name: 'appdock_get_tray',
-    description:
-      'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。情報取得と設定変更の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-} as const));
+      'tts.connections.list': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read', 'useTts'],
+        name: 'appdock_tts_list_connections',
+        description:
+          '登録済み音声サーバーのID・登録名と既定のサーバーIDを取得します。サーバーへの通信は行わず、接続先や認証情報は返しません。',
+        inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'tts.voices.list': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read', 'useTts'],
+        name: 'appdock_tts_list_voices',
+        description:
+          '設定されたTTSサーバーまたは手動設定からボイスID・表示名の一覧を取得します。一覧非対応と空一覧を区別します。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      'tts.jobs.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_tts_get_job',
+        description: '自分の読み上げジョブの状態を取得します。本文・APIキー・音声は返しません。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            jobId: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+            },
+          },
+          required: ['jobId'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'tts.stop': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read', 'execute'],
+        name: 'appdock_tts_stop',
+        description:
+          '自分の読み上げジョブを停止します。サーバー内の生成処理まで停止できたことは保証しません。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            jobId: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+            },
+          },
+          required: ['jobId'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+
+      'ui.ribbon.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_ribbon_view',
+        description:
+          'リボンの描画モデル・選択状態・操作IDを取得します。編集用ribbon.getとは独立したepoch/revisionです。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contextId: { type: 'string', enum: ['primary'] },
+            schemaVersion: { type: 'integer', enum: [1, 2] },
+          },
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'ui.assets.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_ui_asset',
+        description: '描画モデルで公開されたassetIdからPNG/WebPのdata URLを取得します。',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string', maxLength: 64 } },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'ui.actions.invoke': {
+        callers: ['mcp', 'applet'],
+        permissions: ['execute'],
+        name: 'appdock_invoke_ui_action',
+        description:
+          '描画モデルのactionIdを実行します。epochと一意なrequestIdが必要です。同じIDの再送は512件の受付記録内で重複実行しません。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contextId: { type: 'string', enum: ['primary'] },
+            epoch: { type: 'string', maxLength: 100 },
+            requestId: { type: 'string', minLength: 1, maxLength: 100 },
+            actionId: { type: 'string', maxLength: 250 },
+          },
+          required: ['epoch', 'requestId', 'actionId'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      'input.sendKeys': {
+        callers: ['applet'],
+        permissions: ['sendInput'],
+        name: 'appdock_send_keys',
+        description: 'アクティブなウィンドウへキーを送信します。',
+        inputSchema: {
+          type: 'object',
+          properties: { keys: { type: 'string', minLength: 1, maxLength: 100 } },
+          required: ['keys'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      'input.appCommand': {
+        callers: ['applet'],
+        permissions: ['sendInput'],
+        name: 'appdock_send_app_command',
+        description: 'アクティブなウィンドウへ操作メッセージを送信します。',
+        inputSchema: {
+          type: 'object',
+          properties: { action: { type: 'string', enum: ['back', 'forward', 'reload'] } },
+          required: ['action'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      'system.getInfo': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_info',
+        description: 'AppDockの版・接続先・対応APIを取得します。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'applets.list': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_list_applets',
+        description: 'Appletの基本情報と稼働状態を取得します。設定や認証情報は含みません。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'settings.getSchema': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_settings_schema',
+        description:
+          '公開された設定の型・適用タイミングを取得します。appletId省略時は本体設定です。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            appletId: {
+              type: 'string',
+              maxLength: 200,
+            },
+          },
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'settings.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_settings',
+        description:
+          '公開された設定と変更番号を取得します。appletId省略時は本体設定です。変更前に呼んでください。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            appletId: {
+              type: 'string',
+              maxLength: 200,
+            },
+          },
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'applets.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_applet',
+        description:
+          '指定したAppletの説明・状態・エラー概要・外部公開コマンドを取得します。認証情報や全設定は含みません。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              maxLength: 200,
+            },
+          },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'commands.list': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_list_commands',
+        description:
+          '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'commands.execute': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_execute_command',
+        description:
+          'commands.listのinputSchemaに従いidとargsで実行します。設定変更とAppletの有効・無効は設定変更許可、独立した動作やApplet再起動はコマンド実行許可が必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              maxLength: 200,
+            },
+            args: {
+              type: 'object',
+              description: 'commands.listで取得したinputSchemaに従う引数',
+            },
+          },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      'shortcuts.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_shortcuts',
+        description:
+          'キージェスチャーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktop、globalはwhen.excludedProcessesに対応します。各トリガーのexcludedProcessesに割り当ての除外を追加し、いずれかに一致すれば実行しません。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesは現在の公開inputSchemaに従います。入力別のinputExecutionModesは全体のexecutionModeを上書きし、未指定の入力は全体設定を使用します。判定対象は押下時の前面ウィンドウです。情報取得と設定変更の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。' +
+          hostText('settings.commandTriggerOptions.apiHint'),
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'touchpadGestures.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_touchpad_gestures',
+        description:
+          'タッチパッドの割り当て・接続用キー・Windowsとの接続状態・revisionを取得します。updateはAppDock設定だけを保存します。Windowsの変更にはset-enabledまたはreconnectを明示的に実行します。' +
+          hostText('settings.commandTriggerOptions.apiHint'),
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'gestures.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_gestures',
+        description:
+          'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。情報取得と設定変更の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。' +
+          hostText('settings.commandTriggerOptions.apiHint'),
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'ribbon.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_ribbon',
+        description:
+          'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。情報取得と設定変更の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      'tray.get': {
+        callers: ['mcp', 'applet'],
+        permissions: ['read'],
+        name: 'appdock_get_tray',
+        description:
+          'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。情報取得と設定変更の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+    }) as const,
+);
 export type ApiCaller = 'mcp' | 'applet';
 export function operationsFor(caller: ApiCaller) {
   return Object.entries(appDockOperations).filter(([, d]) =>
@@ -472,16 +488,19 @@ export function operationsFor(caller: ApiCaller) {
 }
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
-export const appletApiPermissionLabels = localizedMetadata(() => ({
-  useMcp: hostText('settings.appdock-api.mcpUse'),
-  useAi: hostText('settings.appdock-api.ai'),
-  useTts: hostText('settings.appdock-api.tts'),
-  sendInput: hostText('settings.appdock-api.input'),
-  runProcesses: hostText('settings.appdock-api.process'),
-  read: hostText('settings.appdock-api.read'),
-  execute: hostText('settings.appdock-api.execute'),
-  write: hostText('settings.appdock-api.write'),
-} as const));
+export const appletApiPermissionLabels = localizedMetadata(
+  () =>
+    ({
+      useMcp: hostText('settings.appdock-api.mcpUse'),
+      useAi: hostText('settings.appdock-api.ai'),
+      useTts: hostText('settings.appdock-api.tts'),
+      sendInput: hostText('settings.appdock-api.input'),
+      runProcesses: hostText('settings.appdock-api.process'),
+      read: hostText('settings.appdock-api.read'),
+      execute: hostText('settings.appdock-api.execute'),
+      write: hostText('settings.appdock-api.write'),
+    }) as const,
+);
 // Accepted only while reading existing permission files; never independent grants.
 export const retiredAppletApiPermissions = [
   'manageCustomCommands',
@@ -514,11 +533,13 @@ export type AppDockResult<M extends AppDockMethod> = M extends 'ai.text.generate
       ? { models: import('./ai').AiModel[] }
       : M extends 'tts.speak'
         ? import('./tts').TtsSpeakResult
-        : M extends 'tts.voices.list'
-          ? import('./tts').TtsVoicesResult
-          : M extends 'tts.jobs.get' | 'tts.stop'
-            ? import('./tts').TtsJob
-            : Record<string, unknown>;
+        : M extends 'tts.connections.list'
+          ? import('./tts').TtsConnectionsResult
+          : M extends 'tts.voices.list'
+            ? import('./tts').TtsVoicesResult
+            : M extends 'tts.jobs.get' | 'tts.stop'
+              ? import('./tts').TtsJob
+              : Record<string, unknown>;
 export interface AppDockClient {
   call<M extends AppDockMethod>(
     method: M,

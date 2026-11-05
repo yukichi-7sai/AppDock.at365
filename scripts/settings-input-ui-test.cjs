@@ -353,21 +353,20 @@ const disk = () =>
     await select('通知');
     await page.getByTestId('notification-delivery').locator(':scope > summary').click();
     await page.getByTestId('notification-speech').locator(':scope > summary').click();
-    await page.getByRole('switch', { name: '通知の声に共通設定を使う', exact: true }).click();
     await settleSettings(page);
-    const voice = page.getByLabel('通知用のボイスID', { exact: true });
+    const voice = page.getByLabel('通知用の話し方', { exact: true });
     const originalVoice = await pending(
       voice,
       'unconfirmed-voice',
-      (s) => s.notificationPreferences?.speech?.voice,
+      (s) => s.notificationPreferences?.speech?.instructions,
     );
     await voice.press('Escape');
     assert.equal(await voice.inputValue(), originalVoice ?? '');
     await voice.fill('confirmed-voice');
     await voice.press('Enter');
     await settleSettings(page);
-    assert.equal(disk().notificationPreferences.speech.voice, 'confirmed-voice');
-    checks.push('editable voice combobox defers direct text and supports Escape/Enter');
+    assert.equal(disk().notificationPreferences.speech.instructions, 'confirmed-voice');
+    checks.push('notification instructions defer text and support Escape/Enter');
 
     const search = page.getByLabel('設定を検索', { exact: true });
     await search.fill('ユーザー名');

@@ -84,7 +84,7 @@ function setup(t, extra = {}) {
     failed: () => failed.push('query'),
   });
   const tts = new TtsService({
-    settings: () => require('../out/main/shared/tts').ttsServerSpeech(settings.tts.connections[0]),
+    settings: () => settings.tts,
     key: () => undefined,
     canUse: (owner) => owner === 'host' || speech?.allows(owner),
     fetcher: async (u, o) => {
@@ -172,7 +172,7 @@ function setup(t, extra = {}) {
 test('notification speech settings inherit independently and reject invalid or secret fields', () => {
   const s = createDefaultSettings();
   assert.deepEqual(parseNotificationPreferences(), { overrides: [] });
-  assert.deepEqual(resolveNotificationSpeech(s), { voice: '', speed: 1 });
+  assert.deepEqual(resolveNotificationSpeech(s), { connectionId: undefined });
   s.tts = {
     connections: [
       { ...require('../out/main/shared/tts').newTtsServer('default'), name: 'Fixture' },
@@ -181,10 +181,21 @@ test('notification speech settings inherit independently and reject invalid or s
   };
   s.tts.connections[0].defaultVoice = 'common';
   s.tts.connections[0].defaultSpeed = 1.2;
-  s.notificationPreferences = { overrides: [], speech: { voice: 'UPPER' } };
-  assert.deepEqual(resolveNotificationSpeech(s), { voice: 'UPPER', speed: 1.2 });
-  s.notificationPreferences.speech = { speed: 1.8 };
-  assert.deepEqual(resolveNotificationSpeech(s), { voice: 'common', speed: 1.8 });
+  s.notificationPreferences = {
+    overrides: [],
+    speech: { connectionId: 'other', instructions: '通知用' },
+  };
+  assert.deepEqual(resolveNotificationSpeech(s), { connectionId: 'other', instructions: '通知用' });
+  s.notificationPreferences.speech = {};
+  assert.deepEqual(resolveNotificationSpeech(s), { connectionId: 'default' });
+  assert.deepEqual(
+    parseNotificationPreferences({ overrides: [], speech: { voice: 'old', speed: 1.5 } }),
+    { overrides: [], speech: {} },
+  );
+  assert.deepEqual(
+    parseNotificationPreferences({ overrides: [], speech: { instructions: '  ' } }),
+    { overrides: [], speech: {} },
+  );
   for (const speech of [
     { voice: '' },
     { voice: null },
@@ -193,6 +204,9 @@ test('notification speech settings inherit independently and reject invalid or s
     { speed: 4.1 },
     { baseUrl: 'http://other' },
     { apiKey: 'secret' },
+    { connectionId: '' },
+    { connectionId: '../other' },
+    { instructions: 1 },
   ])
     assert.throws(() => parseNotificationPreferences({ overrides: [], speech }));
   assert.throws(() =>
@@ -253,9 +267,21 @@ test('startup preserves captured voice and speed and expiry permits speech; gene
     },
   });
   f.ready(false);
-  f.settings.notificationPreferences.speech = { voice: 'notice', speed: 1.7 };
+  f.settings.tts.connections.push(
+    ...['notice', 'next', 'later'].map((id, i) => ({
+      ...f.settings.tts.connections[0],
+      id,
+      name: id,
+      defaultVoice: id,
+      defaultSpeed: [1.7, 2, 3][i],
+      instructionsMode: 'json',
+      alwaysInstructions: '共通',
+      defaultInstructions: '既定',
+    })),
+  );
+  f.settings.notificationPreferences.speech = { connectionId: 'notice', instructions: '最初' };
   const a = f.publish();
-  f.settings.notificationPreferences.speech = { voice: 'next', speed: 2 };
+  f.settings.notificationPreferences.speech = { connectionId: 'next', instructions: '予約時' };
   f.service.end('applet.' + owner.ownerId, a.notificationId, 'resolved');
   f.ready(true);
   await new Promise((r) => setTimeout(r, 20));
@@ -267,11 +293,12 @@ test('startup preserves captured voice and speed and expiry permits speech; gene
     f.service.list().find((i) => i.id === b.notificationId),
     undefined,
   );
-  f.settings.notificationPreferences.speech = { voice: 'later', speed: 3 };
+  f.settings.notificationPreferences.speech = { connectionId: 'later', instructions: '変更後' };
   f.ready(true);
   await wait(() => f.posts.length === 1 && resolvePlay);
   assert.equal(f.posts[0].voice, 'next');
   assert.equal(f.posts[0].speed, 2);
+  assert.equal(f.posts[0].instructions, '共通\n予約時');
   f.stop();
   await wait(() => !f.speech.allows('notification:' + b.notificationId));
   resolvePlay();
@@ -338,7 +365,7 @@ test('shared TTS queue preserves notification snapshots and isolates cancellatio
   });
   const host = f.tts.speak('host', { text: 'manual', requestId: 'manual' });
   await wait(() => release);
-  f.settings.notificationPreferences.speech = { voice: 'notice', speed: 1.5 };
+  f.settings.notificationPreferences.speech = { connectionId: 'default', instructions: '通知用' };
   const a = f.publish();
   await wait(() => f.availability.status() === 'allowed');
   f.settings.notificationPreferences.overrides[0].speak = false;

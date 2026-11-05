@@ -71,6 +71,7 @@ interface Field extends SettingDefinition {
   writable?: boolean;
   resettable?: boolean;
   inherit?: boolean;
+  resetWhenDefault?: boolean;
 }
 interface Target {
   ui?: SettingsUiBinding;
@@ -238,6 +239,7 @@ export class SettingsServiceTargets {
               fail('LOCAL_ACTION_REQUIRED');
             if (
               field.inherit !== false &&
+              field.resetWhenDefault !== false &&
               field.default !== undefined &&
               sameSetting(actual[field.key], field.default)
             ) {
@@ -1442,26 +1444,23 @@ export class SettingsServiceTargets {
     };
   }
   private speech(): Target {
-    const defaults = resolveNotificationSpeech({
-      ...this.options.settings.value,
-      notificationPreferences: { overrides: [] },
-    });
     const fields: Field[] = [
       {
-        key: 'voice',
-        title: hostText('settings.notificationSettings.voice'),
-        type: 'string',
-        minLength: 1,
-        maxLength: 200,
-        default: defaults.voice,
+        key: 'connectionId',
+        title: hostText('settings.notificationSettings.connection'),
+        type: 'select',
+        resetWhenDefault: false,
+        options: (this.options.settings.value.tts?.connections ?? []).map(({ id, name }) => ({
+          value: id,
+          label: name,
+        })),
+        default: this.options.settings.value.tts?.defaultConnectionId,
       },
       {
-        key: 'speed',
-        title: hostText('settings.notificationSettings.speed'),
-        type: 'number',
-        minimum: 0.25,
-        maximum: 4,
-        default: defaults.speed,
+        key: 'instructions',
+        title: hostText('settings.notificationSettings.instructions'),
+        type: 'string',
+        default: '',
       },
     ];
     return {
@@ -1472,6 +1471,10 @@ export class SettingsServiceTargets {
       category: 'notifications',
       fields,
       values: (settings) => resolveNotificationSpeech(settings),
+      hasDependentChanges: (before, after, key) =>
+        key === 'connectionId' &&
+        before.notificationPreferences?.speech?.connectionId !==
+          after.notificationPreferences?.speech?.connectionId,
       overrides: (raw) => project(object(raw.notificationPreferences).speech, fields),
       replace: (settings, changes, reset) => {
         const speech = { ...settings.notificationPreferences?.speech };

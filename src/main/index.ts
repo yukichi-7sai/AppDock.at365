@@ -960,24 +960,11 @@ const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-keys.json'), {
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
 });
-let notificationVoiceListRevision = 0;
-let notificationVoiceListSignature = '';
-function notificationVoicesRevision() {
-  const signature = JSON.stringify(settings.value.tts ?? defaultTtsSettings());
-  if (signature !== notificationVoiceListSignature) {
-    notificationVoiceListSignature = signature;
-    notificationVoiceListRevision++;
-  }
-  return notificationVoiceListRevision;
-}
 const ttsOwner = (id?: string) =>
   id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp';
 const tts = new TtsService({
-  settings: () => ttsServerSpeech(selectedTtsServer(settings.value.tts)),
-  key: () => {
-    const server = selectedTtsServer(settings.value.tts);
-    return server ? ttsSecrets.key(server) : undefined;
-  },
+  settings: () => settings.value.tts ?? { connections: [] },
+  key: (server) => ttsSecrets.key(server),
   canUse: (owner, speak) => {
     if (quitting) return false;
     if (owner === 'host' || owner === 'notification-preview') return startupReady;
@@ -1009,7 +996,6 @@ const tts = new TtsService({
     ),
 });
 const ttsSettings = new TtsSettingsController(settings, ttsSecrets, () => {
-  notificationVoiceListRevision++;
   notificationSpeech?.reconcile(true);
   tts.reconcile(true);
   changed();
@@ -1543,6 +1529,7 @@ const operationApi = new AppDockApi({
       ...(await ai.models(aiOwner(id), params.connectionId)),
     }),
     'tts.speak': async (params, id) => tts.speak(ttsOwner(id), params),
+    'tts.connections.list': async (_params, id) => tts.connections(ttsOwner(id)),
     'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
     'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
     'tts.stop': async (params, id) => ({ ...(await tts.stop(ttsOwner(id), params.jobId)) }),
@@ -2768,14 +2755,12 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
         error: soundLibrary.preview.errorFor('notification-settings'),
       },
       notificationSpeech: {
-        defaults: {
-          defaultVoice: selectedTtsServer(settings.value.tts)?.defaultVoice ?? '',
-          defaultSpeed: selectedTtsServer(settings.value.tts)?.defaultSpeed ?? 1,
-        },
-        configured:
-          !!selectedTtsServer(settings.value.tts)?.baseUrl &&
-          !!selectedTtsServer(settings.value.tts)?.model,
-        voiceListRevision: notificationVoicesRevision(),
+        connections: (settings.value.tts?.connections ?? []).map((server) => ({
+          id: server.id,
+          name: server.name,
+          configured: !!server.baseUrl && !!server.model,
+        })),
+        defaultConnectionId: settings.value.tts?.defaultConnectionId,
         jobs: [...notificationPreviewJobs].flatMap((id) => {
           try {
             return [tts.get('notification-preview', id)];
@@ -3251,10 +3236,10 @@ function settingsPageActions(
       tts.voices('host', ttsSettings.configuration(id as string | undefined));
     actions.ttsModels = async ([id]) =>
       tts.models('host', ttsSettings.configuration(id as string | undefined));
-    actions.ttsPreview = async ([text, requestId, id]) => {
+    actions.ttsPreview = async ([text, requestId, id, instructions]) => {
       const job = tts.speak(
         'host',
-        { text, requestId },
+        { text, requestId, ...(instructions === undefined ? {} : { instructions }) },
         { configuration: ttsSettings.configuration(id as string | undefined) },
       );
       previewJobs.add(job.jobId as string);
@@ -3332,7 +3317,6 @@ function settingsPageActions(
       );
       if (next !== settings.value) commitSettings(prepareSettings(next), settings.revision);
     };
-    actions.notificationVoices = async () => tts.voices('host');
     actions.notificationPreview = async ([requestId]) => {
       if (
         [...notificationPreviewJobs].some((id) => {

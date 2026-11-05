@@ -294,10 +294,13 @@ export function parseTtsSettings(value: unknown): TtsSettings {
 }
 export type TtsSpeakInput = {
   text: string;
-  voice?: string;
-  speed?: number;
+  connectionId?: string;
   instructions?: string;
   requestId: string;
 };
 export type TtsSpeakResult = TtsJob & { completion: 'accepted' };
+export type TtsConnectionsResult = {
+  connections: Pick<TtsServer, 'id' | 'name'>[];
+  defaultConnectionId?: string;
+};
 export type TtsVoicesResult = { voices: TtsVoice[]; source: 'endpoint' | 'manual' };
