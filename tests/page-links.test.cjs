@@ -55,7 +55,7 @@ test('names track catalogs, unavailable Applet pages never enable or start their
   assert.equal(refs.has('page:missing'), false);
   assert.equal(
     commandTextPlain('[page:text-library] [setting:command-triggers]', new Map(), refs),
-    'テキストライブラリー コマンドトリガー',
+    '文字ライブラリー コマンドトリガー',
   );
   assert.equal(JSON.stringify({ settings, applet }), before);
   applet.enabled = true;
@@ -87,12 +87,12 @@ test('settings search resolves page names without rewriting metadata or input va
   ];
   const before = JSON.stringify({ applets, settings });
   const pages = settingsCatalog(applets, settings);
-  assert(searchSettings(pages, 'テキストライブラリー').some((item) => item.key === 'setting:text'));
+  assert(searchSettings(pages, '文字ライブラリー').some((item) => item.key === 'setting:text'));
   assert(searchSettings(pages, 'command-triggers').some((item) => item.key === 'setting:text'));
   const item = pages
     .find((page) => page.id === 'applet:fixture.links')
     .items.find((item) => item.key === 'setting:text');
-  assert.equal(item.description, 'テキストライブラリー コマンドトリガー');
+  assert.equal(item.description, '文字ライブラリー コマンドトリガー');
   assert.equal(item.definition.description, raw);
   assert.equal(JSON.stringify({ applets, settings }), before);
   applets[0].settings[0].description = '\\[page:logs]';

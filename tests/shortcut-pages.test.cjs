@@ -42,7 +42,7 @@ test('candidates include the library and settings pages and each declared Applet
   const pages = shortcutPageChoices(applets);
   assert.deepEqual(
     pages.filter((p) => p.id.startsWith('host:')).map((p) => p.title),
-    ['画像ライブラリー', '音ライブラリー', 'テキストライブラリー', '設定', 'ログ', '通知センター'],
+    ['画像ライブラリー', '音ライブラリー', '文字ライブラリー', '設定', 'ログ', '通知センター'],
   );
   assert.equal(pages.find((p) => p.id === 'page:test.wallpaper:history').title, '壁紙履歴');
   assert.equal(

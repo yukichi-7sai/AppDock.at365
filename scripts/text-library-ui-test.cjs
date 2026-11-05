@@ -142,7 +142,7 @@ const choose = (page, file, options) =>
     await launch();
     await host.evaluate(() => window.dock.executeCommand('appdock.text-library.open'));
     const page = host.locator('.library-page');
-    await page.getByRole('heading', { name: 'テキストライブラリー', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '文字ライブラリー', exact: true }).waitFor();
     await until(
       async () => (await model())?.content.total === 141 && !(await model()).content.indexing,
       'text index',
@@ -397,7 +397,7 @@ const choose = (page, file, options) =>
     app = undefined;
     await launch();
     await host.evaluate(() => window.dock.executeCommand('appdock.text-library.open'));
-    await host.getByRole('heading', { name: 'テキストライブラリー', exact: true }).waitFor();
+    await host.getByRole('heading', { name: '文字ライブラリー', exact: true }).waitFor();
     await until(async () => (await model())?.kind === 'text-library', 'reopened');
     assert.equal((await model()).content.cardWidth, 360);
     assert.equal((await model()).content.layout.sidebarWidth, width);
