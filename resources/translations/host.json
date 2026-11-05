@@ -1920,6 +1920,7 @@
   "settings.apiPermissionsSettings.processWarning": "このPCでコマンドやプログラムを起動します。ファイルやシステムへ影響する場合があります。",
   "settings.apiPermissionsSettings.settings": "設定変更",
   "settings.apiPermissionsSettings.stopped": "連携が停止中です",
+  "settings.apiPermissionsSettings.starting": "起動中…",
   "settings.apiPermissionsSettings.title": "操作の許可",
   "settings.apiPermissionsSettings.tts": "読み上げ",
   "settings.apiPermissionsSettings.ttsWarning": "設定したTTSサーバーへ読み上げる文章を送信します。",

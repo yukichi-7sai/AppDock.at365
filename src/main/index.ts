@@ -2869,7 +2869,10 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
       },
     };
   if (id === 'permissions')
-    return { permissions: { permissions: appletApiAccess.get(), error: appletApiAccess.error } };
+    return {
+      permissions: { permissions: appletApiAccess.get(), error: appletApiAccess.error },
+      automation: automation?.state(),
+    };
   return {};
 }
 let settingsRecording = false;

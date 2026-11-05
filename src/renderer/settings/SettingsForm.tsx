@@ -190,6 +190,7 @@ export function SettingsForm({
     return (
       <ApiPermissionsSettings
         grants={aux.permissions?.permissions ?? {}}
+        state={aux.automation}
         error={aux.permissions?.error}
         busy={busy}
       />

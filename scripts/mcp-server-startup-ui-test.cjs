@@ -39,6 +39,7 @@ initial.gestures.enabled = false;
 initial.touchpadGestures.enabled = false;
 initial.updates.checkHostOnStartup = false;
 initial.updates.checkAppletsOnStartup = false;
+initial.updates.checkHostOnAboutOpen = false;
 fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(initial));
 const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
@@ -54,7 +55,7 @@ async function until(fn, label) {
   }
   throw Error(label);
 }
-async function launch(restore = false) {
+async function launch(restore = false, category = 'MCPサーバー') {
   const port = await freePort();
   mainPort = await freePort();
   const env = { ...process.env, CODEX_HOME: path.join(profile, 'codex') };
@@ -95,7 +96,7 @@ async function launch(restore = false) {
   if (!restore) await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   await settingsPage(host);
   if (!restore) await host.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
-  await host.getByRole('heading', { name: 'MCPサーバー', exact: true }).waitFor();
+  await host.getByRole('heading', { name: category, exact: true }).waitFor();
 }
 async function stop() {
   if (host && !host.isClosed())
@@ -127,6 +128,196 @@ async function waitRunning() {
   );
   assert.equal(await host.getByRole('button', { name: '接続を再試行', exact: true }).count(), 0);
 }
+async function pauseNextStartup() {
+  const packagePath = portable ? null : path.join(root, 'package.json');
+  await inspect(
+    mainPort,
+    `(() => {
+      const load = process.getBuiltinModule('module').createRequire(${packagePath ? JSON.stringify(packagePath) : "process.resourcesPath + '/app.asar/package.json'"});
+      const { AutomationMcp } = load('./out/main/main/core/automation-mcp.js');
+      const original = AutomationMcp.prototype.verifyLoopback;
+      AutomationMcp.prototype.verifyLoopback = async function (...args) {
+        AutomationMcp.prototype.verifyLoopback = original;
+        await original.apply(this, args);
+        await new Promise((resolve) => globalThis.__mcpStartupUiRelease = resolve);
+      };
+      return true;
+    })()`,
+  );
+}
+const releaseStartup = () =>
+  inspect(
+    mainPort,
+    'globalThis.__mcpStartupUiRelease?.(); delete globalThis.__mcpStartupUiRelease; true',
+  );
+async function checkPermissions() {
+  await host.setViewportSize({ width: 1280, height: 840 });
+  await host.evaluate(async () => {
+    const { state } = await window.dock.automation({ kind: 'status' });
+    await window.dock.automation({
+      kind: 'configure',
+      enabled: false,
+      allowWrite: true,
+      port: state.port,
+    });
+    await window.dock.automation({ kind: 'setExecution', allowed: true });
+  });
+  await pauseNextStartup();
+  await host.evaluate(async () => {
+    const { state } = await window.dock.automation({ kind: 'status' });
+    window.__permissionStartup = window.dock
+      .automation({
+        kind: 'configure',
+        enabled: true,
+        allowWrite: state.allowWrite,
+        port: state.port,
+      })
+      .then(
+        () => null,
+        (error) => String(error),
+      );
+  });
+  await until(
+    () => inspect(mainPort, "typeof globalThis.__mcpStartupUiRelease === 'function'"),
+    'permissions startup gate',
+  );
+  await host.getByRole('button', { name: '操作の許可', exact: true }).click();
+  await host.getByRole('heading', { name: '操作の許可', exact: true }).waitFor();
+  const mcp = (key) => host.getByTestId(`permission-row-${key}`).locator('[data-caller="MCP"]');
+  await mcp('write').getByText('起動中…', { exact: true }).waitFor();
+  assert.equal(await host.getByText('連携が停止中です', { exact: true }).count(), 0);
+  assert.equal(await mcp('write').getByRole('switch').isChecked(), true);
+  assert.equal(await mcp('execute').getByRole('switch').isChecked(), true);
+  assert.equal(await mcp('write').getByRole('switch').isDisabled(), true);
+  assert.equal(
+    await host
+      .getByTestId('permission-row-read')
+      .locator('[data-caller="Applet"]')
+      .getByRole('switch')
+      .isEnabled(),
+    true,
+  );
+  const starting = await model();
+  assert.equal(starting.content.auxiliary.automation.starting, true);
+  await host.screenshot({ path: path.join(profile, 'permissions-starting.png') });
+  checks.push('permissions opened during startup show progress and keep saved grants');
+  await releaseStartup();
+  assert.equal(await host.evaluate(() => window.__permissionStartup), null);
+  const waitPermissionsRunning = async () => {
+    await until(
+      async () => (await model())?.content.auxiliary.automation?.running,
+      'permissions running projection',
+    );
+    await until(
+      async () =>
+        (await host.getByText('起動中…', { exact: true }).count()) === 0 &&
+        (await host.getByText('連携が停止中です', { exact: true }).count()) === 0 &&
+        (await mcp('write').getByRole('switch').isEnabled()),
+      'permissions running display',
+    );
+    assert.equal((await model()).content.page.id, 'permissions');
+  };
+  await waitPermissionsRunning();
+  const ready = await model();
+  assert.equal(ready.id, starting.id);
+  assert(ready.revision > starting.revision);
+  assert.equal(ready.content.editing.editRevision, starting.content.editing.editRevision);
+  checks.push('startup completion clears the permissions warning without navigation or editing');
+  const permissionKeys = [
+    'allowWrite',
+    'allowExecute',
+    'allowSendInput',
+    'allowRunProcesses',
+    'allowUseMcp',
+    'allowUseAi',
+    'allowUseTts',
+  ];
+  const permissionValues = (value) =>
+    Object.fromEntries(permissionKeys.map((key) => [key, value[key]]));
+  const saved = await state();
+  const applet = await host.evaluate(async () => (await window.dock.snapshot()).appletApi);
+  await mcp('execute').getByRole('switch').uncheck();
+  await until(async () => (await state()).allowExecute === false, 'saved MCP permission');
+  assert.deepEqual(permissionValues(await state()), {
+    ...permissionValues(saved),
+    allowExecute: false,
+  });
+  assert.deepEqual(
+    await host.evaluate(async () => (await window.dock.snapshot()).appletApi),
+    applet,
+  );
+  await mcp('execute').getByRole('switch').check();
+  await until(async () => (await state()).allowExecute === true, 'restored MCP permission');
+  const appletRead = host
+    .getByTestId('permission-row-read')
+    .locator('[data-caller="Applet"]')
+    .getByRole('switch');
+  await appletRead.setChecked(!applet.permissions.read);
+  await until(
+    async () =>
+      (await host.evaluate(
+        async () => (await window.dock.snapshot()).appletApi.permissions.read,
+      )) === !applet.permissions.read,
+    'saved Applet permission',
+  );
+  assert.deepEqual(permissionValues(await state()), permissionValues(saved));
+  await appletRead.setChecked(applet.permissions.read);
+  await until(
+    async () =>
+      (await host.evaluate(
+        async () => (await window.dock.snapshot()).appletApi.permissions.read,
+      )) === applet.permissions.read,
+    'restored Applet permission',
+  );
+  checks.push(
+    'permission switches save immediately and keep the other caller and unrelated grants unchanged',
+  );
+  await stop();
+  await launch(true, '操作の許可');
+  await waitPermissionsRunning();
+  assert.deepEqual(permissionValues(await state()), permissionValues(saved));
+  assert.deepEqual(
+    await host.evaluate(async () => (await window.dock.snapshot()).appletApi),
+    applet,
+  );
+  await host.screenshot({ path: path.join(profile, 'permissions-restored.png') });
+  checks.push('process restart restores the permissions page with live status and saved grants');
+  await stop();
+  blocker = net.createServer((socket) => socket.destroy());
+  await new Promise((resolve, reject) =>
+    blocker.once('error', reject).listen(saved.port, '127.0.0.1', resolve),
+  );
+  await launch(true, '操作の許可');
+  await until(
+    async () => (await model())?.content.auxiliary.automation?.error,
+    'permissions startup failure',
+  );
+  await mcp('write').getByText('連携が停止中です', { exact: true }).waitFor();
+  assert.equal(await mcp('write').getByRole('switch').isChecked(), true);
+  assert.equal(await host.getByText('起動中…', { exact: true }).count(), 0);
+  assert.deepEqual(permissionValues(await state()), permissionValues(saved));
+  checks.push(
+    'a real startup failure remains visible on permissions without clearing saved grants',
+  );
+  await new Promise((resolve) => blocker.close(resolve));
+  blocker = undefined;
+  await host.evaluate(() => window.dock.automation({ kind: 'retryStart' }));
+  await waitPermissionsRunning();
+  assert.equal((await state()).error, undefined);
+  assert.deepEqual(permissionValues(await state()), permissionValues(saved));
+  await host.evaluate(async () => {
+    const { state } = await window.dock.automation({ kind: 'status' });
+    await window.dock.automation({
+      kind: 'configure',
+      enabled: false,
+      allowWrite: state.allowWrite,
+      port: state.port,
+    });
+  });
+  await mcp('write').getByText('連携が停止中です', { exact: true }).waitFor();
+  assert.deepEqual(permissionValues(await state()), permissionValues(saved));
+  checks.push('recovery and disabling update the open permissions page and preserve all grants');
+}
 (async () => {
   try {
     await launch();
@@ -139,21 +330,7 @@ async function waitRunning() {
     await host.getByRole('combobox', { name: '接続範囲', exact: true }).selectOption('network');
     await until(async () => (await state()).connectionScope === 'network', 'network scope');
 
-    const packagePath = portable ? null : path.join(root, 'package.json');
-    await inspect(
-      mainPort,
-      `(() => {
-      const load = process.getBuiltinModule('module').createRequire(${packagePath ? JSON.stringify(packagePath) : "process.resourcesPath + '/app.asar/package.json'"});
-      const { AutomationMcp } = load('./out/main/main/core/automation-mcp.js');
-      const original = AutomationMcp.prototype.verifyLoopback;
-      AutomationMcp.prototype.verifyLoopback = async function (...args) {
-        AutomationMcp.prototype.verifyLoopback = original;
-        await original.apply(this, args);
-        await new Promise((resolve) => globalThis.__mcpStartupUiRelease = resolve);
-      };
-      return true;
-    })()`,
-    );
+    await pauseNextStartup();
     await host.getByRole('switch', { name: 'Codex連携を有効にする', exact: true }).click();
     await until(
       () => inspect(mainPort, "typeof globalThis.__mcpStartupUiRelease === 'function'"),
@@ -197,10 +374,7 @@ async function waitRunning() {
       'settings navigation remains available during startup and returning keeps the live progress',
     );
     const starting = await model();
-    await inspect(
-      mainPort,
-      'globalThis.__mcpStartupUiRelease(); delete globalThis.__mcpStartupUiRelease; true',
-    );
+    await releaseStartup();
     await waitRunning();
     const ready = await model();
     assert(ready.revision > starting.revision);
@@ -267,6 +441,7 @@ async function waitRunning() {
     checks.push(
       'narrow light retry is keyboard accessible, recovers the server and preserves connection settings',
     );
+    await checkPermissions();
     assert.deepEqual(failures, []);
     success = true;
   } catch (error) {
@@ -276,6 +451,7 @@ async function waitRunning() {
     process.exitCode = 1;
   } finally {
     if (blocker) await new Promise((resolve) => blocker.close(resolve));
+    if (host && !host.isClosed()) await releaseStartup().catch(() => {});
     await stop().catch((error) => {
       output += String(error);
       child?.kill();

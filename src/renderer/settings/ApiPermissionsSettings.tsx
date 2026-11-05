@@ -7,7 +7,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
 import { useSettingsControls } from '../settings-ui/api';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
 import { SettingsTable } from '../settings-ui/SettingsTable';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
@@ -18,14 +18,16 @@ import {
 } from '../../shared/appdock-api';
 import type { AutomationAction, AutomationState } from '../../shared/automation';
 
-const rows = localizedMetadata<{
-  key: AppletApiPermission;
-  description: string;
-  mcp?: keyof AutomationState;
-  action?: string;
-  label?: string;
-  mcpWarning?: string;
-}[]>(() => [
+const rows = localizedMetadata<
+  {
+    key: AppletApiPermission;
+    description: string;
+    mcp?: keyof AutomationState;
+    action?: string;
+    label?: string;
+    mcpWarning?: string;
+  }[]
+>(() => [
   { key: 'read', description: hostSettingItem('permissions', 'read').description },
   {
     key: 'write',
@@ -92,37 +94,20 @@ function needs(key: AppletApiPermission, permissions: AppletApiPermissions, appl
 
 export function ApiPermissionsSettings({
   grants,
+  state,
   error: appletError,
   busy: hostBusy,
 }: {
   grants: AppletApiPermissions;
+  state?: AutomationState;
   error?: string;
   busy: boolean;
 }) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
-  const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const operation = useRef(false);
-  useEffect(() => {
-    let active = true;
-    const refresh = () =>
-      void settingsControls
-        .automation({ kind: 'status' })
-        .then((r) => {
-          if (active) setState(r.state);
-        })
-        .catch((e) => {
-          if (active) setError(String(e));
-        });
-    refresh();
-    const unsubscribe = settingsControls.onChanged(refresh);
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
   async function save(action: () => Promise<unknown>) {
     if (operation.current) return;
     operation.current = true;
@@ -142,7 +127,11 @@ export function ApiPermissionsSettings({
     write: state?.allowWrite,
   };
   function reason(key: AppletApiPermission, applet: boolean) {
-    if (!applet && !state?.running) return translate('settings.apiPermissionsSettings.stopped');
+    if (!applet) {
+      if (!state) return '';
+      if (state.starting) return translate('settings.apiPermissionsSettings.starting');
+      if (!state.running) return translate('settings.apiPermissionsSettings.stopped');
+    }
     const missing = needs(key, applet ? grants : mcpPermissions, applet);
     return missing.length
       ? translate('settings.apiPermissionsSettings.prerequisites', { value: missing.join('・') })
@@ -227,7 +216,7 @@ export function ApiPermissionsSettings({
                             label: row.label ?? appletApiPermissionLabels[row.key],
                           })}
                           checked={!!mcpOn}
-                          disabled={hostBusy || busy || !state}
+                          disabled={hostBusy || busy || !state || state.starting}
                           onChange={(allowed) =>
                             void save(async () => {
                               const action =
@@ -239,7 +228,7 @@ export function ApiPermissionsSettings({
                                       port: state!.port,
                                     } as const)
                                   : ({ kind: row.action, allowed } as AutomationAction);
-                              setState((await settingsControls.automation(action)).state);
+                              await settingsControls.automation(action);
                             })
                           }
                         />
