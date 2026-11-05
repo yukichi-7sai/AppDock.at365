@@ -31,7 +31,8 @@ export const specializedHostDefaults = {
 type OrdinaryHostKey = Exclude<keyof HostSettings, keyof typeof specializedHostDefaults>;
 export type HostSettingDefinition = SettingDefinition & {
   key: OrdinaryHostKey;
-  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications' | 'text-palette' | 'ribbon';
+  pageId:
+    'appearance' | 'general' | 'about' | 'statusbar' | 'notifications' | 'text-palette' | 'ribbon';
   catalogKey?: string;
   applies?: string;
 };
@@ -312,7 +313,7 @@ const definitions = localizedMetadata(
         applies: 'nextStart',
       },
       hardwareAcceleration: {
-        pageId: 'general',
+        pageId: 'about',
         title: hostText('general.hardwareAcceleration.label'),
         description: hostText('general.hardwareAcceleration.description'),
         type: 'boolean',
@@ -321,7 +322,7 @@ const definitions = localizedMetadata(
         generateCommands: [...switches],
       },
       fileWatchAssistanceEnabled: {
-        pageId: 'general',
+        pageId: 'about',
         title: hostText('general.fileWatch.enabled'),
         description: hostText('general.fileWatch.description'),
         type: 'boolean',
@@ -330,7 +331,7 @@ const definitions = localizedMetadata(
         generateCommands: [...switches],
       },
       fileWatchAssistanceIntervalSeconds: {
-        pageId: 'general',
+        pageId: 'about',
         title: hostText('general.fileWatch.interval'),
         description: hostText('general.fileWatch.intervalDescription'),
         type: 'number',

@@ -91,7 +91,7 @@ async function state() {
 async function openGeneral() {
   ui = settingsAwarePage(host);
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-  await ui.getByRole('button', { name: '一般', exact: true }).click();
+  await ui.getByRole('button', { name: 'AppDockについて', exact: true }).click();
   await ui.getByRole('heading', { name: '設定ファイル', exact: true }).first().waitFor();
 }
 async function dialogs(mode) {

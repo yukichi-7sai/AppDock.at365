@@ -23,7 +23,10 @@ assert.equal(hash(source), hash(executable));
 const settings = createDefaultSettings();
 settings.host.notifications = false;
 settings.host.hardwareAcceleration = false;
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const service = new WindowsLaunch(executable, profile, [`--test-profile=${profile}`]);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -72,7 +75,7 @@ async function launch() {
   page = require('./settings-aware-page.cjs').settingsAwarePage(page);
   page.setDefaultTimeout(12000);
   await page.locator('[data-ribbon-id="settings"]').click();
-  await category('一般').click();
+  await category('AppDockについて').click();
 }
 const button = (name) => page.getByRole('button', { name, exact: true });
 const category = (name) =>
@@ -82,6 +85,21 @@ const category = (name) =>
 const toggle = (name) => page.getByRole('switch', { name, exact: true });
 const snapshot = () => page.evaluate(() => window.dock.snapshot());
 async function save() {
+  // Toggle edits save immediately; wait for the Windows operation before requesting an input flush.
+  const desired = {
+    startAtLogon:
+      (await toggle('ログイン時に自動的に起動する').getAttribute('aria-checked')) === 'true',
+    runAsAdministrator:
+      (await toggle('常に管理者として起動').getAttribute('aria-checked')) === 'true',
+  };
+  await until(async () => {
+    const current = await snapshot();
+    const editing = await page.evaluate(() => window.dock.settingsEditing());
+    return (
+      !editing.pending &&
+      Object.entries(desired).every(([key, value]) => current.settings.value.host[key] === value)
+    );
+  }, 'launch choices saved after Windows registration');
   await settleSettings(page);
 }
 async function close() {
@@ -109,9 +127,10 @@ async function close() {
     await toggle('ログイン時に自動的に起動する').click();
     await save();
     assert.equal((await service.read()).registered, true);
+    await category('一般').click();
     await toggle('閉じるとトレイに収納').click();
     await category('リボン').click();
-    await category('一般').click();
+    await category('AppDockについて').click();
     assert.equal(await toggle('ログイン時に自動的に起動する').getAttribute('aria-checked'), 'true');
     await save();
     const registered = await service.read();
@@ -197,7 +216,7 @@ async function close() {
         ])
           assert.equal(
             await page
-              .getByRole(name.includes('登録') || name.includes('常に') ? 'switch' : 'button', {
+              .getByRole(name.includes('ログイン') || name.includes('常に') ? 'switch' : 'button', {
                 name,
                 exact: true,
               })
@@ -221,7 +240,7 @@ async function close() {
     await save();
     assert.equal((await service.read()).registered, false);
     await button('状態を確認').click();
-    await page.getByText(/ログイン時の自動起動: 未登録/).waitFor();
+    await page.getByText(/ログイン時の自動起動：未登録/).waitFor();
     checks.push(
       'restart preserves settings and detects Windows registration; disabling and saving removes only isolated task',
     );
@@ -240,9 +259,22 @@ async function close() {
     }
     if (!registered.administratorAccount && !registered.elevated) {
       await close();
-      const stored = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+      const stored = JSON.parse(
+        fs.readFileSync(
+          require('./test-settings.cjs').file(
+            profile,
+            'settings-' + require('node:os').hostname() + '.json',
+          ),
+        ),
+      );
       stored.host.runAsAdministrator = true;
-      fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(stored));
+      fs.writeFileSync(
+        require('./test-settings.cjs').file(
+          profile,
+          'settings-' + require('node:os').hostname() + '.json',
+        ),
+        JSON.stringify(stored),
+      );
       await launch();
       const fallback = await snapshot();
       assert.equal(fallback.launch.elevated, false);

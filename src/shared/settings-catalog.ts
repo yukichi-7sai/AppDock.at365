@@ -324,6 +324,18 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
   ],
   about: [
     [
+      'startAtLogon',
+      hostText('general.startAtLogon.label'),
+      hostText('general.startAtLogon.description'),
+    ],
+    [
+      'runAsAdministrator',
+      hostText('general.runAsAdministrator.label'),
+      hostText('general.runAsAdministrator.description'),
+    ],
+    ['launch', hostText('general.launch.label'), hostText('general.launch.keywords')],
+    ['settingsFile', hostText('general.files.title'), hostText('general.files.keywords')],
+    [
       'updateActions',
       hostText('settings.settings-catalog.updates'),
       hostText('settings.settings-catalog.updatesKeywords'),
@@ -392,29 +404,10 @@ const localizedHostFields = {
     ['overlayShadow', 'appearance.overlayShadow.label', 'appearance.overlayShadow.description'],
   ],
   general: [
-    ['soundEnabled', 'general.sound.label', 'general.sound.description'],
     ['startPage', 'general.startPage.label', 'general.startPage.description'],
-    ['startAtLogon', 'general.startAtLogon.label', 'general.startAtLogon.description'],
-    [
-      'runAsAdministrator',
-      'general.runAsAdministrator.label',
-      'general.runAsAdministrator.description',
-    ],
-    ['launch', 'general.launch.label', 'general.launch.keywords'],
     ['closeToTray', 'general.closeToTray.label', 'general.closeToTray.description'],
-    [
-      'hardwareAcceleration',
-      'general.hardwareAcceleration.label',
-      'general.hardwareAcceleration.description',
-    ],
     ['startMinimized', 'general.startMinimized.label', 'general.startMinimized.description'],
-    ['settingsFile', 'general.files.title', 'general.files.keywords'],
-    ['fileWatchAssistanceEnabled', 'general.fileWatch.enabled', 'general.fileWatch.description'],
-    [
-      'fileWatchAssistanceIntervalSeconds',
-      'general.fileWatch.interval',
-      'general.fileWatch.intervalDescription',
-    ],
+    ['soundEnabled', 'general.sound.label', 'general.sound.description'],
   ],
 } as const;
 function hostRows(
@@ -666,7 +659,7 @@ export function settingsPaths(
   if (isHostPageSettingsId(page.id))
     return [
       ...hostPageSettingsPaths(page.id),
-      ...(page.id === 'general' ? deviceOnlyHostKeys.map((key) => ['host', key]) : []),
+      ...(page.id === 'about' ? deviceOnlyHostKeys.map((key) => ['host', key]) : []),
     ];
   switch (page.id) {
     case 'mcp-client':

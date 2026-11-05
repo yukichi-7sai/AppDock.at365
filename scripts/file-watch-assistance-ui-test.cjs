@@ -82,8 +82,8 @@ async function main() {
   await until(async () => (await snapshot()).startupReady, 'startup ready');
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   const ui = settingsAwarePage(host);
-  await ui.getByRole('button', { name: '一般', exact: true }).click();
-  await ui.getByRole('heading', { name: 'ファイル監視', exact: true }).waitFor();
+  await ui.getByRole('button', { name: 'AppDockについて', exact: true }).click();
+  await ui.getByRole('heading', { name: '高度な設定', exact: true }).waitFor();
   const enabled = ui.getByRole('switch', { name: 'ファイル監視の補助確認', exact: true });
   const interval = ui.getByLabel('補助確認の待機時間（秒）', { exact: true });
   assert.equal(await enabled.isChecked(), false);

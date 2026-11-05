@@ -227,7 +227,7 @@ test('notification and update service settings read, write and reset the selecte
     },
     { pageId: 'about', targetId: 'service.updates', key: 'startupDelaySeconds', value: 42 },
   ]) {
-    f.store.setHostPageLocalSettings(pageId, true, f.store.revision);
+    if (pageId !== 'about') f.store.setHostPageLocalSettings(pageId, true, f.store.revision);
     const sharedBefore = fs.readFileSync(f.store.file, 'utf8');
     f.call('apply', f.request(targetId, [{ kind: 'set', changes: { [key]: value } }]));
     assert.equal(f.values(targetId)[key], value);
@@ -236,12 +236,15 @@ test('notification and update service settings read, write and reset the selecte
     f.call('apply', f.request(targetId, [{ kind: 'reset', keys: [key] }]));
     assert.equal(f.read(targetId).fields.find((field) => field.key === key).inherited, true);
     assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+    if (pageId === 'about') {
+      assert.throws(() => f.store.setHostPageLocalSettings(pageId, false, f.store.revision));
+      continue;
+    }
     f.store.setHostPageLocalSettings(pageId, false, f.store.revision);
     f.call('apply', f.request(targetId, [{ kind: 'set', changes: { [key]: value } }]));
     assert.equal(f.values(targetId)[key], value);
     assert.notEqual(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
   }
-  f.store.setHostPageLocalSettings('about', true, f.store.revision);
   const device = JSON.parse(fs.readFileSync(f.store.device.file, 'utf8'));
   device.hostPages.about.configuration.updates = { startupDelaySeconds: 10 };
   fs.writeFileSync(f.store.device.file, JSON.stringify(device));
@@ -2351,7 +2354,7 @@ test('update fields follow existing defaults and catalog, with explicit applicat
   assert.equal(f.writes(), 0);
 });
 
-test('update fields dryRun and batched reset share atomic, default-omitting storage without changing device or unrelated settings', (t) => {
+test('update fields dryRun and batched reset use atomic device storage without changing shared or unrelated settings', (t) => {
   const f = fixture(t, { device: true }),
     before = fs.readFileSync(f.store.shared.file),
     device = fs.readFileSync(f.store.device.file),
@@ -2370,13 +2373,15 @@ test('update fields dryRun and batched reset share atomic, default-omitting stor
   assert.equal(preview.completion, 'validated');
   assert.equal(preview.effectVerified, false);
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
   assert.equal(f.writes(), 0);
   const request = f.request(updatesId, [{ kind: 'set', changes }]),
     saved = f.call('apply', request);
   assert.deepEqual(f.call('apply', request), saved);
   assert.equal(f.writes(), 1);
   assert.deepEqual(f.values(updatesId), changes);
-  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  assert.notDeepEqual(fs.readFileSync(f.store.device.file), device);
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   assert.deepEqual(f.store.value.ai, ai);
   assert.deepEqual(f.store.value.notificationPreferences, notifications);
   f.call('apply', f.request(updatesId, [{ kind: 'reset', keys: Object.keys(changes) }]));

@@ -189,7 +189,7 @@ const values = (result) =>
 
 test('assistance settings support public dry-run, fractional apply, minimum validation and scoped reset', (t) => {
   const f = fixture(t, { device: true });
-  const targetId = 'host.general';
+  const targetId = 'host.about';
   const schema = f.call('schema.get', { targetId });
   assert.equal(
     schema.items.find((field) => field.key === 'fileWatchAssistanceIntervalSeconds').inputSchema

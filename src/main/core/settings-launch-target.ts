@@ -60,14 +60,14 @@ export function launchSettingsTarget(options: {
   };
   return {
     targetId: 'service.launch',
-    ui: settingsUiFields('general'),
+    ui: settingsUiFields('about'),
     ownerId: 'appdock',
     title: hostText('general.startup.section'),
     category: 'launch',
     available,
     fields: keys.map((key) => ({
       key,
-      title: hostSettingItem('general', key).title,
+      title: hostSettingItem('about', key).title,
       type: 'boolean',
       default: defaults[key],
     })),

@@ -118,7 +118,7 @@ import { pathToFileURL } from 'node:url';
 import { SettingsConflictError } from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
 import { readDeviceCollections, readDeviceManifests } from './core/device-settings';
-import { isHostPageSettingsId } from '../shared/host-page-settings';
+import { isHostPageSettingsId, canSwitchHostPageSettings } from '../shared/host-page-settings';
 import { restoreSettingsCollections } from '../shared/settings-storage';
 import { settingsResetPaths, appletSettingsPageId } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
@@ -2520,7 +2520,7 @@ function settingsPageStorage(
   )
     scopes.add('device');
   return {
-    canSwitch: (page.kind === 'applet' && !page.collection) || isHostPageSettingsId(page.id),
+    canSwitch: (page.kind === 'applet' && !page.collection) || canSwitchHostPageSettings(page.id),
     local,
     signature: `${page.id}:${local ? 'device' : 'shared'}${
       page.id === 'custom-commands'
@@ -2732,20 +2732,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
   }
 
   if (id === 'appearance') return {};
-  if (id === 'general')
-    return {
-      startPages: startPageOptions(settings.value, applets),
-      launch: launch.state,
-      settingsHealth: {
-        restartRequired: settingsRestartRequired(),
-        reasons: settingsRestartRequired() ? [settingsRestartReason()] : [],
-        errors: settings.health.all().map((i) => i.message),
-        recovered: settings.recovered,
-        canRestore: settings.recovered && !!settings.backupCandidate(),
-        busy: settingsOperationBusy(),
-        launchRecovery: launch.recoveryPending,
-      },
-    };
+  if (id === 'general') return { startPages: startPageOptions(settings.value, applets) };
   if (id === 'notifications')
     return {
       notificationTypes: notificationCatalog(orderApplets(applets, settings.value.appletOrder)),
@@ -2828,6 +2815,16 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
         availableCommandCount: new Set(
           commands.filter((command) => command.available).map((command) => command.id),
         ).size,
+      },
+      launch: launch.state,
+      settingsHealth: {
+        restartRequired: settingsRestartRequired(),
+        reasons: settingsRestartRequired() ? [settingsRestartReason()] : [],
+        errors: settings.health.all().map((i) => i.message),
+        recovered: settings.recovered,
+        canRestore: settings.recovered && !!settings.backupCandidate(),
+        busy: settingsOperationBusy(),
+        launchRecovery: launch.recoveryPending,
       },
       hostStartupTiming: hostStartupTiming.snapshot(),
     };
@@ -3089,7 +3086,7 @@ function settingsPageActions(
       assertSettingsWritable();
       return customCommands.update(args);
     };
-  if ((page.kind === 'applet' && !page.collection) || isHostPageSettingsId(page.id))
+  if ((page.kind === 'applet' && !page.collection) || canSwitchHostPageSettings(page.id))
     actions['set-local-settings'] = async ([
       enabled,
       revision,
@@ -3352,7 +3349,7 @@ function settingsPageActions(
     actions.openClipboardSettings = () => shell.openExternal('ms-settings:clipboard');
     actions.manageSnippets = manageSnippets;
   }
-  if (page.id === 'general') {
+  if (page.id === 'about') {
     actions.restoreScopedSettings = async ([scope]) => {
       if (scope !== 'shared' && scope !== 'device')
         throw Error(hostText('settings.index.invalidRecovery'));
@@ -5101,7 +5098,7 @@ async function initialize() {
           mcpAccess: operationApi.settingsAccess(page),
           shortcutCapture: settingsRecording ? shortcutCaptured : undefined,
           storage: settingsPageStorage(page),
-          settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,
+          settingsFiles: page.id === 'about' ? settings.diagnostics() : undefined,
         }),
         actions: settingsPageActions,
         release: releaseSettingsView,

@@ -13,10 +13,10 @@ const {
   resetSettingsPage,
 } = require('../out/main/shared/settings-catalog');
 
-test('general JSON and page reset include assistance values while preserving another page', () => {
+test('About JSON and page reset include assistance values while preserving another page', () => {
   const current = createDefaultSettings();
   current.host.theme = 'dark';
-  const page = settingsCatalog([], current).find((page) => page.id === 'general');
+  const page = settingsCatalog([], current).find((page) => page.id === 'about');
   const edited = parseSettings(
     applySettingsJson(
       current,
@@ -50,7 +50,7 @@ test('assistance defaults, sparse storage and public field metadata share the or
     field.key.startsWith('fileWatchAssistance'),
   );
   assert.equal(fields.length, 2);
-  assert(fields.every((field) => field.pageId === 'general' && field.automation));
+  assert(fields.every((field) => field.pageId === 'about' && field.automation));
   assert.equal(fields.find((field) => field.type === 'number').minimum, 2);
 });
 
@@ -67,12 +67,12 @@ test('settings validation rejects invalid intervals while retaining fractional v
   assert.throws(() => parseSettings(settings));
 });
 
-test('general-page device storage preserves assistance values through reload without modifying shared values', (t) => {
+test('fixed About device storage preserves assistance values through reload without modifying shared values', (t) => {
   const root = fs.mkdtempSync(path.resolve('.artifacts/file-watch-settings-'));
   const file = path.join(root, 'data/settings.json');
   let store = new DeviceSettingsStore(file, path.join(root, 'local'), 'TEST');
   store.load();
-  store.setHostPageLocalSettings('general', true, store.revision);
+  assert.equal(store.hostPageLocalSettings('about'), true);
   t.after(() => store.close());
   const shared = fs.readFileSync(file);
   store.save(

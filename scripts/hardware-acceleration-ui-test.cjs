@@ -9,13 +9,18 @@ fs.mkdirSync(profile, { recursive: true });
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
 const settings = createDefaultSettings();
 delete settings.host.hardwareAcceleration;
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 let application;
 async function launch() {
   application = await electron.launch({
-    executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+    executablePath: process.argv[2]
+      ? require('./copy-host.cjs').prepareTestHost(path.resolve(process.argv[2]), profile)
+      : require('electron'),
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
     timeout: 30000,
@@ -28,7 +33,7 @@ async function launch() {
     await app.getGPUInfo('basic');
   });
   await page.keyboard.press('Control+,');
-  await page.getByRole('button', { name: '一般', exact: true }).click();
+  await page.getByRole('button', { name: 'AppDockについて', exact: true }).click();
   return page;
 }
 const enabled = () => application.evaluate(({ app }) => app.isHardwareAccelerationEnabled());
@@ -43,7 +48,14 @@ async function save(page, value) {
     value,
   );
   assert.equal(
-    JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.hardwareAcceleration,
+    JSON.parse(
+      fs.readFileSync(
+        require('./test-settings.cjs').file(
+          profile,
+          'settings-' + require('node:os').hostname() + '.json',
+        ),
+      ),
+    ).host.hardwareAcceleration ?? false,
     value,
   );
 }

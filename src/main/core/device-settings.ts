@@ -21,6 +21,7 @@ import {
   hostPageSettingsIds,
   hostPageSettingsPaths,
   isHostPageSettingsId,
+  isDeviceOnlyHostPage,
   readHostPagePath,
   writeHostPagePath,
   type HostPageConfiguration,
@@ -206,7 +207,14 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
       throw Error(hostText('services.deviceSettings.invalidHostPage'));
     const page: DeviceHostPage = { useLocalSettings: entry.useLocalSettings };
     if (entry.configuration !== undefined) {
-      assertHostPageConfiguration(entry.configuration, hostPageSettingsPaths(pageId));
+      // Accept obsolete General watch fields without importing them into the new local page.
+      const paths = hostPageSettingsPaths(pageId);
+      if (pageId === 'general')
+        paths.push(
+          ['host', 'fileWatchAssistanceEnabled'],
+          ['host', 'fileWatchAssistanceIntervalSeconds'],
+        );
+      assertHostPageConfiguration(entry.configuration, paths);
       const candidate = createDefaultSettings();
       applyHostPageConfiguration(candidate, entry.configuration, pageId);
       if (pageId === 'tray') delete (candidate as Partial<Settings>).trayCommands;
@@ -307,8 +315,8 @@ export function combineSettings(
   for (const key of deviceOnlyHostKeys) result.host[key] = device.host[key];
   for (const pageId of hostPageSettingsIds) {
     const entry = device.hostPages?.[pageId];
-    if (entry?.useLocalSettings) {
-      applyHostPageConfiguration(result, entry.configuration ?? {}, pageId);
+    if (isDeviceOnlyHostPage(pageId) || entry?.useLocalSettings) {
+      applyHostPageConfiguration(result, entry?.configuration ?? {}, pageId);
       if (pageId === 'tray') delete (result as Partial<Settings>).trayCommands;
     }
   }
@@ -340,12 +348,20 @@ export function combineSettings(
   }
   return parseSettings(result);
 }
-/** Missing pages start shared. Keep legacy PC overrides available for a later switch to local. */
+/** Selectable pages start shared; fixed local pages never inherit shared configuration. */
 export function initializeHostPageSettings(
   device: DeviceSettings,
   legacyShared?: Settings,
 ): DeviceSettings {
-  if (hostPageSettingsIds.every((pageId) => device.hostPages?.[pageId])) return device;
+  if (
+    hostPageSettingsIds.every((pageId) => {
+      const entry = device.hostPages?.[pageId];
+      return (
+        entry && (!isDeviceOnlyHostPage(pageId) || (entry.useLocalSettings && entry.configuration))
+      );
+    })
+  )
+    return device;
   const legacyHost = legacyShared && omitSettingDefaults(device.host, createDefaultSettings().host);
   const legacy = legacyShared && {
     ...legacyShared,
@@ -354,6 +370,16 @@ export function initializeHostPageSettings(
   const result = structuredClone(device);
   result.hostPages ??= {};
   for (const pageId of hostPageSettingsIds) {
+    if (isDeviceOnlyHostPage(pageId)) {
+      result.hostPages[pageId] = {
+        useLocalSettings: true,
+        configuration: hostPageConfiguration(
+          result.hostPages[pageId]?.configuration ?? createDefaultSettings(),
+          pageId,
+        ),
+      };
+      continue;
+    }
     if (result.hostPages[pageId]) continue;
     const entry: DeviceHostPage = { useLocalSettings: false };
     if (legacy && hostPageConfiguration({ host: legacyHost }, pageId).host)

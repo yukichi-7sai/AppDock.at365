@@ -117,7 +117,7 @@ test('general sound toggle is searchable and editable through partial JSON witho
   const settings = createDefaultSettings();
   const pages = settingsCatalog(applets, settings);
   const page = pages.find((p) => p.id === 'general');
-  assert.equal(page.items[0].key, 'soundEnabled');
+  assert(page.items.some((item) => item.key === 'soundEnabled'));
   const projection = settingsProjection(settings, page, applets);
   assert.equal(projection.host.soundEnabled, true);
   projection.host.soundEnabled = false;

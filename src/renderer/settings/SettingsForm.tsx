@@ -4,8 +4,6 @@ import { McpClientSettingsForm } from './McpClientSettings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
-import { settingAnchor } from '../settings-ui/setting-anchor';
-import React from 'react';
 import type { Settings } from '../../shared/contracts';
 import type { SettingsPageModel } from '../../shared/settings-page';
 import { useSettingsControls } from '../settings-ui/api';
@@ -14,6 +12,7 @@ import { DescriptionText } from '../settings-ui/DescriptionText';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { minimumInputPaletteWidth } from '../../shared/input-palette';
 import { AboutSettings } from './AboutSettings';
+import { SettingRow } from './SettingRow';
 import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
 
@@ -74,7 +73,6 @@ export function SettingsForm({
   const extensions = aux.applets ?? [],
     commands = aux.commands ?? [],
     globalHotKeys = aux.statuses ?? [];
-  const launch = aux.launch!;
   const run = async (work: () => Promise<unknown>) => {
     try {
       await work();
@@ -120,7 +118,9 @@ export function SettingsForm({
       />
     );
   if (category === 'about')
-    return <AboutSettings settings={settings} edit={edit} startupTiming={aux.hostStartupTiming} />;
+    return (
+      <AboutSettings settings={settings} edit={edit} auxiliary={aux} busy={busy} invoke={invoke} />
+    );
   if (category === 'tray')
     return (
       <SettingsMcpScope itemId={settingsItemId('tray', 'trayMenu')}>
@@ -535,17 +535,6 @@ export function SettingsForm({
         )}
         {category === 'general' && (
           <>
-            <SettingsSection>
-              <SettingRow pageId={category} itemKey="soundEnabled">
-                <Toggle
-                  label={t('general.sound.label')}
-                  checked={settings.host.soundEnabled}
-                  onChange={(v) =>
-                    edit({ ...settings, host: { ...settings.host, soundEnabled: v } })
-                  }
-                />
-              </SettingRow>
-            </SettingsSection>
             <SettingsSection title={t('general.window.section')}>
               <SettingRow
                 pageId={category}
@@ -591,210 +580,19 @@ export function SettingsForm({
                   />
                 </SettingRow>
               ))}
-            </SettingsSection>
-            <SettingsSection
-              title={t('general.startup.section')}
-              data-testid="general-startup-settings"
-              description={t('settings.storage.deviceOnly')}
-              hint={t('general.startup.hint')}
-            >
-              <SettingRow pageId={category} itemKey="startAtLogon">
+              <SettingRow pageId={category} itemKey="soundEnabled">
                 <Toggle
-                  label={t('general.startAtLogon.label')}
-                  checked={settings.host.startAtLogon}
-                  disabled={!launch.supported}
+                  label={t('general.sound.label')}
+                  checked={settings.host.soundEnabled}
                   onChange={(v) =>
-                    edit({ ...settings, host: { ...settings.host, startAtLogon: v } })
+                    edit({ ...settings, host: { ...settings.host, soundEnabled: v } })
                   }
                 />
               </SettingRow>
-              <SettingRow pageId={category} itemKey="runAsAdministrator">
-                <Toggle
-                  label={t('general.runAsAdministrator.label')}
-                  checked={settings.host.runAsAdministrator}
-                  disabled={!launch.supported}
-                  onChange={(v) =>
-                    edit({ ...settings, host: { ...settings.host, runAsAdministrator: v } })
-                  }
-                />
-              </SettingRow>
-              <SettingRow pageId={category} itemKey="hardwareAcceleration">
-                <Toggle
-                  label={hostSettingItem(category, 'hardwareAcceleration', language).title}
-                  checked={settings.host.hardwareAcceleration}
-                  onChange={(hardwareAcceleration) =>
-                    edit({ ...settings, host: { ...settings.host, hardwareAcceleration } })
-                  }
-                />
-              </SettingRow>
-              <SettingRow
-                pageId={category}
-                itemKey="launch"
-                error={launch.error}
-                description={
-                  launch.supported
-                    ? t('general.launch.status', {
-                        privilege: launch.elevated
-                          ? t('general.launch.elevated')
-                          : t('general.launch.normal'),
-                        registration: launch.registered
-                          ? launch.taskElevated
-                            ? t('general.launch.registeredElevated')
-                            : t('general.launch.registeredNormal')
-                          : t('general.launch.notRegistered'),
-                      })
-                    : t('general.launch.unsupported')
-                }
-              >
-                <SettingsActions>
-                  <button
-                    disabled={!launch.supported || busy}
-                    onClick={() => void run(() => invoke('refreshLaunchState'))}
-                  >
-                    {t('general.launch.refresh')}
-                  </button>
-                  <button
-                    disabled={!launch.supported || launch.elevated || busy}
-                    onClick={() => void run(() => invoke('restartAsAdministrator'))}
-                  >
-                    {t('general.launch.restartElevated')}
-                  </button>
-                </SettingsActions>
-              </SettingRow>
-            </SettingsSection>
-            <SettingsSection
-              title={t('general.fileWatch.section')}
-              data-testid="file-watch-settings"
-            >
-              <SettingRow pageId={category} itemKey="fileWatchAssistanceEnabled">
-                <Toggle
-                  label={t('general.fileWatch.enabled')}
-                  checked={settings.host.fileWatchAssistanceEnabled}
-                  onChange={(checked) =>
-                    edit({
-                      ...settings,
-                      host: { ...settings.host, fileWatchAssistanceEnabled: checked },
-                    })
-                  }
-                />
-              </SettingRow>
-              <SettingRow pageId={category} itemKey="fileWatchAssistanceIntervalSeconds">
-                <SettingsInput
-                  aria-label={t('general.fileWatch.interval')}
-                  type="number"
-                  min={2}
-                  step="any"
-                  disabled={busy || !settings.host.fileWatchAssistanceEnabled}
-                  value={settings.host.fileWatchAssistanceIntervalSeconds}
-                  onChange={(event) =>
-                    edit({
-                      ...settings,
-                      host: {
-                        ...settings.host,
-                        fileWatchAssistanceIntervalSeconds: numberInput(event.target.value),
-                      },
-                    })
-                  }
-                />
-              </SettingRow>
-            </SettingsSection>
-            <SettingsSection
-              title={t('general.files.title')}
-              {...settingAnchor(category, 'settingsFile')}
-              hint={t('general.files.hint')}
-              error={[...new Set(aux.settingsHealth?.errors)].join('\n')}
-              description={[
-                !aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired
-                  ? t('general.files.healthy')
-                  : '',
-                aux.settingsHealth?.recovered ? t('general.files.recovered') : '',
-                ...(aux.settingsHealth?.reasons ?? []),
-                aux.settingsHealth?.errors.length ? t('general.files.restartAdvice') : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              {aux.settingsFiles?.map((file) => (
-                <SettingsField
-                  key={file.scope}
-                  title={
-                    file.scope === 'device' ? t('general.files.device') : t('general.files.shared')
-                  }
-                  description={
-                    <>
-                      <code>{file.path}</code> —{' '}
-                      {file.recovered ? t('general.files.continuing') : t('general.files.normal')}
-                    </>
-                  }
-                >
-                  {file.canRestore && (
-                    <button
-                      disabled={busy || aux.settingsHealth?.busy}
-                      onClick={() => void run(() => invoke('restoreScopedSettings', [file.scope]))}
-                    >
-                      {t('general.files.restoreOne')}
-                    </button>
-                  )}
-                </SettingsField>
-              ))}
-              <SettingsActions>
-                <button
-                  disabled={busy || aux.settingsHealth?.busy}
-                  onClick={() => void run(() => invoke('restart'))}
-                >
-                  {t('general.files.restart')}
-                </button>
-                <button
-                  disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
-                  onClick={() => void run(() => invoke('restoreSettingsBackup'))}
-                >
-                  {t('general.files.restore')}
-                </button>
-                <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
-                  {t('general.files.open')}
-                </button>
-                {aux.settingsHealth?.launchRecovery && (
-                  <button
-                    disabled={busy}
-                    onClick={() => void run(() => invoke('recoverLaunchSettings'))}
-                  >
-                    {t('general.files.recoverLaunch')}
-                  </button>
-                )}
-              </SettingsActions>
             </SettingsSection>
           </>
         )}
       </div>
     </div>
-  );
-}
-function SettingRow({
-  pageId,
-  itemKey,
-  description,
-  error,
-  children,
-}: {
-  pageId: string;
-  itemKey: string;
-  description?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  const { language } = useHostTranslation();
-  const item = hostSettingItem(pageId, itemKey, language);
-  const requiredDescription =
-    pageId === 'general' && ['runAsAdministrator', 'hardwareAcceleration'].includes(itemKey);
-  return (
-    <SettingsField
-      title={item.title}
-      error={error}
-      hint={description === undefined && !requiredDescription ? item.description : undefined}
-      description={description ?? (requiredDescription ? item.description : undefined)}
-      {...settingAnchor(pageId, itemKey)}
-    >
-      {children}
-    </SettingsField>
   );
 }

@@ -418,7 +418,7 @@ test('a successful local save cannot authorize an older asynchronous editor to r
     values.host.closeToTray = !editor.value.host.closeToTray;
   });
   f.edit((settings) => {
-    settings.host.hardwareAcceleration = !editor.value.host.hardwareAcceleration;
+    settings.host.startMinimized = !editor.value.host.startMinimized;
   });
   await f.client.flush();
   editor.value.host.soundEnabled = !editor.value.host.soundEnabled;
@@ -426,10 +426,7 @@ test('a successful local save cannot authorize an older asynchronous editor to r
   await f.client.flush();
   assert.equal(f.error, '');
   assert.equal(f.displayed.content.values.host.closeToTray, !editor.value.host.closeToTray);
-  assert.equal(
-    f.displayed.content.values.host.hardwareAcceleration,
-    !editor.value.host.hardwareAcceleration,
-  );
+  assert.equal(f.displayed.content.values.host.startMinimized, !editor.value.host.startMinimized);
   assert.equal(f.displayed.content.values.host.soundEnabled, editor.value.host.soundEnabled);
 });
 test('queued forms preserve external fields merged by the first queued save', async () => {

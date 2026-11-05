@@ -169,7 +169,7 @@ export function SettingsPageLayout({
                         </button>
                       ))}
                   </div>
-                  {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
+                  {storage?.canSwitch ? (
                     <label className="settings-storage-toggle">
                       <input
                         data-testid="settings-storage-local"
@@ -181,12 +181,16 @@ export function SettingsPageLayout({
                       {t('settings.local.label')}
                       <SettingsHintIcon
                         title={t('settings.local.label')}
-                        hint={[
-                          storage.local ? t('settings.local.hint') : t('settings.shared.hint'),
-                          ...(page.id === 'general' ? [t('settings.general.storageHint')] : []),
-                        ].join(' ')}
+                        hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
                       />
                     </label>
+                  ) : page.id === 'about' ? (
+                    <span
+                      className="settings-storage-toggle"
+                      data-testid="settings-storage-device-only"
+                    >
+                      {t('settings.storage.deviceOnly')}
+                    </span>
                   ) : null}
                   <span className="sr-only" role="status">
                     {pending ? t('settings.saving') : ''}

@@ -17,6 +17,7 @@ import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { UpdateActions, UpdateSettings } from './UpdateSettings';
 import { Icon } from '../../shared/ui-icons';
 import './about.css';
+import { AboutSystemSettings } from './AboutSystemSettings';
 import { HostStartupTimingPanel } from './HostStartupTimingPanel';
 import { SettingsAppIdentity } from '../settings-ui/SettingsAppIdentity';
 import { SettingsStatistic } from '../settings-ui/SettingsStatistic';
@@ -190,11 +191,15 @@ export function AboutInformationPanel({
 export function AboutSettings({
   settings,
   edit,
-  startupTiming,
+  auxiliary,
+  busy,
+  invoke,
 }: {
   settings: Settings;
   edit(value: Settings): void;
-  startupTiming?: SettingsPageAuxiliary['hostStartupTiming'];
+  auxiliary: SettingsPageAuxiliary;
+  busy: boolean;
+  invoke(name: string, args?: unknown[]): Promise<unknown>;
 }) {
   const { t } = useHostTranslation();
   return (
@@ -202,8 +207,15 @@ export function AboutSettings({
       className="settings-sections about-page"
       aria-label={t('settings.aboutSettings.title')}
     >
+      <AboutSystemSettings
+        settings={settings}
+        edit={edit}
+        auxiliary={auxiliary}
+        busy={busy}
+        invoke={invoke}
+      />
       <UpdateSettings settings={settings} edit={edit} />
-      <HostStartupTimingPanel timing={startupTiming} />
+      <HostStartupTimingPanel timing={auxiliary.hostStartupTiming} />
     </section>
   );
 }

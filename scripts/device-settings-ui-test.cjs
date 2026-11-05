@@ -202,9 +202,9 @@ const checks = [];
     );
     assert.deepEqual(
       general.content.auxiliary.storage.files.map((file) => file.scope),
-      ['shared', 'device'],
+      ['shared'],
     );
-    checks.push('general defaults shared with separate device-only launch settings');
+    checks.push('general defaults shared and contains only basic behavior settings');
     const hostPages = [
       ['appearance', '表示', { host: { theme: 'dark', showHints: false } }],
       [
@@ -214,8 +214,6 @@ const checks = [];
           host: {
             soundEnabled: false,
             closeToTray: false,
-            fileWatchAssistanceEnabled: true,
-            fileWatchAssistanceIntervalSeconds: 61.5,
           },
         },
       ],
@@ -241,7 +239,6 @@ const checks = [];
           },
         },
       ],
-      ['about', 'AppDockについて', { updates: { startupDelaySeconds: 31 } }],
     ];
     const hostPageModel = () =>
       page.evaluate(() =>
@@ -286,7 +283,7 @@ const checks = [];
       assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        pageId === 'general' ? ['shared', 'device'] : ['shared'],
+        ['shared'],
       );
       await toggle().check();
       await until(
@@ -314,43 +311,31 @@ const checks = [];
     assert.equal(await toggle().isVisible(), true);
     await page.screenshot({ path: path.join(output, 'host-about-shared-narrow.png') });
     await page.setViewportSize({ width: 1280, height: 842 });
-    await page.getByTestId('settings-nav:general').click();
-    const startup = () => page.getByTestId('general-startup-settings');
+    await page.getByTestId('settings-nav:about').click();
+    const startup = () => page.getByTestId('about-startup-settings');
     await startup().waitFor();
     assert.equal(await startup().getByRole('switch').count(), 3);
-    assert.equal(await startup().getByText('このPC専用', { exact: true }).isVisible(), true);
+    assert.equal(await page.getByTestId('settings-storage-device-only').isVisible(), true);
+    assert.equal(await toggle().count(), 0);
     const gpu = () => startup().getByRole('switch', { name: /ハードウェアアクセラレーション/ });
     await gpu().click();
     await until(
       () => disk(deviceFile).host.hardwareAcceleration === true,
-      'hardware remains local in shared general',
+      'hardware saved locally',
     );
     assert.equal(
       require('../out/main/shared/settings-schema').parseSettings(disk(sharedFile)).host
         .hardwareAcceleration,
       false,
     );
+    await page.getByTestId('settings-nav:general').click();
     await toggle().check();
-    await until(
-      () => disk(deviceFile).hostPages.general.useLocalSettings,
-      'general local with fixed hardware',
-    );
-    assert.equal(
-      disk(deviceFile).hostPages.general.configuration.host?.hardwareAcceleration,
-      undefined,
-    );
+    await until(() => disk(deviceFile).hostPages.general.useLocalSettings, 'general local');
     await toggle().click();
     await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
-    await until(
-      () => !disk(deviceFile).hostPages.general.useLocalSettings,
-      'general shared with fixed hardware',
-    );
+    await until(() => !disk(deviceFile).hostPages.general.useLocalSettings, 'general shared');
     assert.equal(disk(deviceFile).host.hardwareAcceleration, true);
-    await startup().scrollIntoViewIfNeeded();
-    await page.screenshot({ path: path.join(output, 'general-shared-startup-device.png') });
-    checks.push(
-      'general shared mode keeps all three startup settings local; hardware is grouped under startup and survives mode switches',
-    );
+    checks.push('About is fixed local and startup settings survive General storage changes');
     await page.getByTestId('settings-nav:text-palette').click();
     await toggle().check();
     await until(
@@ -367,18 +352,18 @@ const checks = [];
       assert.equal(await toggle().isChecked(), local);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        local ? ['device'] : pageId === 'general' ? ['shared', 'device'] : ['shared'],
+        local ? ['device'] : ['shared'],
       );
     }
     checks.push(
-      'all eight host pages retain their saved modes and file targets across restart, including the local palette',
+      'all seven selectable host pages retain their saved modes and file targets across restart, including the local palette',
     );
     assert.equal(
       (await state.host.evaluate(() => window.dock.snapshot())).settings.value.host
         .hardwareAcceleration,
       true,
     );
-    await page.getByTestId('settings-nav:general').click();
+    await page.getByTestId('settings-nav:about').click();
     await gpu().click();
     await until(
       () => disk(deviceFile).host.hardwareAcceleration === undefined,

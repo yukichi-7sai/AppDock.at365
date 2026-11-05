@@ -120,8 +120,6 @@ export function UpdateSettings({
     <SettingsSection
       title={translate('settings.updateSettings.settings')}
       hint={translate('settings.updateSettings.settingsHint')}
-      collapsible
-      defaultOpen
       {...settingAnchor('about', 'updates')}
       data-testid="update-settings"
     >

@@ -52,6 +52,12 @@ const paths: Record<HostPageSettingsId, string[][]> = {
 export function isHostPageSettingsId(value: string): value is HostPageSettingsId {
   return (hostPageSettingsIds as readonly string[]).includes(value);
 }
+export function isDeviceOnlyHostPage(pageId: string): boolean {
+  return pageId === 'about';
+}
+export function canSwitchHostPageSettings(pageId: string): pageId is HostPageSettingsId {
+  return isHostPageSettingsId(pageId) && !isDeviceOnlyHostPage(pageId);
+}
 export function hostPageSettingsPaths(pageId: HostPageSettingsId): string[][] {
   const ordinary = hostSettingDefinitions
     .filter(

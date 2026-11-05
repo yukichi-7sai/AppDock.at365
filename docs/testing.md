@@ -101,7 +101,9 @@ GitHubの匿名APIへ実通信するテストは作成・実行しません。�
 
 `scripts/command-triggers-ui-test.cjs [固定EXE] --filter-consistency-only`は、提供元と入力の併用・同種だけの差し替え、文字検索/カテゴリ/状態/種類の保持、個別解除とフォーカス復帰、空の結果、保存値とApplet有効状態の不変を確認する。`command-filter-combination-checks.cjs`へ操作をまとめ、宣言アイコンと代替アイコン、長い名前の明暗・狭幅表示は測定値と代表画像で確認する。表示幅はDPIスケーリング後の論理ピクセルとして扱い、標準条件は1720 × 1000と900 × 620、AppDock倍率100%とする。DPI倍率を再現するための追加CSSズームは掛けない。対象コマンドとの併用・個別解除は`command-palette-ui-test.cjs`で確認する。
 
-`tests/host-page-settings.test.cjs`は、本体7ページの共有／端末専用の保存・既定値省略・既存値の引き継ぎ・2端末の独立・共有への反映と取消後の再開・保存失敗時の原子的復旧を確認する。通知・更新の公開設定APIは`tests/settings-service-targets.test.cjs`、画面からの切り替え・JSON・取消・再起動後の保持・共通ツールバーは`scripts/device-settings-ui-test.cjs [固定EXE]`を使う。同スクリプトは一般の起動3項目の常時端末専用と、Appletの既存切り替え・停止中の編集・自己設定も確認する。
+`tests/host-page-settings.test.cjs`は、本体7ページの共有／端末専用の保存・既定値省略・既存値の引き継ぎ・2端末の独立・共有への反映と取消後の再開・保存失敗時の原子的復旧を確認する。通知・更新の公開設定APIは`tests/settings-service-targets.test.cjs`、画面からの切り替え・JSON・取消・再起動後の保持・共通ツールバーは`scripts/device-settings-ui-test.cjs [固定EXE]`を使う。同スクリプトは「AppDockについて」の起動3項目の常時端末専用と、Appletの既存切り替え・停止中の編集・自己設定も確認する。
+
+「AppDockについて」の端末専用固定、共有受信からの独立、既定値への復帰、旧一般設定の補助確認キーの読み捨ては`tests/host-page-settings.test.cjs`で確認する。`scripts/about-settings-ui-test.cjs [固定EXE]`は、起動／設定ファイル／高度／更新／計測の順序、権限と実登録状態、更新設定の常時表示、フォーム／JSONの端末保存、一般とのリセット分離、実プロセス再起動後の保持を確認する。1720 × 1000と900 × 620の論理サイズ、明暗テーマ、AppDock倍率100%で代表画像を確認する。
 
 `tests/start-page.test.cjs`はページ候補の実効表示先・安定ID・JSON/リセット・待機と戻り先・明示移動の優先を担当する。`scripts/start-page-ui-test.cjs [固定EXE]`は隔離した固定/動的/設定由来のlocal/remoteページで、設定の保存・通常起動・再起動の復元・利用不可時の選択保持・起動待ち/読み込み中の移動取消・非表示/最小化/トレイ起動・広幅/狭幅の操作を確認する。実アカウントや認証情報は使用しない。
 

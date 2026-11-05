@@ -23,7 +23,8 @@ import {
   hostPageConfiguration,
   hostPageForPath,
   hostPageSettingsIds,
-  isHostPageSettingsId,
+  isDeviceOnlyHostPage,
+  canSwitchHostPageSettings,
   type HostPageSettingsId,
 } from '../../shared/host-page-settings';
 import {
@@ -110,7 +111,10 @@ export class DeviceSettingsStore extends SettingsStore {
     };
   }
   hostPageLocalSettings(pageId: HostPageSettingsId) {
-    return this.device.value.hostPages[pageId]?.useLocalSettings ?? false;
+    return (
+      isDeviceOnlyHostPage(pageId) ||
+      (this.device.value.hostPages[pageId]?.useLocalSettings ?? false)
+    );
   }
   override settingScope(path: readonly string[]): Scope {
     const pageId = hostPageForPath(path);
@@ -132,8 +136,8 @@ export class DeviceSettingsStore extends SettingsStore {
     }
     for (const pageId of hostPageSettingsIds) {
       const entry = device.hostPages?.[pageId];
-      if (entry?.useLocalSettings)
-        applyHostPageConfiguration(result, entry.configuration ?? {}, pageId);
+      if (isDeviceOnlyHostPage(pageId) || entry?.useLocalSettings)
+        applyHostPageConfiguration(result, entry?.configuration ?? {}, pageId);
     }
     return result;
   }
@@ -526,7 +530,7 @@ export class DeviceSettingsStore extends SettingsStore {
   ) {
     this.assertRevision(revision);
     if (
-      !isHostPageSettingsId(pageId) ||
+      !canSwitchHostPageSettings(pageId) ||
       typeof enabled !== 'boolean' ||
       !['keep', 'share', 'clear'].includes(disposition) ||
       (enabled && disposition !== 'keep')

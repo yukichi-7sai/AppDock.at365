@@ -13,6 +13,7 @@ const { createDefaultSettings, parseSettings } = require('../out/main/shared/set
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 const {
   hostPageSettingsIds,
+  canSwitchHostPageSettings,
   hostPageConfiguration,
   applyHostPageConfiguration,
 } = require('../out/main/shared/host-page-settings');
@@ -97,7 +98,7 @@ test('legacy PC overrides without a saved mode stay dormant while all pages foll
     assert.equal(combineSettings(createDefaultSettings(), device, []).host.showStatusBar, true);
   });
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
-  for (const pageId of hostPageSettingsIds)
+  for (const pageId of hostPageSettingsIds.filter(canSwitchHostPageSettings))
     assert.equal(store.hostPageLocalSettings(pageId), false, pageId);
   assert.equal(store.value.host.notificationBannerPosition, shared.host.notificationBannerPosition);
   assert.equal(store.value.host.showStatusBar, shared.host.showStatusBar);
@@ -131,7 +132,7 @@ test('a new PC adopts later shared changes before first enabling local palette s
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
 });
 
-for (const pageId of hostPageSettingsIds) {
+for (const pageId of hostPageSettingsIds.filter(canSwitchHostPageSettings)) {
   test(`${pageId}: local edits, external shared updates, keep/resume, share and two PCs use the selected file`, (t) => {
     const { store, file, base } = fixture(t);
     const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
@@ -241,8 +242,8 @@ test('selected persisted overrides and stale revisions follow the host page mode
 
 test('sharing a local page rolls both files back if the second write fails', (t) => {
   const { store, file } = fixture(t);
-  store.setHostPageLocalSettings('about', true, store.revision);
-  store.save(change(store.value, 'about'), store.revision);
+  store.setHostPageLocalSettings('general', true, store.revision);
+  store.save(change(store.value, 'general'), store.revision);
   const sharedBefore = fs.readFileSync(file, 'utf8');
   const deviceBefore = fs.readFileSync(store.device.file, 'utf8');
   const save = store.device.save;
@@ -251,7 +252,7 @@ test('sharing a local page rolls both files back if the second write fails', (t)
   };
   try {
     assert.throws(
-      () => store.setHostPageLocalSettings('about', false, store.revision, undefined, 'share'),
+      () => store.setHostPageLocalSettings('general', false, store.revision, undefined, 'share'),
       /injected/,
     );
   } finally {
@@ -259,7 +260,7 @@ test('sharing a local page rolls both files back if the second write fails', (t)
   }
   assert.equal(fs.readFileSync(file, 'utf8'), sharedBefore);
   assert.equal(fs.readFileSync(store.device.file, 'utf8'), deviceBefore);
-  assert.equal(store.hostPageLocalSettings('about'), true);
+  assert.equal(store.hostPageLocalSettings('general'), true);
 });
 
 for (const local of [false, true])
@@ -420,8 +421,93 @@ test('general shared/local modes and sharing never transfer launch or hardware f
     for (const key of fixed) assert.equal(store.value.host[key], true);
   }
   const paths = require('../out/main/shared/settings-catalog').settingsPaths(
-    { id: 'general', kind: 'host', json: true },
+    { id: 'about', kind: 'host', json: true },
     [],
   );
   for (const key of fixed) assert(paths.some((path) => path.join('.') === 'host.' + key));
+});
+
+test('About stays device-only across edits, shared reloads, resets and a second PC', (t) => {
+  const { store, file, base } = fixture(t);
+  const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
+  t.after(() => b.close());
+  b.load();
+  const sharedBefore = fs.readFileSync(file, 'utf8');
+  assert.equal(store.hostPageLocalSettings('about'), true);
+  for (const enabled of [false, true])
+    assert.throws(() => store.setHostPageLocalSettings('about', enabled, store.revision));
+  const next = change(store.value, 'about');
+  next.host.fileWatchAssistanceEnabled = true;
+  next.host.fileWatchAssistanceIntervalSeconds = 17;
+  store.save(next, store.revision);
+  assert.equal(fs.readFileSync(file, 'utf8'), sharedBefore);
+  assert.equal(store.settingScope(['updates', 'hostSource']), 'device');
+  assert.equal(store.settingScope(['host', 'fileWatchAssistanceEnabled']), 'device');
+  assert.equal(store.storedValue().updates.startupDelaySeconds, 42);
+  b.reload();
+  assert.equal(
+    b.value.updates.startupDelaySeconds,
+    createDefaultSettings().updates.startupDelaySeconds,
+  );
+  const incoming = change(parseSettings(disk(file)), 'about', true);
+  incoming.host.fileWatchAssistanceIntervalSeconds = 25;
+  fs.writeFileSync(file, JSON.stringify(settingsStorageValue(incoming)));
+  store.reload();
+  b.reload();
+  assert.equal(store.value.updates.startupDelaySeconds, 42);
+  assert.equal(store.value.host.fileWatchAssistanceIntervalSeconds, 17);
+  assert.equal(
+    b.value.updates.startupDelaySeconds,
+    createDefaultSettings().updates.startupDelaySeconds,
+  );
+  const reset = structuredClone(store.value);
+  applyHostPageConfiguration(
+    reset,
+    hostPageConfiguration(createDefaultSettings(), 'about'),
+    'about',
+  );
+  const sharedAfter = fs.readFileSync(file, 'utf8');
+  store.save(reset, store.revision);
+  store.reload();
+  assert.equal(fs.readFileSync(file, 'utf8'), sharedAfter);
+  assert.deepEqual(
+    hostPageConfiguration(store.value, 'about'),
+    hostPageConfiguration(createDefaultSettings(), 'about'),
+  );
+  assert.equal(store.storedValue().updates?.startupDelaySeconds, undefined);
+});
+
+test('old General watch fields are discarded without losing other local settings or requiring recovery', (t) => {
+  const { store } = fixture(t, (device) => {
+    device.hostPages = {
+      general: {
+        useLocalSettings: true,
+        configuration: {
+          host: {
+            soundEnabled: false,
+            fileWatchAssistanceEnabled: true,
+            fileWatchAssistanceIntervalSeconds: 17,
+          },
+        },
+      },
+      about: { useLocalSettings: false },
+    };
+  });
+  assert.equal(store.recovered, false);
+  assert.equal(store.value.host.soundEnabled, false);
+  assert.equal(store.hostPageLocalSettings('about'), true);
+  assert.equal(
+    store.value.host.fileWatchAssistanceIntervalSeconds,
+    createDefaultSettings().host.fileWatchAssistanceIntervalSeconds,
+  );
+  const paths = require('../out/main/shared/settings-catalog').settingsPaths(
+    { id: 'general', kind: 'host', json: true },
+    [],
+  );
+  assert.deepEqual(paths.map((path) => path.join('.')).sort(), [
+    'host.closeToTray',
+    'host.soundEnabled',
+    'host.startMinimized',
+    'host.startPage',
+  ]);
 });
