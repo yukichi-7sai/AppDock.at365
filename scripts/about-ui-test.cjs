@@ -385,7 +385,7 @@ exports.deactivate = () => record('stop');
     assert.equal(
       await page
         .getByText(
-          require('../resources/translations/host.json')['settings.updateSettings.startupHint'],
+          '起動時は更新情報の確認だけを行います。配布ファイルのダウンロードや適用は行いません。同じ版の再適用を許可しても古い版には戻しません。',
           { exact: true },
         )
         .count(),
