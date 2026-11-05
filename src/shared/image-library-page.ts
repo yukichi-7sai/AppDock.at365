@@ -162,6 +162,7 @@ export type ImageLibraryPageAction = {
   id: string;
   type: 'gallery';
 } & (
+  | { command: 'sound-generation' }
   | { command: 'query'; value: string }
   | { command: 'folder'; folder: string }
   | { command: 'import-set'; setId: string }

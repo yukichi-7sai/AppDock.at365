@@ -25,7 +25,7 @@ export class LibrarySoundPreview {
   errorFor(owner: string) {
     return owner === this.errorOwner ? this.error : '';
   }
-  async play(ref: LibraryRef, owner: string) {
+  async play(ref: LibraryRef, owner: string, generation?: string) {
     this.stop();
     this.error = '';
     this.errorOwner = owner;
@@ -38,7 +38,7 @@ export class LibrarySoundPreview {
     this.changed();
     const live = () => this.active === current && !current.controller.signal.aborted;
     try {
-      const saved = await this.files.read(ref, undefined, { active: live, cachePreview: false });
+      const saved = await this.files.read(ref, generation, { active: live, cachePreview: false });
       if (!live()) return;
       current.status.state = 'waiting';
       this.changed();

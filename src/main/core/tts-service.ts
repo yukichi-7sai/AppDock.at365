@@ -127,6 +127,7 @@ export interface TtsInternalOptions {
   configuration?: { settings: TtsSettings; key?: string };
   startBefore?: number;
   canStart?(): boolean;
+  audio?: { maximumBytes: number; receive(bytes: Buffer, seconds: number): void };
 }
 interface InternalJob {
   view: TtsJob;
@@ -233,6 +234,61 @@ export class TtsService {
       )
         this.jobs.delete(ended[i].view.jobId);
   }
+  /** Host-only generation uses the same request, credentials, queue and validation as speech. */
+  generate(
+    owner: string,
+    input: Record<string, unknown>,
+    signal: AbortSignal,
+    maximumBytes: number,
+  ) {
+    return new Promise<{ bytes: Buffer; seconds: number }>((resolve, reject) => {
+      if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
+      let id: string | undefined;
+      let audio: { bytes: Buffer; seconds: number } | undefined;
+      const abort = () => {
+        if (id) void this.stop(owner, id).catch(() => {});
+      };
+      const unsubscribe = this.subscribe((jobOwner, job) => {
+        if (
+          jobOwner !== owner ||
+          job.jobId !== id ||
+          !['completed', 'failed', 'canceled'].includes(job.state)
+        )
+          return;
+        unsubscribe();
+        signal.removeEventListener('abort', abort);
+        if (job.state === 'completed' && audio) resolve(audio);
+        else if (job.state === 'canceled') reject(new DOMException('Cancelled', 'AbortError'));
+        else
+          reject(
+            new TtsError(
+              job.error?.code ?? 'TTS_INVALID_AUDIO',
+              job.error?.message ?? hostText('services.ttsService.failed'),
+            ),
+          );
+      });
+      try {
+        const accepted = this.speak(
+          owner,
+          { ...input, requestId: randomUUID() },
+          {
+            audio: {
+              maximumBytes,
+              receive: (bytes, seconds) => {
+                audio = { bytes, seconds };
+              },
+            },
+          },
+        );
+        id = accepted.jobId as string;
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+      } catch (error) {
+        unsubscribe();
+        reject(error);
+      }
+    });
+  }
   speak(
     owner: string,
     input: Record<string, unknown>,
@@ -263,6 +319,7 @@ export class TtsService {
           connectionId,
           instructions,
           configuration: internal?.configuration?.settings,
+          generationOnly: !!internal?.audio,
         }),
       )
       .digest('hex');
@@ -438,7 +495,7 @@ export class TtsService {
           body: JSON.stringify(request.body),
           signal: controller.signal,
         },
-        this.limits.audioBytes,
+        Math.min(this.limits.audioBytes, j.internal?.audio?.maximumBytes ?? this.limits.audioBytes),
         false,
       );
       clearTimeout(j.timer);
@@ -447,14 +504,18 @@ export class TtsService {
       const seconds = waveDuration(bytes);
       this.authorize(j.owner, true);
       this.checkStart(j);
-      this.state(j, 'waitingPlayback');
-      if (j.ended === undefined)
-        await this.options.play(bytes, seconds, controller.signal, () => {
-          this.authorize(j.owner, true);
-          this.checkStart(j);
-          clearTimeout(j.startTimer);
-          this.state(j, 'playing');
-        });
+      if (j.internal?.audio) {
+        j.internal.audio.receive(bytes, seconds);
+      } else {
+        this.state(j, 'waitingPlayback');
+        if (j.ended === undefined)
+          await this.options.play(bytes, seconds, controller.signal, () => {
+            this.authorize(j.owner, true);
+            this.checkStart(j);
+            clearTimeout(j.startTimer);
+            this.state(j, 'playing');
+          });
+      }
       if (j.ended === undefined) this.finish(j, 'completed');
     } catch (error) {
       if (j.ended === undefined)

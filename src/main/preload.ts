@@ -44,6 +44,28 @@ const api: DockApi = {
     return () => ipcRenderer.removeListener('dock:overlayState', listener);
   },
   overlayViewport: (bounds) => ipcRenderer.invoke('dock:overlayViewport', bounds),
+  soundGeneration: {
+    onChanged: (callback) => {
+      let live = true,
+        received = false;
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        model: import('../shared/sound-generation').SoundGenerationModel | null,
+      ) => {
+        received = true;
+        if (live) callback(model);
+      };
+      ipcRenderer.on('dock:soundGeneration:changed', listener);
+      void ipcRenderer.invoke('dock:soundGeneration:pending').then((model) => {
+        if (live && !received) callback(model);
+      });
+      return () => {
+        live = false;
+        ipcRenderer.removeListener('dock:soundGeneration:changed', listener);
+      };
+    },
+    act: (id, action) => ipcRenderer.invoke('dock:soundGeneration:act', id, action),
+  },
   imageLibraryDialog: {
     onRequest: (callback) => {
       let live = true;

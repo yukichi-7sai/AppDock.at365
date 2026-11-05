@@ -397,8 +397,10 @@ export class RegisteredAssets {
   async addVerified(
     bytes: Buffer,
     filename: string,
+    options: { unique?: boolean; writable?(): void } = {},
   ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
     const run = async () => {
+      options.writable?.();
       if (assignedImage(filename))
         throw Error(this.text('services.registeredImages.invalidFilename'));
       const decoded = await this.validate(bytes, filename);
@@ -408,10 +410,21 @@ export class RegisteredAssets {
       const files = (await fs.readdir(path.dirname(this.file(filename))))
         .map((name) => (parent ? parent + '/' + name : name))
         .filter((name) => this.validName(name));
+      if (options.unique) {
+        const extension = path.extname(filename),
+          stem = filename.slice(0, -extension.length);
+        const names = new Set(files.map((file) => file.toLowerCase()));
+        let serial = 1;
+        do {
+          filename = `${stem}-${String(serial++).padStart(3, '0')}${extension}`;
+        } while (names.has(filename.toLowerCase()));
+      }
       const existing = files.find((n) => n.toLowerCase() === filename.toLowerCase());
       const name = existing ?? filename,
         ref = { file: name };
       const duplicate = async () => {
+        if (options.unique)
+          throw Error(this.text('services.registeredImages.duplicateName', { name }));
         const before = await this.fileSignature(name);
         if (!(await this.fileBytes(name)).equals(bytes))
           throw Error(this.text('services.registeredImages.duplicateName', { name: String(name) }));
@@ -433,6 +446,7 @@ export class RegisteredAssets {
         await handle.sync();
         await handle.close();
         try {
+          options.writable?.();
           await fs.link(temp, this.file(name));
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') return await duplicate();

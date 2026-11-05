@@ -14,6 +14,8 @@ import { LibraryPreviewDialog } from './settings-ui/LibraryPreviewDialog';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
 import { TextLibraryEditor } from './TextLibraryEditor';
+import { SoundGenerationDialog } from './SoundGenerationDialog';
+import type { SoundGenerationModel } from '../shared/sound-generation';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
 import { libraryOrderLabel } from '../shared/order-list';
 import { RegisteredGalleryPreview } from './settings-ui/RegisteredImagePicker';
@@ -46,6 +48,8 @@ export function useImageLibraryDialogFocus() {
 export function ImageLibraryDialogHost() {
   const opening = useContext(DialogFocus);
   const [request, setRequest] = useState<ImageLibraryDialogRequest | null>(null);
+  const [soundRequest, setSoundRequest] = useState<SoundGenerationModel | null>(null);
+  useEffect(() => window.dock.soundGeneration.onChanged(setSoundRequest), []);
   useEffect(
     () =>
       window.dock.imageLibraryDialog.onRequest((next) =>
@@ -55,6 +59,14 @@ export function ImageLibraryDialogHost() {
       ),
     [],
   );
+  if (soundRequest)
+    return (
+      <SoundGenerationDialog
+        key={soundRequest.id}
+        model={soundRequest}
+        returnFocus={opening?.current?.target ?? null}
+      />
+    );
   return request ? (
     <LibraryMediaProvider media={request.media ?? 'image'}>
       <Editor key={request.id} request={request} returnFocus={opening?.current?.target ?? null} />

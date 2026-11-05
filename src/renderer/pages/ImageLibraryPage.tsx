@@ -70,6 +70,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
   const [toast, setToast] = useState('');
   const [dialogPending, setDialogPending] = useState(false),
     openingDialog = useRef(false);
+  const generationOpener = useRef<HTMLElement | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (dialogPending || model.content.busy || !generationOpener.current) return;
+    generationOpener.current.focus({ preventScroll: true });
+    generationOpener.current = undefined;
+  }, [dialogPending, model.content.busy]);
   const root = useRef<HTMLElement>(null),
     sidebar = useRef<HTMLElement>(null);
   const navigationButton = useRef<HTMLButtonElement>(null);
@@ -105,7 +111,10 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
   };
   const act = async (action: Action, opener?: HTMLElement) => {
     if (openingDialog.current && action.command !== 'anchor') return;
-    const opensDialog = action.command === 'dialog' || action.command === 'retry-import';
+    const opensDialog =
+      action.command === 'dialog' ||
+      action.command === 'retry-import' ||
+      action.command === 'sound-generation';
     const focusTarget =
       opener ??
       (document.activeElement instanceof HTMLElement ? document.activeElement : undefined);
@@ -117,6 +126,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         )
       : undefined;
     if (opensDialog) {
+      if (action.command === 'sound-generation') generationOpener.current = focusTarget;
       openingDialog.current = true;
       setDialogPending(true);
       setDrawer(false);
@@ -658,6 +668,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             <Icon name="upload" size={15} />
             {t('images.addImages')}
           </SettingsButton>
+          {media === 'sound' && (
+            <SettingsButton disabled={c.busy} onClick={() => run({ command: 'sound-generation' })}>
+              <Icon name="volume" size={15} />
+              {t('soundGeneration.open')}
+            </SettingsButton>
+          )}
           {media === 'image' && (
             <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
               <Icon name="download" size={15} />

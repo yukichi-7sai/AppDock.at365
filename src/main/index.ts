@@ -70,6 +70,7 @@ import { defaultNavigation, navigationCommands } from '../shared/navigation';
 import { startPageOptions, startPageState } from '../shared/start-page';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
+import { SoundGeneration } from './core/sound-generation';
 import { GalleryViewStateStore } from './core/gallery-view-state';
 import { GalleryImages } from './core/gallery-images';
 import { NotificationCenterController } from './core/notification-center';
@@ -467,6 +468,7 @@ let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
 let hostPages: HostPages | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
+let soundGeneration: SoundGeneration | undefined;
 let galleryViewState: GalleryViewStateStore;
 let soundGalleryViewState: GalleryViewStateStore;
 const rendererSoundSessions = new Map<string, ReturnType<SoundGallery['session']>>();
@@ -1668,6 +1670,7 @@ const changed = () => {
     ribbonHost?.refresh();
     windowBarHost?.refresh();
     hostPages?.refresh();
+    soundGeneration?.refresh();
     settingsPageHost?.refresh();
     overlayHost?.refresh();
     const historyAvailability = JSON.stringify(navigation.history.availability);
@@ -3713,6 +3716,11 @@ function registerIpc() {
   handle('dock:snapshot', snapshot);
   handle('dock:imageLibrary:snapshot', () => imageLibraryHost.snapshot());
   handle('dock:imageLibraryDialog:pending', () => imageLibraryDialogs?.current() ?? null);
+  handle('dock:soundGeneration:pending', () => soundGeneration?.current() ?? null);
+  handle('dock:soundGeneration:act', (id, action) => {
+    if (!soundGeneration) throw Error(hostText('soundGeneration.closed'));
+    return soundGeneration.act(id, action);
+  });
   handle('dock:imageLibraryDialog:complete', (id, operation) =>
     imageLibraryDialogs?.complete(id, operation),
   );
@@ -5201,6 +5209,22 @@ async function initialize() {
           : galleryFailed(hostText('services.index.imageOperationBody')),
   });
   imageLibraryDialogs = galleryDialogs;
+  soundGeneration?.cancel();
+  const generation = new SoundGeneration({
+    library: soundLibrary,
+    tts,
+    configuration: () => settings.value.tts ?? { connections: [] },
+    send: (model) => {
+      if (window && !window.isDestroyed())
+        window.webContents.send('dock:soundGeneration:changed', model);
+    },
+    failed: soundLibraryFailed,
+    changed,
+  });
+  soundGeneration = generation;
+  window.webContents.on('did-start-loading', () => generation.cancel());
+  window.webContents.on('render-process-gone', () => generation.cancel());
+  window.on('closed', () => generation.cancel());
   window.webContents.on('did-start-loading', () => galleryDialogs.cancel());
   window.webContents.on('render-process-gone', () => galleryDialogs.cancel());
   window.once('closed', () => {
@@ -5238,6 +5262,12 @@ async function initialize() {
                   : galleryImages,
             texts: request.kind === 'text-library' ? textLibrary : undefined,
             preview: request.kind === 'sound-library' ? soundLibrary.preview : undefined,
+            generateSounds:
+              request.kind === 'sound-library'
+                ? (folder, group) => generation.open(request.id, folder, group)
+                : undefined,
+            cancelGeneration:
+              request.kind === 'sound-library' ? () => generation.cancel(request.id) : undefined,
             state:
               request.kind === 'text-library'
                 ? textState
