@@ -7,11 +7,14 @@ const active = 'fixture.common-active',
 module.exports = async ({ page, client, profile, local, checks, tool, value, until }) => {
   const tools = JSON.stringify((await client.listTools()).tools),
     sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
-    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
+    deviceFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    ),
     marker = (id) => path.join(profile, 'extensions', id, 'activations.json'),
     count = (id) => (fs.existsSync(marker(id)) ? JSON.parse(fs.readFileSync(marker(id))) : 0),
     ai = fs.readFileSync(path.join(local, 'ai-keys.json')),
-    tts = fs.readFileSync(path.join(local, 'tts-key.json')),
+    tts = fs.readFileSync(path.join(local, 'tts-keys.json')),
     orderId = (await value('appdock_settings_list_targets', { query: 'applet-management' }))
       .items[0].targetId,
     commonId = async (ownerId) =>
@@ -176,7 +179,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   );
   assert.deepEqual(fs.readFileSync(deviceFile), deviceBeforeOrder);
   assert.deepEqual(fs.readFileSync(path.join(local, 'ai-keys.json')), ai);
-  assert.deepEqual(fs.readFileSync(path.join(local, 'tts-key.json')), tts);
+  assert.deepEqual(fs.readFileSync(path.join(local, 'tts-keys.json')), tts);
   assert.equal(count(active), 3);
   assert.equal(count(waiting), 0);
   assert.equal((await value('appdock_get_info')).executable, false);

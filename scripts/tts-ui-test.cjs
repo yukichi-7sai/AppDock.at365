@@ -61,7 +61,15 @@ async function configure(patch) {
   await host.evaluate(async (patch) => {
     const s = await window.dock.snapshot();
     await window.dock.saveSettings(
-      { ...s.settings.value, tts: { ...s.settings.value.tts, ...patch } },
+      {
+        ...s.settings.value,
+        tts: {
+          ...s.settings.value.tts,
+          connections: s.settings.value.tts.connections.map((c) =>
+            c.id === s.settings.value.tts.defaultConnectionId ? { ...c, ...patch } : c,
+          ),
+        },
+      },
       s.settings.revision,
     );
   }, patch);
@@ -88,10 +96,16 @@ async function configure(patch) {
     settings.keybindings = [];
     settings.gestures.enabled = false;
     settings.tts = {
-      ...settings.tts,
-      baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
-      model: 'test',
-      defaultVoice: 'voice-a',
+      defaultConnectionId: 'default',
+      connections: [
+        {
+          ...require('../out/main/shared/tts').newTtsServer('default'),
+          name: 'Primary',
+          baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+          model: 'test',
+          defaultVoice: 'voice-a',
+        },
+      ],
     };
     const fixtureBuild = spawnSync(
       'dotnet',
@@ -232,341 +246,32 @@ async function configure(patch) {
       ),
     );
     await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
-    await page.getByLabel('TTSモデル', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    await page
-      .getByText('1件のボイスを取得しました。候補から選ぶか、IDを直接入力できます。', {
-        exact: true,
-      })
-      .waitFor();
-    checks.push('settings voice list');
-    await page.getByLabel('APIキー', { exact: true }).fill('fixture-secret');
-    await page.getByRole('button', { name: 'APIキーを設定', exact: true }).click();
-    const keyfile = path.join(local, 'tts-key.json');
-    await until(() => fs.existsSync(keyfile), 'key saved');
-    await page
-      .getByRole('button', { name: 'APIキーを削除', exact: true })
-      .waitFor({ state: 'visible' });
-    assert(!fs.readFileSync(keyfile, 'utf8').includes('fixture-secret'));
-    assert(
-      !JSON.stringify(
-        await page.evaluate(() =>
-          window.dock.settingsPage.get(
-            document.querySelector('.settings-surface').dataset.settingsConnection,
-          ),
-        ),
-      ).includes('fixture-secret'),
-    );
-    checks.push('encrypted key and public model privacy');
-    const savedKey = fs.readFileSync(keyfile);
-    const selectPreset = async (value) => {
-      await page.getByLabel('接続プリセット', { exact: true }).selectOption(value);
-      await settleSettings(page);
-      await until(
-        async () => (await snapshot()).settings.value.tts.preset === value,
-        'preset saved',
-      );
-    };
-    await selectPreset('openai-speech');
-    assert.equal((await snapshot()).settings.value.tts.voicesSource, 'manual');
-    assert.equal((await snapshot()).settings.value.tts.baseUrl, settings.tts.baseUrl);
-    assert.deepEqual(fs.readFileSync(keyfile), savedKey);
-    await page.getByLabel('既定のボイス', { exact: true }).fill('');
-    await page.getByLabel('既定のボイス', { exact: true }).press('Enter');
-    await settleSettings(page);
-    await selectPreset('ollama');
-    assert.equal((await snapshot()).settings.value.tts.instructionsMode, 'none');
-    assert.equal((await snapshot()).settings.value.tts.defaultVoice, 'default');
-    assert.deepEqual((await snapshot()).settings.value.tts.manualVoices, [
-      { id: 'default', name: 'default' },
-    ]);
-    assert.equal(await page.getByLabel('既定のボイス', { exact: true }).inputValue(), 'default');
-    assert.equal(await page.getByLabel('取得したボイス', { exact: true }).inputValue(), 'default');
-    const presetDetails = page.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' });
-    await presetDetails.press('Enter');
-    const manualVoices = page.getByLabel('手動ボイス一覧', { exact: true });
-    for (const empty of ['', ' \n\t ']) {
-      await manualVoices.fill(empty);
-      await manualVoices.press(empty ? 'Tab' : 'Enter');
-      await settleSettings(page);
-      assert.deepEqual((await snapshot()).settings.value.tts.manualVoices, []);
-      assert.equal(await manualVoices.inputValue(), '[]');
-      assert.equal((await snapshot()).settings.value.tts.defaultVoice, 'default');
-      await page.getByRole('button', { name: 'プリセットの詳細設定に戻す', exact: true }).click();
-      await settleSettings(page);
-      assert.equal((await snapshot()).settings.value.tts.manualVoices[0].id, 'default');
-    }
-    await manualVoices.fill('[{"id":"default","name":"標準ボイス"}]');
-    await manualVoices.press('Enter');
-    await settleSettings(page);
-    assert.equal(
-      await page
-        .getByLabel('取得したボイス', { exact: true })
-        .locator('option:checked')
-        .textContent(),
-      '標準ボイス',
-    );
-    await manualVoices.fill('[{"id":"other","name":"取り消す声"}]');
-    await manualVoices.press('Escape');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.manualVoices[0].name, '標準ボイス');
-    const savedManualVoices = (await snapshot()).settings.value.tts.manualVoices;
-    for (const invalid of ['{}', '[{"id":"default","name":{}}]']) {
-      await manualVoices.fill(invalid);
-      await manualVoices.press('Enter');
-      try {
-        await settleSettings(page);
-        assert.deepEqual((await snapshot()).settings.value.tts.manualVoices, savedManualVoices);
-        await page
-          .locator('.settings-error-summary')
-          .filter({ hasText: '手動ボイス一覧をJSON配列で入力してください。' })
-          .waitFor({ timeout: 5000 });
-        assert.equal(await manualVoices.inputValue(), invalid);
-        assert.equal(
-          await page.getByLabel('取得したボイス', { exact: true }).inputValue(),
-          'default',
-        );
-        if (invalid === '{}')
-          await page.screenshot({ path: path.join(profile, 'manual-voices-validation.png') });
-      } catch (error) {
-        await page.screenshot({ path: path.join(profile, 'invalid-manual-voices.png') });
-        throw error;
-      }
-      await manualVoices.fill(JSON.stringify(savedManualVoices));
-      await manualVoices.press('Enter');
-      await settleSettings(page);
-      await page
-        .locator('.settings-error-summary')
-        .filter({ hasText: '手動ボイス一覧をJSON配列で入力してください。' })
-        .waitFor({ state: 'hidden' });
-    }
-    assert.equal(fs.existsSync(path.join(profile, 'renderer-errors.log')), false);
-    checks.push(
-      'invalid manual voice JSON keeps the page and saved candidates intact and allows correction',
-    );
-    await page.getByLabel('既定のボイス', { exact: true }).fill('voice-a');
-    await page.getByLabel('既定のボイス', { exact: true }).press('Enter');
-    await settleSettings(page);
-    await selectPreset('custom');
-    await selectPreset('ollama');
-    assert.equal((await snapshot()).settings.value.tts.defaultVoice, 'voice-a');
-    assert.equal((await snapshot()).settings.value.tts.manualVoices[0].name, '標準ボイス');
-    await presetDetails.press('Enter');
-    checks.push(
-      'Ollama fills empty voices and manual JSON updates candidates without fetching or losing saved values',
-    );
-    await selectPreset('qwen3-tts');
-    assert.equal((await snapshot()).settings.value.tts.instructionsMode, 'json');
-    await selectPreset('mlx-audio');
-    const mlx = (await snapshot()).settings.value.tts;
-    assert.equal(mlx.instructionsMode, 'json');
-    assert.equal(mlx.instructionsParameter, 'instruct');
-    assert.equal(mlx.voicesSource, 'manual');
-    assert.equal(mlx.defaultVoice, 'voice-a');
-    assert.equal(mlx.manualVoices[0].name, '標準ボイス');
-    await page.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
-    await page.getByLabel('ニュアンスの送信先', { exact: true }).fill('generation.instruct');
-    await page.getByLabel('ニュアンスの送信先', { exact: true }).press('Enter');
-    await settleSettings(page);
-    await page.getByText('カスタマイズ済み', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'プリセットの詳細設定に戻す', exact: true }).click();
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.instructionsParameter, 'instruct');
-    await page.getByLabel('ニュアンスの送信先', { exact: true }).fill('generation.instruct');
-    await page.getByLabel('ニュアンスの送信先', { exact: true }).press('Enter');
-    await settleSettings(page);
-    const alwaysInstructions = '自然な日本語で\n聞き取りやすく';
-    const alwaysControl = page.getByLabel('常に付与するニュアンス', { exact: true });
-    await alwaysControl.fill('取り消す常時付与');
-    await alwaysControl.press('Escape');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, '');
-    await alwaysControl.fill(alwaysInstructions);
-    await alwaysControl.press('Tab');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
-    await page.getByLabel('既定のニュアンス', { exact: true }).fill('やさしく、落ち着いて');
-    await page.getByLabel('既定のニュアンス', { exact: true }).press('Escape');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.defaultInstructions, '');
-    await page.getByLabel('既定のニュアンス', { exact: true }).fill('やさしく、落ち着いて');
-    await page.getByLabel('既定のニュアンス', { exact: true }).press('Enter');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.defaultInstructions, 'やさしく、落ち着いて');
-    const extraControl = page.getByLabel('追加パラメーター（JSON）', { exact: true });
-    await extraControl.fill('{"language":');
-    await extraControl.press('Enter');
-    await settleSettings(page);
-    assert.deepEqual((await snapshot()).settings.value.tts.extraBody, {});
-    const extraBody = { language: 'Japanese', generation: { temperature: 0.4 } };
-    await extraControl.fill(JSON.stringify(extraBody));
-    await extraControl.press('Enter');
-    await settleSettings(page);
-    assert.deepEqual((await snapshot()).settings.value.tts.extraBody, extraBody);
-    await extraControl.fill('{"language":"English"}');
-    await extraControl.press('Escape');
-    await settleSettings(page);
-    assert.deepEqual((await snapshot()).settings.value.tts.extraBody, extraBody);
-    checks.push('custom JSON rejects invalid input, saves typed values and cancels edits');
-    checks.push(
-      'preset selection, credential preservation, custom mapping, reset and default nuance save/cancel',
-    );
-    const layouts = [];
-    for (const [theme, width, height] of [
-      ['light', 1720, 1000],
-      ['dark', 900, 620],
-    ]) {
-      const bounds = await inspect(
+    const { alwaysInstructions, keyfile, setNuanceMode, setAlwaysInstructions } =
+      await require('./tts-server-ui-checks.cjs')({
+        page,
+        host,
+        snapshot,
+        until,
+        configure,
+        requests,
+        checks,
+        settings,
+        profile,
+        local,
         inspector,
-        `(() => {
-        const { BrowserWindow } = ${electronExpression};
-        const window = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/index.html'));
-        window.setSize(${width}, ${height});
-        return { bounds: window.getBounds(), zoom: window.webContents.getZoomFactor() };
-      })()`,
-      );
-      await page.getByRole('button', { name: '表示', exact: true }).click();
-      await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
-      await settleSettings(page);
-      await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
-      await page.getByLabel('接続プリセット', { exact: true }).waitFor({ state: 'visible' });
-      const details = page.locator('details').filter({ hasText: 'サーバーに合わせた詳細設定' });
-      assert.equal(
-        await page.getByRole('button', { name: '設定を再読み込み', exact: true }).count(),
-        0,
-      );
-      for (const [label, file] of [
-        ['接続プリセット', 'connection'],
-        ['ニュアンスの送信先', 'connection-details'],
-        ['追加パラメーター（JSON）', 'additional-parameters'],
-        ['手動ボイス一覧', 'manual-voices'],
-        ['常に付与するニュアンス', 'always-instructions'],
-        ['既定のニュアンス', 'default-instructions'],
-      ]) {
-        const control = page.getByLabel(label, { exact: true });
-        if (label === 'ニュアンスの送信先' && !(await details.evaluate((e) => e.open)))
-          await details.locator('summary').press('Enter');
-        if (label === 'ニュアンスの送信先')
-          assert.equal(await details.evaluate((e) => e.open), true, 'advanced section expanded');
-        await control.scrollIntoViewIfNeeded();
-        try {
-          await control.click();
-        } catch (error) {
-          fs.writeFileSync(
-            path.join(profile, 'layout-failure.json'),
-            JSON.stringify(
-              {
-                theme,
-                label,
-                details: await details.evaluate((e) => ({ open: e.open, html: e.outerHTML })),
-                control: await control.evaluate((e) => ({
-                  rect: e.getBoundingClientRect().toJSON(),
-                  visible: e.checkVisibility(),
-                  ancestors: Array.from(
-                    (function* () {
-                      let p = e;
-                      while (p) {
-                        yield p;
-                        p = p.parentElement;
-                      }
-                    })(),
-                  ).map((p) => ({
-                    tag: p.tagName,
-                    cls: p.className,
-                    open: p.open,
-                    display: getComputedStyle(p).display,
-                    visibility: getComputedStyle(p).visibility,
-                  })),
-                })),
-              },
-              null,
-              2,
-            ),
-          );
-          throw error;
-        }
-        if (label === '接続プリセット') await control.press('Escape');
-        await page.evaluate(
-          () =>
-            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-        );
-        const png = await inspect(
-          inspector,
-          `(async () => {
-          const { BrowserWindow } = ${electronExpression};
-          const window = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/index.html'));
-          return (await window.webContents.capturePage()).toPNG().toString('base64');
-        })()`,
-        );
-        fs.writeFileSync(path.join(profile, `${theme}-${file}.png`), Buffer.from(png, 'base64'));
-        layouts.push({
-          theme,
-          label,
-          ...bounds,
-          ...(await control.evaluate((element) => {
-            const r = element.getBoundingClientRect();
-            return {
-              width: innerWidth,
-              height: innerHeight,
-              dpr: devicePixelRatio,
-              rect: r.toJSON(),
-            };
-          })),
-        });
-      }
-    }
-    fs.writeFileSync(path.join(profile, 'tts-layouts.json'), JSON.stringify(layouts, null, 2));
-    checks.push('light 1720x1000 and dark 900x620 connection, details and default nuance');
-    await host.evaluate(() => window.dock.executeCommand('appdock.quit'));
-    await until(() => child.exitCode !== null, 'restart exit');
-    await browser.close();
-    await launch();
-    assert.equal((await snapshot()).settings.value.tts.preset, 'mlx-audio');
-    assert.equal(
-      (await snapshot()).settings.value.tts.instructionsParameter,
-      'generation.instruct',
-    );
-    assert.equal((await snapshot()).settings.value.tts.defaultInstructions, 'やさしく、落ち着いて');
-    assert.deepEqual(fs.readFileSync(keyfile), savedKey);
-    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
-    assert.deepEqual((await snapshot()).settings.value.tts.extraBody, extraBody);
-    await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    page = await settingsPage(host);
-    await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
-    assert.equal(
-      await page.getByLabel('常に付与するニュアンス', { exact: true }).inputValue(),
-      alwaysInstructions,
-    );
-    assert.equal(
-      await page.getByLabel('既定のニュアンス', { exact: true }).inputValue(),
-      'やさしく、落ち着いて',
-    );
-    checks.push('preset, custom mapping, default nuance and credential survive process restart');
-    await page.getByLabel('読み上げ速度', { exact: true }).fill('1.4');
-    await page.getByLabel('読み上げ速度', { exact: true }).press('Enter');
-    await settleSettings(page);
-    await page.getByLabel('試聴するテキスト', { exact: true }).fill('設定画面の音声テスト。');
-    await page.getByRole('button', { name: '試聴する', exact: true }).click();
-    await until(async () => {
-      const m = await page.evaluate(() =>
-        window.dock.settingsPage.get(
-          document.querySelector('.settings-surface').dataset.settingsConnection,
-        ),
-      );
-      return m.content.auxiliary.tts.jobs.at(-1)?.state === 'completed';
-    }, 'preview ended');
-    assert.equal(requests.at(-1).auth, 'Bearer fixture-secret');
-    assert.equal(requests.at(-1).body.speed, 1);
-    assert.equal(
-      requests.at(-1).body.generation.instruct,
-      alwaysInstructions + '\nやさしく、落ち着いて',
-    );
-    assert.equal(requests.at(-1).body.language, 'Japanese');
-    assert.equal(requests.at(-1).body.generation.temperature, 0.4);
-    checks.push('settings preview ends and playback speed avoids double speed');
-    await page.getByRole('button', { name: 'APIキーを削除', exact: true }).click();
-    await until(() => !fs.existsSync(keyfile), 'key deleted');
-    assert(!fs.existsSync(keyfile));
+        inspect,
+        electronExpression,
+        restart: async () => {
+          await host.evaluate(() => window.dock.executeCommand('appdock.quit'));
+          await until(() => child.exitCode !== null, 'restart exit');
+          await browser.close();
+          await launch();
+          await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+          page = await settingsPage(host);
+          await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
+          return page;
+        },
+      });
     await host.evaluate(() =>
       window.dock.setAppletApiPermissions({ read: true, execute: true, useTts: true }),
     );
@@ -623,7 +328,10 @@ async function configure(patch) {
     );
     const listedVoices = await call('appdock_tts_list_voices');
     assert.equal(listedVoices.source, 'manual');
-    assert.deepEqual(listedVoices.voices, (await snapshot()).settings.value.tts.manualVoices);
+    assert.deepEqual(
+      listedVoices.voices,
+      (await snapshot()).settings.value.tts.connections[0].manualVoices,
+    );
     const a = await call('appdock_tts_speak', {
       text: 'MCP音声テスト。',
       speed: 1.4,
@@ -668,12 +376,7 @@ async function configure(patch) {
     });
     assert(conflicting.isError);
     checks.push('MCP voice, speech, status and deduplication');
-    const detailSummary = page.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' });
-    if (!(await detailSummary.evaluate((e) => e.parentElement.open)))
-      await detailSummary.press('Enter');
-    const nuanceMode = page.getByLabel('ニュアンスの送信方式', { exact: true });
-    await nuanceMode.selectOption('none');
-    await settleSettings(page);
+    await setNuanceMode('none');
     const previewJobs = async () =>
       page.evaluate(async () => {
         const model = await window.dock.settingsPage.get(
@@ -700,15 +403,19 @@ async function configure(patch) {
     );
     assert.deepEqual(requests.at(-1).body.generation, { temperature: 0.4 });
     assert.equal(requests.at(-1).body.input, 'ニュアンスを無視する音声テスト。');
-    assert.equal((await snapshot()).settings.value.tts.defaultInstructions, 'やさしく、落ち着いて');
-    await nuanceMode.selectOption('json');
+    assert.equal(
+      (await snapshot()).settings.value.tts.connections[0].defaultInstructions,
+      'やさしく、落ち着いて',
+    );
+    await setNuanceMode('json');
     await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
+    assert.equal(
+      (await snapshot()).settings.value.tts.connections[0].alwaysInstructions,
+      alwaysInstructions,
+    );
     checks.push('disabled nuance is ignored for settings preview and MCP while speech completes');
-    await page.getByLabel('常に付与するニュアンス', { exact: true }).fill('');
-    await page.getByLabel('常に付与するニュアンス', { exact: true }).press('Enter');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, '');
+    await setAlwaysInstructions('');
+    assert.equal((await snapshot()).settings.value.tts.connections[0].alwaysInstructions, '');
     const cleared = await call('appdock_tts_speak', {
       text: '常時付与なし',
       instructions: ' \n ',
@@ -720,7 +427,7 @@ async function configure(patch) {
     );
     assert.deepEqual(requests.at(-1).body.generation, { temperature: 0.4 });
     checks.push(
-      'always nuance saves and cancels, survives restart, combines with preview and SDK/MCP overrides, and can be cleared',
+      'always nuance survives restart, combines with preview and SDK/MCP overrides, and can be cleared',
     );
     const long = await call('appdock_tts_speak', { text: 'long', requestId: 'long' });
     await until(async () => (await state(long)).state === 'playing', 'long playback');
@@ -774,7 +481,7 @@ async function configure(patch) {
       }
     }
     await configure({
-      baseUrl: settings.tts.baseUrl,
+      baseUrl: settings.tts.connections[0].baseUrl,
       model: 'test',
       defaultVoice: 'voice-a',
       speedMode: 'playback',

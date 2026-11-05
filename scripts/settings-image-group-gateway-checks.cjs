@@ -21,7 +21,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   const assets = path.join(profile, 'data/assets/images');
   const preserved = [
     ...files.map((file) => path.join(assets, file)),
-    ...['ai-keys.json', 'tts-key.json', 'mcp-client.json']
+    ...['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
       .map((file) => path.join(local, file))
       .filter((file) => fs.existsSync(file)),
   ].map((file) => ({ file, sha256: hash(file) }));
@@ -74,8 +74,8 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   await page.locator('.library-page').waitFor();
   await page.getByRole('button', { name: 'MCP gallery groupの操作', exact: true }).click();
   await page
-    .locator('.library-group-menu')
-    .getByRole('menuitem', { name: '名前を変更', exact: true })
+    .getByRole('menu')
+    .getByRole('menuitem', { name: 'グループ名を変更', exact: true })
     .click();
   let dialog = page.getByRole('dialog', { name: '画像グループの名前を変更', exact: true });
   await dialog.waitFor();
@@ -135,14 +135,13 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
       },
     ]),
   );
-  await page
-    .locator('.library-sidebar .library-group-row')
-    .filter({ hasText: 'Native gallery group' })
-    .locator('button')
-    .first()
-    .click();
+  await page.getByTitle('Native gallery group', { exact: true }).click();
   const card = page.locator('.library-page .ad-gallery-card').filter({ hasText: files[0] });
-  await card.getByRole('button', { name: 'グループ', exact: true }).click();
+  await card.locator('.ad-gallery-image').click({ button: 'right' });
+  await page
+    .getByRole('menu')
+    .getByRole('menuitem', { name: '所属グループを編集', exact: true })
+    .click();
   dialog = page.getByRole('dialog', { name: '所属グループを編集', exact: true });
   await dialog.getByLabel('Native added group', { exact: true }).check();
   await dialog.getByLabel('Native gallery group', { exact: true }).uncheck();
@@ -198,7 +197,8 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     async () =>
       JSON.stringify(
         await page
-          .locator('.library-sidebar .library-group-row > button[aria-label]')
+          .getByRole('navigation', { name: 'グループ', exact: true })
+          .getByRole('button', { name: /の操作$/ })
           .evaluateAll((elements) => elements.map((element) => element.getAttribute('aria-label'))),
       ) === JSON.stringify(names),
     'native group order follows MCP',
@@ -213,7 +213,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   );
   await page.getByRole('button', { name: 'MCP added groupの操作', exact: true }).click();
   await page
-    .locator('.library-group-menu')
+    .getByRole('menu')
     .getByRole('menuitem', { name: 'グループを削除', exact: true })
     .click();
   dialog = page.getByRole('dialog', { name: '画像グループを削除', exact: true });

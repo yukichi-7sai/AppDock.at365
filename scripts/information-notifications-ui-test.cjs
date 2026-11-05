@@ -61,7 +61,16 @@ settings.keybindings = ['run', 'fail'].map((name, i) => ({
 }));
 settings.globalShortcutCommands = [];
 settings.gestures.enabled = false;
-settings.tts.baseUrl = 'http://127.0.0.1:1/v1';
+settings.tts = {
+  connections: [
+    {
+      ...require('../out/main/shared/tts').newTtsServer('default'),
+      name: 'Fixture',
+      baseUrl: 'http://127.0.0.1:1/v1',
+    },
+  ],
+  defaultConnectionId: 'default',
+};
 settings.updates.hostSource = path.join(profile, 'feed');
 settings.notificationPreferences = {
   overrides: [
@@ -469,14 +478,17 @@ async function main() {
   checks.push('settings Shell operation reports account creation once without inline duplicate');
   await dismissAll();
   await ui.getByRole('button', { name: '音声生成AI', exact: true }).click();
+  await ui.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
   await ui.getByLabel('APIキー', { exact: true }).fill('PRIVATE_TEST_KEY');
-  await ui.getByRole('button', { name: 'APIキーを設定', exact: true }).click();
+  await ui.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
   await until(
     async () => (await info()).some((i) => i.body === 'APIキーをこのPCに保存しました。'),
     'key saved',
   );
   assert(!(await info()).some((i) => i.body.includes('PRIVATE_TEST_KEY')));
+  await ui.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
   await ui.getByRole('button', { name: 'APIキーを削除', exact: true }).click();
+  await ui.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
   await until(
     async () => (await info()).some((i) => i.body === 'APIキーを削除しました。'),
     'key removed',

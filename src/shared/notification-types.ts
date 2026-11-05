@@ -1,3 +1,4 @@
+import { selectedTtsServer } from './tts';
 import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { soundLibraryReference } from './library-assets';
@@ -414,7 +415,8 @@ export function validateNotificationPreferenceChanges(
 export function resolveNotificationSpeech(
   settings: Settings,
   defaults:
-    Pick<import('./tts').TtsSettings, 'defaultVoice' | 'defaultSpeed'> | undefined = settings.tts,
+    | Pick<import('./tts').TtsSettings, 'defaultVoice' | 'defaultSpeed'>
+    | undefined = selectedTtsServer(settings.tts),
 ) {
   const override = settings.notificationPreferences?.speech;
   return {

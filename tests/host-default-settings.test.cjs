@@ -70,7 +70,8 @@ test('all automatic update entry points default off and AI/TTS have no configure
   assert.equal(value.updates.checkHostOnStartup, false);
   assert.equal(value.updates.checkAppletsOnStartup, false);
   assert.deepEqual(value.ai.connections, []);
-  assert.equal(value.tts.baseUrl, '');
+  assert.deepEqual(value.tts.connections, []);
+  assert.equal(value.tts.defaultConnectionId, undefined);
 });
 
 test('saved overrides and legacy tray command lists retain their meaning after the default change', () => {

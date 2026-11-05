@@ -48,13 +48,20 @@ settings.ai = {
     },
   ],
 };
-Object.assign(settings.tts, {
-  baseUrl: 'http://127.0.0.1:9/tts',
-  model: 'fixture-model',
-  defaultVoice: 'fixture-voice',
-  voicesSource: 'manual',
-  manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
-});
+settings.tts = {
+  defaultConnectionId: 'default',
+  connections: [
+    {
+      ...require('../out/main/shared/tts').newTtsServer('default'),
+      name: 'Fixture',
+      baseUrl: 'http://127.0.0.1:9/tts',
+      model: 'fixture-model',
+      defaultVoice: 'fixture-voice',
+      voicesSource: 'manual',
+      manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
+    },
+  ],
+};
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
 fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),

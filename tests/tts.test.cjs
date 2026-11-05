@@ -612,26 +612,26 @@ test('expired completion records become NOT_FOUND and do not persist across rest
 test('keys are encrypted, bound to endpoint, never fall back to plaintext and deletable', (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/tts-implementation/secrets-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const file = path.join(dir, 'tts-key.json');
+  const file = path.join(dir, 'tts-keys.json');
   const keys = new TtsSecrets(file, {
     encrypt: (s) => 'encrypted:' + Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s.slice(10), 'base64').toString(),
   });
-  keys.set('http://host/v1', 'secret-value');
+  keys.setKey({ id: 'one', baseUrl: 'http://host/v1' }, 'secret-value');
   assert(!fs.readFileSync(file, 'utf8').includes('secret-value'));
-  assert.equal(keys.get('http://host/v1/'), 'secret-value');
-  assert.equal(keys.get('http://other/v1'), undefined);
-  assert.throws(() => keys.set('http://host/v1', 'x\ny'));
-  keys.set('http://host/v1', '');
-  assert(!fs.existsSync(file));
+  assert.equal(keys.key({ id: 'one', baseUrl: 'http://host/v1' }), 'secret-value');
+  assert.equal(keys.key({ id: 'one', baseUrl: 'http://other/v1' }), undefined);
+  assert.throws(() => keys.setKey({ id: 'one', baseUrl: 'http://host/v1' }, 'x\ny'));
+  keys.setKey({ id: 'one', baseUrl: 'http://host/v1' }, '');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).entries, {});
   const denied = new TtsSecrets(file, {
     encrypt: () => {
       throw Error('unavailable');
     },
     decrypt: () => '',
   });
-  assert.throws(() => denied.set('http://host/v1', 'secret'));
-  assert(!fs.existsSync(file));
+  assert.throws(() => denied.setKey({ id: 'two', baseUrl: 'http://host/v1' }, 'secret'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).entries, {});
 });
 test('common dispatcher publishes four tools and enforces dedicated permissions and owner', async (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/tts-implementation/api-'));
@@ -703,6 +703,29 @@ test('real HTTP redirect is not followed and request uses configured authenticat
   assert.equal(f.s.get('a', a.jobId).error.code, 'TTS_CONNECTION_FAILED');
 });
 module.exports = { wave };
+test('preview configuration uses its own endpoint and key without changing normal speech', async (t) => {
+  const f = setup(t, { key: () => 'normal-key' });
+  const preview = {
+    settings: {
+      ...defaultTtsSettings(),
+      baseUrl: 'http://preview/v1',
+      model: 'preview-model',
+      defaultVoice: 'preview-voice',
+      defaultSpeed: 1.5,
+    },
+    key: 'preview-key',
+  };
+  const job = f.s.speak('host', input('preview'), { configuration: preview });
+  await wait(() => f.s.get('host', job.jobId).state === 'completed');
+  assert.equal(f.posts[0].u, 'http://preview/v1/audio/speech');
+  assert.equal(f.posts[0].o.headers.Authorization, 'Bearer preview-key');
+  assert.equal(JSON.parse(f.posts[0].o.body).voice, 'preview-voice');
+  const normal = f.s.speak('host', input('normal'));
+  await wait(() => f.s.get('host', normal.jobId).state === 'completed');
+  assert.equal(f.posts[1].u, 'http://localhost:8080/v1/audio/speech');
+  assert.equal(f.posts[1].o.headers.Authorization, 'Bearer normal-key');
+  assert.equal(JSON.parse(f.posts[1].o.body).voice, 'voice');
+});
 test('playback/server speed modes apply speed exactly once', async (t) => {
   for (const mode of ['playback', 'server']) {
     let sent, played;

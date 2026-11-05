@@ -6,7 +6,7 @@ const assert = require('node:assert/strict'),
 module.exports = async ({ page, client, profile, local, checks, tool, value, until }) => {
   const tools = JSON.stringify((await client.listTools()).tools);
   const target = (await value('appdock_settings_list_targets', { limit: 100 })).items.find(
-    (item) => item.kind === 'list' && item.category === 'tts',
+    (item) => item.targetId === 'service.tts.manual-voices',
   );
   assert(target);
   const targetId = target.targetId,
@@ -26,10 +26,10 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   const apply = async (operations, dryRun = false) =>
     value('appdock_settings_apply', await request(operations, dryRun));
   const sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
-    keyFile = path.join(local, 'tts-key.json'),
+    keyFile = path.join(local, 'tts-keys.json'),
     cipher = fs.readFileSync(keyFile),
     before = fs.readFileSync(sharedFile),
-    ttsBefore = JSON.parse(before).tts;
+    ttsBefore = JSON.parse(before).tts.connections[0];
   const operation = { kind: 'add', values: { id: 'Voice-A😀' } };
   const preview = await apply([operation], true);
   assert.deepEqual(preview.changes[0].values, { id: 'Voice-A😀', name: 'Voice-A😀' });
@@ -40,9 +40,23 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   assert.deepEqual(await value('appdock_settings_apply', save), saved);
   await page.evaluate(() => window.dock.navigate('settings'));
   await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
-  const details = page.locator('details:has([data-testid="tts-manual-voices"])');
-  if ((await details.getAttribute('open')) === null) await details.locator('summary').click();
-  const manual = page.getByTestId('tts-manual-voices');
+  let manual;
+  const refresh = async () => {
+    const dialog = page.getByRole('dialog');
+    if (await dialog.count())
+      await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    const name = JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0].name;
+    await page.getByRole('button', { name: name + 'の設定', exact: true }).click();
+    await dialog.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
+    manual = dialog.locator('[data-testid="tts-manual-voices"]');
+  };
+  const saveManual = async () => {
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    await refresh();
+  };
+  await refresh();
   await until(
     async () => JSON.parse(await manual.inputValue()).some((voice) => voice.id === 'Voice-A😀'),
     'TTS UI received list addition',
@@ -52,6 +66,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await apply([
     { kind: 'update', itemRef: added.itemRef, changes: { id: 'Voice-B😀', name: ' Same ' } },
   ]);
+  await refresh();
   await until(
     async () =>
       JSON.parse(await manual.inputValue()).some(
@@ -65,6 +80,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   }));
   await manual.fill(JSON.stringify(fromUi));
   await manual.press('Tab');
+  await saveManual();
   await until(
     async () => (await items()).items.every((row) => row.values.name === 'UI name'),
     'TTS JSON UI save reached MCP list',
@@ -79,6 +95,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     { kind: 'update', itemRef: rows[0].itemRef, changes: { name: 'Stale' } },
   ]);
   await apply([{ kind: 'reorder', itemRefs: rows.map((row) => row.itemRef).reverse() }]);
+  await refresh();
   await until(
     async () => JSON.parse(await manual.inputValue())[0].id === rows.at(-1).values.id,
     'TTS UI received list order',
@@ -102,11 +119,12 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   const defaultRow = rows.find((row) => row.values.id === ttsBefore.defaultVoice);
   assert(defaultRow);
   await apply([{ kind: 'remove', itemRef: defaultRow.itemRef }]);
+  await refresh();
   await until(
     async () => JSON.parse(await manual.inputValue()).length === 1,
     'TTS UI received candidate removal',
   );
-  let current = JSON.parse(fs.readFileSync(sharedFile)).tts;
+  let current = JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0];
   assert.equal(current.defaultVoice, ttsBefore.defaultVoice);
   assert.equal(current.voicesSource, ttsBefore.voicesSource);
   assert.equal(current.baseUrl, ttsBefore.baseUrl);
@@ -119,8 +137,10 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   const large = Array.from({ length: 1000 }, (_, index) => ({ id: 'v' + index, name: 'Same' }));
   await manual.fill(JSON.stringify(large));
   await manual.press('Tab');
+  await saveManual();
   await until(
-    async () => JSON.parse(fs.readFileSync(sharedFile)).tts.manualVoices?.length === 1000,
+    async () =>
+      JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0].manualVoices?.length === 1000,
     'TTS UI saved 1000 manual voices',
   );
   const schema = await value('appdock_settings_get_schema', { targetId });
@@ -146,6 +166,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   };
   assert(Buffer.byteLength(JSON.stringify(wire), 'utf8') < 65536);
   await value('appdock_settings_apply', reorder);
+  await refresh();
   await until(
     async () => JSON.parse(await manual.inputValue())[0].id === 'v999',
     'TTS UI received all-row reorder',
@@ -156,19 +177,25 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     'REVISION_CONFLICT',
   );
   assert.equal((await apply([{ kind: 'add', values: { id: 'v1000' } }])).changed, true);
-  assert.equal(JSON.parse(fs.readFileSync(sharedFile)).tts.manualVoices.length, 1001);
+  assert.equal(
+    JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0].manualVoices.length,
+    1001,
+  );
+  await refresh();
   await manual.fill('[]');
   await manual.press('Tab');
+  await saveManual();
   await until(async () => (await items()).items.length === 0, 'TTS JSON UI cleared candidates');
   await apply([{ kind: 'add', values: { id: 'last' } }]);
   await apply([{ kind: 'remove', itemRef: (await items()).items[0].itemRef }]);
-  current = JSON.parse(fs.readFileSync(sharedFile)).tts;
-  assert.equal(Object.hasOwn(current, 'manualVoices'), false);
+  current = JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0];
+  assert.deepEqual(current.manualVoices, []);
   assert.equal(current.defaultVoice, ttsBefore.defaultVoice);
   assert.equal(current.voicesSource, ttsBefore.voicesSource);
   assert.deepEqual(fs.readFileSync(keyFile), cipher);
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
+  await page.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
   checks.push(
-    'TTS manual list pagination and real MCP full reorder fit the fixed transport; adding beyond the former 1000-row limit, empty-default compaction and tool definitions stay consistent',
+    'TTS manual list pagination and real MCP full reorder fit the fixed transport; adding beyond the former 1000-row limit, empty-list persistence and tool definitions stay consistent',
   );
 };

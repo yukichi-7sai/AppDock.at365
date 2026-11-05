@@ -24,6 +24,62 @@ export interface TtsSettings extends TtsConnectionSettings {
   defaultInstructions: string;
   alwaysInstructions: string;
 }
+export interface TtsServer extends TtsSettings {
+  id: string;
+  name: string;
+}
+export interface TtsConfiguration {
+  connections: TtsServer[];
+  defaultConnectionId?: string;
+}
+export const defaultTtsConfiguration = (): TtsConfiguration => ({ connections: [] });
+export const newTtsServer = (id: string): TtsServer => ({ ...defaultTtsSettings(), id, name: '' });
+export function parseTtsServer(value: unknown): TtsServer {
+  if (!object(value)) throw Error(hostText('settings.tts.object'));
+  const { id, name, ...speech } = value;
+  if (
+    typeof id !== 'string' ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(id) ||
+    typeof name !== 'string' ||
+    !name.trim() ||
+    name.length > 200
+  )
+    throw Error(hostText('settings.ttsServers.invalidServer'));
+  return { ...parseTtsSettings(speech), id, name: name.trim() };
+}
+export function parseTtsConfiguration(value: unknown): TtsConfiguration {
+  if (value === undefined) return defaultTtsConfiguration();
+  if (!object(value)) throw Error(hostText('settings.tts.object'));
+  // Retire the former single-server configuration without invalidating unrelated settings.
+  if (!Object.keys(value).length) return defaultTtsConfiguration();
+  if (
+    !Object.hasOwn(value, 'connections') &&
+    Object.keys(value).every((key) => Object.hasOwn(defaultTtsSettings(), key))
+  ) {
+    parseTtsSettings(value);
+    return defaultTtsConfiguration();
+  }
+  if (
+    Object.keys(value).some((k) => !['connections', 'defaultConnectionId'].includes(k)) ||
+    !Array.isArray(value.connections)
+  )
+    throw Error(hostText('settings.tts.fields'));
+  const connections = value.connections.map(parseTtsServer);
+  if (new Set(connections.map((c) => c.id)).size !== connections.length)
+    throw Error(hostText('settings.ttsServers.invalidServer'));
+  const id = value.defaultConnectionId;
+  if (id !== undefined && (typeof id !== 'string' || !connections.some((c) => c.id === id)))
+    throw Error(hostText('settings.ttsServers.missingServer'));
+  return { connections, ...(id === undefined ? {} : { defaultConnectionId: id as string }) };
+}
+export function selectedTtsServer(value?: TtsConfiguration, id = value?.defaultConnectionId) {
+  return value?.connections.find((c) => c.id === id);
+}
+export function ttsServerSpeech(server?: TtsServer): TtsSettings {
+  if (!server) return defaultTtsSettings();
+  const { id: _id, name: _name, ...speech } = server;
+  return parseTtsSettings(speech);
+}
 export const ttsPresetIds = [
   'custom',
   'openai-speech',

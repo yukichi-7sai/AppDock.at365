@@ -110,11 +110,18 @@ async function start() {
       settings.updates.checkHostOnAboutOpen =
         false;
     settings.tts = {
-      ...settings.tts,
-      baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
-      model: 'fixture',
-      defaultVoice: 'common',
-      speedMode: 'server',
+      connections: [
+        {
+          id: 'default',
+          name: 'Fixture',
+          ...settings.tts.connections[0],
+          baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+          model: 'fixture',
+          defaultVoice: 'common',
+          speedMode: 'server',
+        },
+      ],
+      defaultConnectionId: 'default',
     };
     settings.extensions[id] = { enabled: true, settings: {} };
     const directory = path.join(profile, 'data/assets/sounds');

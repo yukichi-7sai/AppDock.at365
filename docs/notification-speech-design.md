@@ -28,8 +28,8 @@ interface NotificationPreference extends NotificationOwner {
 
 | 項目 | 保存・検証 | 実効値 |
 | --- | --- | --- |
-| `speech.voice` | 省略で継承。指定時は空白だけを拒否し、200文字以下。大文字小文字を保持 | 指定値、なければ`tts.defaultVoice` |
-| `speech.speed` | 省略で継承。指定時は0.25〜4.0の有限数 | 指定値、なければ`tts.defaultSpeed` |
+| `speech.voice` | 省略で継承。指定時は空白だけを拒否し、200文字以下。大文字小文字を保持 | 指定値、なければ既定サーバーの`defaultVoice` |
+| `speech.speed` | 省略で継承。指定時は0.25〜4.0の有限数 | 指定値、なければ既定サーバーの`defaultSpeed` |
 | 各overrideの`speak` | 任意boolean。省略時false | 通知方針が有効かつtrueの場合だけ対象 |
 | 接続先・モデル・APIキー | 通知設定には追加しない | 共通の音声生成AI設定とPC専用秘密領域 |
 | 速度適用方式 | 通知設定には追加しない | `tts.speedMode` |

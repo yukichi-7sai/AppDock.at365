@@ -118,6 +118,8 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
   ],
 
   tts: [
+    ['connections', hostText('settings.ttsServers.registered')],
+    ['defaultConnectionId', hostText('settings.ttsServers.defaultServer')],
     ['preset', hostText('settings.ttsSettings.preset')],
     ['speechPath', hostText('settings.ttsSettings.speechPath')],
     ['defaultInstructions', hostText('settings.ttsSettings.defaultInstructions')],

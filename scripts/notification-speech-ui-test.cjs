@@ -77,11 +77,18 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     initial.keybindings = [];
     initial.gestures.enabled = false;
     initial.tts = {
-      ...initial.tts,
-      baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
-      model: 'fixture',
-      defaultVoice: 'common',
-      speedMode: 'server',
+      connections: [
+        {
+          id: 'default',
+          name: 'Fixture',
+          ...initial.tts.connections[0],
+          baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
+          model: 'fixture',
+          defaultVoice: 'common',
+          speedMode: 'server',
+        },
+      ],
+      defaultConnectionId: 'default',
     };
     const id = 'fixture.speech';
     const folder = path.join(profile, 'extensions', id);
@@ -396,11 +403,18 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
           {
             ...s.settings.value,
             tts: {
-              ...s.settings.value.tts,
-              baseUrl: 'http://alice:8080/v1',
-              model: '1.7B-Base',
-              defaultVoice: 'yui',
-              speedMode: 'playback',
+              connections: [
+                {
+                  id: 'default',
+                  name: 'Fixture',
+                  ...s.settings.value.tts.connections[0],
+                  baseUrl: 'http://alice:8080/v1',
+                  model: '1.7B-Base',
+                  defaultVoice: 'yui',
+                  speedMode: 'playback',
+                },
+              ],
+              defaultConnectionId: 'default',
             },
             notificationPreferences: {
               ...s.settings.value.notificationPreferences,
@@ -433,7 +447,20 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       await window.dock.saveSettings(
-        { ...s.settings.value, tts: { ...s.settings.value.tts, model: 'fixture-updated' } },
+        {
+          ...s.settings.value,
+          tts: {
+            connections: [
+              {
+                id: 'default',
+                name: 'Fixture',
+                ...s.settings.value.tts.connections[0],
+                model: 'fixture-updated',
+              },
+            ],
+            defaultConnectionId: 'default',
+          },
+        },
         s.settings.revision,
       );
     });

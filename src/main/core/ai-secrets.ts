@@ -36,7 +36,7 @@ export class AiSecrets {
       throw Error(hostText('services.aiSecrets.readFileFailed'));
     }
   }
-  key(c: AiConnectionSettings): string | undefined {
+  key(c: Pick<AiConnectionSettings, 'id' | 'baseUrl'>): string | undefined {
     const v = this.read(this.keysFile)[c.id];
     if (!v || v.fingerprint !== hash(c.baseUrl) || v.key === undefined) return undefined;
     try {
@@ -57,7 +57,7 @@ export class AiSecrets {
       return { protected: true, revision: 'unavailable' };
     }
   }
-  prepareKey(c: AiConnectionSettings, value: unknown) {
+  prepareKey(c: Pick<AiConnectionSettings, 'id' | 'baseUrl'>, value: unknown) {
     if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f\x7f]/.test(value))
       throw Error(hostText('services.aiSecrets.keyFormat'));
     const entries = this.read(this.keysFile);
@@ -74,10 +74,10 @@ export class AiSecrets {
       },
     };
   }
-  setKey(c: AiConnectionSettings, value: unknown) {
+  setKey(c: Pick<AiConnectionSettings, 'id' | 'baseUrl'>, value: unknown) {
     this.prepareKey(c, value).commit();
   }
-  status(c: AiConnectionSettings) {
+  status(c: Pick<AiConnectionSettings, 'id' | 'baseUrl'>) {
     let keyRevision = '';
     try {
       keyRevision = this.revision(c.id);

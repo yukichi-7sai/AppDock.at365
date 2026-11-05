@@ -64,15 +64,33 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
   await apply(tts, [{ kind: 'set', changes: { defaultSpeed: 1.75, model: 'mcp-model' } }]);
   await select('音声生成AI');
+  await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
   await until(
     async () => (await page.getByLabel('読み上げ速度', { exact: true }).inputValue()) === '1.75',
     'TTS UI received MCP save',
   );
   await page.getByLabel('読み上げ速度', { exact: true }).fill('1.25');
   await page.getByLabel('読み上げ速度', { exact: true }).press('Tab');
+  assert.equal((await vals(tts)).defaultSpeed, 1.75, 'dialog edits stay local until OK');
+  await page.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await until(async () => (await vals(tts)).defaultSpeed === 1.25, 'TTS UI save reached MCP');
-  await invoke('ttsSetKey', ['PRIVATE_TTS_SERVICE_FIXTURE']);
-  const ttsFile = path.join(local, 'tts-key.json'),
+  const ttsOriginal = (await snapshot()).settings.value.tts.connections[0];
+  const ttsStatus = await page.evaluate(
+    async () =>
+      (
+        await window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        )
+      ).content.auxiliary.tts.connections[0],
+  );
+  await invoke('ttsSaveConnection', [
+    ttsOriginal,
+    ttsOriginal,
+    'PRIVATE_TTS_SERVICE_FIXTURE',
+    ttsStatus.keyRevision,
+  ]);
+  const ttsFile = path.join(local, 'tts-keys.json'),
     ttsBytes = fs.readFileSync(ttsFile, 'utf8');
   assert(!ttsBytes.includes('PRIVATE_TTS_SERVICE_FIXTURE'));
   for (const dryRun of [true, false])

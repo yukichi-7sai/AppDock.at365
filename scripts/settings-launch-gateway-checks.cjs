@@ -14,8 +14,11 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     read = () => value('appdock_settings_get_values', { targetId }),
     schema = await value('appdock_settings_get_schema', { targetId }),
     sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
-    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
-    privateFiles = ['ai-keys.json', 'tts-key.json', 'mcp-client.json'].map((name) =>
+    deviceFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    ),
+    privateFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json'].map((name) =>
       path.join(local, name),
     ),
     privateBytes = privateFiles.map((file) => fs.readFileSync(file)),

@@ -48,7 +48,16 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     settings.host.notifications = false;
     settings.keybindings = [];
     settings.gestures.enabled = false;
-    settings.tts.baseUrl = base + '/v1';
+    settings.tts = {
+      connections: [
+        {
+          ...require('../out/main/shared/tts').newTtsServer('default'),
+          name: 'Fixture',
+          baseUrl: base + '/v1',
+        },
+      ],
+      defaultConnectionId: 'default',
+    };
     settings.ai.connections = [
       {
         ...require('../out/main/shared/ai').newAiConnection('fixture'),
@@ -116,7 +125,8 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     page.setDefaultTimeout(10000);
     const select = async (name) => {
       await page.getByRole('button', { name, exact: true }).click();
-      await page.getByRole('heading', { name, level: 1, exact: true }).waitFor();
+      if (name === 'AppDockについて') await page.getByTestId('about-overview').waitFor();
+      else await page.getByRole('heading', { name, level: 1, exact: true }).waitFor();
     };
     async function confirmed(label, read, expected, mode = 'Enter') {
       const input = page.getByLabel(label, { exact: true }),
@@ -177,22 +187,28 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       'AI dialog URL confirms locally, fetches models on Enter, and cancels without saving',
     );
     await select('音声生成AI');
-    await confirmed(
-      'APIのURL',
-      (s) => s.tts.baseUrl,
-      { raw: base + '/speech/', saved: base + '/speech' },
-      'blur',
+    await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
+    const ttsDialog = page.getByRole('dialog'),
+      ttsUrl = ttsDialog.getByLabel('APIのURL', { exact: true });
+    const ttsRevision = (await snapshot()).settings.revision;
+    await ttsUrl.fill(base + '/speech/');
+    assert.equal(await ttsUrl.inputValue(), base + '/speech/');
+    await ttsUrl.press('Tab');
+    await until(
+      () => ttsUrl.inputValue().then((v) => v === base + '/speech'),
+      'TTS normalized in dialog',
     );
-    checks.push('TTS uses identical deferred input and normalizes on blur');
+    assert.equal((await snapshot()).settings.revision, ttsRevision);
+    await ttsDialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await ttsDialog.waitFor({ state: 'hidden' });
+    assert.equal((await snapshot()).settings.value.tts.connections[0].baseUrl, base + '/speech');
+    checks.push('TTS dialog URL normalizes on blur and saves only on OK');
     await select('AppDockについて');
-    assert.equal(
-      await page
-        .locator('details')
-        .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) })
-        .getAttribute('open'),
-      null,
-    );
-    await page.locator('.about-page > details.settings-section > summary').click();
+    const updateDetails = page
+      .locator('details')
+      .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) });
+    if ((await updateDetails.getAttribute('open')) === null)
+      await updateDetails.locator(':scope > summary').click();
     assert.equal(
       await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
       'github:yukichi-7sai/AppDock.at365',
@@ -219,7 +235,9 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       .locator('[data-applet-id="fixture.url"]')
       .getByRole('button', { name: 'URL fixture', exact: true })
       .click();
-    await page.locator('.applet-update-source > summary').click();
+    const appletCommon = page.getByTestId('applet-common-settings');
+    if ((await appletCommon.getAttribute('open')) === null)
+      await appletCommon.locator(':scope > summary').click();
     await confirmed(
       'URL fixtureの更新元',
       (s) => s.extensions['fixture.url'].updateSource,

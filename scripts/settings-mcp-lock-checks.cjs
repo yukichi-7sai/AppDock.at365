@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { settingsItemId } = require('../out/main/shared/settings-catalog');
 
 module.exports = async ({ page, profile, local, checks, value, until, fixtureId }) => {
-  const credentialFiles = ['ai-keys.json', 'tts-key.json', 'mcp-client.json']
+  const credentialFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
     .map((name) => path.join(local, name))
     .filter((file) => fs.existsSync(file));
   const credentials = credentialFiles.map((file) => fs.readFileSync(file));
@@ -99,9 +99,11 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
   );
 
   await nav('tts');
+  await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
   assert.equal(await field('tts', 'apiKey').locator('[data-mcp-lock]').count(), 1);
   assert.equal(await count(field('tts', 'baseUrl')), 0);
   assert.equal(await count(field('tts', 'model')), 0);
+  await page.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
   await nav('applets');
   const enabledRow = page.locator('[data-applet-id="fixture.common-active"]');
   assert.equal(await enabledRow.locator('[data-mcp-lock]').count(), 0);

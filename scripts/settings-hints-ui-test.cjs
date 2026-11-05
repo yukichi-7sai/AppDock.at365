@@ -317,7 +317,16 @@ async function checkSectionTitles() {
     initial.gestures.enabled = false;
     initial.host.trayClickCommand = 'fixture.hints.run';
     initial.host.trayDoubleClickCommand = null;
-    initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+    initial.tts = {
+      connections: [
+        {
+          ...require('../out/main/shared/tts').newTtsServer('default'),
+          name: 'Fixture',
+          baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+        },
+      ],
+      defaultConnectionId: 'default',
+    };
     if (commandNavigationOnly || listScrollbarOnly) {
       initial.keybindings = [
         {
@@ -487,8 +496,8 @@ async function checkSectionTitles() {
       );
     }
     if (assignmentSpeechOnly) {
-      initial.tts.defaultVoice = 'fixture-voice';
-      initial.tts.defaultSpeed = 1.25;
+      initial.tts.connections[0].defaultVoice = 'fixture-voice';
+      initial.tts.connections[0].defaultSpeed = 1.25;
     }
     initial.extensions['fixture.hints'] = { enabled: true, settings: {} };
     const fixture = path.join(profile, 'extensions', 'hints');

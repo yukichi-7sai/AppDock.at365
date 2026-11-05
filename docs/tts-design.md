@@ -4,25 +4,25 @@
 
 MCPの[固定設定API](settings-api.md)から通常値と手動ボイス一覧を編集できる。read/writeを使い、読み上げ許可とは分ける。保存による通常の再適用を行うが、候補取得・試聴・通信を兼ねない。暗号化キーとその結び付け先の変更はローカルの設定画面で行う。
 
-共有settings.jsonに任意のttsオブジェクトを追加する。未設定では接続・生成・再生を開始しない。
+共有settings.jsonのttsは`connections`（サーバー登録配列、既定は空）と`defaultConnectionId`（通常の読み上げに使う登録ID、省略可能）を持つ。各登録は一意で変更されない`id`、表示用の`name`と次の設定を持つ。既定が未選択では通常の生成・読み上げを開始しない。登録数に固定上限は設けない。旧単一接続形式・旧APIキーは移行せず再登録する。旧形式の読み込みでは音声設定だけを空にし、ほかの設定を維持する。
 
 | キー                        | 内容・既定値                                                                                    |
 | --------------------------- | ----------------------------------------------------------------------------------------------- |
-| `tts.baseUrl`               | APIベースURL。未設定は空。例: `http://host:8080/v1`                                             |
-| `tts.model`                 | モデルID。未設定は空                                                                            |
-| `tts.defaultVoice`          | 省略時に使うボイスID。未設定は空                                                                |
-| `tts.defaultSpeed`          | 0.25～4.0の有限数。既定1.0                                                                      |
-| `tts.defaultInstructions`   | 省略時のニュアンス。既定は空文字                                                                |
-| `tts.alwaysInstructions`    | 毎回付与するニュアンス。既定は空文字。0.154.0以上                                                |
-| `tts.preset`                | custom（既定）／openai-speech／qwen3-tts／mlx-audio／ollama。詳細値の初期入力に使ったプリセット |
-| `tts.speechPath`            | 音声生成APIの相対パス。既定audio/speech                                                         |
-| `tts.instructionsMode`      | none（既定、送信しない）／json（指定JSON項目へ送信）                                            |
-| `tts.instructionsParameter` | ニュアンスの送信先。既定instructions。入れ子はgeneration.instructのようにドット区切り           |
-| `tts.extraBody`             | 音声生成JSONに追加するオブジェクト。既定{}。例: {"language":"Japanese"}                         |
-| `tts.speedMode`             | playback（既定）またはserver。速度の適用先                                                      |
-| `tts.voicesSource`          | endpointまたはmanual。既定endpoint                                                              |
-| `tts.voicesPath`            | ベースURL配下の相対パス。既定audio/voices                                                       |
-| `tts.manualVoices`          | 手動ボイスのid/name配列。既定空配列                                                             |
+| `tts.connections[].baseUrl`               | APIベースURL。未設定は空。例: `http://host:8080/v1`                                             |
+| `tts.connections[].model`                 | モデルID。未設定は空                                                                            |
+| `tts.connections[].defaultVoice`          | 省略時に使うボイスID。未設定は空                                                                |
+| `tts.connections[].defaultSpeed`          | 0.25～4.0の有限数。既定1.0                                                                      |
+| `tts.connections[].defaultInstructions`   | 省略時のニュアンス。既定は空文字                                                                |
+| `tts.connections[].alwaysInstructions`    | 毎回付与するニュアンス。既定は空文字                                                |
+| `tts.connections[].preset`                | custom（既定）／openai-speech／qwen3-tts／mlx-audio／ollama。詳細値の初期入力に使ったプリセット |
+| `tts.connections[].speechPath`            | 音声生成APIの相対パス。既定audio/speech                                                         |
+| `tts.connections[].instructionsMode`      | none（既定、送信しない）／json（指定JSON項目へ送信）                                            |
+| `tts.connections[].instructionsParameter` | ニュアンスの送信先。既定instructions。入れ子はgeneration.instructのようにドット区切り           |
+| `tts.connections[].extraBody`             | 音声生成JSONに追加するオブジェクト。既定{}。例: {"language":"Japanese"}                         |
+| `tts.connections[].speedMode`             | playback（既定）またはserver。速度の適用先                                                      |
+| `tts.connections[].voicesSource`          | endpointまたはmanual。既定endpoint                                                              |
+| `tts.connections[].voicesPath`            | ベースURL配下の相対パス。既定audio/voices                                                       |
+| `tts.connections[].manualVoices`          | 手動ボイスのid/name配列。既定空配列                                                             |
 
 URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。モデルとボイスは一覧からの選択と自由入力を提供する。一覧非対応でも直接入力したIDを保存できる。IDの大文字・小文字は維持する。
 
@@ -30,13 +30,17 @@ URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。
 
 APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化方式に合わせてPC専用rootのホスト用秘密領域へ保存する。Applet別SecretsのIDを流用しない。暗号化不可の場合は平文へフォールバックしない。キーの登録・置換・削除はホスト設定画面に限定し、Applet/MCPへ値を返さない。必要な状態表示にはapiKeyConfiguredだけを使う。
 
-キーはPC専用rootのtts-key.jsonへ暗号化保存し、正規化した接続先のハッシュに紐付ける。URL変更時に以前のキーを別の接続先へ自動送信しない。キー未設定ならAuthorizationヘッダーなし、設定済みの場合だけBearer認証とする。秘密情報の保存失敗は画面へ返し、成功扱いしない。
+キーはPC専用rootのtts-keys.jsonへ登録ID別に暗号化保存し、それぞれ正規化した接続先のハッシュにも紐付ける。同じURLの複数登録でもキーを共有しない。URL変更時に以前のキーを別の接続先へ自動送信しない。キー未設定ならAuthorizationヘッダーなし、設定済みの場合だけBearer認証とする。設定と秘密情報は原子的に保存し、失敗時は両方を復元する。秘密情報の保存失敗は画面へ返し、成功扱いしない。
 
 生成音声は共有data/・登録通知音に保存しない。初期実装はサイズ制限付きメモリ保持を優先し、ジョブ終了時に音声参照を解放する。ファイルが必要になった場合だけPC専用一時領域を使い、正常終了・取消・次回起動時に自分のファイルだけ回収する。本文・音声・ジョブ履歴の永続保存は行わない。
 
 ## 設定画面
 
-「音声生成AI」は共通カードを使い、接続先（プリセット/URL/APIキー）、モデルと声（モデル/既定ボイス/速度/既定のニュアンス）、試聴の順に配置する。「サーバーに合わせた詳細設定」は接続先Section内の折りたたみ行へ置く。音声生成パス・速度の適用先・ニュアンスの送信方式/送信先・追加パラメーターJSON・ボイス一覧方式/パス/手動一覧をすべて手動編集できる。
+「音声生成AI」は登録サーバー一覧、既定のサーバー、試聴の順に配置する。一覧は登録名・URL・プリセット・モデルと声を表示し、追加・編集・削除・並べ替えを共通部品で行う。追加／編集ダイアログに登録名、接続先、APIキー、モデルと声をまとめ、OKで登録単位に保存する。キャンセルは秘密情報も含めて破棄する。最初の登録は既定に選び、以後の追加は既定を変えない。既定サーバーの削除確認では代わりのサーバーまたは未選択を選び、一括保存する。
+
+設定ページでは「既定のサーバー」だけを選択し、選択先のモデル・ボイス・速度・常時付与と既定ニュアンスを通常の読み上げに使用する。これらの値は各サーバーの追加／編集ダイアログだけで編集し、OKで保存する。既定のサーバーを切り替えても各登録の値は変更しない。試聴には独立した一時的なサーバー選択を置き、既定を変更しない。
+
+ダイアログの「サーバーに合わせた詳細設定」は接続先Section内の折りたたみ行へ置く。音声生成パス・速度の適用先・ニュアンスの送信方式/送信先・追加パラメーターJSON・ボイス一覧方式/パス/手動一覧をすべて手動編集できる。
 
 ### 接続プリセットとカスタム設定
 
@@ -58,7 +62,7 @@ Ollamaのdefaultはモデル本来の声を選ぶ値。利用可能な別の声�
 
 MLX-AudioはベースURLを`/v1`まで指定し、ニュアンスを`instruct`へ送る。モデル・既定ボイスは固定せず、利用するモデルに対応した値を入力する。公式サーバーの`GET /v1/audio/voices`はmodelクエリが必須で、voice packを持たないモデルでは一覧が空になるため、プリセットは手動一覧を使う。言語などのモデル固有値は追加パラメーターで指定する（公式サーバーの言語フィールドは`lang_code`。受け付ける値やニュアンス対応はモデルによる）。
 
-プリセットは接続先の自動検出や読み込み時の強制規則ではない。保存済みの詳細値を毎回プリセットで上書きせず、異なる値は「カスタマイズ済み」と表示する。JSON編集は各項目の確定値を保存する。既存設定にはcustom/none/空のニュアンスを補い、従来の生成要求を維持する。
+プリセットは接続先の自動検出や読み込み時の強制規則ではない。保存済みの詳細値を毎回プリセットで上書きせず、異なる値は「カスタマイズ済み」と表示する。JSON編集は各項目の確定値を保存する。新しい登録にはcustom/none/空のニュアンスを補う。
 
 Qwen3-TTSの公式Python APIのgenerate_custom_voiceはtext・language・speaker・instructを受け付ける。日本語はlanguage="Japanese"、ニュアンスはinstructで指定する。1.7B CustomVoiceはニュアンス制御に対応するが、0.6B CustomVoiceとBaseは同じ制御を保証しない。AppDockのQwen3-TTSプリセットはinstructを受け付けるOpenAI互換HTTPサーバー向けであり、Python APIへの直接接続や全HTTPサーバーのAPIを保証しない。保存済みのinstructionsParameterは自動変更せず、プリセットの再選択／詳細設定への復元でinstructを反映する。OpenAI Speech APIはニュアンス対応モデルを使用する。OpenAIの2026-10-01告知では従来TTSモデルの2027-01-06終了とRealtime APIへの移行が案内されているが、本プリセットは既存Speech API用で、Realtime通信を実装したものではない。Ollamaは現行の音声APIでinstructionsが未対応のため初期値をnoneとし、将来の対応版や別実装では手動変更できる。
 
@@ -66,7 +70,7 @@ Qwen3-TTSの公式Python APIのgenerate_custom_voiceはtext・language・speaker
 
 ### 常に付与するニュアンス
 
-「モデルと声」に「常に付与するニュアンス」を既定のニュアンスの直前へ配置する。`tts.alwaysInstructions`は既定値と同じ共通の音声生成AI設定に属し、プリセット選択・詳細設定の復元でも保持する。公開設定APIは`service.tts.alwaysInstructions`から取得・変更・リセットできる。空欄が既定なので、未設定の既存環境の動作は変わらない。
+サーバーの追加／編集ダイアログの「モデルと声」に「常に付与するニュアンス」を既定のニュアンスの直前へ配置する。`tts.connections[].alwaysInstructions`は既定値と同じ各登録の音声設定に属し、プリセット選択・詳細設定の復元でも保持する。公開設定APIは`service.tts.alwaysInstructions`から取得・変更・リセットできる。空欄が既定なので、未設定の既存環境の動作は変わらない。
 
 発話受付時に、常時付与分、発話ごとの指定（省略時は既定値）の順で、空文字・空白のみの部分を除いて改行1文字で連結する。各部分の本文や内部改行は保持する。発話ごとの明示空文字・空白指定は既定値を使わず、常時付与分だけを送る。両方空ならニュアンス項目を送らない。合成結果は設定済みのinstruct／instructions等へ送り、読み上げ本文へ追加しない。
 
@@ -86,9 +90,9 @@ MCP・Node/.NET Applet・試聴・通知読み上げは共通TtsServiceで一度
 
 例として送信先generation.instructと追加設定{"generation":{"temperature":0.7}}は併用でき、temperatureを保持したままinstructを追加する。各ジョブが受付時の追加設定を複製し、本文やニュアンスを追加しても保存済み設定を変更しない。空のinstructions指定でも追加設定と常時付与するニュアンスは保持する。UIはEnter/blur確定とEscape取消を使い、不正JSONを保存しない。プリセット選択／詳細リセットでも追加設定を保持する。
 
-### 将来の複数接続への境界
+### 複数接続と共通再生
 
-接続単位のTtsConnectionSettings、共通発話入力、HTTP要求を構成するttsSpeechRequest、共通再生キューを分離する。接続用の詳細フォームもTtsConnectionDetailsとして値と変更コールバックだけを受け取る。今回の保存形式は既存ttsオブジェクトを拡張し、接続一覧や選択IDはまだ追加しない。複数接続を導入するときは接続IDで選択し、受付時に一つの接続と認証を確定する。ジョブ途中で別接続の値を混ぜず、再生は既存の単一キューを引き続き使用する。
+接続単位のTtsConnectionSettings、共通発話入力、HTTP要求を構成するttsSpeechRequest、共通再生キューを分離する。接続用の詳細フォームもTtsConnectionDetailsとして値と変更コールバックだけを受け取る。接続は登録IDで選択し、受付時に一つの接続と認証を確定する。公開tts.speak／SDK／MCPと通知読み上げは既定の登録を使い、公開発話APIにサーバー指定を追加しない。設定画面の試聴・候補取得だけが内部で選択した登録の設定とキーを渡す。ジョブ途中で別接続の値を混ぜず、再生は既存の単一キューを引き続き使用する。
 
 即時保存・入力検証・revision競合・本体描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「モデル一覧を更新」「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
 
@@ -150,10 +154,10 @@ OpenAI互換はボイス一覧APIの互換性まで保証しない。404/405は�
 
 | 操作名            | MCPツール名               | 入力                                          | 結果                              |
 | ----------------- | ------------------------- | --------------------------------------------- | --------------------------------- |
-| `tts.speak`       | `appdock_tts_speak`       | text、任意voice/speed/instructions、requestId | jobId、state、completion:accepted |
-| `tts.voices.list` | `appdock_tts_list_voices` | なし                                          | voices、source:endpoint/manual    |
-| `tts.jobs.get`    | `appdock_tts_get_job`     | jobId                                         | 状態・時刻・失敗時のエラー        |
-| `tts.stop`        | `appdock_tts_stop`        | jobId                                         | 停止後の状態                      |
+| `tts.connections[].speak`       | `appdock_tts_speak`       | text、任意voice/speed/instructions、requestId | jobId、state、completion:accepted |
+| `tts.connections[].voices.list` | `appdock_tts_list_voices` | なし                                          | voices、source:endpoint/manual    |
+| `tts.connections[].jobs.get`    | `appdock_tts_get_job`     | jobId                                         | 状態・時刻・失敗時のエラー        |
+| `tts.connections[].stop`        | `appdock_tts_stop`        | jobId                                         | 停止後の状態                      |
 
 voice/speed省略時は受付時の既定値を使用する。voiceも既定値も空の場合はINVALID_ARGUMENT。未知のプロパティを拒否する。URL・モデル・キーはAPI引数に含めず、設定済み接続先を使う。
 

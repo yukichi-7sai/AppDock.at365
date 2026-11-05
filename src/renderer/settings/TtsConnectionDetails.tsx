@@ -5,21 +5,32 @@ import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 
-/** Connection-only fields, reusable in a future connection registration dialog. */
+/** Connection-only fields for the server registration dialog. */
 export function TtsConnectionDetails({
   value,
   change,
   setError,
+  onValidityChange,
 }: {
   value: TtsConnectionSettings;
   change(patch: Partial<TtsConnectionSettings>): void;
   setError(message: string): void;
+  onValidityChange?(valid: boolean): void;
 }) {
   const { t } = useHostTranslation();
   const [manual, setManual] = useState<string>();
   const [extra, setExtra] = useState<string>();
   useEffect(() => setManual(undefined), [JSON.stringify(value.manualVoices)]);
   useEffect(() => setExtra(undefined), [JSON.stringify(value.extraBody)]);
+  useEffect(() => {
+    try {
+      if (manual !== undefined) parseTtsVoices(JSON.parse(manual));
+      if (extra !== undefined) parseTtsExtraBody(JSON.parse(extra), value.instructionsParameter);
+      onValidityChange?.(true);
+    } catch {
+      onValidityChange?.(false);
+    }
+  }, [manual, extra, value.instructionsParameter, onValidityChange]);
   return (
     <SettingsSection
       title={t('settings.ttsSettings.advanced')}

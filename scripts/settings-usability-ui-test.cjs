@@ -65,10 +65,17 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     initial.keybindings = [];
     initial.gestures.enabled = false;
     initial.tts = {
-      ...initial.tts,
-      baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
-      model: '',
-      defaultVoice: '',
+      connections: [
+        {
+          id: 'default',
+          name: 'Fixture',
+          ...initial.tts.connections[0],
+          baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
+          model: '',
+          defaultVoice: '',
+        },
+      ],
+      defaultConnectionId: 'default',
     };
     fs.writeFileSync(
       require('./test-settings.cjs').file(profile, 'settings.json'),
@@ -123,25 +130,35 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     };
     await select('音声生成AI');
     assert.equal(requests.length, 0, 'opening settings does not contact server');
+    const editTts = () => page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
+    const saveTts = async () => {
+      await page.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
+      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+      await settleSettings(page);
+    };
+    await editTts();
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page.getByLabel('取得したTTSモデル', { exact: true }).selectOption('model-b');
-    await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.tts.connections[0].model, '');
+    await saveTts();
     await until(
-      async () => (await snapshot()).settings.value.tts.model === 'model-b',
+      async () => (await snapshot()).settings.value.tts.connections[0].model === 'model-b',
       'selected model saved',
     );
+    await editTts();
     await page.getByLabel('TTSモデル', { exact: true }).fill('custom-model');
     await page.getByLabel('TTSモデル', { exact: true }).press('Enter');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.model, 'custom-model');
+    await saveTts();
+    assert.equal((await snapshot()).settings.value.tts.connections[0].model, 'custom-model');
+    await editTts();
     modelStatus = 404;
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page
-      .locator('.settings-page-layout .settings-status-area')
+      .getByRole('dialog')
       .getByRole('alert')
       .filter({ hasText: 'モデル一覧に対応していません' })
       .waitFor();
-    assert.equal((await snapshot()).settings.value.tts.model, 'custom-model');
+    assert.equal((await snapshot()).settings.value.tts.connections[0].model, 'custom-model');
     checks.push(
       'models can be fetched before configuration, selected, entered manually and retained on unsupported server',
     );
@@ -159,16 +176,17 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       '一覧から選択…',
       '1.7B-Base',
     ]);
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.model, '1.7B-Base');
-    checks.push('Qwen catalog offers downloaded models and saves their server IDs');
+    assert.equal(await page.getByLabel('TTSモデル', { exact: true }).inputValue(), '1.7B-Base');
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
     await page.getByLabel('取得したボイス', { exact: true }).selectOption('voice-a');
     await settleSettings(page);
     await page.getByLabel('読み上げ速度', { exact: true }).fill('1.45');
     await page.getByLabel('読み上げ速度', { exact: true }).press('Enter');
-    await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.tts.defaultSpeed, 1.45);
+    await saveTts();
+    assert.equal((await snapshot()).settings.value.tts.connections[0].model, '1.7B-Base');
+    checks.push('Qwen catalog offers downloaded models and saves their server IDs');
+    assert.equal((await snapshot()).settings.value.tts.connections[0].defaultVoice, 'voice-a');
+    assert.equal((await snapshot()).settings.value.tts.connections[0].defaultSpeed, 1.45);
     assert(!requests.includes('speech'), 'editing never speaks');
     checks.push('voice selection and speed save without automatic speech');
     await select('通知');

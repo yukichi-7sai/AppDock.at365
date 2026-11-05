@@ -108,7 +108,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   const preserved = [
     cookie,
     pending,
-    ...['ai-keys.json', 'tts-key.json', 'mcp-client.json']
+    ...['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
       .map((name) => path.join(local, name))
       .filter((entry) => fs.existsSync(entry)),
   ].map((entry) => ({ file: entry, sha256: hash(entry) }));

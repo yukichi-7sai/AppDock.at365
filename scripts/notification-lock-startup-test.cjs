@@ -141,10 +141,17 @@ const checks = [];
     settings.host.fileWatchAssistanceEnabled = true;
     settings.host.fileWatchAssistanceIntervalSeconds = 2;
     settings.tts = {
-      ...settings.tts,
-      baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
-      model: 'fixture',
-      defaultVoice: 'fixture',
+      connections: [
+        {
+          id: 'default',
+          name: 'Fixture',
+          ...settings.tts.connections[0],
+          baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
+          model: 'fixture',
+          defaultVoice: 'fixture',
+        },
+      ],
+      defaultConnectionId: 'default',
     };
     const id = 'fixture.lockstartup',
       folder = path.join(profile, 'extensions', id);

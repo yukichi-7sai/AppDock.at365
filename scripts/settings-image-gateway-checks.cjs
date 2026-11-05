@@ -96,7 +96,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   const toolsBefore = JSON.stringify((await client.listTools()).tools);
   const assets = path.join(profile, 'data/assets/images');
   const assetHashes = filenames.map((file) => hash(path.join(assets, file)));
-  const credentials = ['ai-keys.json', 'tts-key.json', 'mcp-client.json']
+  const credentials = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
     .map((name) => path.join(local, name))
     .filter((file) => fs.existsSync(file))
     .map((file) => ({ file, sha256: hash(file) }));
@@ -144,7 +144,10 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     { dryRun: true },
   );
   assert.equal((await value('appdock_settings_apply', draft)).completion, 'validated');
-  assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), before);
+  assert.deepEqual(
+    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    before,
+  );
   const save = { ...draft, requestId: randomUUID(), dryRun: false };
   const result = await value('appdock_settings_apply', save);
   assert.equal(result.completion, 'settingsSaved');
@@ -172,11 +175,16 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     .locator('.ad-gallery-image')
     .click();
   await picker.getByRole('button', { name: '画像を使う', exact: true }).click();
+  const assignedName = hash(path.join(assets, filenames[0])) + '.png';
   await until(
     async () =>
       (await read(fields)).fields.find((item) => item.key === 'picture').value?.file ===
-      filenames[0],
+      '@assigned/' + assignedName,
     'native image choice reaches MCP',
+  );
+  assert.equal(
+    hash(path.join(profile, 'data/assets/assigned-images', assignedName)),
+    hash(path.join(assets, filenames[0])),
   );
   await value(
     'appdock_settings_apply',

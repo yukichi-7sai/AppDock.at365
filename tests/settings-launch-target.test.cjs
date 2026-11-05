@@ -36,7 +36,7 @@ async function fixture(
   t.after(() => store.close());
   if (Object.keys(initial).length)
     store.save({ ...store.value, host: { ...store.value.host, ...initial } }, store.revision);
-  for (const name of ['ai-keys.json', 'tts-key.json', 'mcp-client.json'])
+  for (const name of ['ai-keys.json', 'tts-keys.json', 'mcp-client.json'])
     fs.writeFileSync(path.join(local, name), '{"fixture":"PRESERVED_CIPHER"}');
   const state = {
     administrator,
@@ -171,7 +171,7 @@ async function fixture(
       [
         store.shared.file,
         store.device.file,
-        ...['ai-keys.json', 'tts-key.json', 'mcp-client.json'].map((name) =>
+        ...['ai-keys.json', 'tts-keys.json', 'mcp-client.json'].map((name) =>
           path.join(local, name),
         ),
       ].map((file) => fs.readFileSync(file));

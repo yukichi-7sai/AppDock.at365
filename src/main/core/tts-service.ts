@@ -119,6 +119,7 @@ export function waveDuration(b: Buffer): number {
   return duration;
 }
 export interface TtsInternalOptions {
+  configuration?: { settings: TtsSettings; key?: string };
   startBefore?: number;
   canStart?(): boolean;
 }
@@ -186,8 +187,8 @@ export class TtsService {
     this.signature = JSON.stringify(options.settings());
     this.limits = { ...ttsLimits, ...options.limits };
   }
-  private config(requireModel = true) {
-    const config = parseTtsSettings(this.options.settings());
+  private config(requireModel = true, configuration?: { settings: TtsSettings }) {
+    const config = parseTtsSettings(configuration?.settings ?? this.options.settings());
     if (!config.baseUrl || (requireModel && !config.model))
       fail('TTS_NOT_CONFIGURED', hostText('services.ttsService.configure'));
     return config;
@@ -232,7 +233,15 @@ export class TtsService {
     )
       fail('INVALID_ARGUMENT', hostText('services.ttsService.requestFormat'));
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify({ text, voice, speed, instructions }))
+      .update(
+        JSON.stringify({
+          text,
+          voice,
+          speed,
+          instructions,
+          configuration: internal?.configuration?.settings,
+        }),
+      )
       .digest('hex');
     this.prune();
     const previous = [...this.jobs.values()].find(
@@ -243,7 +252,7 @@ export class TtsService {
         fail('TTS_REQUEST_CONFLICT', hostText('services.ttsService.requestIdConflict'));
       return { ...previous.view, completion: 'accepted' };
     }
-    const config = this.config();
+    const config = this.config(true, internal?.configuration);
     const selectedInstructions =
       config.instructionsMode === 'none'
         ? ''
@@ -259,7 +268,7 @@ export class TtsService {
       fail('TTS_QUEUE_FULL', hostText('services.ttsService.queueLimit'));
     let key: string | undefined;
     try {
-      key = this.options.key(config.baseUrl);
+      key = internal?.configuration ? internal.configuration.key : this.options.key(config.baseUrl);
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -513,14 +522,20 @@ export class TtsService {
       if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {});
     }
   }
-  models(owner: string): Promise<{ models: TtsVoice[] }> {
+  models(
+    owner: string,
+    configuration?: { settings: TtsSettings; key?: string },
+  ): Promise<{ models: TtsVoice[] }> {
     this.authorize(owner, false);
-    const config = this.config(false);
+    const config = this.config(false, configuration);
     const existing = this.modelLists.get(owner);
-    if (existing && !existing.abort.signal.aborted) return existing.promise;
+    if (existing && !existing.abort.signal.aborted) {
+      if (!configuration) return existing.promise;
+      existing.abort.abort();
+    }
     let key: string | undefined;
     try {
-      key = this.options.key(config.baseUrl);
+      key = configuration ? configuration.key : this.options.key(config.baseUrl);
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -554,18 +569,24 @@ export class TtsService {
     this.modelLists.set(owner, { abort, promise });
     return promise;
   }
-  voices(owner: string): Promise<{ voices: TtsVoice[]; source: 'endpoint' | 'manual' }> {
+  voices(
+    owner: string,
+    configuration?: { settings: TtsSettings; key?: string },
+  ): Promise<{ voices: TtsVoice[]; source: 'endpoint' | 'manual' }> {
     this.authorize(owner, false);
-    const config = parseTtsSettings(this.options.settings());
+    const config = parseTtsSettings(configuration?.settings ?? this.options.settings());
     if (config.voicesSource === 'manual')
       return Promise.resolve({ voices: config.manualVoices, source: 'manual' });
     if (!config.baseUrl)
       fail('TTS_NOT_CONFIGURED', hostText('services.ttsService.configureConnection'));
     const existing = this.lists.get(owner);
-    if (existing && !existing.abort.signal.aborted) return existing.promise;
+    if (existing && !existing.abort.signal.aborted) {
+      if (!configuration) return existing.promise;
+      existing.abort.abort();
+    }
     let key: string | undefined;
     try {
-      key = this.options.key(config.baseUrl);
+      key = configuration ? configuration.key : this.options.key(config.baseUrl);
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }

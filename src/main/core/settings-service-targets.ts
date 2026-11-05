@@ -12,6 +12,11 @@ import {
   defaultTtsSettings,
   parseTtsSettings,
   applyTtsPreset,
+  selectedTtsServer,
+  ttsServerSpeech,
+  parseTtsConfiguration,
+  parseTtsServer,
+  type TtsSettings,
   ttsPresetIds,
 } from '../../shared/tts';
 import { replaceNotificationPreference } from '../../shared/notification-preference-edit';
@@ -165,6 +170,7 @@ export class SettingsServiceTargets {
         ...this.options.notifications().map((type) => this.notification(type)),
       ].map((target) => this.target(target)),
       this.aiConnections(),
+      this.ttsConnections(),
       this.ttsVoices(),
       this.appletOrder(),
       ...(this.options.mcpSettings
@@ -913,8 +919,19 @@ export class SettingsServiceTargets {
   }
   private tts(): Target {
     const defaults = defaultTtsSettings(),
-      protectedKey = this.options.tts.configurationState().protected;
+      protectedKey = this.options.tts.configurationState(
+        this.options.settings.value.tts?.defaultConnectionId ?? '',
+      ).protected;
     const fields: Field[] = [
+      {
+        key: 'defaultConnectionId',
+        title: hostText('settings.ttsServers.defaultServer'),
+        type: 'select',
+        options: parseTtsConfiguration(this.options.settings.value.tts).connections.map((c) => ({
+          value: c.id,
+          label: c.name,
+        })),
+      },
       {
         key: 'preset',
         title: hostText('settings.ttsSettings.preset'),
@@ -1023,29 +1040,302 @@ export class SettingsServiceTargets {
       ui: settingsUiFields('tts'),
       title: hostText('settings.ttsSettings.title'),
       category: 'tts',
-      fields,
-      values: (settings) => project(parseTtsSettings(settings.tts), fields),
-      overrides: (raw) => project(raw.tts, fields),
+      fields: fields.map((field) => ({ ...field, inherit: field.key === 'defaultConnectionId' })),
+      values: (settings) =>
+        project(
+          {
+            ...ttsServerSpeech(selectedTtsServer(settings.tts)),
+            defaultConnectionId: settings.tts?.defaultConnectionId,
+          },
+          fields,
+        ),
+      overrides: (raw) =>
+        project(
+          {
+            ...selectedTtsServer(parseTtsConfiguration(raw.tts)),
+            defaultConnectionId: object(raw.tts).defaultConnectionId,
+          },
+          fields,
+        ),
       replace: (settings, changes, reset) => {
-        let tts = parseTtsSettings(settings.tts);
+        const config = parseTtsConfiguration(settings.tts);
+        const { defaultConnectionId, ...speechChanges } = changes;
+        if (Object.hasOwn(changes, 'defaultConnectionId'))
+          config.defaultConnectionId = defaultConnectionId as string;
+        if (reset.includes('defaultConnectionId')) delete config.defaultConnectionId;
+        const selected =
+          selectedTtsServer(config) ??
+          (reset.includes('defaultConnectionId') ? selectedTtsServer(settings.tts) : undefined);
+        if (!selected && Object.keys(speechChanges).length) fail('NOT_FOUND');
+        let tts = ttsServerSpeech(selected);
         if (
           typeof changes.preset === 'string' &&
           ttsPresetIds.includes(changes.preset as typeof tts.preset)
         )
           tts = applyTtsPreset(tts, changes.preset as typeof tts.preset);
-        updateRecord(tts as unknown as RecordValue, changes, reset, fields);
-        settings.tts = parseTtsSettings(tts);
+        updateRecord(
+          tts as unknown as RecordValue,
+          speechChanges,
+          reset.filter((k) => k !== 'defaultConnectionId'),
+          fields,
+        );
+        settings.tts = parseTtsConfiguration({
+          ...config,
+          connections: config.connections.map((c) =>
+            c.id === selected?.id ? { ...c, ...parseTtsSettings(tts) } : c,
+          ),
+        });
         return settings;
       },
       guard: (next) => {
-        if (
-          parseTtsSettings(next.tts).baseUrl !==
-            parseTtsSettings(this.options.settings.value.tts).baseUrl &&
-          this.options.tts.configurationState().protected
-        )
-          fail('LOCAL_ACTION_REQUIRED');
+        for (const before of this.options.settings.value.tts?.connections ?? []) {
+          const after = selectedTtsServer(next.tts, before.id);
+          if (
+            after?.baseUrl !== before.baseUrl &&
+            this.options.tts.configurationState(before.id).protected
+          )
+            fail('LOCAL_ACTION_REQUIRED');
+        }
       },
-      guardRevision: () => this.options.tts.configurationState().revision,
+      guardRevision: () =>
+        JSON.stringify([
+          this.options.settings.value.tts?.defaultConnectionId,
+          this.options.tts.configurationState(
+            this.options.settings.value.tts?.defaultConnectionId ?? '',
+          ).revision,
+        ]),
+    };
+  }
+  private ttsConnections(): SettingsListTarget {
+    const defaults = defaultTtsSettings();
+    const fields: Field[] = [
+      {
+        key: 'preset',
+        title: hostText('settings.ttsSettings.preset'),
+        type: 'select',
+        options: ttsPresetIds.map((value) => ({
+          value,
+          label: hostText(`settings.ttsSettings.preset.${value}`),
+        })),
+        default: defaults.preset,
+      },
+      {
+        key: 'speechPath',
+        title: hostText('settings.ttsSettings.speechPath'),
+        type: 'string',
+        maxLength: 256,
+        default: defaults.speechPath,
+      },
+      {
+        key: 'alwaysInstructions',
+        title: hostText('settings.ttsSettings.alwaysInstructions'),
+        type: 'string',
+        default: defaults.alwaysInstructions,
+      },
+      {
+        key: 'defaultInstructions',
+        title: hostText('settings.ttsSettings.defaultInstructions'),
+        type: 'string',
+        default: defaults.defaultInstructions,
+      },
+      {
+        key: 'instructionsMode',
+        title: hostText('settings.ttsSettings.instructionsMode'),
+        type: 'select',
+        options: options(['none', 'json']),
+        default: defaults.instructionsMode,
+      },
+      {
+        key: 'instructionsParameter',
+        title: hostText('settings.ttsSettings.instructionsParameter'),
+        type: 'string',
+        default: defaults.instructionsParameter,
+      },
+      {
+        key: 'extraBody',
+        title: hostText('settings.ttsSettings.extraBody'),
+        type: 'json',
+        schema: { type: 'object', additionalProperties: true },
+        default: defaults.extraBody,
+      },
+      {
+        key: 'baseUrl',
+        title: hostText('settings.ttsSettings.url'),
+        type: 'string',
+        maxLength: 2048,
+        default: defaults.baseUrl,
+      },
+      {
+        key: 'model',
+        title: hostText('settings.ttsSettings.model'),
+        type: 'string',
+        maxLength: 200,
+        default: defaults.model,
+      },
+      {
+        key: 'defaultVoice',
+        title: hostText('settings.ttsSettings.defaultVoice'),
+        type: 'string',
+        maxLength: 200,
+        default: defaults.defaultVoice,
+      },
+      {
+        key: 'defaultSpeed',
+        title: hostText('settings.ttsSettings.speed'),
+        type: 'number',
+        minimum: 0.25,
+        maximum: 4,
+        default: defaults.defaultSpeed,
+      },
+      {
+        key: 'speedMode',
+        title: hostText('settings.ttsSettings.speedMode'),
+        type: 'select',
+        options: options(['playback', 'server']),
+        default: defaults.speedMode,
+      },
+      {
+        key: 'voicesSource',
+        title: hostText('settings.ttsSettings.voiceMode'),
+        type: 'select',
+        options: options(['endpoint', 'manual']),
+        default: defaults.voicesSource,
+      },
+      {
+        key: 'voicesPath',
+        title: hostText('settings.ttsSettings.voicePath'),
+        type: 'string',
+        maxLength: 256,
+        default: defaults.voicesPath,
+      },
+    ];
+
+    fields.unshift(
+      { key: 'id', title: hostText('settings.aiSettings.connectionId'), type: 'string' },
+      {
+        key: 'name',
+        title: hostText('settings.ttsServers.name'),
+        type: 'string',
+        minLength: 1,
+        maxLength: 200,
+      },
+    );
+    fields.push({
+      key: 'manualVoices',
+      title: hostText('settings.ttsSettings.manualList'),
+      type: 'json',
+      default: [],
+      schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['id'],
+          additionalProperties: false,
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 200 },
+            name: { type: 'string', maxLength: 200 },
+          },
+        },
+      },
+    });
+    const definition: Field = {
+      key: 'connections',
+      title: hostText('settings.ttsServers.registered'),
+      type: 'object-list',
+      fields,
+      default: [],
+      list: {
+        idKey: 'id',
+        titleKey: 'name',
+        columns: ['name', 'baseUrl', 'model', 'defaultVoice'],
+      },
+    };
+    const protectedKey = (row: RecordValue) =>
+      this.options.tts.configurationState(String(row.id)).protected;
+    const owner = this.target({
+      id: 'service.tts.connections',
+      title: definition.title,
+      category: 'tts',
+      fields: [definition],
+      values: (settings) => ({ connections: parseTtsConfiguration(settings.tts).connections }),
+      overrides: (raw) => project(raw.tts, [definition]),
+      replace: (settings, changes) => {
+        const current = parseTtsConfiguration(settings.tts);
+        const connections = ((changes.connections as unknown[]) ?? []).map(parseTtsServer);
+        settings.tts = parseTtsConfiguration({
+          connections,
+          defaultConnectionId: connections.some((c) => c.id === current.defaultConnectionId)
+            ? current.defaultConnectionId
+            : !current.connections.length
+              ? connections[0]?.id
+              : undefined,
+        });
+        return settings;
+      },
+      guard: (next) => {
+        const before = parseTtsConfiguration(this.options.settings.value.tts),
+          after = parseTtsConfiguration(next.tts);
+        const byId = new Map(after.connections.map((c) => [c.id, c]));
+        for (const c of before.connections) {
+          const changed = byId.get(c.id);
+          if (
+            (!changed || changed.baseUrl !== c.baseUrl) &&
+            this.options.tts.configurationState(c.id).protected
+          )
+            fail('LOCAL_ACTION_REQUIRED');
+        }
+        for (const c of after.connections) {
+          if (!c.baseUrl) fail();
+          if (
+            !before.connections.some((old) => old.id === c.id) &&
+            this.options.tts.configurationState(c.id).protected
+          )
+            fail('LOCAL_ACTION_REQUIRED');
+        }
+      },
+      guardRevision: () =>
+        JSON.stringify(
+          parseTtsConfiguration(this.options.settings.value.tts).connections.map((c) => [
+            c.id,
+            this.options.tts.configurationState(c.id).revision,
+          ]),
+        ),
+    });
+    return {
+      kind: 'list',
+      targetId: owner.targetId,
+      ui: (field) => [
+        ...settingsUiGroup('tts', 'connections')(field),
+        ...settingsUiFields('tts')(field),
+      ],
+      ownerId: owner.ownerId,
+      title: owner.title,
+      category: owner.category,
+      available: true,
+      fields,
+      definition,
+      rows: () =>
+        parseTtsConfiguration(this.options.settings.value.tts)
+          .connections as unknown as RecordValue[],
+      inputSchema: (field) => (field as Field).schema ?? settingInputSchema(field),
+      writable: (field) => field.key !== 'id',
+      itemWritable: (row, field) =>
+        field.key !== 'id' && (field.key !== 'baseUrl' || !protectedKey(row)),
+      removable: (row) => !protectedKey(row),
+      createRow: () => ({ ...defaultTtsSettings(), id: randomUUID() }),
+      prepareRow: (row, keys) => {
+        if (!keys.includes('preset')) return;
+        const explicit = Object.fromEntries(keys.map((key) => [key, row[key]]));
+        const { id, name, ...speech } = row;
+        Object.assign(
+          row,
+          applyTtsPreset(speech as unknown as TtsSettings, row.preset as TtsSettings['preset']),
+          explicit,
+        );
+      },
+      overrides: owner.overrides,
+      applies: owner.applies,
+      plan: (rows, revision) => owner.plan({ connections: rows }, [], revision),
     };
   }
   private ttsVoices(): SettingsListTarget {
@@ -1077,12 +1367,19 @@ export class SettingsServiceTargets {
       title: definition.title,
       category: 'tts',
       fields: [definition],
-      values: (settings) => ({ manualVoices: parseTtsSettings(settings.tts).manualVoices }),
-      overrides: (raw) => project(raw.tts, [definition]),
+      values: (settings) => ({
+        manualVoices: ttsServerSpeech(selectedTtsServer(settings.tts)).manualVoices,
+      }),
+      overrides: (raw) => project(selectedTtsServer(parseTtsConfiguration(raw.tts)), [definition]),
       replace: (settings, changes) => {
-        settings.tts = parseTtsSettings({
-          ...parseTtsSettings(settings.tts),
-          manualVoices: changes.manualVoices ?? [],
+        const config = parseTtsConfiguration(settings.tts),
+          selected = selectedTtsServer(config);
+        if (!selected) fail('NOT_FOUND');
+        settings.tts = parseTtsConfiguration({
+          ...config,
+          connections: config.connections.map((c) =>
+            c.id === selected!.id ? { ...c, manualVoices: changes.manualVoices ?? [] } : c,
+          ),
         });
         return settings;
       },
@@ -1098,7 +1395,8 @@ export class SettingsServiceTargets {
       fields,
       definition,
       rows: () =>
-        parseTtsSettings(this.options.settings.value.tts).manualVoices as unknown as RecordValue[],
+        ttsServerSpeech(selectedTtsServer(this.options.settings.value.tts))
+          .manualVoices as unknown as RecordValue[],
       // Voice IDs identify the server's voices and are edited explicitly, never generated.
       createRow: (values) => (values.name === undefined ? { name: values.id } : {}),
       overrides: owner.overrides,

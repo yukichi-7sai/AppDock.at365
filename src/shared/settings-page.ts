@@ -104,7 +104,10 @@ export interface SettingsPageAuxiliary {
     connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
     jobs: import('./ai').AiJob[];
   };
-  tts?: { apiKeyConfigured: boolean; error?: string; jobs: import('./tts').TtsJob[] };
+  tts?: {
+    connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
+    jobs: import('./tts').TtsJob[];
+  };
   notificationSpeech?: {
     defaults: { defaultVoice: string; defaultSpeed: number };
     configured: boolean;

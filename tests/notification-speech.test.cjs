@@ -56,11 +56,18 @@ function setup(t, extra = {}) {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-speech-unit-'));
   const settings = createDefaultSettings();
   settings.tts = {
-    ...settings.tts,
-    baseUrl: 'http://localhost:8080/v1',
-    model: 'model',
-    defaultVoice: 'common',
-    speedMode: 'server',
+    connections: [
+      {
+        id: 'default',
+        name: 'Fixture',
+        ...settings.tts.connections[0],
+        baseUrl: 'http://localhost:8080/v1',
+        model: 'model',
+        defaultVoice: 'common',
+        speedMode: 'server',
+      },
+    ],
+    defaultConnectionId: 'default',
   };
   settings.notificationPreferences = { overrides: [{ ...owner, typeId: 'message', speak: true }] };
   let generation = 'run1',
@@ -77,7 +84,7 @@ function setup(t, extra = {}) {
     failed: () => failed.push('query'),
   });
   const tts = new TtsService({
-    settings: () => settings.tts,
+    settings: () => require('../out/main/shared/tts').ttsServerSpeech(settings.tts.connections[0]),
     key: () => undefined,
     canUse: (owner) => owner === 'host' || speech?.allows(owner),
     fetcher: async (u, o) => {
@@ -166,8 +173,14 @@ test('notification speech settings inherit independently and reject invalid or s
   const s = createDefaultSettings();
   assert.deepEqual(parseNotificationPreferences(), { overrides: [] });
   assert.deepEqual(resolveNotificationSpeech(s), { voice: '', speed: 1 });
-  s.tts.defaultVoice = 'common';
-  s.tts.defaultSpeed = 1.2;
+  s.tts = {
+    connections: [
+      { ...require('../out/main/shared/tts').newTtsServer('default'), name: 'Fixture' },
+    ],
+    defaultConnectionId: 'default',
+  };
+  s.tts.connections[0].defaultVoice = 'common';
+  s.tts.connections[0].defaultSpeed = 1.2;
   s.notificationPreferences = { overrides: [], speech: { voice: 'UPPER' } };
   assert.deepEqual(resolveNotificationSpeech(s), { voice: 'UPPER', speed: 1.2 });
   s.notificationPreferences.speech = { speed: 1.8 };
@@ -194,9 +207,9 @@ test('notification speech settings inherit independently and reject invalid or s
 });
 test('new notifications speak once across dedupe, timer restart, reads and target changes; recurrence speaks again', async (t) => {
   const f = setup(t);
-  f.settings.tts.instructionsMode = 'json';
-  f.settings.tts.alwaysInstructions = '自然な日本語で';
-  f.settings.tts.defaultInstructions = '落ち着いて';
+  f.settings.tts.connections[0].instructionsMode = 'json';
+  f.settings.tts.connections[0].alwaysInstructions = '自然な日本語で';
+  f.settings.tts.connections[0].defaultInstructions = '落ち着いて';
   f.reconcile();
   const a = f.publish();
   await wait(() => f.posts.length === 1 && f.played.length === 1);

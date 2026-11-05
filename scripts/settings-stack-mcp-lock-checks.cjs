@@ -50,7 +50,7 @@ exports.check = async ({ page, profile, checks }) => {
   await page.getByRole('button', { name: title + 'を編集', exact: true }).click();
   let dialog = page.getByTestId('settings-dialog');
   await dialog.getByTestId('stack-execution-mode').waitFor();
-  assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);
+  assert.equal(await dialog.locator('[data-mcp-lock]:visible').count(), 0);
   await dialog.screenshot({ path: path.join(profile, 'mcp-named-stack.png') });
   await cancel(dialog);
   checks.push(
@@ -61,7 +61,7 @@ exports.check = async ({ page, profile, checks }) => {
   await page.getByTestId('trigger-stacks:gestures:list:edit:move-up').click();
   dialog = page.getByTestId('settings-dialog');
   await dialog.getByTestId('stack-execution-mode').waitFor();
-  assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);
+  assert.equal(await dialog.locator('[data-mcp-lock]:visible').count(), 0);
   await dialog.screenshot({ path: path.join(profile, 'mcp-trigger-stack.png') });
   await cancel(dialog);
   checks.push(
@@ -72,7 +72,7 @@ exports.check = async ({ page, profile, checks }) => {
   await page.getByTestId('trigger-stacks:gestures:list:edit:move-up').click();
   dialog = page.getByTestId('settings-dialog');
   await dialog.getByTestId('stack-execution-mode').waitFor();
-  assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);
+  assert.equal(await dialog.locator('[data-mcp-lock]:visible').count(), 0);
   await cancel(dialog);
   checks.push(
     'The input settings page uses the same trigger-stack publication metadata as the command-trigger tabs',

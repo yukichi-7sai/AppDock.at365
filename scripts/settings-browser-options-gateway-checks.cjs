@@ -10,7 +10,10 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     targetId = target.targetId,
     read = () => value('appdock_settings_get_values', { targetId }),
     sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
-    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
+    deviceFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    ),
     field = (state, key) => state.fields.find((item) => item.key === key);
   const request = async (operations, dryRun = false) => {
     const state = await read();
@@ -32,7 +35,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     shared = fs.readFileSync(sharedFile),
     device = fs.readFileSync(deviceFile),
     ai = fs.readFileSync(path.join(local, 'ai-keys.json')),
-    tts = fs.readFileSync(path.join(local, 'tts-key.json'));
+    tts = fs.readFileSync(path.join(local, 'tts-keys.json'));
   assert.equal(browser.inputSchema.type, 'array');
   assert.equal(browser.inputSchema.maxItems, undefined);
   const changes = { browsers: [' EDGE.EXE ', 'edge'], requireChromiumWindowClass: true };
@@ -151,7 +154,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   assert((await read()).fields.every((item) => item.inherited));
   assert.deepEqual(fs.readFileSync(deviceFile), device);
   assert.deepEqual(fs.readFileSync(path.join(local, 'ai-keys.json')), ai);
-  assert.deepEqual(fs.readFileSync(path.join(local, 'tts-key.json')), tts);
+  assert.deepEqual(fs.readFileSync(path.join(local, 'tts-keys.json')), tts);
   assert.equal((await value('appdock_get_info')).executable, false);
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
   fs.writeFileSync(

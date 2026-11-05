@@ -47,7 +47,7 @@ export interface Settings {
   mcpServers?: import('./mcp-client').McpServerRoster;
   customCommands?: import('./custom-commands').CustomCommandBlock;
   migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
-  tts?: import('./tts').TtsSettings;
+  tts?: import('./tts').TtsConfiguration;
   ai?: import('./ai').AiSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];

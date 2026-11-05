@@ -7,7 +7,7 @@ import { prepareSettingsLookups } from './settings-lookups';
 import { parseMcpRoster } from './mcp-client';
 import { minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { isAccentColor, isAccentHex } from './appearance';
-import { defaultTtsSettings, parseTtsSettings } from './tts';
+import { defaultTtsConfiguration, parseTtsConfiguration } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseNotificationPreferences } from './notification-types';
 import {
@@ -41,7 +41,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
-  tts: defaultTtsSettings(),
+  tts: defaultTtsConfiguration(),
   ai: defaultAiSettings(),
   appletOrder: [],
   touchpadGestures: defaultTouchpadGestures(),
@@ -97,6 +97,7 @@ export function parseSettings(value: unknown): Settings {
       ...(raw.imageLibrary === undefined ? {} : { imageLibrary: { groups: [] } }),
       ...(raw.soundLibrary === undefined ? {} : { soundLibrary: { groups: [] } }),
       ...(raw.textLibrary === undefined ? {} : { textLibrary: { groups: [] } }),
+      ...(raw.tts === undefined ? {} : { tts: undefined }),
     });
   }
   if (
@@ -278,7 +279,7 @@ export function parseSettings(value: unknown): Settings {
     ...(value.customCommands === undefined
       ? {}
       : { customCommands: parseCustomCommands(value.customCommands) }),
-    tts: parseTtsSettings(value.tts),
+    tts: parseTtsConfiguration(value.tts),
     ai: parseAiSettings(value.ai),
     touchpadGestures: parseTouchpadGestures(value.touchpadGestures),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
