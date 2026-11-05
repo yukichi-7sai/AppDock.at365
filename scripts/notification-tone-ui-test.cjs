@@ -177,12 +177,12 @@ async function start() {
     await execute(id + '.publish');
     assert.deepEqual(await events(), []);
     checks.push('default no sound/OFF; dialog cancellation and ON without a selection');
-    await section().getByRole('button', { name: 'サウンドライブラリーから選択' }).click();
+    await section().getByRole('button', { name: '音ライブラリーから選択' }).click();
     await picker().getByRole('button', { name: 'chime.wavを選択', exact: true }).click();
     await picker().getByRole('button', { name: 'キャンセル', exact: true }).click();
     await picker().waitFor({ state: 'hidden' });
     assert.equal((await preferences()).sound, undefined);
-    await section().getByRole('button', { name: 'サウンドライブラリーから選択' }).click();
+    await section().getByRole('button', { name: '音ライブラリーから選択' }).click();
     await picker().getByRole('button', { name: 'chime.wavを選択', exact: true }).click();
     await picker().getByRole('button', { name: '音を使う', exact: true }).click();
     await picker().waitFor({ state: 'hidden' });
