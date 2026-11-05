@@ -14,10 +14,10 @@ import {
 import { SettingsButton } from '../settings-ui/SettingsButton';
 import { useSettingsControls } from '../settings-ui/api';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
-import { UpdateActions, UpdateSettings } from './UpdateSettings';
+import { UpdateActions, UpdateSettings, UpdateDeveloperSettings } from './UpdateSettings';
 import { Icon } from '../../shared/ui-icons';
 import './about.css';
-import { AboutSystemSettings } from './AboutSystemSettings';
+import { AboutSystemSettings, AboutAdvancedSettings } from './AboutSystemSettings';
 import { HostStartupTimingPanel } from './HostStartupTimingPanel';
 import { SettingsAppIdentity } from '../settings-ui/SettingsAppIdentity';
 import { SettingsStatistic } from '../settings-ui/SettingsStatistic';
@@ -215,6 +215,8 @@ export function AboutSettings({
         invoke={invoke}
       />
       <UpdateSettings settings={settings} edit={edit} />
+      <AboutAdvancedSettings settings={settings} edit={edit} busy={busy} />
+      <UpdateDeveloperSettings settings={settings} edit={edit} />
       <HostStartupTimingPanel timing={auxiliary.hostStartupTiming} />
     </section>
   );

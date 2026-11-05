@@ -156,39 +156,54 @@ export function AboutSystemSettings({
           )}
         </SettingsActions>
       </SettingsSection>
-      <SettingsSection title={t('about.advanced.section')} data-testid="file-watch-settings">
-        <SettingRow pageId={category} itemKey="fileWatchAssistanceEnabled">
-          <Toggle
-            label={t('general.fileWatch.enabled')}
-            checked={settings.host.fileWatchAssistanceEnabled}
-            onChange={(checked) =>
-              edit({
-                ...settings,
-                host: { ...settings.host, fileWatchAssistanceEnabled: checked },
-              })
-            }
-          />
-        </SettingRow>
-        <SettingRow pageId={category} itemKey="fileWatchAssistanceIntervalSeconds">
-          <SettingsInput
-            aria-label={t('general.fileWatch.interval')}
-            type="number"
-            min={2}
-            step="any"
-            disabled={busy || !settings.host.fileWatchAssistanceEnabled}
-            value={settings.host.fileWatchAssistanceIntervalSeconds}
-            onChange={(event) =>
-              edit({
-                ...settings,
-                host: {
-                  ...settings.host,
-                  fileWatchAssistanceIntervalSeconds: numberInput(event.target.value),
-                },
-              })
-            }
-          />
-        </SettingRow>
-      </SettingsSection>
     </>
+  );
+}
+
+export function AboutAdvancedSettings({
+  settings,
+  edit,
+  busy,
+}: {
+  settings: Settings;
+  edit(value: Settings): void;
+  busy: boolean;
+}) {
+  const { t } = useHostTranslation();
+  const category = 'about';
+  return (
+    <SettingsSection title={t('about.advanced.section')} data-testid="file-watch-settings">
+      <SettingRow pageId={category} itemKey="fileWatchAssistanceEnabled">
+        <Toggle
+          label={t('general.fileWatch.enabled')}
+          checked={settings.host.fileWatchAssistanceEnabled}
+          onChange={(checked) =>
+            edit({
+              ...settings,
+              host: { ...settings.host, fileWatchAssistanceEnabled: checked },
+            })
+          }
+        />
+      </SettingRow>
+      <SettingRow pageId={category} itemKey="fileWatchAssistanceIntervalSeconds">
+        <SettingsInput
+          aria-label={t('general.fileWatch.interval')}
+          type="number"
+          min={2}
+          step="any"
+          disabled={busy || !settings.host.fileWatchAssistanceEnabled}
+          value={settings.host.fileWatchAssistanceIntervalSeconds}
+          onChange={(event) =>
+            edit({
+              ...settings,
+              host: {
+                ...settings.host,
+                fileWatchAssistanceIntervalSeconds: numberInput(event.target.value),
+              },
+            })
+          }
+        />
+      </SettingRow>
+    </SettingsSection>
   );
 }

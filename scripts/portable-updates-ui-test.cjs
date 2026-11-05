@@ -102,6 +102,16 @@ fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(settings, null, 2),
 );
+const machine = require('node:os').hostname();
+const device = require('../out/main/main/core/device-settings').initialDeviceSettings(
+  machine,
+  settings,
+);
+device.hostPages.about = { useLocalSettings: true, configuration: { updates: settings.updates } };
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, `settings-${machine}.json`),
+  JSON.stringify(device),
+);
 fs.mkdirSync(path.join(profile, 'data/web-accounts'), { recursive: true });
 fs.writeFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'login-fixture');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -358,6 +368,8 @@ async function restarted(inspectPort, predicate, previousPid) {
     assert.equal(await inspect(inspectPort, `${mainWindow}.isVisible()`), false);
     await inspect(inspectPort, `${mainWindow}.show()`, false);
     await about(page);
+    assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
+    await page.getByTestId('developer-settings').locator('summary').click();
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), true);
     assert.equal(await page.getByTestId('about-overview').count(), 1);
     assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
@@ -379,7 +391,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       assert.ok(Math.abs(time.y + time.height / 2 - button.y - button.height / 2) < 2);
     }
     checks.push(
-      'welcome panel and initially open update settings, per-target last-check times beside update buttons',
+      'welcome panel and initially collapsed developer settings, per-target last-check times beside update buttons',
     );
     await capture('updates-settings-dark.png');
     // Both source resets save immediately and preserve unrelated settings.
@@ -406,7 +418,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       .fill(path.join(profile, 'sources/test.disabled'));
     await settleSettings(page);
     await about(page);
-    const updateSettings = page.getByTestId('update-settings');
+    const updateSettings = page.getByTestId('developer-settings');
     if ((await updateSettings.getAttribute('open')) === null)
       await updateSettings.locator('summary').click();
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
@@ -415,7 +427,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       'github:yukichi-7sai/AppDock.at365',
     );
     checks.push(
-      'initially open settings, prominent actions, per-Applet sources, host/Applet default resets',
+      'developer settings, prominent actions, per-Applet sources, host/Applet default resets',
     );
     await page
       .getByLabel('AppDockの更新元', { exact: true })
@@ -427,7 +439,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     await settleSettings(page);
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);
     await capture('updates-settings.png');
-    await page.getByText('更新の設定', { exact: true }).click();
+    await page.getByText('開発用の設定', { exact: true }).click();
     await page.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.host.theme = 'light';

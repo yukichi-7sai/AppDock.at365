@@ -59,7 +59,7 @@ Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のs
 
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。metadataで適用候補が見つかったら、取得前にネイティブの「更新して再起動」ダイアログを1回表示する。取消時は更新ファイルを取得しない。実行を選んだ場合だけ全候補を取得・検証し、成功後に再確認せずhelperへ引き渡して1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
-「AppDockについて」のAboutSettingsは最上部の単一情報パネルに本体情報・実行環境・更新操作をまとめる。バージョン横の確認アイコンは本体metadataだけを取得し、現在版の隣に更新版、右側に最終確認日時を表示する。下部は本体+全Appletと本体のみの2つの更新ボタンを同じ大きさで横に並べる。Appletだけの一括更新リンク、独立した本体・実行環境Section、管理ボタンは置かず、Applet数タイルから管理画面へ移動する。「更新の設定」はその下に初期状態で折りたたんで表示する。Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。更新処理・フッター等のVersionCheck・起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
+「AppDockについて」のAboutSettingsは最上部の単一情報パネルに本体情報・実行環境・更新操作をまとめる。バージョン横の確認アイコンは本体metadataだけを取得し、現在版の隣に更新版、右側に最終確認日時を表示する。下部は本体+全Appletと本体のみの2つの更新ボタンを同じ大きさで横に並べる。Appletだけの一括更新リンク、独立した本体・実行環境Section、管理ボタンは置かず、Applet数タイルから管理画面へ移動する。「更新の設定」は「設定ファイル」の下へ常時表示し、自動確認・通知・待機時間を設定する。更新元と同じバージョンの再適用は、「高度な設定」の下にある初期状態で閉じた「開発用の設定」へ配置する。Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。更新処理・フッター等のVersionCheck・起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
 
 ## 本体終了後の進行表示
 
@@ -79,7 +79,7 @@ scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへ
 
 ## 操作画面と再起動
 
-更新・一括更新を先頭に置き、UpdateSettingsの共通設定と各AppletカードのAppletUpdateSourceをdetailsで折りたたむ。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存の即時保存・revision付き入力キューへ接続する。
+更新・一括更新を先頭に置き、本体の更新設定は常時表示する。更新元と同じバージョンの再適用は、折りたたみ可能な「開発用の設定」にまとめる。各Appletの更新元はApplet設定から編集する。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存の即時保存・revision付き入力キューへ接続する。
 
 通常のrelaunchとhelperのrestartArgsへ`--restore-view`を付ける。ホストはこの起動時だけstartMinimizedを上書きしてshowし、信頼済みホスト文書の固定URLへrestoreViewクエリーを付ける。IPCはその完全一致URLと送信元WebContents/mainFrameを照合する。通常起動の設定は変更しない。
 

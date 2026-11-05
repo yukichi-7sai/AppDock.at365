@@ -106,6 +106,19 @@ exports.deactivate = () => record('stop');
       require('./test-settings.cjs').file(profile, 'settings.json'),
       JSON.stringify(initial),
     );
+    const machine = require('node:os').hostname();
+    const device = require('../out/main/main/core/device-settings').initialDeviceSettings(
+      machine,
+      initial,
+    );
+    device.hostPages.about = {
+      useLocalSettings: true,
+      configuration: { updates: initial.updates },
+    };
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, `settings-${machine}.json`),
+      JSON.stringify(device),
+    );
     const portable = !!process.argv[2],
       executablePath = portable ? testHostPath(profile) : require('electron');
     if (portable) {
@@ -192,7 +205,7 @@ exports.deactivate = () => record('stop');
       await overview.getByRole('button', { name: 'AppDockを更新', exact: true }).count(),
       1,
     );
-    const options = page.getByTestId('update-settings');
+    const options = page.getByTestId('developer-settings');
     const setOptionsOpen = async (open) => {
       if ((await options.evaluate((element) => element.open)) !== open)
         await options.locator(':scope > summary').click();
@@ -203,9 +216,9 @@ exports.deactivate = () => record('stop');
       await timing.evaluate((element) => element === element.parentElement.lastElementChild),
       'startup timing is the last section after update settings',
     );
-    assert.equal(await options.evaluate((e) => e.open), true);
+    assert.equal(await options.evaluate((e) => e.open), false);
     assert.equal(
-      await options.getByRole('switch').first().getAttribute('aria-label'),
+      await options.getByRole('switch', { includeHidden: true }).first().getAttribute('aria-label'),
       require('../out/main/shared/settings-catalog').hostSettingItem('about', 'allowSameVersion')
         .title,
     );
@@ -236,7 +249,7 @@ exports.deactivate = () => record('stop');
       return button.evaluate((e) => getComputedStyle(e).borderTopWidth);
     }
     checks.push(
-      'information panel, frameless check icon, initially expanded update settings with allow-same-version first and one quiet automatic host check',
+      'information panel, frameless check icon, initially collapsed developer settings and one quiet automatic host check',
     );
     const oldCount = (await model()).content.auxiliary.aboutStats.commandCount;
     await page.evaluate(async () => {
@@ -289,7 +302,7 @@ exports.deactivate = () => record('stop');
     const catalog = (await model()).content.auxiliary.commands;
     await page.getByTestId('settings-nav:about').click();
     await overview.waitFor();
-    assert.equal(await options.evaluate((e) => e.open), true);
+    assert.equal(await options.evaluate((e) => e.open), false);
     await setOptionsOpen(false);
     assert.equal(
       (await model()).content.auxiliary.aboutStats.commandCount,
@@ -414,7 +427,7 @@ exports.deactivate = () => record('stop');
       .click();
     await settleSettings(page);
     checks.push(
-      'collapsible update settings preserve save behavior, automatic check opt-out/throttle and adjacent icon reset',
+      'developer settings preserve save behavior, automatic check opt-out/throttle and adjacent icon reset',
     );
     const appletTile = overview.getByRole('button', { name: 'Appletの管理と更新', exact: true });
     await appletTile.focus();

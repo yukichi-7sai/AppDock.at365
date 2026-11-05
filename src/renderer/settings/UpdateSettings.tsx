@@ -110,7 +110,6 @@ export function UpdateSettings({
   edit(next: Settings): void;
 }) {
   const { t: translate } = useHostTranslation();
-  const settingsControls = useSettingsControls();
   const edit = (change: (next: Settings) => void) => {
     const next = structuredClone(settings);
     change(next);
@@ -123,42 +122,8 @@ export function UpdateSettings({
       {...settingAnchor('about', 'updates')}
       data-testid="update-settings"
     >
-      <SettingsField
-        title={translate('settings.updateSettings.hostSource')}
-        hint={hostSettingItem('about', 'hostSource').description}
-        {...settingAnchor('about', 'hostSource')}
-        data-testid="update-setting-hostSource"
-      >
-        <SettingsInputActions>
-          <SettingsUrlInput
-            aria-label={translate('settings.updateSettings.hostSource')}
-            value={settings.updates.hostSource}
-            onChange={(event) =>
-              edit((next) => {
-                next.updates.hostSource = event.target.value;
-              })
-            }
-            placeholder={translate('settings.updateSettings.sourcePlaceholder')}
-          />
-          <SettingsButton
-            icon
-            className="settings-list-icon"
-            title={translate('settings.updateSettings.resetSource')}
-            aria-label={translate('settings.updateSettings.resetSource')}
-            disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
-            onClick={() =>
-              edit((next) => {
-                next.updates.hostSource = createDefaultSettings().updates.hostSource;
-              })
-            }
-          >
-            <Icon name="refresh" size={16} />
-          </SettingsButton>
-        </SettingsInputActions>
-      </SettingsField>
       {(
         [
-          'allowSameVersion',
           'checkHostOnAboutOpen',
           'checkHostOnStartup',
           'checkAppletsOnStartup',
@@ -200,6 +165,77 @@ export function UpdateSettings({
           onChange={(event) =>
             edit((next) => {
               next.updates.startupDelaySeconds = numberInput(event.target.value);
+            })
+          }
+        />
+      </SettingsField>
+    </SettingsSection>
+  );
+}
+
+export function UpdateDeveloperSettings({
+  settings,
+  edit: onChange,
+}: {
+  settings: Settings;
+  edit(next: Settings): void;
+}) {
+  const { t: translate } = useHostTranslation();
+  const edit = (change: (next: Settings) => void) => {
+    const next = structuredClone(settings);
+    change(next);
+    onChange(next);
+  };
+  return (
+    <SettingsSection
+      title={translate('about.developer.section')}
+      collapsible
+      data-testid="developer-settings"
+    >
+      <SettingsField
+        title={translate('settings.updateSettings.hostSource')}
+        hint={hostSettingItem('about', 'hostSource').description}
+        {...settingAnchor('about', 'hostSource')}
+        data-testid="update-setting-hostSource"
+      >
+        <SettingsInputActions>
+          <SettingsUrlInput
+            aria-label={translate('settings.updateSettings.hostSource')}
+            value={settings.updates.hostSource}
+            onChange={(event) =>
+              edit((next) => {
+                next.updates.hostSource = event.target.value;
+              })
+            }
+            placeholder={translate('settings.updateSettings.sourcePlaceholder')}
+          />
+          <SettingsButton
+            icon
+            className="settings-list-icon"
+            title={translate('settings.updateSettings.resetSource')}
+            aria-label={translate('settings.updateSettings.resetSource')}
+            disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
+            onClick={() =>
+              edit((next) => {
+                next.updates.hostSource = createDefaultSettings().updates.hostSource;
+              })
+            }
+          >
+            <Icon name="refresh" size={16} />
+          </SettingsButton>
+        </SettingsInputActions>
+      </SettingsField>
+      <SettingsField
+        title={hostSettingItem('about', 'allowSameVersion').title}
+        {...settingAnchor('about', 'allowSameVersion')}
+        data-testid="update-setting-allowSameVersion"
+      >
+        <Toggle
+          label={hostSettingItem('about', 'allowSameVersion').title}
+          checked={settings.updates.allowSameVersion}
+          onChange={(checked) =>
+            edit((next) => {
+              next.updates.allowSameVersion = checked;
             })
           }
         />

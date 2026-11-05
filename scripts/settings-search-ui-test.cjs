@@ -300,9 +300,9 @@ async function until(fn, label) {
     await search().press('Escape');
     await until(async () => (await modelOf(shell)).content.query === '', 'escape');
     assert.equal(await shell.locator('[aria-current="true"] span[title]').innerText(), '表示');
-    await search().fill('起動から確認まで');
-    await shell.getByRole('option', { name: /起動から確認まで/ }).click();
-    const updateId = itemId('about', 'startupDelaySeconds');
+    await search().fill('AppDockの更新元');
+    await shell.getByRole('option', { name: /AppDockの更新元/ }).click();
+    const updateId = itemId('about', 'hostSource');
     await until(
       () =>
         shell.evaluate(

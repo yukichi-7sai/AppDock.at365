@@ -58,8 +58,9 @@ async function main() {
   assert.deepEqual(headings, [
     'AppDockの起動',
     '設定ファイル',
-    '高度な設定',
     '更新の設定',
+    '高度な設定',
+    '開発用の設定',
     '起動時間の計測',
   ]);
   const startup = page.getByTestId('about-startup-settings');
@@ -72,10 +73,49 @@ async function main() {
   }
   assert.equal(await page.getByTestId('update-settings').evaluate((el) => el.tagName), 'SECTION');
   assert.equal(await page.getByTestId('update-settings').locator('summary').count(), 0);
+  const developer = page.getByTestId('developer-settings');
+  const source = developer.getByRole('textbox', { name: 'AppDockの更新元', exact: true });
+  const sameVersion = developer.getByRole('switch', {
+    name: '同じバージョンの再適用を許可（開発用）',
+    exact: true,
+  });
+  assert.equal(await developer.evaluate((el) => el.open), false);
+  assert.equal(await source.isVisible(), false);
+  const sharedBefore = fs.readFileSync(sharedFile, 'utf8');
+  await developer.locator(':scope > summary').click();
+  const sourceReset = developer.getByRole('button', {
+    name: 'AppDockの更新元を既定に戻す',
+    exact: true,
+  });
+  assert(await sourceReset.isDisabled());
+  const customSource = path.join(profile, 'development-feed');
+  await source.fill(customSource);
+  await source.press('Enter');
+  await sameVersion.click();
+  await settleSettings(page);
+  assert.equal(disk(deviceFile).hostPages.about.configuration.updates.hostSource, customSource);
+  assert.equal(disk(deviceFile).hostPages.about.configuration.updates.allowSameVersion, true);
+  await developer.locator(':scope > summary').click();
+  assert.equal(await developer.evaluate((el) => el.open), false);
+  const search = page.getByRole('combobox', { name: '設定を検索' });
+  await search.fill('AppDockの更新元');
+  await page.getByRole('option', { name: /AppDockの更新元/ }).click();
+  await until(() => source.isVisible(), 'search opens developer settings');
+  assert.equal(await source.inputValue(), customSource);
+  await sourceReset.click();
+  await settleSettings(page);
+  assert.equal((await model()).content.values.updates.hostSource, initial.updates.hostSource);
+  assert(await sourceReset.isDisabled());
+  await source.fill(customSource);
+  await source.press('Enter');
+  await settleSettings(page);
+  await search.fill('');
+  checks.push(
+    'developer settings start collapsed; source/reset and same-version save locally; search opens the hidden field',
+  );
   checks.push(
     'fixed device toolbar/file target; section order; live launch description and refresh; always-open update settings',
   );
-  const sharedBefore = fs.readFileSync(sharedFile, 'utf8');
   const delay = page.getByTestId('update-setting-startupDelaySeconds').locator('input');
   await delay.fill('37');
   await delay.press('Enter');
@@ -114,6 +154,9 @@ async function main() {
   await host.close();
   host = undefined;
   await start();
+  assert.equal(await page.getByTestId('developer-settings').evaluate((el) => el.open), false);
+  assert.equal((await model()).content.values.updates.hostSource, customSource);
+  assert.equal((await model()).content.values.updates.allowSameVersion, true);
   assert.equal((await model()).content.values.updates.startupDelaySeconds, 43);
   // Use the current page after restarting the real process.
   const currentInterval = page.getByLabel('補助確認の待機時間（秒）', { exact: true });
@@ -129,6 +172,14 @@ async function main() {
     await page.getByTestId('update-settings').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, `${theme}-updates.png`) });
     assert(await page.getByTestId('update-setting-startupDelaySeconds').isVisible());
+    const currentDeveloper = page.getByTestId('developer-settings');
+    await currentDeveloper.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(profile, `${theme}-developer-collapsed.png`) });
+    await currentDeveloper.locator(':scope > summary').click();
+    await page.getByTestId('update-setting-hostSource').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(profile, `${theme}-developer-open.png`) });
+    assert(await page.getByTestId('update-setting-hostSource').isVisible());
+    await currentDeveloper.locator(':scope > summary').click();
   }
   const sharedAfter = fs.readFileSync(sharedFile, 'utf8');
   await reset();
@@ -138,6 +189,8 @@ async function main() {
     initial.updates.startupDelaySeconds,
   );
   assert.equal((await model()).content.values.host.fileWatchAssistanceEnabled, false);
+  assert.equal((await model()).content.values.updates.hostSource, initial.updates.hostSource);
+  assert.equal((await model()).content.values.updates.allowSameVersion, false);
   assert.equal(disk(deviceFile).hostPages.about.useLocalSettings, true);
   checks.push(
     'real process restart retains About values; light/wide and dark/minimum layouts; About reset remains device-only',

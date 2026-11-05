@@ -3631,7 +3631,7 @@
   "settings.updateSettings.reset": "既定に戻す",
   "settings.updateSettings.resetSource": "AppDockの更新元を既定に戻す",
   "settings.updateSettings.settings": "更新の設定",
-  "settings.updateSettings.settingsHint": "起動時の確認方法と、本体の更新元を変更できます。",
+  "settings.updateSettings.settingsHint": "更新の自動確認と通知を設定できます。",
   "settings.updateSettings.sourceLabel": "{{displayName}}の更新元",
   "settings.updateSettings.sourcePlaceholder": "publishフォルダー / URL / github:owner/repo",
   "settings.updateSettings.sources": "更新元の設定",
@@ -4026,5 +4026,6 @@
   "settings.ttsEditor.removeVoice": "{{index}}行目の声を削除",
   "settings.ttsEditor.manualHint": "声のIDと表示名を入力します。表示名の空欄はIDを使います。使う声は「声・話し方」で選択できます。",
   "settings.ttsEditor.invalidVoices": "声のIDを空欄にせず、重複しない値にしてください。IDと表示名は200文字以内で入力してください。",
-  "about.advanced.section": "高度な設定"
+  "about.advanced.section": "高度な設定",
+  "about.developer.section": "開発用の設定"
 }

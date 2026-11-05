@@ -74,7 +74,7 @@ module.exports = async ({
     await apply(targetId, [{ kind: 'set', changes }]);
     await page.evaluate(() => window.dock.navigate('settings'));
     await page.getByTestId('settings-nav:about').click();
-    const section = page.getByTestId('update-settings');
+    const section = page.getByTestId('developer-settings');
     if ((await section.getAttribute('open')) === null) await section.locator('summary').click();
     const sourceField = page.getByTestId('update-setting-hostSource').getByRole('textbox'),
       delay = page.getByTestId('update-setting-startupDelaySeconds').getByRole('spinbutton');

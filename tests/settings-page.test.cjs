@@ -241,6 +241,22 @@ test('the settings index is available without loading page values or actions', (
   assert.equal(JSON.stringify(index()).includes('"definition"'), false);
 });
 
+test('TTS server fields search to the server list instead of absent dialog controls', async () => {
+  const f = fixture();
+  await f.act({ kind: 'select', pageId: 'tts' });
+  assert.deepEqual(
+    f.page.snapshot().content.page.items.map((item) => item.key),
+    ['connections', 'defaultConnectionId', 'preview'],
+  );
+  for (const text of ['speechPath', 'defaultVoice', 'extraBody']) {
+    await f.act({ kind: 'search', text });
+    const result = f.page.snapshot().content.results.find((item) => item.pageId === 'tts');
+    assert.equal(result.id, 'tts/connections');
+    await f.act({ kind: 'move', itemId: result.id });
+    assert.equal(f.page.snapshot().content.page.id, 'tts');
+  }
+});
+
 test('all settings pages receive live hint visibility without exposing other page values', async () => {
   const f = fixture();
   await f.act({ kind: 'select', pageId: 'tts' });

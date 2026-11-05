@@ -189,7 +189,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await select('音声生成AI');
     await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
     const ttsDialog = page.getByRole('dialog'),
-      ttsUrl = ttsDialog.getByLabel('APIのURL', { exact: true });
+      ttsUrl = ttsDialog.getByLabel('サーバーURL', { exact: true });
     const ttsRevision = (await snapshot()).settings.revision;
     await ttsUrl.fill(base + '/speech/');
     assert.equal(await ttsUrl.inputValue(), base + '/speech/');
@@ -206,7 +206,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await select('AppDockについて');
     const updateDetails = page
       .locator('details')
-      .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) });
+      .filter({ has: page.getByRole('heading', { name: '開発用の設定', exact: true }) });
     if ((await updateDetails.getAttribute('open')) === null)
       await updateDetails.locator(':scope > summary').click();
     assert.equal(

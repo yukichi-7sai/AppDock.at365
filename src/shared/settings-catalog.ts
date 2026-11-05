@@ -493,6 +493,7 @@ export function settingsCatalog(
   references: readonly CommandReference[] = [],
 ): SettingsPageDefinition[] {
   const t = getHostTranslator(current.host.language);
+  const ttsPageKeys = ['connections', 'defaultConnectionId', 'preview'];
   const pages: SettingsPageDefinition[] = [
     ...hostSettingsPages.map(([id, title]) => ({
       id,
@@ -500,34 +501,40 @@ export function settingsCatalog(
       kind: 'host' as const,
       json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
       items: [
-        ...hostRows(id, current.host.language).map(([key, title, description]) => ({
-          ...item(
-            id,
-            key,
-            title,
-            description,
-            hostSettingDefinitions.find((field) => field.pageId === id && field.key === key),
-          ),
-          keywords:
-            id === 'appearance' && key === 'language'
-              ? hostLanguages.flatMap((code) => [code, hostLanguageName(code)])
-              : id === 'appearance' && key === 'theme'
-                ? [
-                    t('appearance.theme.dark'),
-                    t('appearance.theme.light'),
-                    t('appearance.theme.system'),
-                  ]
-                : id === 'appearance' && key === 'accentColor'
-                  ? [
-                      ...accentChoices.flatMap((p) => [p.id, p.title]),
-                      t('appearance.accent.dark'),
-                      t('appearance.accent.light'),
-                      'HEX',
-                      'customAccentDark',
-                      'customAccentLight',
-                    ]
-                  : undefined,
-        })),
+        ...hostRows(id, current.host.language)
+          .filter(([key]) => id !== 'tts' || ttsPageKeys.includes(key))
+          .map(([key, title, description]) => ({
+            ...item(
+              id,
+              key,
+              title,
+              description,
+              hostSettingDefinitions.find((field) => field.pageId === id && field.key === key),
+            ),
+            keywords:
+              id === 'tts' && key === 'connections'
+                ? hostRows('tts', current.host.language)
+                    .filter(([field]) => !ttsPageKeys.includes(field))
+                    .flatMap(([field, label, hint]) => [field, label, hint ?? ''])
+                : id === 'appearance' && key === 'language'
+                  ? hostLanguages.flatMap((code) => [code, hostLanguageName(code)])
+                  : id === 'appearance' && key === 'theme'
+                    ? [
+                        t('appearance.theme.dark'),
+                        t('appearance.theme.light'),
+                        t('appearance.theme.system'),
+                      ]
+                    : id === 'appearance' && key === 'accentColor'
+                      ? [
+                          ...accentChoices.flatMap((p) => [p.id, p.title]),
+                          t('appearance.accent.dark'),
+                          t('appearance.accent.light'),
+                          'HEX',
+                          'customAccentDark',
+                          'customAccentLight',
+                        ]
+                      : undefined,
+          })),
         ...(id === 'notifications'
           ? notificationCatalog(orderApplets(applets, current.appletOrder)).map((t) =>
               item(id, notificationSettingKey(t), t.title, t.ownerTitle + ' ' + t.description),

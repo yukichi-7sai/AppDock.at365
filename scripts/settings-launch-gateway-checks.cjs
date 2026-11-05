@@ -55,7 +55,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     );
     return;
   }
-  const executable = path.join(profile, 'AppDock.at365.exe'),
+  const executable = require('./copy-host.cjs').testHostPath(profile),
     inspector = new WindowsLaunch(executable, profile, [`--test-profile=${profile}`]),
     before = bytes(),
     defaults = createDefaultSettings().host;
@@ -85,7 +85,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
       'Real MCP launch dryRun is inert; save/replay awaits the existing owner and registers only the isolated EXE/profile with Limited InteractiveToken, without execute permission',
     );
 
-    await page.getByRole('button', { name: hostText('pages.general.title'), exact: true }).click();
+    await page.getByTestId('settings-nav:about').click();
     const toggle = page.getByRole('switch', {
       name: hostText('general.startAtLogon.label'),
       exact: true,
