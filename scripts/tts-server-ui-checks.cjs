@@ -24,13 +24,7 @@ module.exports = async function ({
   await defaultSelect.waitFor();
   assert.equal(await defaultSelect.inputValue(), 'default');
   const assertDefaultsInDialogOnly = async () => {
-    for (const label of [
-      'モデル',
-      '声',
-      '読み上げ速度',
-      'いつも加える話し方',
-      '指定がないときの話し方',
-    ])
+    for (const label of ['モデル', '声', 'いつも加える話し方', '指定がないときの話し方'])
       assert.equal(await page.getByLabel(label, { exact: true }).count(), 0, label);
   };
   await assertDefaultsInDialogOnly();
@@ -42,7 +36,7 @@ module.exports = async function ({
     return dialog;
   };
   const field = async (scope, name, value) => {
-    const speech = ['モデル', '声', '読み上げ速度', 'いつも加える話し方', '指定がないときの話し方'];
+    const speech = ['モデル', '声', 'いつも加える話し方', '指定がないときの話し方'];
     const connection = ['登録名', 'サーバーURL', 'APIキー'];
     await scope
       .getByRole('tab', {
@@ -66,8 +60,7 @@ module.exports = async function ({
   let dialog = await edit('Primary');
   await field(dialog, '登録名', 'Canceled');
   await field(dialog, 'APIキー', 'canceled-secret');
-  await field(dialog, '読み上げ速度', '2');
-  await field(dialog, '読み上げ速度', '9');
+  await field(dialog, 'モデル', 'x'.repeat(201));
   await dialog.getByRole('tab', { name: '接続', exact: true }).click();
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(
@@ -76,10 +69,10 @@ module.exports = async function ({
         .getByRole('tab', { name: '声・話し方', exact: true })
         .getAttribute('aria-selected')
         .then((v) => v === 'true'),
-    'invalid speed returns to its tab',
+    'invalid model returns to its tab',
   );
   assert.equal((await snapshot()).settings.value.tts.connections[0].name, 'Primary');
-  await field(dialog, '読み上げ速度', '2');
+  await field(dialog, 'モデル', 'test');
   await dialog.getByRole('tab', { name: '接続', exact: true }).click();
   const preset = dialog.getByLabel('サーバーの種類', { exact: true });
   await preset.selectOption('qwen3-tts');
@@ -98,8 +91,8 @@ module.exports = async function ({
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   assert.equal((await snapshot()).settings.value.tts.connections[0].name, 'Primary');
   assert.equal(
-    (await snapshot()).settings.value.tts.connections[0].defaultSpeed,
-    settings.tts.connections[0].defaultSpeed,
+    (await snapshot()).settings.value.tts.connections[0].defaultVoice,
+    settings.tts.connections[0].defaultVoice,
   );
   assert.equal(fs.existsSync(keyfile), false);
   dialog = await edit('Primary');
@@ -131,7 +124,7 @@ module.exports = async function ({
   await field(dialog, 'APIキー', 'secondary-secret');
   await field(dialog, 'モデル', 'second-model');
   await field(dialog, '声', 'second-voice');
-  await field(dialog, '読み上げ速度', '1.5');
+  await field(dialog, '指定がないときの話し方', 'second instructions');
   assert.equal((await snapshot()).settings.value.tts.connections.length, 1);
   assert.deepEqual(fs.readFileSync(keyfile), firstCipher);
   await save(dialog);
@@ -144,21 +137,26 @@ module.exports = async function ({
   await assertDefaultsInDialogOnly();
   dialog = await edit('Secondary');
   assert.equal(await dialog.getByLabel('モデル', { exact: true }).inputValue(), 'second-model');
-  await field(dialog, '読み上げ速度', '1.6');
+  await field(dialog, '指定がないときの話し方', 'updated instructions');
   await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
-  await dialog.getByLabel('速度の適用先', { exact: true }).selectOption('server');
-  assert.equal((await snapshot()).settings.value.tts.connections[1].defaultSpeed, 1.5);
+  assert.equal(
+    (await snapshot()).settings.value.tts.connections[1].defaultInstructions,
+    'second instructions',
+  );
   await save(dialog);
   await defaultSelect.selectOption('default');
   await settleSettings(page);
   dialog = await edit('Primary');
   assert.equal(await dialog.getByLabel('モデル', { exact: true }).inputValue(), 'test');
   assert.equal(
-    await dialog.getByLabel('読み上げ速度', { exact: true }).inputValue(),
-    String(settings.tts.connections[0].defaultSpeed),
+    await dialog.getByLabel('指定がないときの話し方', { exact: true }).inputValue(),
+    settings.tts.connections[0].defaultInstructions,
   );
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  assert.equal((await snapshot()).settings.value.tts.connections[1].defaultSpeed, 1.6);
+  assert.equal(
+    (await snapshot()).settings.value.tts.connections[1].defaultInstructions,
+    'updated instructions',
+  );
   await page.getByLabel('試聴するサーバー', { exact: true }).selectOption(second.id);
   await page.getByLabel('試聴するテキスト', { exact: true }).fill('別サーバーの試聴');
   await page.getByRole('button', { name: '試聴する', exact: true }).click();
@@ -173,7 +171,7 @@ module.exports = async function ({
   assert.equal(requests.at(-1).auth, 'Bearer secondary-secret');
   assert.equal(requests.at(-1).body.model, 'second-model');
   assert.equal(requests.at(-1).body.voice, 'second-voice');
-  assert.equal(requests.at(-1).body.speed, 1.6);
+  assert.equal(Object.hasOwn(requests.at(-1).body, 'speed'), false);
   assert.equal((await snapshot()).settings.value.tts.defaultConnectionId, 'default');
   checks.push(
     'two same-endpoint servers retain distinct credentials and defaults; preview does not change the default server',
@@ -342,8 +340,6 @@ module.exports = async function ({
     alwaysInstructions,
     defaultInstructions: 'やさしく、落ち着いて',
     extraBody: { language: 'Japanese', generation: { temperature: 0.4 } },
-    speedMode: 'playback',
-    defaultSpeed: 1.4,
     voicesSource: 'manual',
     manualVoices: [{ id: 'voice-a', name: 'Voice A' }],
   });

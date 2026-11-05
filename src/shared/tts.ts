@@ -14,13 +14,11 @@ export interface TtsConnectionSettings {
   instructionsMode: 'none' | 'json';
   instructionsParameter: string;
   extraBody: Record<string, unknown>;
-  speedMode: 'playback' | 'server';
   voicesSource: 'endpoint' | 'manual';
   voicesPath: string;
   manualVoices: TtsVoice[];
 }
 export interface TtsSettings extends TtsConnectionSettings {
-  defaultSpeed: number;
   defaultInstructions: string;
   alwaysInstructions: string;
 }
@@ -54,7 +52,10 @@ export function parseTtsConfiguration(value: unknown): TtsConfiguration {
   if (!Object.keys(value).length) return defaultTtsConfiguration();
   if (
     !Object.hasOwn(value, 'connections') &&
-    Object.keys(value).every((key) => Object.hasOwn(defaultTtsSettings(), key))
+    Object.keys(value).every(
+      (key) =>
+        Object.hasOwn(defaultTtsSettings(), key) || ['defaultSpeed', 'speedMode'].includes(key),
+    )
   ) {
     parseTtsSettings(value);
     return defaultTtsConfiguration();
@@ -90,16 +91,10 @@ export const ttsPresetIds = [
 export type TtsPresetId = (typeof ttsPresetIds)[number];
 type TtsPreset = Pick<
   TtsConnectionSettings,
-  | 'speechPath'
-  | 'speedMode'
-  | 'voicesSource'
-  | 'voicesPath'
-  | 'instructionsMode'
-  | 'instructionsParameter'
+  'speechPath' | 'voicesSource' | 'voicesPath' | 'instructionsMode' | 'instructionsParameter'
 >;
 const commonPreset: TtsPreset = {
   speechPath: 'audio/speech',
-  speedMode: 'playback',
   voicesSource: 'endpoint',
   voicesPath: 'audio/voices',
   instructionsMode: 'none',
@@ -149,14 +144,12 @@ export const defaultTtsSettings = (): TtsSettings => ({
   baseUrl: '',
   model: '',
   defaultVoice: '',
-  defaultSpeed: 1,
   defaultInstructions: '',
   alwaysInstructions: '',
   preset: 'custom',
   speechPath: 'audio/speech',
   instructionsMode: 'none',
   instructionsParameter: 'instructions',
-  speedMode: 'playback',
   voicesSource: 'endpoint',
   voicesPath: 'audio/voices',
   manualVoices: [],
@@ -255,10 +248,12 @@ export function parseTtsModels(value: unknown): TtsVoice[] {
 export function parseTtsSettings(value: unknown): TtsSettings {
   if (value === undefined) return defaultTtsSettings();
   if (!object(value)) throw Error(hostText('settings.tts.object'));
+  // Discard retired speed preferences without losing the registered connection.
+  const { defaultSpeed: _defaultSpeed, speedMode: _speedMode, ...settings } = value;
   const defaults = defaultTtsSettings();
-  if (Object.keys(value).some((k) => !Object.hasOwn(defaults, k)))
+  if (Object.keys(settings).some((k) => !Object.hasOwn(defaults, k)))
     throw Error(hostText('settings.tts.fields'));
-  const v = { ...defaults, ...value };
+  const v = { ...defaults, ...settings };
   for (const key of [
     'baseUrl',
     'model',
@@ -272,10 +267,6 @@ export function parseTtsSettings(value: unknown): TtsSettings {
     if (typeof v[key] !== 'string') throw Error(hostText('settings.tts.strings'));
   if (v.model.length > 200 || v.defaultVoice.length > 200)
     throw Error(hostText('settings.tts.nameLength'));
-  if (!Number.isFinite(v.defaultSpeed) || v.defaultSpeed < 0.25 || v.defaultSpeed > 4)
-    throw Error(hostText('settings.tts.speed'));
-  if (!['playback', 'server'].includes(v.speedMode))
-    throw Error(hostText('settings.tts.speedMode'));
   if (!['endpoint', 'manual'].includes(v.voicesSource))
     throw Error(hostText('settings.tts.voiceSource'));
   if (!ttsPresetIds.includes(v.preset) || !['none', 'json'].includes(v.instructionsMode))

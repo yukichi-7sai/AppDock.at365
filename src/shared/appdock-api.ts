@@ -34,7 +34,7 @@ export const appDockOperations = localizedMetadata(
               maxLength: 100,
               pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$',
               description:
-                '登録済み音声サーバーのID。省略時は既定のサーバーを使用します。声・速度は選択したサーバーの設定を使用し、既定のサーバーは変更しません。',
+                '登録済み音声サーバーのID。省略時は既定のサーバーを使用します。声は選択したサーバーの設定を使用し、既定のサーバーは変更しません。',
             },
             instructions: {
               type: 'string',

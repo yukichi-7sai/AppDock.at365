@@ -118,7 +118,6 @@ async function start() {
           baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
           model: 'fixture',
           defaultVoice: 'common',
-          speedMode: 'server',
         },
       ],
       defaultConnectionId: 'default',

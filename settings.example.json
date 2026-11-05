@@ -110,8 +110,6 @@
     "baseUrl": "",
     "model": "",
     "defaultVoice": "",
-    "defaultSpeed": 1,
-    "speedMode": "playback",
     "voicesSource": "endpoint",
     "voicesPath": "audio/voices",
     "manualVoices": []

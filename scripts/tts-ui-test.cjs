@@ -107,6 +107,9 @@ async function configure(patch) {
           baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
           model: 'test',
           defaultVoice: 'voice-a',
+          // A pre-upgrade profile must retain the connection and use normal playback.
+          defaultSpeed: 1.4,
+          speedMode: 'server',
         },
       ],
     };
@@ -333,6 +336,13 @@ async function configure(patch) {
     assert.equal(speakSchema.properties.voice, undefined);
     assert.equal(speakSchema.properties.speed, undefined);
     assert.equal(speakSchema.properties.connectionId.type, 'string');
+    const requestsBeforeInvalid = requests.length;
+    const invalidSpeed = await client.callTool({
+      name: 'appdock_tts_speak',
+      arguments: { text: 'invalid speed', requestId: 'retired-speed', speed: 1.5 },
+    });
+    assert.equal(invalidSpeed.isError, true);
+    assert.equal(requests.length, requestsBeforeInvalid);
     const connections = await call('appdock_tts_list_connections');
     assert.deepEqual(
       connections.connections,
@@ -455,10 +465,8 @@ async function configure(patch) {
     );
     const media = await audioPage.evaluate(() => ({
       rate: document.querySelector('audio').playbackRate,
-      pitch: document.querySelector('audio').preservesPitch,
     }));
-    assert.equal(media.rate, 1.4);
-    assert.equal(media.pitch, true);
+    assert.equal(media.rate, 1);
     assert.equal((await call('appdock_tts_stop', { jobId: long.jobId })).state, 'canceled');
     checks.push('31-second WAV playback and stop');
     const revoked = await call('appdock_tts_speak', { text: 'long', requestId: 'revoke' });
@@ -471,12 +479,11 @@ async function configure(patch) {
         baseUrl: 'http://alice:8080/v1',
         model: '1.7B-Base',
         defaultVoice: 'yui',
-        speedMode: 'playback',
         defaultInstructions: '',
       });
       await host.evaluate(() => window.dock.automation({ kind: 'setTts', allowed: true }));
       for (const voice of ['yui', 'yui-quietgirl']) {
-        await configure({ defaultVoice: voice, defaultSpeed: 1.4 });
+        await configure({ defaultVoice: voice });
         const j = await call('appdock_tts_speak', {
           text: '音声連携の動作確認です。',
           connectionId: 'default',
@@ -491,14 +498,13 @@ async function configure(patch) {
           190000,
         );
         assert.equal(ended.state, 'completed', JSON.stringify(ended));
-        checks.push('real server ' + voice + ' playback completion at 1.4');
+        checks.push('real server ' + voice + ' playback completion at normal speed');
       }
     }
     await configure({
       baseUrl: settings.tts.connections[0].baseUrl,
       model: 'test',
       defaultVoice: 'voice-a',
-      speedMode: 'playback',
     });
     await host.evaluate(() => window.dock.automation({ kind: 'setTts', allowed: true }));
     const shutdownJob = await call('appdock_tts_speak', {

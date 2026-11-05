@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
-import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
+import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsInputActions } from '../settings-ui/SettingsSections';
 import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -121,24 +121,6 @@ export function TtsSpeechFields({
             </button>
           )}
         </SettingsInputActions>
-      </SettingsField>
-      <SettingsField
-        className="server-editor-full tts-editor-speed"
-        title={translate('settings.ttsSettings.speed')}
-        hint={translate('settings.ttsSettings.speedHint')}
-        {...settingAnchor('tts', 'defaultSpeed')}
-      >
-        <SettingsInput
-          aria-label={translate('settings.ttsSettings.speed')}
-          type="number"
-          min={0.25}
-          max={4}
-          step={0.05}
-          value={value.defaultSpeed}
-          onChange={(e) =>
-            change({ defaultSpeed: e.target.value.trim() ? Number(e.target.value) : NaN })
-          }
-        />
       </SettingsField>
       <SettingsField
         className="server-editor-full"

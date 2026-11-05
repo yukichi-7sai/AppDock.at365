@@ -135,7 +135,6 @@ interface InternalJob {
   fingerprint: string;
   text?: string;
   voice?: string;
-  speed?: number;
   instructions?: string;
   config?: TtsSettings;
   key?: string;
@@ -180,7 +179,6 @@ export class TtsService {
         bytes: Buffer,
         seconds: number,
         signal: AbortSignal,
-        speed?: number,
         beforePlay?: () => void,
       ): Promise<void>;
       changed?(): void;
@@ -305,7 +303,6 @@ export class TtsService {
       fingerprint,
       text: text as string,
       voice: config.defaultVoice,
-      speed: config.defaultSpeed,
       instructions: selectedInstructions,
       config,
       key,
@@ -360,7 +357,6 @@ export class TtsService {
     if (error) j.view.error = { code: error.code, message: error.message };
     j.text = j.voice = j.key = j.instructions = undefined;
     j.config = undefined;
-    j.speed = undefined;
     j.internal = undefined;
     this.state(j, state);
     this.options.audit?.(j.owner, j.view.jobId, state, error?.code);
@@ -429,7 +425,6 @@ export class TtsService {
       const request = ttsSpeechRequest(j.config!, {
         text: j.text!,
         voice: j.voice!,
-        speed: j.speed!,
         instructions: j.instructions!,
       });
       const received = await this.download(
@@ -450,12 +445,11 @@ export class TtsService {
       if (j.ended !== undefined) return;
       const bytes = finalizeTtsWave(received);
       const seconds = waveDuration(bytes);
-      const playbackSpeed = j.config!.speedMode === 'playback' ? j.speed : 1;
       this.authorize(j.owner, true);
       this.checkStart(j);
       this.state(j, 'waitingPlayback');
       if (j.ended === undefined)
-        await this.options.play(bytes, seconds, controller.signal, playbackSpeed, () => {
+        await this.options.play(bytes, seconds, controller.signal, () => {
           this.authorize(j.owner, true);
           this.checkStart(j);
           clearTimeout(j.startTimer);

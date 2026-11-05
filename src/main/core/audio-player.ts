@@ -4,7 +4,6 @@ import type { AudioPlaybackRequest } from './audio-playback';
 export async function playAudioWave({
   bytes,
   signal,
-  speed = 1,
   playbackTimeoutMs,
   beforePlay,
 }: AudioPlaybackRequest & { signal: AbortSignal }): Promise<void> {
@@ -60,7 +59,6 @@ export async function playAudioWave({
       player.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       const audio = new Audio(${JSON.stringify('data:audio/wav;base64,' + bytes.toString('base64'))});
       document.body.append(audio);
-      audio.playbackRate = ${JSON.stringify(speed)}; audio.preservesPitch = true;
       audio.onended = () => resolve(true);
       audio.onerror = () => reject(new Error('Playback failed'));
       audio.play().catch(reject);

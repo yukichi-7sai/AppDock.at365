@@ -64,21 +64,6 @@ export function TtsConnectionDetails({
         />
       </SettingsField>
       <SettingsField
-        title={t('settings.ttsSettings.speedMode')}
-        {...settingAnchor('tts', 'speedMode')}
-      >
-        <select
-          aria-label={t('settings.ttsSettings.speedMode')}
-          value={value.speedMode}
-          onChange={(e) =>
-            change({ speedMode: e.target.value as TtsConnectionSettings['speedMode'] })
-          }
-        >
-          <option value="playback">{t('settings.ttsSettings.localSpeed')}</option>
-          <option value="server">{t('settings.ttsSettings.serverSpeed')}</option>
-        </select>
-      </SettingsField>
-      <SettingsField
         title={t('settings.ttsSettings.instructionsMode')}
         {...settingAnchor('tts', 'instructionsMode')}
       >

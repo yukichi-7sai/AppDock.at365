@@ -88,7 +88,6 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
           baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
           model: 'fixture',
           defaultVoice: 'common',
-          speedMode: 'server',
         },
       ],
       defaultConnectionId: 'default',
@@ -99,7 +98,6 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       name: '通知用',
       model: 'notification-model',
       defaultVoice: 'notice',
-      defaultSpeed: 1.6,
       instructionsMode: 'json',
       alwaysInstructions: '常時の話し方',
       defaultInstructions: '既定の話し方',
@@ -276,7 +274,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await execute(id + '.publish');
     await until(() => requests.length === 1, 'notification TTS');
     assert.equal(requests[0].voice, 'notice');
-    assert.equal(requests[0].speed, 1.6);
+    assert.equal(Object.hasOwn(requests[0], 'speed'), false);
     assert.equal(requests[0].model, 'notification-model');
     assert.equal(requests[0].instructions, '常時の話し方\n通知の話し方');
     assert.equal(requests[0].input, 'Fixture notice。Notification body');
@@ -285,7 +283,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       return logs.some((l) => JSON.stringify(l).includes('state=completed'));
     }, 'playback completed');
     checks.push(
-      'automatic center-only speech uses the selected server voice/speed and notification instructions',
+      'automatic center-only speech uses the selected server voice and notification instructions',
     );
     await execute(id + '.update');
     await new Promise((r) => setTimeout(r, 350));
@@ -327,7 +325,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await execute(id + '.publish');
     await until(() => requests.length === 3, 'inherited speech');
     assert.equal(requests[2].voice, 'common');
-    assert.equal(requests[2].speed, 1);
+    assert.equal(Object.hasOwn(requests[2], 'speed'), false);
     checks.push('independent inheritance restoration');
     const requireMain = `process.getBuiltinModule('module').createRequire(${electronExpression}.app.getAppPath()+'/package.json')`;
     await until(
@@ -384,8 +382,6 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
                   baseUrl: 'http://alice:8080/v1',
                   model: '1.7B-Base',
                   defaultVoice: 'yui',
-                  speedMode: 'playback',
-                  defaultSpeed: 1.4,
                 },
               ],
               defaultConnectionId: 'default',

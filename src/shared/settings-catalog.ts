@@ -138,12 +138,6 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       hostText('settings.settings-catalog.ttsModelKeywords'),
     ],
     ['defaultVoice', hostText('settings.settings-catalog.ttsVoice')],
-    ['defaultSpeed', hostText('settings.settings-catalog.ttsSpeed')],
-    [
-      'speedMode',
-      hostText('settings.settings-catalog.ttsSpeedMode'),
-      hostText('settings.settings-catalog.ttsSpeedModeKeywords'),
-    ],
     ['voicesSource', hostText('settings.settings-catalog.ttsVoiceSource')],
     ['voicesPath', hostText('settings.settings-catalog.ttsVoicePath')],
     ['manualVoices', hostText('settings.settings-catalog.ttsManualVoices')],

@@ -181,8 +181,8 @@ test('muted TTS still generates and completes without claiming playback or block
       generated++;
       return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
     },
-    play: (bytes, seconds, signal, speed, beforePlay) =>
-      f.queue.play({ bytes, signal, speed, beforePlay, playbackTimeoutMs: 1000 }),
+    play: (bytes, seconds, signal, beforePlay) =>
+      f.queue.play({ bytes, signal, beforePlay, playbackTimeoutMs: 1000 }),
   });
   const jobs = ['one', 'two'].map((requestId) => tts.speak('host', { text: 'fixture', requestId }));
   for (let i = 0; i < 20 && jobs.some((j) => tts.get('host', j.jobId).state !== 'completed'); i++)
@@ -221,8 +221,8 @@ test('TTS generation leaves audio free; waiting playback retains start deadline 
       });
       return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
     },
-    play: (bytes, seconds, signal, speed, beforePlay) =>
-      f.queue.play({ bytes, signal, speed, beforePlay, playbackTimeoutMs: 1000 }),
+    play: (bytes, seconds, signal, beforePlay) =>
+      f.queue.play({ bytes, signal, beforePlay, playbackTimeoutMs: 1000 }),
   });
   const job = tts.speak(
     'host',

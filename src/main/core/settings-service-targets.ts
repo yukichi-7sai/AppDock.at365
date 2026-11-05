@@ -1013,21 +1013,6 @@ export class SettingsServiceTargets {
         default: defaults.defaultVoice,
       },
       {
-        key: 'defaultSpeed',
-        title: hostText('settings.ttsSettings.speed'),
-        type: 'number',
-        minimum: 0.25,
-        maximum: 4,
-        default: defaults.defaultSpeed,
-      },
-      {
-        key: 'speedMode',
-        title: hostText('settings.ttsSettings.speedMode'),
-        type: 'select',
-        options: options(['playback', 'server']),
-        default: defaults.speedMode,
-      },
-      {
         key: 'voicesSource',
         title: hostText('settings.ttsSettings.voiceMode'),
         type: 'select',
@@ -1187,21 +1172,6 @@ export class SettingsServiceTargets {
         type: 'string',
         maxLength: 200,
         default: defaults.defaultVoice,
-      },
-      {
-        key: 'defaultSpeed',
-        title: hostText('settings.ttsSettings.speed'),
-        type: 'number',
-        minimum: 0.25,
-        maximum: 4,
-        default: defaults.defaultSpeed,
-      },
-      {
-        key: 'speedMode',
-        title: hostText('settings.ttsSettings.speedMode'),
-        type: 'select',
-        options: options(['playback', 'server']),
-        default: defaults.speedMode,
       },
       {
         key: 'voicesSource',

@@ -71,13 +71,7 @@ export function TtsConnectionDialog({
           parseTtsServer(draft);
         } catch (reason) {
           setTab(
-            !Number.isFinite(draft.defaultSpeed) ||
-              draft.defaultSpeed < 0.25 ||
-              draft.defaultSpeed > 4 ||
-              draft.model.length > 200 ||
-              draft.defaultVoice.length > 200
-              ? 'speech'
-              : 'connection',
+            draft.model.length > 200 || draft.defaultVoice.length > 200 ? 'speech' : 'connection',
           );
           throw reason;
         }

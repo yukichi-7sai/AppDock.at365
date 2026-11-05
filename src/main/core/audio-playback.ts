@@ -3,7 +3,6 @@ import { hostText } from '../../shared/i18n';
 export interface AudioPlaybackRequest {
   bytes: Buffer;
   signal?: AbortSignal;
-  speed?: number;
   playbackTimeoutMs: number;
   beforePlay?: () => void;
 }

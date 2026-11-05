@@ -3,14 +3,13 @@ import { ttsInstructionsPath, type TtsConnectionSettings } from './tts';
 /** Build a request from a captured connection, ready for a future connection selector. */
 export function ttsSpeechRequest(
   connection: TtsConnectionSettings,
-  speech: { text: string; voice: string; speed: number; instructions: string },
+  speech: { text: string; voice: string; instructions: string },
 ) {
   const body: Record<string, unknown> = {
     ...structuredClone(connection.extraBody),
     model: connection.model,
     input: speech.text,
     ...(speech.voice ? { voice: speech.voice } : {}),
-    speed: connection.speedMode === 'server' ? speech.speed : 1,
     response_format: 'wav',
   };
   if (speech.instructions && connection.instructionsMode === 'json') {

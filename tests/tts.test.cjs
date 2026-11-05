@@ -69,9 +69,9 @@ function setup(t, extra = {}) {
             defaultConnectionId: 'default',
           };
     },
-    play: async (b, d, signal, speed, beforePlay) => {
+    play: async (b, d, signal, beforePlay) => {
       beforePlay?.();
-      await extra.play?.(b, d, signal, speed, beforePlay);
+      await extra.play?.(b, d, signal, beforePlay);
     },
   });
   t.after(() => s.close());
@@ -89,22 +89,20 @@ function setup(t, extra = {}) {
   };
 }
 const input = (id, text = '本文') => ({ text, requestId: id });
-test('registered server selection binds model, voice, speed and key while instructions remain per call', async (t) => {
-  const server = (id, voice, speed) => ({
+test('registered server selection binds model, voice and key while instructions remain per call', async (t) => {
+  const server = (id, voice) => ({
     ...defaultTtsSettings(),
     id,
     name: 'Same name',
     baseUrl: 'http://same/v1',
     model: id,
     defaultVoice: voice,
-    defaultSpeed: speed,
-    speedMode: 'server',
     instructionsMode: 'json',
     alwaysInstructions: '常時',
     defaultInstructions: '既定',
   });
   const config = {
-    connections: [server('first', 'voice-a', 1.1), server('second', '', 1.7)],
+    connections: [server('first', 'voice-a'), server('second', '')],
     defaultConnectionId: 'first',
   };
   const f = setup(t, { settings: () => config, key: (value) => 'key-' + value.id });
@@ -135,7 +133,7 @@ test('registered server selection binds model, voice, speed and key while instru
   assert.equal(config.defaultConnectionId, 'first');
   const body = JSON.parse(f.posts[0].o.body);
   assert.equal(body.model, 'second');
-  assert.equal(body.speed, 1.7);
+  assert.equal(Object.hasOwn(body, 'speed'), false);
   assert.equal(Object.hasOwn(body, 'voice'), false);
   assert.equal(body.instructions, '常時\n今回');
   assert.throws(() => f.s.speak('a', { ...request, connectionId: 'first' }), {
@@ -166,7 +164,6 @@ test('connection presets preserve identity and speech defaults; custom edits sur
     defaultVoice: 'saved-voice',
     defaultInstructions: '穏やかに',
     alwaysInstructions: '自然な日本語で',
-    defaultSpeed: 1.3,
     manualVoices: [{ id: 'saved-voice', name: 'Saved' }],
     extraBody: { language: 'Japanese' },
   });
@@ -176,7 +173,6 @@ test('connection presets preserve identity and speech defaults; custom edits sur
       'baseUrl',
       'model',
       'defaultVoice',
-      'defaultSpeed',
       'defaultInstructions',
       'alwaysInstructions',
       'manualVoices',
@@ -305,7 +301,7 @@ test('extra parameters merge beside nested instructions without mutating saved s
     instructionsParameter: 'generation.instruct',
     extraBody: { language: 'Japanese', generation: { temperature: 0.6, options: [true, null] } },
   });
-  const speech = { text: '本文', voice: 'voice', speed: 1, instructions: '静かに' };
+  const speech = { text: '本文', voice: 'voice', instructions: '静かに' };
   const first = ttsSpeechRequest(connection, speech);
   assert.deepEqual(first.body.generation, {
     temperature: 0.6,
@@ -450,8 +446,7 @@ test('streamed WAV length sentinels are finalized before the common player; malf
   await wait(() => f.s.get('a', job.jobId).state === 'completed');
   assert(played);
 });
-test('TTS settings validate endpoints, secrets exclusion, voice list and speed', () => {
-  assert.equal(parseTtsSettings().defaultSpeed, 1);
+test('TTS settings validate endpoints, secrets exclusion, voice list', () => {
   assert.equal(
     parseTtsSettings({ baseUrl: 'http://host:8080/v1/' }).baseUrl,
     'http://host:8080/v1',
@@ -463,8 +458,6 @@ test('TTS settings validate endpoints, secrets exclusion, voice list and speed',
     { voicesPath: '../voices' },
     { voicesPath: '%2e%2e/voices' },
     { voicesPath: '/voices' },
-    { defaultSpeed: NaN },
-    { defaultSpeed: 0 },
     { apiKey: 'secret' },
     ...[{}, null, 'default', [null], [{}], [{ id: 'default', name: {} }]].map((manualVoices) => ({
       manualVoices,
@@ -502,7 +495,7 @@ test('accepted jobs deduplicate, preserve default snapshot and expose no text or
   );
   await wait(() => f.s.get('a', a.jobId).state === 'completed');
   assert.equal(f.posts.length, 1);
-  assert.equal(JSON.parse(f.posts[0].o.body).speed, 1);
+  assert.equal(Object.hasOwn(JSON.parse(f.posts[0].o.body), 'speed'), false);
   assert.equal(f.posts[0].u, 'http://localhost:8080/v1/audio/speech');
   assert.equal(f.posts[0].o.headers.Authorization, undefined);
   f.config({ defaultVoice: 'different' });
@@ -790,7 +783,6 @@ test('preview configuration uses its own endpoint and key without changing norma
       baseUrl: 'http://preview/v1',
       model: 'preview-model',
       defaultVoice: 'preview-voice',
-      defaultSpeed: 1.5,
     },
     key: 'preview-key',
   };
@@ -805,9 +797,10 @@ test('preview configuration uses its own endpoint and key without changing norma
   assert.equal(f.posts[1].o.headers.Authorization, 'Bearer normal-key');
   assert.equal(JSON.parse(f.posts[1].o.body).voice, 'voice');
 });
-test('playback/server speed modes apply speed exactly once', async (t) => {
+test('retired speed preferences never reach the server and generated WAV bytes reach playback unchanged', async (t) => {
   for (const mode of ['playback', 'server']) {
-    let sent, played;
+    const original = wave();
+    let played;
     const f = setup(t, {
       settings: () => ({
         ...defaultTtsSettings(),
@@ -818,17 +811,18 @@ test('playback/server speed modes apply speed exactly once', async (t) => {
         defaultSpeed: 1.4,
       }),
       fetcher: async (_u, o) => {
-        sent = JSON.parse(o.body).speed;
-        return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
+        assert.equal(Object.hasOwn(JSON.parse(o.body), 'speed'), false);
+        return new Response(original, { headers: { 'Content-Type': 'audio/wav' } });
       },
-      play: async (_b, _d, _signal, speed) => {
-        played = speed;
+      play: async (bytes, duration, signal, beforePlay) => {
+        assert.equal(typeof beforePlay, 'function');
+        assert.equal(duration, waveDuration(original));
+        played = bytes;
       },
     });
     const job = f.s.speak('a', input(mode));
     await wait(() => f.s.get('a', job.jobId).state === 'completed');
-    assert.equal(sent, mode === 'server' ? 1.4 : 1);
-    assert.equal(played, mode === 'playback' ? 1.4 : 1);
+    assert.deepEqual(played, original);
   }
 });
 

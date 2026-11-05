@@ -634,7 +634,7 @@ test('TTS updates share validation, are atomic and side-effect free in dryRun, p
   const operations = [
       {
         kind: 'set',
-        changes: { defaultSpeed: 1.5, speedMode: 'server', defaultVoice: 'new voice' },
+        changes: { defaultInstructions: 'new instructions', defaultVoice: 'new voice' },
       },
     ],
     preview = f.call('apply', f.request(id, operations, true));
@@ -645,31 +645,77 @@ test('TTS updates share validation, are atomic and side-effect free in dryRun, p
     saved = f.call('apply', request);
   assert.deepEqual(f.call('apply', request), saved);
   assert.equal(f.writes(), 1);
-  assert.equal(f.values(id).defaultSpeed, 1.5);
+  assert.equal(f.values(id).defaultInstructions, 'new instructions');
   assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), device);
   assert.throws(
     () =>
       f.call(
         'apply',
-        f.request(id, [{ kind: 'set', changes: { model: 'valid', defaultSpeed: 9 } }]),
+        f.request(id, [
+          { kind: 'set', changes: { model: 'valid', defaultVoice: 'x'.repeat(201) } },
+        ]),
       ),
     { code: 'INVALID_ARGUMENT' },
   );
   assert.equal(f.values(id).model, 'model');
   f.call(
     'apply',
-    f.request(id, [{ kind: 'reset', keys: ['defaultSpeed', 'speedMode', 'defaultVoice'] }]),
+    f.request(id, [{ kind: 'reset', keys: ['defaultInstructions', 'defaultVoice'] }]),
   );
-  assert.equal(f.values(id).defaultSpeed, 1);
-  assert.equal(f.read(id, ['defaultSpeed']).fields[0].inherited, null);
+  assert.equal(f.values(id).defaultInstructions, '');
+  assert.equal(f.read(id, ['defaultInstructions']).fields[0].inherited, null);
   assert.deepEqual(f.store.value.tts.connections[0].manualVoices, []);
   const count = f.writes();
   assert.equal(
-    f.call('apply', f.request(id, [{ kind: 'reset', keys: ['defaultSpeed'] }])).changed,
+    f.call('apply', f.request(id, [{ kind: 'reset', keys: ['defaultInstructions'] }])).changed,
     false,
   );
   assert.equal(f.writes(), count);
 });
+test('TTS settings API rejects retired speed fields atomically for defaults and server rows', (t) => {
+  const f = fixture(t);
+  const before = fs.readFileSync(f.store.file);
+  const targetId = 'service.tts.connections';
+  const row = f.call('items.list', { targetId }).items[0];
+  for (const changes of [{ defaultSpeed: 1.5 }, { speedMode: 'server' }]) {
+    for (const dryRun of [false, true]) {
+      assert.throws(
+        () =>
+          f.call(
+            'apply',
+            f.request(
+              'service.tts',
+              [{ kind: 'set', changes: { model: 'must-not-save', ...changes } }],
+              dryRun,
+            ),
+          ),
+        { code: 'NOT_FOUND' },
+      );
+      assert.throws(
+        () =>
+          f.call(
+            'apply',
+            f.request(
+              targetId,
+              [
+                {
+                  kind: 'update',
+                  itemRef: row.itemRef,
+                  changes: { model: 'must-not-save', ...changes },
+                },
+              ],
+              dryRun,
+            ),
+          ),
+        { code: 'NOT_FOUND' },
+      );
+    }
+    assert.throws(() => f.read('service.tts', Object.keys(changes)), { code: 'NOT_FOUND' });
+  }
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.equal(f.writes(), 0);
+});
+
 test('TTS preset applies dependent fields atomically, preserves credentials and accepts explicit custom overrides', (t) => {
   const f = fixture(t),
     id = 'service.tts';
@@ -1463,8 +1509,14 @@ test('TTS server list adds, edits and reorders independently of the default and 
   assert.equal(f.store.value.tts.connections[1].voicesSource, 'manual');
   assert.equal(f.store.value.tts.connections[1].instructionsParameter, 'generation.instruct');
   assert.equal(f.store.value.tts.defaultConnectionId, 'default');
-  apply([{ kind: 'update', itemRef: rows()[1].itemRef, changes: { defaultSpeed: 1.7 } }]);
-  assert.equal(f.values('service.tts').defaultSpeed, 1);
+  apply([
+    {
+      kind: 'update',
+      itemRef: rows()[1].itemRef,
+      changes: { defaultInstructions: 'second instructions' },
+    },
+  ]);
+  assert.equal(f.values('service.tts').defaultInstructions, '');
   apply([
     {
       kind: 'reorder',
@@ -1478,7 +1530,7 @@ test('TTS server list adds, edits and reorders independently of the default and 
     'apply',
     f.request('service.tts', [{ kind: 'set', changes: { defaultConnectionId: second.id } }]),
   );
-  assert.equal(f.values('service.tts').defaultSpeed, 1.7);
+  assert.equal(f.values('service.tts').defaultInstructions, 'second instructions');
   f.ttsSecrets.setKey(second, 'PRIVATE_TTS_KEY');
   f.call(
     'apply',
@@ -1521,10 +1573,15 @@ test('TTS server list adds, edits and reorders independently of the default and 
   assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
   f.call(
     'apply',
-    f.request('service.tts', [{ kind: 'reset', keys: ['defaultConnectionId', 'defaultSpeed'] }]),
+    f.request('service.tts', [
+      { kind: 'reset', keys: ['defaultConnectionId', 'defaultInstructions'] },
+    ]),
   );
   assert.equal(f.store.value.tts.defaultConnectionId, undefined);
-  assert.equal(f.store.value.tts.connections.find((c) => c.id === second.id).defaultSpeed, 1);
+  assert.equal(
+    f.store.value.tts.connections.find((c) => c.id === second.id).defaultInstructions,
+    '',
+  );
 });
 const voiceRows = (f) => f.call('items.list', { targetId: ttsList, limit: 100 }).items;
 const voiceApply = (f, operations, dryRun = false) =>

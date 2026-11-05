@@ -408,7 +408,7 @@ input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しませ�
 
 ## TTS読み上げ
 
-現行の発話引数とサーバー一覧は最低ホスト版0.156.0。tts.speak / tts.connections.list / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。発話はconnectionIdで登録を選び（省略時は既定）、instructionsで今回の話し方を指定できます。voice/speedは受け付けず、登録した設定を使います。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
+現行の発話引数とサーバー一覧は最低ホスト版0.156.0。tts.speak / tts.connections.list / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。発話はconnectionIdで登録を選び（省略時は既定）、instructionsで今回の話し方を指定できます。voice/speedは受け付けず、声は登録した設定を使います。音声は常に等速で再生します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
 ### 3.1 PC専用設定
 

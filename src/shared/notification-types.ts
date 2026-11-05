@@ -215,12 +215,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
           !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(speech.connectionId))) ||
       (speech.instructions !== undefined && typeof speech.instructions !== 'string') ||
       (speech.voice !== undefined &&
-        (typeof speech.voice !== 'string' || !speech.voice.trim() || speech.voice.length > 200)) ||
-      (speech.speed !== undefined &&
-        (typeof speech.speed !== 'number' ||
-          !Number.isFinite(speech.speed) ||
-          speech.speed < 0.25 ||
-          speech.speed > 4)))
+        (typeof speech.voice !== 'string' || !speech.voice.trim() || speech.voice.length > 200)))
   )
     throw Error(hostText('settings.notification-types.speech'));
   const sound = value.sound;

@@ -160,7 +160,7 @@ let child,
       const sound=f.req('./out/main/main/core/sounds').queueSound;
       const tts=f.req('./out/main/main/core/tts-player').playTtsWave;
       sound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('notification'));
-      tts(bytes,0.5,new AbortController().signal,1.5).catch(()=>f.errors.push('tts'));
+      tts(bytes,0.5,new AbortController().signal).catch(()=>f.errors.push('tts'));
       sound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('preview'));
       sound('',()=>true,()=>f.errors.push('empty'));
       return true;

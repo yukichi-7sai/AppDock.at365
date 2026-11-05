@@ -197,15 +197,12 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
     await choose('声', 'voice-a Voice A');
     await settleSettings(page);
-    await page.getByLabel('読み上げ速度', { exact: true }).fill('1.45');
-    await page.getByLabel('読み上げ速度', { exact: true }).press('Enter');
     await saveTts();
     assert.equal((await snapshot()).settings.value.tts.connections[0].model, '1.7B-Base');
     checks.push('Qwen catalog offers downloaded models and saves their server IDs');
     assert.equal((await snapshot()).settings.value.tts.connections[0].defaultVoice, 'voice-a');
-    assert.equal((await snapshot()).settings.value.tts.connections[0].defaultSpeed, 1.45);
     assert(!requests.includes('speech'), 'editing never speaks');
-    checks.push('voice selection and speed save without automatic speech');
+    checks.push('voice selection saves without automatic speech');
     await select('通知');
     const model = await page.evaluate(() =>
       window.dock.settingsPage.get(

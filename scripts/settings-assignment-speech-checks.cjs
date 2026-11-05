@@ -82,7 +82,6 @@ module.exports = async function ({
     undefined,
   );
   assert.equal(await host.getByLabel('通知用のボイスID', { exact: true }).count(), 0);
-  assert.equal(await host.getByLabel('通知用の読み上げ速度', { exact: true }).count(), 0);
   checks.push('notification-server-and-instructions-save-and-reset-independently');
   await field('音声生成AI').getByRole('button', { name: '設定を開く', exact: true }).click();
   await host.getByRole('heading', { name: '音声生成AI', exact: true, level: 1 }).waitFor();

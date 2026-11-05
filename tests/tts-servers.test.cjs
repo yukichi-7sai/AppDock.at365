@@ -30,7 +30,6 @@ function fixture(t) {
     baseUrl: 'http://fixture/v1',
     model: id,
     defaultVoice: id,
-    defaultSpeed: id === 'one' ? 1.2 : 1.4,
   });
   return { store, keys, controller, file, server };
 }
@@ -53,6 +52,37 @@ test('server settings validate stable identities, retain order and retire only f
   assert.equal(previous.host.soundEnabled, false);
   assert.equal(selectedTtsServer({ connections: [one] }), undefined);
 });
+test('retired speed preferences are discarded on reload and save without losing servers or credentials', (t) => {
+  const f = fixture(t);
+  f.controller.save(f.server('one'), null, 'first-secret');
+  f.controller.save(f.server('two'), null, 'second-secret');
+  const keys = fs.readFileSync(f.file);
+  const saved = JSON.parse(fs.readFileSync(f.store.file, 'utf8'));
+  saved.host = { ...saved.host, soundEnabled: false };
+  saved.tts.connections[0].defaultSpeed = 1.8;
+  saved.tts.connections[0].speedMode = 'playback';
+  saved.tts.connections[1].defaultSpeed = 'retired-value';
+  saved.tts.connections[1].speedMode = 'server';
+  fs.writeFileSync(f.store.file, JSON.stringify(saved));
+  f.store.load();
+  assert.equal(f.store.value.host.soundEnabled, false);
+  assert.equal(f.store.value.tts.defaultConnectionId, 'one');
+  assert.deepEqual(f.store.value.tts.connections, [f.server('one'), f.server('two')]);
+  assert.equal(f.controller.configuration('one').key, 'first-secret');
+  assert.equal(f.controller.configuration('two').key, 'second-secret');
+  const one = selectedTtsServer(f.store.value.tts);
+  f.controller.save({ ...one, name: 'Renamed' }, one, undefined, f.keys.revision(one.id));
+  f.store.load();
+  const persisted = JSON.parse(fs.readFileSync(f.store.file, 'utf8'));
+  assert.equal(persisted.tts.connections[0].name, 'Renamed');
+  for (const server of persisted.tts.connections) {
+    assert.equal(Object.hasOwn(server, 'defaultSpeed'), false);
+    assert.equal(Object.hasOwn(server, 'speedMode'), false);
+  }
+  assert.equal(f.store.value.host.soundEnabled, false);
+  assert.deepEqual(fs.readFileSync(f.file), keys);
+});
+
 test('two servers at the same URL keep separate keys and speech defaults across reload', (t) => {
   const f = fixture(t);
   f.controller.save(f.server('one'), null, 'first-secret');
@@ -60,7 +90,7 @@ test('two servers at the same URL keep separate keys and speech defaults across 
   assert.equal(f.store.value.tts.defaultConnectionId, 'one');
   assert.equal(f.controller.configuration('one').key, 'first-secret');
   assert.equal(f.controller.configuration('two').key, 'second-secret');
-  assert.equal(f.controller.configuration('two').settings.defaultSpeed, 1.4);
+  assert.equal(f.controller.configuration('two').settings.defaultVoice, 'two');
   assert.equal(f.store.value.tts.defaultConnectionId, 'one');
   assert(!fs.readFileSync(f.file, 'utf8').includes('secret'));
   f.store.load();

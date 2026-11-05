@@ -497,7 +497,6 @@ async function checkSectionTitles() {
     }
     if (assignmentSpeechOnly) {
       initial.tts.connections[0].defaultVoice = 'fixture-voice';
-      initial.tts.connections[0].defaultSpeed = 1.25;
     }
     initial.extensions['fixture.hints'] = { enabled: true, settings: {} };
     const fixture = path.join(profile, 'extensions', 'hints');

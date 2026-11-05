@@ -55,27 +55,51 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
     before = await read(tts),
     sharedFile = require('./test-settings.cjs').file(path.dirname(local), 'settings.json'),
     sharedBefore = fs.readFileSync(sharedFile, 'utf8');
+  for (const changes of [{ defaultSpeed: 1.5 }, { speedMode: 'server' }]) {
+    const rejected = await tool(
+      'appdock_settings_apply',
+      await request(tts, [{ kind: 'set', changes: { model: 'must-not-save', ...changes } }]),
+    );
+    assert.equal(rejected.isError, true);
+    assert.equal(rejected.structuredContent.code, 'NOT_FOUND');
+  }
+  assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
   const preview = await value(
     'appdock_settings_apply',
-    await request(tts, [{ kind: 'set', changes: { defaultSpeed: 1.5 } }], true),
+    await request(
+      tts,
+      [{ kind: 'set', changes: { defaultInstructions: 'preview instructions' } }],
+      true,
+    ),
   );
   assert.equal(preview.completion, 'validated');
   assert.equal((await read(tts)).revision, before.revision);
   assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
-  await apply(tts, [{ kind: 'set', changes: { defaultSpeed: 1.75, model: 'mcp-model' } }]);
+  await apply(tts, [
+    { kind: 'set', changes: { defaultInstructions: 'mcp instructions', model: 'mcp-model' } },
+  ]);
   await select('音声生成AI');
   await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
   await page.getByRole('tab', { name: '声・話し方', exact: true }).click();
   await until(
-    async () => (await page.getByLabel('読み上げ速度', { exact: true }).inputValue()) === '1.75',
+    async () =>
+      (await page.getByLabel('指定がないときの話し方', { exact: true }).inputValue()) ===
+      'mcp instructions',
     'TTS UI received MCP save',
   );
-  await page.getByLabel('読み上げ速度', { exact: true }).fill('1.25');
-  await page.getByLabel('読み上げ速度', { exact: true }).press('Tab');
-  assert.equal((await vals(tts)).defaultSpeed, 1.75, 'dialog edits stay local until OK');
+  await page.getByLabel('指定がないときの話し方', { exact: true }).fill('ui instructions');
+  await page.getByLabel('指定がないときの話し方', { exact: true }).press('Tab');
+  assert.equal(
+    (await vals(tts)).defaultInstructions,
+    'mcp instructions',
+    'dialog edits stay local until OK',
+  );
   await page.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await until(async () => (await vals(tts)).defaultSpeed === 1.25, 'TTS UI save reached MCP');
+  await until(
+    async () => (await vals(tts)).defaultInstructions === 'ui instructions',
+    'TTS UI save reached MCP',
+  );
   const ttsOriginal = (await snapshot()).settings.value.tts.connections[0];
   const ttsStatus = await page.evaluate(
     async () =>

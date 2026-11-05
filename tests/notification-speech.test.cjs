@@ -64,7 +64,6 @@ function setup(t, extra = {}) {
         baseUrl: 'http://localhost:8080/v1',
         model: 'model',
         defaultVoice: 'common',
-        speedMode: 'server',
       },
     ],
     defaultConnectionId: 'default',
@@ -91,9 +90,9 @@ function setup(t, extra = {}) {
       posts.push(JSON.parse(o.body));
       return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
     },
-    play: async (b, d, s, sp, guard) => {
+    play: async (b, d, s, guard) => {
       guard?.();
-      played.push(sp);
+      played.push(b);
     },
     ...extra.tts,
   });
@@ -180,7 +179,6 @@ test('notification speech settings inherit independently and reject invalid or s
     defaultConnectionId: 'default',
   };
   s.tts.connections[0].defaultVoice = 'common';
-  s.tts.connections[0].defaultSpeed = 1.2;
   s.notificationPreferences = {
     overrides: [],
     speech: { connectionId: 'other', instructions: '通知用' },
@@ -199,9 +197,6 @@ test('notification speech settings inherit independently and reject invalid or s
   for (const speech of [
     { voice: '' },
     { voice: null },
-    { speed: 0 },
-    { speed: NaN },
-    { speed: 4.1 },
     { baseUrl: 'http://other' },
     { apiKey: 'secret' },
     { connectionId: '' },
@@ -253,11 +248,11 @@ test('off to on never reads old notices and failed TTS does not reject or hide d
   assert.equal(f.service.list().find((i) => i.id === b.notificationId).status, 'active');
   assert.equal(f.service.list().find((i) => i.id === a.notificationId).status, 'active');
 });
-test('startup preserves captured voice and speed and expiry permits speech; generation stop cancels after expiry', async (t) => {
+test('startup preserves captured voice and instructions and expiry permits speech; generation stop cancels after expiry', async (t) => {
   let resolvePlay;
   const f = setup(t, {
     tts: {
-      play: async (b, d, s, sp, guard) => {
+      play: async (b, d, s, guard) => {
         guard?.();
         await new Promise((r) => {
           resolvePlay = r;
@@ -268,12 +263,11 @@ test('startup preserves captured voice and speed and expiry permits speech; gene
   });
   f.ready(false);
   f.settings.tts.connections.push(
-    ...['notice', 'next', 'later'].map((id, i) => ({
+    ...['notice', 'next', 'later'].map((id) => ({
       ...f.settings.tts.connections[0],
       id,
       name: id,
       defaultVoice: id,
-      defaultSpeed: [1.7, 2, 3][i],
       instructionsMode: 'json',
       alwaysInstructions: '共通',
       defaultInstructions: '既定',
@@ -297,7 +291,7 @@ test('startup preserves captured voice and speed and expiry permits speech; gene
   f.ready(true);
   await wait(() => f.posts.length === 1 && resolvePlay);
   assert.equal(f.posts[0].voice, 'next');
-  assert.equal(f.posts[0].speed, 2);
+  assert.equal(Object.hasOwn(f.posts[0], 'speed'), false);
   assert.equal(f.posts[0].instructions, '共通\n予約時');
   f.stop();
   await wait(() => !f.speech.allows('notification:' + b.notificationId));
@@ -354,7 +348,7 @@ test('shared TTS queue preserves notification snapshots and isolates cancellatio
   let release;
   const f = setup(t, {
     tts: {
-      play: async (b, d, s, sp, guard) => {
+      play: async (b, d, s, guard) => {
         guard?.();
         await new Promise((r) => {
           release = r;
@@ -410,7 +404,7 @@ test('starting playback before freshness deadline permits long playback past tha
   const f = setup(t, {
     startMs: 35,
     tts: {
-      play: async (b, d, s, sp, guard) => {
+      play: async (b, d, s, guard) => {
         guard?.();
         await new Promise((r) => {
           release = r;
