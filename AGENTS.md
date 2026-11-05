@@ -1,6 +1,6 @@
 # AppDockの作業ルール
 
-A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](../AGENTS.md)を読む。このファイルはAppDock全体に適用する。兄弟Appletの変更では、そのrepoの指示も確認する。
+A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示](../AGENTS.md)を読む。このファイルはAppDock全体に適用する。兄弟Appletの変更では、そのrepoの指示も確認する。
 
 ## 文書と作業範囲
 
