@@ -4,15 +4,14 @@ import { orderedReads } from './ordered-io';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn, execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
+import { executeNativeHelper as execute, nativeMessages } from './native-messages';
 import { compareVersions, parseVersion } from '../../shared/versions';
 import { validateUpdateSource } from '../../shared/update-sources';
 import { readManifest } from './extensions';
 import type { UpdateResult, UpdateState, UpdateSettings } from '../../shared/contracts';
 import type { AppletPackagePlan } from '../../shared/applet-packages';
 
-const execute = promisify(execFile);
 const fs = physicalFs.promises;
 const { createReadStream } = physicalFs;
 const limit = 512 * 1024 * 1024;
@@ -1066,6 +1065,7 @@ export class PortableUpdates {
       operationId,
       showProgress: true,
       progressMessages: updaterWindowMessages(),
+      nativeMessages: nativeMessages(),
       baseDirectory: this.options.baseDirectory,
       executable: this.options.executable,
       args: this.options.restartArgs,

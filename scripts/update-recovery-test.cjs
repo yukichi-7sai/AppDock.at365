@@ -54,6 +54,7 @@ source = source.replace(
 );
 assert.ok(source.includes('args[0] == "--hold"'));
 fs.writeFileSync(path.join(output, 'Program.cs'), source);
+fs.copyFileSync(path.join(root, 'dotnet/NativeMessages.cs'), path.join(output, 'NativeMessages.cs'));
 for (const name of [
   'PackageTransactions.cs',
   'HostPackage.cs',

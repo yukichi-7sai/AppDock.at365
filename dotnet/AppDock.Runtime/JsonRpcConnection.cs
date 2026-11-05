@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace AppDock.Runtime;
 
-internal sealed class JsonRpcConnection(TextReader input, TextWriter output) : IAsyncDisposable
+internal sealed class JsonRpcConnection(TextReader input, TextWriter output, Func<Exception, object>? describeError = null) : IAsyncDisposable
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim writeLock = new(1, 1);
@@ -79,7 +79,11 @@ internal sealed class JsonRpcConnection(TextReader input, TextWriter output) : I
         catch (Exception e)
         {
             if (hasId && !lifetime.IsCancellationRequested)
-                try { await SendAsync(new { jsonrpc = "2.0", id, error = new { code = -32000, message = e.Message } }, lifetime.Token); }
+                try {
+                    object error = describeError is null ? new { code = -32000, message = e.Message }
+                        : new { code = -32000, message = e.Message, data = describeError(e) };
+                    await SendAsync(new { jsonrpc = "2.0", id, error }, lifetime.Token);
+                }
                 catch (Exception) when (lifetime.IsCancellationRequested) { }
         }
     }

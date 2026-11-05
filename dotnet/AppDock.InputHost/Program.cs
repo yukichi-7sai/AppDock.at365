@@ -30,7 +30,7 @@ internal static class Program
         using var palettePaste = new PalettePaste(app.Dispatcher);
         using var capture = new InputCaptureThread();
         _ = Task.Run(async () => {
-            await using var peer = new JsonRpcConnection(Console.In, output);
+            await using var peer = new JsonRpcConnection(Console.In, output, NativeMessages.Describe);
             using var inputSender = new InputSender();
             var touchpad = new TouchpadWindowsController(() => { _ = peer.NotifyAsync("touchpad.changed", new { }); });
             await capture.BindAsync(p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime),

@@ -148,7 +148,7 @@ import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
 import { PortableUpdates, type UpdateTarget } from './core/portable-updates';
-import { execFileSync } from 'node:child_process';
+import { recoverNativeUpdate } from './core/native-messages';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
 import { RibbonState } from './core/ribbon-state';
@@ -4138,7 +4138,7 @@ async function initialize() {
     : path.join(app.getAppPath(), '.artifacts', 'updater', 'AppDock.Updater.exe');
   if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) {
     try {
-      execFileSync(helperPath, ['--recover', baseDirectory, dataDirectory], { windowsHide: true });
+      recoverNativeUpdate(helperPath, baseDirectory, dataDirectory);
     } catch (error) {
       dialog.showErrorBox(
         hostText('services.index.updateRecoveryTitle'),

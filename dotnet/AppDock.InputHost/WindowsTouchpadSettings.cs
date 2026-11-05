@@ -24,16 +24,16 @@ internal sealed class TouchpadRegistryValues : ITouchpadValues
     internal const string Path = @"Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad";
     public TouchpadValue Read(string name)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(Path) ?? throw new InvalidOperationException("タッチパッドのWindows設定が見つかりません。");
+        using var key = Registry.CurrentUser.OpenSubKey(Path) ?? throw NativeMessages.Error("native.touchpad.settingsMissing", text => new InvalidOperationException(text));
         var value = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
         if (value == null) return new(false);
         if (key.GetValueKind(name) != RegistryValueKind.DWord || value is not int number)
-            throw new InvalidDataException("タッチパッドのWindows設定形式を確認できません。");
+            throw NativeMessages.Error("native.touchpad.settingsFormat", text => new InvalidDataException(text));
         return new(true, unchecked((uint)number));
     }
     public void Write(string name, TouchpadValue value)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(Path, true) ?? throw new InvalidOperationException("タッチパッド設定へ書き込めません。");
+        using var key = Registry.CurrentUser.OpenSubKey(Path, true) ?? throw NativeMessages.Error("native.touchpad.settingsNotWritable", text => new InvalidOperationException(text));
         if (value.Exists) key.SetValue(name, unchecked((int)value.Value), RegistryValueKind.DWord);
         else key.DeleteValue(name, false);
         key.Flush();
@@ -68,11 +68,11 @@ internal static class TouchpadWindowsModel
     {
         var parts = shortcut.Split('+');
         if (!int.TryParse(parts[^1].TrimStart('F'), out var function) || parts[^1] != "F" + function || function is < 13 or > 24)
-            throw new ArgumentException("接続用キーはF13～F24です。");
+            throw NativeMessages.Error("native.touchpad.connectionKey", text => new ArgumentException(text));
         uint modifiers = 0;
         foreach (var part in parts[..^1]) {
-            uint flag = part switch { "Ctrl" => 1, "Shift" => 2, "Win" => 4, "Alt" => 16, _ => throw new ArgumentException("修飾キーが不正です。") };
-            if ((modifiers & flag) != 0) throw new ArgumentException("修飾キーが重複しています。");
+            uint flag = part switch { "Ctrl" => 1, "Shift" => 2, "Win" => 4, "Alt" => 16, _ => throw NativeMessages.Error("native.touchpad.invalidModifier", text => new ArgumentException(text)) };
+            if ((modifiers & flag) != 0) throw NativeMessages.Error("native.touchpad.duplicateModifier", text => new ArgumentException(text));
             modifiers |= flag;
         }
         return ((uint)(0x70 + function - 1) << 16) | modifiers;
@@ -92,14 +92,14 @@ internal static class TouchpadWindowsModel
     internal static TouchpadWindowsPlan Plan(TouchpadWindowsSnapshot snapshot, Dictionary<string, string> connections)
     {
         if (connections.Count is < 1 or > 10 || connections.Keys.Any(id => !Descriptors.Any(row => row.Id == id)))
-            throw new ArgumentException("変更するジェスチャーを確認してください。");
+            throw NativeMessages.Error("native.touchpad.invalidGesture", text => new ArgumentException(text));
         var desired = new Dictionary<string, uint>();
         foreach (var (id, shortcut) in connections) {
             var row = Descriptors.Single(row => row.Id == id);
             if (row.Direction != 0 && snapshot.Effective[row.Mode] != 0xFFFF)
                 foreach (var sibling in Descriptors.Where(sibling => sibling.Mode == row.Mode))
                     desired[sibling.Action] = Action(sibling, snapshot.Effective)
-                        ?? throw new InvalidOperationException("ほかの方向の動作を維持できないWindows設定のため、変更しません。");
+                        ?? throw NativeMessages.Error("native.touchpad.cannotPreserveDirections", text => new InvalidOperationException(text));
             desired[row.Key] = Encode(shortcut);
             desired[row.Action] = row.CustomAction;
             desired[row.Mode] = 0xFFFF;
@@ -114,7 +114,7 @@ internal static class TouchpadWindowsModel
         var gestures = Gestures(after);
         foreach (var (id, shortcut) in connections)
             if (gestures.Count(row => row.Key == shortcut) != 1)
-                throw new InvalidOperationException("Windowsの別のジェスチャーと接続用キーが重複しています。");
+                throw NativeMessages.Error("native.touchpad.duplicateConnection", text => new InvalidOperationException(text));
         var modes = Descriptors.Select(row => row.Mode).ToHashSet();
         var changes = desired.OrderBy(pair => modes.Contains(pair.Key) ? 1 : 0)
             .Select(pair => new TouchpadChange(pair.Key, snapshot.Values[pair.Key], new(true, pair.Value)))
@@ -143,35 +143,35 @@ internal sealed class WindowsTouchpadSettings : IDisposable
         using var cache = openCache();
         var raw = TouchpadWindowsModel.Names.ToDictionary(name => name, name => values.Read(name));
         var effective = TouchpadWindowsModel.Names.ToDictionary(name => name, cache.Read);
-        if (observed != generation()) throw new IOException("Windows設定の変更を確認中です。再確認してください。");
+        if (observed != generation()) throw NativeMessages.Error("native.touchpad.changePending", text => new IOException(text));
         var revision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { raw, effective }))));
         return new(observed, revision, raw, effective, TouchpadWindowsModel.Gestures(effective));
     }
     internal TouchpadWindowsSnapshot Apply(TouchpadWindowsPlan plan)
     {
         var current = Read();
-        if (current.Revision != plan.Revision) throw new IOException("Windows設定が操作前に変更されました。再確認してください。");
+        if (current.Revision != plan.Revision) throw NativeMessages.Error("native.touchpad.changedBefore", text => new IOException(text));
         // Recompute server-side: IPC cannot write arbitrary values or paths.
         var validated = TouchpadWindowsModel.Plan(current, plan.Connections);
-        if (JsonSerializer.Serialize(validated.Changes) != JsonSerializer.Serialize(plan.Changes)) throw new ArgumentException("Windows設定の変更計画が一致しません。");
+        if (JsonSerializer.Serialize(validated.Changes) != JsonSerializer.Serialize(plan.Changes)) throw NativeMessages.Error("native.touchpad.planMismatch", text => new ArgumentException(text));
         using var cache = openCache();
         var written = new List<TouchpadChange>();
         try {
             foreach (var change in validated.Changes) {
-                if (values.Read(change.Name) != change.Before) throw new IOException("Windows設定が操作中に変更されました。");
+                if (values.Read(change.Name) != change.Before) throw NativeMessages.Error("native.touchpad.changedDuring", text => new IOException(text));
                 values.Write(change.Name, change.After); written.Add(change);
-                if (values.Read(change.Name) != change.After) throw new IOException("Windows設定の保存を確認できません。");
+                if (values.Read(change.Name) != change.After) throw NativeMessages.Error("native.touchpad.saveUnconfirmed", text => new IOException(text));
                 cache.Changed(change.Name);
-                if (cache.Read(change.Name) != change.After.Value) throw new IOException("Windows設定の反映を確認できません。");
+                if (cache.Read(change.Name) != change.After.Value) throw NativeMessages.Error("native.touchpad.applyUnconfirmed", text => new IOException(text));
             }
             var after = Read();
             foreach (var row in after.Gestures) {
                 if (validated.Connections.TryGetValue(row.Gesture, out var key)) {
-                    if (row.Key != key) throw new IOException("接続用キーの反映を確認できません。");
+                    if (row.Key != key) throw NativeMessages.Error("native.touchpad.keyUnconfirmed", text => new IOException(text));
                 } else {
                     var before = validated.Before.Single(before => before.Gesture == row.Gesture);
                     if (row.Action != before.Action || row.Key != before.Key || row.Supported != before.Supported)
-                        throw new IOException("変更対象以外のジェスチャーの動作を確認できません。");
+                        throw NativeMessages.Error("native.touchpad.otherGestureUnconfirmed", text => new IOException(text));
                 }
             }
             return after;
@@ -229,7 +229,7 @@ internal sealed class TouchpadWindowsController : IDisposable
     internal TouchpadWindowsController(Action changed)
     {
         var user = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
-            ?? throw new InvalidOperationException("Windowsユーザーを確認できません。");
+            ?? throw NativeMessages.Error("native.touchpad.userUnknown", text => new InvalidOperationException(text));
         lease = new Mutex(false, "Local\\AppDock.TouchpadBridge." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(user))));
         monitor = new TouchpadWindowsMonitor(changed);
         TouchpadInputLease.Monitor = monitor;
@@ -250,13 +250,13 @@ internal sealed class TouchpadWindowsController : IDisposable
         if (method == "touchpad.read") return settings.Read();
         if (method == "touchpad.plan") {
             var connections = request.GetProperty("connections").Deserialize<Dictionary<string, string>>(AppDock.Runtime.JsonRpcConnection.Json)
-                ?? throw new ArgumentException("接続先がありません。");
+                ?? throw NativeMessages.Error("native.touchpad.connectionMissing", text => new ArgumentException(text));
             return TouchpadWindowsModel.Plan(settings.Read(), connections);
         }
         if (method == "touchpad.apply") {
-            if (!owned) throw new InvalidOperationException("このAppDockはタッチパッド接続を所有していません。");
+            if (!owned) throw NativeMessages.Error("native.touchpad.notOwner", text => new InvalidOperationException(text));
             var plan = request.GetProperty("plan").Deserialize<TouchpadWindowsPlan>(AppDock.Runtime.JsonRpcConnection.Json)
-                ?? throw new ArgumentException("変更計画がありません。");
+                ?? throw NativeMessages.Error("native.touchpad.planMissing", text => new ArgumentException(text));
             return settings.Apply(plan);
         }
         throw new ArgumentException("Unknown touchpad operation.");

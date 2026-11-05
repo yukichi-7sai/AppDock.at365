@@ -41,15 +41,15 @@ internal sealed class InputSender : IDisposable
             // Window-directed app commands retain their ordinary-window restriction.
             if (target == 0 || !IsWindowVisible(target) ||
                 (method == "input.appCommand" && (target == GetDesktopWindow() || target == GetShellWindow())))
-                throw new InvalidOperationException("操作対象のウィンドウを最前面にしてください。");
+                throw NativeMessages.Error("native.input.foregroundRequired", text => new InvalidOperationException(text));
             var expected = new nint(long.Parse(p.GetProperty("window").GetString()!));
-            if (expected != 0 && expected != target) throw new InvalidOperationException("開始時のウィンドウが最前面ではないため中止しました。");
+            if (expected != 0 && expected != target) throw NativeMessages.Error("native.input.startTargetChanged", text => new InvalidOperationException(text));
             InputKeyChord? chord = method == "input.sendKeys" ? InputKeyChord.Parse(p.GetProperty("keys").GetString()!) : null;
             var requestedChord = chord;
             var appCommand = method == "input.appCommand" ? p.GetProperty("action").GetString() switch {
-                "back" => 1, "forward" => 2, "reload" => 3, _ => throw new ArgumentException("未対応の操作です。")
+                "back" => 1, "forward" => 2, "reload" => 3, _ => throw NativeMessages.Error("native.input.unsupportedOperation", text => new ArgumentException(text))
             } : 0;
-            if (chord is null && appCommand == 0) throw new ArgumentException("未対応の操作です。");
+            if (chord is null && appCommand == 0) throw NativeMessages.Error("native.input.unsupportedOperation", text => new ArgumentException(text));
             var start = Environment.TickCount64;
             while (true) {
                 if (requestedChord?.Symbol is char symbol)
@@ -57,7 +57,7 @@ internal sealed class InputSender : IDisposable
                 if (!HeldModifiers.Any(Pressed) && (chord is null || !Pressed(chord.Key))) break;
                 await Task.Delay(25, token);
                 CheckTarget(target);
-                if (Environment.TickCount64 - start >= 2000) throw new InvalidOperationException("修飾キーを離してから再実行してください。");
+                if (Environment.TickCount64 - start >= 2000) throw NativeMessages.Error("native.input.releaseModifiers", text => new InvalidOperationException(text));
             }
             token.ThrowIfCancellationRequested();
             CheckTarget(target);
@@ -72,17 +72,17 @@ internal sealed class InputSender : IDisposable
                     var releases = events.Take((int)sent).Where(e => (e.Data.Keyboard.Flags & 2) == 0).Reverse()
                         .Select(e => KeyEvent(e.Data.Keyboard.Key, true, (e.Data.Keyboard.Flags & 1) != 0)).ToArray();
                     if (releases.Length > 0) SendInput((uint)releases.Length, releases, Marshal.SizeOf<Input>());
-                    throw new InvalidOperationException("キーの一部を送信できませんでした。操作先を確認してください。");
+                    throw NativeMessages.Error("native.input.partialSend", text => new InvalidOperationException(text));
                 }
             } else if (SendMessageTimeout(target, 0x0319, target, new nint(appCommand << 16), 0x22, 1000, out var handled) == 0 || handled == 0)
-                throw new InvalidOperationException("操作メッセージが処理されませんでした。");
+                throw NativeMessages.Error("native.input.commandNotProcessed", text => new InvalidOperationException(text));
             return new { ok = true };
-        } catch (OperationCanceledException) { return new { ok = false, code = "CANCELLED", message = "入力操作は取り消されました。送信済みの入力は元に戻りません。" }; }
-        catch (ArgumentException) { return new { ok = false, code = "INVALID_ARGUMENT", message = "入力操作の引数が不正です。" }; }
-        catch (Exception) { return new { ok = false, code = "INPUT_FAILED", message = "入力操作が完了しませんでした。送信先・キーの押下状態・権限を確認してください。" }; }
+        } catch (OperationCanceledException) { return new { ok = false, code = "CANCELLED", message = NativeMessages.Message("native.input.cancelled") }; }
+        catch (ArgumentException) { return new { ok = false, code = "INVALID_ARGUMENT", message = NativeMessages.Message("native.input.invalidArguments") }; }
+        catch (Exception) { return new { ok = false, code = "INPUT_FAILED", message = NativeMessages.Message("native.input.failed") }; }
         finally { if (entered) gate.Release(); lock (sync) pending.Remove(id); }
     }
-    private static void CheckTarget(nint target) { if (GetForegroundWindow() != target || !IsWindowVisible(target)) throw new InvalidOperationException("操作先が変わりました。"); }
+    private static void CheckTarget(nint target) { if (GetForegroundWindow() != target || !IsWindowVisible(target)) throw NativeMessages.Error("native.input.targetChanged", text => new InvalidOperationException(text)); }
     private static bool Pressed(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
     internal static bool PasteKeysHeld() => HeldModifiers.Any(Pressed) || Pressed(0x56);
     internal static void SubmitPasteShortcut()
@@ -94,7 +94,7 @@ internal sealed class InputSender : IDisposable
             var releases = sent == 2 ? events[2..] : events[3..];
             SendInput((uint)releases.Length, releases, Marshal.SizeOf<Input>());
         }
-        throw new InvalidOperationException("貼り付けキーを送信できませんでした。");
+        throw NativeMessages.Error("native.input.pasteKeyFailed", text => new InvalidOperationException(text));
     }
     public void Dispose() { lock (sync) { disposed = true; foreach (var cts in pending.Values) cts.Cancel(); } }
     private static Input KeyEvent(ushort key, bool up, bool extended) => new() {

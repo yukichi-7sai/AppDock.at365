@@ -34,7 +34,7 @@ internal static partial class Program
                 // Registered volume ancestors are normal storage, including during apply/recovery.
                 // A linked target or any mount/link inside a payload tree is still rejected.
                 if (!Same(current, boundary) && Within(current, boundary) && VolumeMount(current)) continue;
-                throw new IOException("更新対象にリンク・ジャンクションを使用できません。");
+                throw NativeMessages.Error("native.updater.linksDenied", text => new IOException(text));
             }
     }
     private static void SafeName(string name)
@@ -42,7 +42,7 @@ internal static partial class Program
         if (string.IsNullOrEmpty(name) || name.StartsWith('/') || name.Contains('\\') || name.Contains(':') || name.Any(c => c < 32) ||
             name.Split('/').Any(p => string.IsNullOrEmpty(p) || p is "." or ".." || p.EndsWith('.') || p.EndsWith(' ') ||
                 System.Text.RegularExpressions.Regex.IsMatch(p, @"^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
-            throw new IOException("更新ファイルに使用できないパスが含まれています。");
+            throw NativeMessages.Error("native.updater.invalidPath", text => new IOException(text));
     }
     private static string Hash(string file)
     {
@@ -70,7 +70,7 @@ internal static partial class Program
                 else
                 {
                     size += new FileInfo(file).Length;
-                    if (size > max || files.Count >= 10000) throw new IOException("更新ファイルのサイズ・個数が上限を超えました。");
+                    if (size > max || files.Count >= 10000) throw NativeMessages.Error("native.updater.fileLimit", text => new IOException(text));
                     files.Add(file);
                 }
             }
@@ -79,18 +79,18 @@ internal static partial class Program
     }
     private static void Extract(string archive, string directory, long max = Limit)
     {
-        if (Directory.Exists(directory)) throw new IOException("展開先は空の新規フォルダーにしてください。");
+        if (Directory.Exists(directory)) throw NativeMessages.Error("native.updater.extractDestination", text => new IOException(text));
         Directory.CreateDirectory(directory); NoLinks(directory);
         using var zip = ZipFile.OpenRead(archive);
         long size = 0; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (zip.Entries.Count > 10000) throw new IOException("ZIPのファイル数が上限を超えました。");
+        if (zip.Entries.Count > 10000) throw NativeMessages.Error("native.updater.zipFileLimit", text => new IOException(text));
         foreach (var entry in zip.Entries)
         {
             var name = entry.FullName.TrimEnd('/'); SafeName(name);
-            if (((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000) throw new IOException("ZIPにリンクを含めることはできません。");
-            if (!paths.Add(name)) throw new IOException("ZIPに重複したパスがあります。");
+            if (((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000) throw NativeMessages.Error("native.updater.zipLinksDenied", text => new IOException(text));
+            if (!paths.Add(name)) throw NativeMessages.Error("native.updater.zipDuplicatePath", text => new IOException(text));
             var destination = Full(Path.Combine(directory, name));
-            if (!Within(directory, destination) || (size += entry.Length) > max) throw new IOException("ZIPの展開範囲・サイズが上限を超えました。");
+            if (!Within(directory, destination) || (size += entry.Length) > max) throw NativeMessages.Error("native.updater.zipExtractionLimit", text => new IOException(text));
             if (entry.FullName.EndsWith('/')) Directory.CreateDirectory(destination);
             else { Directory.CreateDirectory(Path.GetDirectoryName(destination)!); entry.ExtractToFile(destination, false); }
         }
@@ -132,12 +132,12 @@ internal static partial class Program
     {
         NoLinks(item.Source); NoLinks(item.Destination);
         var digest = FileItem(item.Kind) ? Hash(item.Source) : TreeHash(item.Source, item.Kind == "host-directory" ? HostLimit : Limit);
-        if (!string.Equals(digest, item.Sha256, StringComparison.OrdinalIgnoreCase)) throw new IOException("準備済み更新ファイルのハッシュが一致しません。");
+        if (!string.Equals(digest, item.Sha256, StringComparison.OrdinalIgnoreCase)) throw NativeMessages.Error("native.updater.preparedHashMismatch", text => new IOException(text));
         if (item.Kind == "applet")
         {
             using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(item.Source, "extension.json")));
             if (manifest.RootElement.GetProperty("id").GetString() != item.Id || manifest.RootElement.GetProperty("version").GetString() != item.Version)
-                throw new IOException("準備済みAppletのID・版が一致しません。");
+                throw NativeMessages.Error("native.updater.preparedAppletMismatch", text => new IOException(text));
         }
     }
     private static void Restart(string executable, string[] arguments, UpdateProgressWindow? progress = null)
@@ -153,7 +153,7 @@ internal static partial class Program
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         try
         {
-            using var process = Process.Start(start) ?? throw new IOException("AppDockを起動できませんでした。");
+            using var process = Process.Start(start) ?? throw NativeMessages.Error("native.updater.startFailed", text => new IOException(text));
             if (pipe is not null && !WaitForUpdatedWindow(pipe, process).GetAwaiter().GetResult())
                 progress?.Outcome("startupUnconfirmed");
         }
@@ -167,7 +167,7 @@ internal static partial class Program
         // Normal state is local-only. Isolated tests can keep state within their placement.
         if (!Same(state, legacy) && !Within(baseDirectory, state) &&
             !(Same(Path.GetDirectoryName(state)!, profiles) && System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(state), "^[a-f0-9]{64}$")))
-            throw new IOException("PC専用の更新記録保存先が正しくありません。");
+            throw NativeMessages.Error("native.updater.invalidStateDirectory", text => new IOException(text));
         NoLinks(state); return state;
     }
     private static void Apply(string jobPath)
@@ -176,45 +176,46 @@ internal static partial class Program
         var stage = Path.GetDirectoryName(jobPath)!;
         NoLinks(stage);
         if (!Path.GetFileName(stage).StartsWith("AppDock-update-", StringComparison.Ordinal) || !Within(Path.GetTempPath(), stage))
-            throw new IOException("更新ジョブは専用の一時フォルダーに必要です。");
+            throw NativeMessages.Error("native.updater.jobDirectory", text => new IOException(text));
         using var job = JsonDocument.Parse(File.ReadAllText(jobPath));
         var root = job.RootElement;
+        if (root.TryGetProperty("nativeMessages", out var messages)) NativeMessages.Set(messages);
         if (root.GetProperty("schemaVersion").GetInt32() == 2) { ApplyPackageJob(root, stage, jobPath); return; }
-        if (root.GetProperty("schemaVersion").GetInt32() != 1) throw new IOException("更新ジョブの形式が違います。");
+        if (root.GetProperty("schemaVersion").GetInt32() != 1) throw NativeMessages.Error("native.updater.jobSchema", text => new IOException(text));
         var baseDirectory = Full(root.GetProperty("baseDirectory").GetString()!); NoLinks(baseDirectory);
         var executable = Full(root.GetProperty("executable").GetString()!); NoLinks(executable);
         var result = Full(root.GetProperty("result").GetString()!);
         var stateDirectory = StateDirectory(baseDirectory, root.TryGetProperty("stateDirectory", out var state) && state.ValueKind == JsonValueKind.String ? state.GetString() : null);
-        if (!Same(result, Path.Combine(stateDirectory, "update-result.json"))) throw new IOException("結果保存先が正しくありません。");
+        if (!Same(result, Path.Combine(stateDirectory, "update-result.json"))) throw NativeMessages.Error("native.updater.resultLocation", text => new IOException(text));
         var arguments = root.GetProperty("args").EnumerateArray().Select(v => v.GetString()!).ToArray();
         var swaps = new List<Swap>(); var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in root.GetProperty("items").EnumerateArray())
         {
             var item = new Item(value.GetProperty("kind").GetString()!, value.GetProperty("id").GetString()!, value.GetProperty("version").GetString()!,
                 Full(value.GetProperty("source").GetString()!), Full(value.GetProperty("destination").GetString()!), value.GetProperty("sha256").GetString());
-            if (!Within(stage, item.Source) || !destinations.Add(item.Destination)) throw new IOException("更新ジョブの範囲・重複が正しくありません。");
+            if (!Within(stage, item.Source) || !destinations.Add(item.Destination)) throw NativeMessages.Error("native.updater.jobScope", text => new IOException(text));
             if (item.Kind == "host")
             {
                 if (item.Id != "host" || !Same(item.Destination, executable) || !Same(Path.GetDirectoryName(executable)!, baseDirectory) ||
-                    !string.Equals(Path.GetFileName(executable), "AppDock.at365.exe", StringComparison.OrdinalIgnoreCase)) throw new IOException("本体更新先が正しくありません。");
+                    !string.Equals(Path.GetFileName(executable), "AppDock.at365.exe", StringComparison.OrdinalIgnoreCase)) throw NativeMessages.Error("native.updater.hostDestination", text => new IOException(text));
             }
             else if (item.Kind != "applet" || !Same(Path.GetDirectoryName(item.Destination)!, Path.Combine(baseDirectory, "extensions")))
-                throw new IOException("Applet更新先が正しくありません。");
+                throw NativeMessages.Error("native.updater.appletDestination", text => new IOException(text));
             Verify(item);
-            if (!Exists(item.Destination, item.Kind)) throw new IOException("更新対象がなくなりました。");
+            if (!Exists(item.Destination, item.Kind)) throw NativeMessages.Error("native.updater.targetMissing", text => new IOException(text));
             if (item.Kind == "applet")
             {
                 using var installed = JsonDocument.Parse(File.ReadAllText(Path.Combine(item.Destination, "extension.json")));
-                if (installed.RootElement.GetProperty("id").GetString() != item.Id) throw new IOException("配置先AppletのIDが一致しません。");
+                if (installed.RootElement.GetProperty("id").GetString() != item.Id) throw NativeMessages.Error("native.updater.installedAppletMismatch", text => new IOException(text));
             }
             var suffix = Guid.NewGuid().ToString("N");
             swaps.Add(new(item, item.Destination + ".update-" + suffix, item.Destination + ".previous-" + suffix));
         }
-        if (swaps.Count is 0 or > 501) throw new IOException("更新対象の数が正しくありません。");
+        if (swaps.Count is 0 or > 501) throw NativeMessages.Error("native.updater.targetCount", text => new IOException(text));
         var processes = new List<Process>();
         foreach (var id in root.GetProperty("processIds").EnumerateArray().Select(v => v.GetInt32()).Distinct())
         {
-            if (id == Environment.ProcessId || id <= 0) throw new IOException("待機するプロセスが正しくありません。");
+            if (id == Environment.ProcessId || id <= 0) throw NativeMessages.Error("native.updater.waitProcess", text => new IOException(text));
             try
             {
                 var process = Process.GetProcessById(id);
@@ -227,13 +228,13 @@ internal static partial class Program
         }
         var journal = Path.Combine(stateDirectory, "update-transaction.json");
         NoLinks(result); NoLinks(journal);
-        if (File.Exists(journal)) throw new IOException("前回の更新復元が必要です。AppDockを起動し直してください。");
+        if (File.Exists(journal)) throw NativeMessages.Error("native.updater.recoveryRequired", text => new IOException(text));
         using var progress = UpdateProgressWindow.Open(root, executable);
         File.WriteAllText(jobPath + ".ready", "ready");
         var deadline = Stopwatch.StartNew();
         while (!File.Exists(jobPath + ".commit"))
         {
-            if (deadline.ElapsedMilliseconds > 30000) throw new IOException("更新の開始が取り消されました。");
+            if (deadline.ElapsedMilliseconds > 30000) throw NativeMessages.Error("native.updater.startCancelled", text => new IOException(text));
             Thread.Sleep(100);
         }
         bool changed = false; bool restored = true; bool allExited = false; bool committed = false;
@@ -241,7 +242,7 @@ internal static partial class Program
         {
             foreach (var process in processes)
             {
-                if (!process.WaitForExit(Math.Max(1, 60000 - (int)deadline.ElapsedMilliseconds))) throw new IOException("AppDock/ランチャー/対象Appletの終了を確認できませんでした。");
+                if (!process.WaitForExit(Math.Max(1, 60000 - (int)deadline.ElapsedMilliseconds))) throw NativeMessages.Error("native.updater.exitUnconfirmed", text => new IOException(text));
                 process.Dispose();
             }
             allExited = true;
@@ -262,7 +263,7 @@ internal static partial class Program
             // Record the commit before cleanup. Recovery can finish it without undoing a complete update.
             Write(journal, new { executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps, committed = true });
             committed = true;
-            Write(result, new { ok = true, time = DateTimeOffset.Now, message = "更新を適用しました。", temporaryDirectory = stage, updated = swaps.Select(s => new { s.Item.Id, s.Item.Version }) });
+            Write(result, new { ok = true, time = DateTimeOffset.Now, message = NativeMessages.Text("native.updater.applied"), temporaryDirectory = stage, updated = swaps.Select(s => new { s.Item.Id, s.Item.Version }) });
         }
         catch (Exception error)
         {
@@ -308,8 +309,8 @@ internal static partial class Program
         { RecoverPackageJournal(baseDirectory, stateDirectory, document.RootElement); return; }
         var committed = document.RootElement.TryGetProperty("committed", out var flag) && flag.GetBoolean();
         var swaps = JsonSerializer.Deserialize<List<Swap>>(document.RootElement.GetProperty("swaps"), JsonOptions)
-            ?? throw new IOException("更新復元の記録がありません。");
-        if (swaps.Count is 0 or > 501) throw new IOException("更新復元の対象数が正しくありません。");
+            ?? throw NativeMessages.Error("native.updater.recoveryRecordMissing", text => new IOException(text));
+        if (swaps.Count is 0 or > 501) throw NativeMessages.Error("native.updater.recoveryCount", text => new IOException(text));
         var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // Validate the entire journal before touching any destination.
         foreach (var swap in swaps)
@@ -321,9 +322,9 @@ internal static partial class Program
                 !System.Text.RegularExpressions.Regex.IsMatch(suffix, "^[a-f0-9]{32}$") ||
                 !Same(next, destination + ".update-" + suffix) ||
                 (kind == "host" ? swap.Item.Id != "host" || !Same(destination, Path.Combine(baseDirectory, "AppDock.at365.exe")) : kind != "applet" || !Same(Path.GetDirectoryName(destination)!, Path.Combine(baseDirectory, "extensions"))))
-                throw new IOException("更新復元の範囲が正しくありません。");
+                throw NativeMessages.Error("native.updater.recoveryScope", text => new IOException(text));
             NoLinks(destination); NoLinks(backup); NoLinks(next);
-            if (!Exists(destination, kind) && !Exists(backup, kind)) throw new IOException("復元する更新ファイルが見つかりません。");
+            if (!Exists(destination, kind) && !Exists(backup, kind)) throw NativeMessages.Error("native.updater.recoveryFilesMissing", text => new IOException(text));
             if (committed) Verify(swap.Item with { Source = destination });
         }
         foreach (var swap in swaps.AsEnumerable().Reverse())
@@ -337,7 +338,7 @@ internal static partial class Program
             Delete(swap.Next, swap.Item.Kind);
         }
         Write(result, new { ok = committed, restored = !committed,
-            message = committed ? "中断された更新の後片付けを完了しました。" : "中断された更新を元のバージョンへ復元しました。", time = DateTimeOffset.Now });
+            message = committed ? NativeMessages.Text("native.updater.cleanupCompleted") : NativeMessages.Text("native.updater.restored"), time = DateTimeOffset.Now });
         File.Delete(journal);
     }
     private static void Pack(string kind, string source, string version, string output)
@@ -360,13 +361,13 @@ internal static partial class Program
             id = m.GetProperty("id").GetString()!; version = m.GetProperty("version").GetString()!;
             var entry = m.GetProperty("entry").GetString()!; SafeName(entry);
             if (m.GetProperty("apiVersion").GetInt32() != 1 || !File.Exists(Path.Combine(source, entry)))
-                throw new IOException("発行するAppletのAPI・エントリーが正しくありません。");
+                throw NativeMessages.Error("native.updater.publishAppletInvalid", text => new IOException(text));
             if (m.TryGetProperty("minimumHostVersion", out var minimum)) minimumHostVersion = minimum.GetString();
             // Collect before creating the archive, including when output is the source itself.
             files = Files(source).Where(file => Path.GetRelativePath(source, file).Replace('\\', '/') is not ("update.json" or "update.zip")).ToList();
             payload = "update.zip";
         }
-        else throw new IOException("発行形式はhost/appletです。");
+        else throw NativeMessages.Error("native.updater.publishKind", text => new IOException(text));
         Directory.CreateDirectory(output);
         var filePath = Path.Combine(output, payload);
         NoLinks(filePath);
@@ -380,7 +381,7 @@ internal static partial class Program
                 using (var archive = ZipFile.Open(temporary, ZipArchiveMode.Create))
                     foreach (var file in files!)
                         archive.CreateEntryFromFile(file, Path.GetRelativePath(source, file).Replace('\\', '/'), CompressionLevel.Optimal);
-                if (new FileInfo(temporary).Length > Limit) throw new IOException("ZIPの配布サイズが上限を超えました。");
+                if (new FileInfo(temporary).Length > Limit) throw NativeMessages.Error("native.updater.zipSizeLimit", text => new IOException(text));
                 File.Move(temporary, filePath, true);
             }
             else if (!Same(source, filePath)) { File.Copy(source, temporary); File.Move(temporary, filePath, true); }
@@ -391,8 +392,19 @@ internal static partial class Program
     }
     public static int Main(string[] args)
     {
+        Console.InputEncoding = new UTF8Encoding(false);
+        Console.OutputEncoding = new UTF8Encoding(false);
+        var machineMessages = args.Length > 0 && args[0] == "--host-messages-stdin";
+        NativeMessages.LoadBase(Path.Combine(AppContext.BaseDirectory, "translations", "host.json"));
+        NativeMessages.LoadBase(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "translations", "host.json")));
         try
         {
+            if (machineMessages)
+            {
+                using var messages = JsonDocument.Parse(Console.ReadLine() ?? "{}");
+                NativeMessages.Set(messages.RootElement);
+                args = args[1..];
+            }
             if (args.Length == 3 && args[0] == "--extract") Extract(args[1], args[2]);
             else if (args.Length == 3 && args[0] == "--extract-host") Extract(args[1], args[2], HostLimit);
             else if (args.Length == 2 && args[0] == "--apply") Apply(args[1]);
@@ -406,6 +418,6 @@ internal static partial class Program
             else throw new ArgumentException("AppDock.Updater: --apply job.json / --extract zip directory / --recover base / --pack host|applet source version output");
             return 0;
         }
-        catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
+        catch (Exception error) { Console.Error.WriteLine(machineMessages ? JsonSerializer.Serialize(NativeMessages.Describe(error)) : error.Message); return 1; }
     }
 }

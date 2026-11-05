@@ -109,7 +109,7 @@ internal sealed class TouchpadCacheProfile
     private static ushort Read16(byte[] bytes, int at) => BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(at, 2));
     private static int Read32(byte[] bytes, int at) => BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(at, 4));
     private static ulong Read64(byte[] bytes, int at) => BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(at, 8));
-    private static InvalidDataException Invalid() => new("このWindowsの設定形式を確認できないため、変更しません。ログを確認してください。");
+    private static InvalidDataException Invalid() => NativeMessages.Error("native.touchpad.unsupportedFormat", text => new InvalidDataException(text));
 }
 
 internal sealed class TouchpadWindowsCache : ITouchpadCache
@@ -122,7 +122,7 @@ internal sealed class TouchpadWindowsCache : ITouchpadCache
         this.profile = profile;
         try {
             var type = Type.GetTypeFromCLSID(new("c2f03a33-21f5-47fa-b4bb-156362a2f239"), true)!;
-            shell = Activator.CreateInstance(type) ?? throw new COMException("Windows Shellへ接続できません。");
+            shell = Activator.CreateInstance(type) ?? throw NativeMessages.Error("native.touchpad.shellUnavailable", text => new COMException(text));
             var provider = (IServiceProviderNative)shell;
             var service = new Guid("53660488-8855-460b-a9ab-5cfc6b5012ca");
             var iid = typeof(IImmersiveSettingsCache).GUID;

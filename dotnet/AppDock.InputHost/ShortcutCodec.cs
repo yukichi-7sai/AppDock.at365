@@ -8,7 +8,7 @@ internal sealed record ShortcutInput(string Shortcut, bool BlockOriginalInput = 
     ShortcutCondition[]? Conditions = null, ConditionEnvironment? Environment = null,
     string? Owner = null, long TouchpadGeneration = 0);
 internal sealed record ShortcutStatus(string Shortcut, bool Registered, string[] InputKeys,
-    string Backend = "hook", bool EffectiveBlockOriginalInput = true, string? Error = null);
+    string Backend = "hook", bool EffectiveBlockOriginalInput = true, object? Error = null);
 internal readonly record struct ShortcutChord(uint Key, int Modifiers);
 internal readonly record struct ShortcutPattern(uint Key, int Modifiers, char Character = '\0');
 internal static class ShortcutCodec
@@ -54,7 +54,7 @@ internal static class ShortcutCodec
             key = (uint)(0x70 + function - 1);
         if (key == 0 && name.Length == 1 && char.IsAsciiLetterOrDigit(name[0])) key = char.ToUpperInvariant(name[0]);
         var character = key == 0 ? name == "Plus" ? '+' : name.Length == 1 ? name[0] : '\0' : '\0';
-        if (key == 0 && character == '\0') throw new ArgumentException("このキーボード配列ではキーを検出できません。");
+        if (key == 0 && character == '\0') throw NativeMessages.Error("native.input.layoutKeyUnavailable", text => new ArgumentException(text));
         return new ShortcutPattern(key, modifiers, character);
     }
     internal static ShortcutChord Resolve(ShortcutPattern pattern, nint layout, Dictionary<char, short>? symbols = null)
@@ -67,13 +67,13 @@ internal static class ShortcutCodec
                 code = VkKeyScanEx(pattern.Character, layout);
                 symbols?.Add(pattern.Character, code);
             }
-            if (code == -1) throw new ArgumentException("このキーボード配列ではキーを検出できません。");
+            if (code == -1) throw NativeMessages.Error("native.input.layoutKeyUnavailable", text => new ArgumentException(text));
             key = (uint)(code & 255);
             var shift = (code >> 8) & 7;
             modifiers |= (shift & 1) << 2 | (shift & 2) >> 1 | (shift & 4) >> 1;
         }
         var chord = new ShortcutChord(key, modifiers);
-        if (Protected(chord)) throw new ArgumentException("Windowsが保護するキーは割り当てられません。");
+        if (Protected(chord)) throw NativeMessages.Error("native.input.protectedKey", text => new ArgumentException(text));
         return chord;
     }
     internal static string? Format(uint key, int modifiers, nint layout)

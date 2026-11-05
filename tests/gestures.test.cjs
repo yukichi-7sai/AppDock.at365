@@ -284,6 +284,7 @@ test('native foreground replaces stale Electron focus before activation preparat
 test('activation synchronization uses a bounded key unchanged by focus but changed by settings', async () => {
   const state = {
     settings: {
+      ...createDefaultSettings(),
       gestures: {
         ...defaultGestures(),
         activateOnStart: true,

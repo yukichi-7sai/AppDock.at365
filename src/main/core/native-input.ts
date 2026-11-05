@@ -2,6 +2,7 @@ import { hostText } from '../../shared/i18n';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
+import { nativeRpcMessage } from './native-messages';
 import { AutomationError } from './appdock-api';
 import type { InputInvocation } from './command-contexts';
 
@@ -25,9 +26,15 @@ export class NativeInput {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      const peer = new JsonLinePeer(child.stdout, child.stdin, async () => {
-        throw Error('Unknown input event');
-      });
+      const peer = new JsonLinePeer(
+        child.stdout,
+        child.stdin,
+        async () => {
+          throw Error('Unknown input event');
+        },
+        undefined,
+        nativeRpcMessage,
+      );
       this.child = child;
       this.peer = peer;
       child.stderr.resume();

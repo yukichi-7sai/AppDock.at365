@@ -49,14 +49,14 @@ internal sealed class PalettePaste(Dispatcher dispatcher) : IDisposable
         else
         {
             text = Normalize(target.Body.ToString());
-            if (text.Contains('\0')) throw new InvalidOperationException("クリップボードに格納できない文字が含まれています。");
+            if (text.Contains('\0')) throw NativeMessages.Error("native.input.clipboardCharacters", text => new InvalidOperationException(text));
             if (text.Length == 0) return "verified";
             using var data = new ClipboardText(text, history);
             var started = Environment.TickCount64;
             while (!OpenClipboard(handle))
             {
                 if (!target.IsCurrent()) return "cancelled";
-                if (Environment.TickCount64 - started >= 1000) throw new InvalidOperationException("クリップボードを使用できません。");
+                if (Environment.TickCount64 - started >= 1000) throw NativeMessages.Error("native.input.clipboardUnavailable", text => new InvalidOperationException(text));
                 await Task.Delay(10, lifetime);
             }
             try

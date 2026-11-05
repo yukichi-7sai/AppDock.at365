@@ -10,8 +10,8 @@ internal sealed record Configuration(bool Enabled, string[] Browsers, string[] E
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
     bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true,
-    string IndicatorStyle = "compact", string IndicatorNoActionText = "アクション無し",
-    string IndicatorMoreText = "ほか {count} 件", Dictionary<string, System.Text.Json.JsonElement>? InputExecutionModes = null);
+    string IndicatorStyle = "compact", string IndicatorNoActionText = "",
+    string IndicatorMoreText = "", Dictionary<string, System.Text.Json.JsonElement>? InputExecutionModes = null);
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
 
@@ -212,7 +212,7 @@ internal sealed class GestureEngine : IDisposable
             var events = pending.Released ? new[] { MouseInput(8), MouseInput(16) } : new[] { MouseInput(8) };
             var sent = SendInput((uint)events.Length, events, Marshal.SizeOf<Input>());
             if (pending.Released && sent == 1) SendInput(1, [MouseInput(16)], Marshal.SizeOf<Input>());
-            if (sent != events.Length) Console.Error.WriteLine("通常の右クリックを復元できませんでした。");
+            if (sent != events.Length) NativeMessages.Log("native.input.restoreRightClick");
             ready = false;
         } else cancelled = true;
         CancelPending();
@@ -409,7 +409,7 @@ internal sealed class GestureEngine : IDisposable
                 var events=new[]{MouseInput(8),MouseInput(16)};
                 var sent=SendInput(2,events,Marshal.SizeOf<Input>());
                 if (sent==1) SendInput(1,[MouseInput(16)],Marshal.SizeOf<Input>());
-                if (sent!=2) Console.Error.WriteLine("通常の右クリックを再送信できませんでした。");
+                if (sent!=2) NativeMessages.Log("native.input.resendRightClick");
             }
         }));
     }

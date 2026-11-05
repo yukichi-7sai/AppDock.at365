@@ -116,6 +116,21 @@ test('a change during synchronization is applied afterwards without overlapping 
   assert.equal(f.applied.filter((config) => config.dialogWindow === 'latest').length, 1);
 });
 
+test('language changes refresh native status text even when capture rules are unchanged', async (t) => {
+  const f = fixture(t);
+  await f.manager.start();
+  const before = f.applied.at(-1);
+  const count = f.applied.length;
+  f.state.settings.host.language = 'en';
+  f.manager.requestRefresh();
+  await settle();
+  assert.equal(f.applied.length, count + 1);
+  assert.deepEqual(f.applied.at(-1), before);
+  f.manager.requestRefresh();
+  await settle();
+  assert.equal(f.applied.length, count + 1);
+});
+
 test('native recording completion updates capture state and shutdown ignores queued changes', async (t) => {
   const f = fixture(t);
   const pressed = [];

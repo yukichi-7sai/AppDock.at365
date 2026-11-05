@@ -7,4 +7,6 @@
     <SelfContained>false</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup><Compile Include="../NativeMessages.cs" Link="NativeMessages.cs" /></ItemGroup>
+  <ItemGroup><None Include="../../resources/translations/host.json" Link="translations/host.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" /></ItemGroup>
 </Project>

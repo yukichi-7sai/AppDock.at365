@@ -133,7 +133,7 @@ internal sealed class InputCaptureEngine : IDisposable
         foregroundHook = SetWinEventHook(3, 3, 0, environmentCallback, 0, 0, 0);
         desktopHook = SetWinEventHook(0x20, 0x20, 0, environmentCallback, 0, 0, 0);
         if (foregroundHook == 0 || desktopHook == 0)
-            notify("input.error", new { message = "入力対象の変更通知を登録できません。1秒間隔の補助確認を使用します。" });
+            notify("input.error", new { message = NativeMessages.Message("native.input.foregroundMonitor") });
         Refresh();
     }
     private void EnvironmentChanged(nint hook, uint kind, nint window, int objectId, int child, uint thread, uint time)
@@ -212,8 +212,8 @@ internal sealed class InputCaptureEngine : IDisposable
             gestureRevision = null;
             statuses = next.Shortcuts.Select(row => new ShortcutStatus(row.Shortcut, false, [],
                 EffectiveBlockOriginalInput: row.BlockOriginalInput,
-                Error: "入力フックを適用できません。権限とほかの入力ソフトを確認してください。")).ToArray();
-            notify("input.error", new { message = "入力フックを適用できません。", code = error is Win32Exception win ? win.NativeErrorCode : 0 });
+                Error: NativeMessages.Message("native.input.hookPermission"))).ToArray();
+            notify("input.error", new { message = NativeMessages.Message("native.input.hookFailed"), code = error is Win32Exception win ? win.NativeErrorCode : 0 });
         }
         if (resumed) Refresh();
         else UpdateTimer();
@@ -245,7 +245,7 @@ internal sealed class InputCaptureEngine : IDisposable
                     new[] { row.Shortcut, alias ?? row.Shortcut }.Distinct().ToArray(),
                     EffectiveBlockOriginalInput: row.BlockOriginalInput);
             } catch (ArgumentException error) {
-                return new ShortcutStatus(row.Shortcut, false, [], EffectiveBlockOriginalInput: row.BlockOriginalInput, Error: error.Message);
+                return new ShortcutStatus(row.Shortcut, false, [], EffectiveBlockOriginalInput: row.BlockOriginalInput, Error: NativeMessages.Describe(error));
             }
         }).ToArray();
         var blockers = new Dictionary<string, bool>();
@@ -284,10 +284,10 @@ internal sealed class InputCaptureEngine : IDisposable
                 Gestures.Configure(configuration.Gestures with { Enabled = false });
                 gestureRevision = null;
                 var statuses = configuration.Shortcuts.Select(row => new ShortcutStatus(row.Shortcut, false, [],
-                    EffectiveBlockOriginalInput: row.BlockOriginalInput, Error: "入力フックを適用できません。設定を保存するか再試行してください。")).ToArray();
+                    EffectiveBlockOriginalInput: row.BlockOriginalInput, Error: NativeMessages.Message("native.input.hookRetry"))).ToArray();
                 notify("shortcuts.applied", new { revision = configuration.ShortcutRevision, statuses });
             }
-            notify("input.error", new { message = "入力フックを適用できません。設定を保存するか再試行してください。" });
+            notify("input.error", new { message = NativeMessages.Message("native.input.hookRetry") });
         }
         UpdateTimer();
     }
@@ -496,7 +496,7 @@ internal sealed class InputCaptureEngine : IDisposable
             FlushPendingPresses();
             return block ? 1 : Forward();
         } catch {
-            try { notify("input.error", new { message = "入力の通知に失敗しました。確定済みの元入力ブロックは維持します。" }); } catch { }
+            try { notify("input.error", new { message = NativeMessages.Message("native.input.notifyFailed") }); } catch { }
             return blockDecision == true ? 1 : Forward();
         }
     }
@@ -566,7 +566,7 @@ internal sealed class InputCaptureEngine : IDisposable
         };
         var sent = SendInput(2, events, Marshal.SizeOf<Input>());
         if (sent == 1) SendInput(1, [events[1]], Marshal.SizeOf<Input>());
-        if (sent != 2) notify("input.error", new { message = "修飾キーの単独動作を抑止できませんでした。元キーのブロックは維持します。" });
+        if (sent != 2) notify("input.error", new { message = NativeMessages.Message("native.input.modifierSuppression") });
     }
     public void Dispose()
     {

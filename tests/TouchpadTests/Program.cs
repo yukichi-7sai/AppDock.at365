@@ -3,6 +3,34 @@ using System.Text.Json;
 
 var checks = 0;
 void Check(bool value, string name) { if (!value) throw new Exception(name); checks++; Console.WriteLine("PASS " + name); }
+{
+    NativeMessages.Set(JsonSerializer.SerializeToElement(new Dictionary<string, string> {
+        ["native.touchpad.connectionKey"] = "Choose a connection key.",
+        ["native.hostPackage.runtimeBundled"] = "Cannot bundle: {{path}}",
+    }));
+    try { TouchpadWindowsModel.Encode("not-a-key"); throw new Exception("expected validation failure"); }
+    catch (ArgumentException error) {
+        Check(error.Message == "Choose a connection key.", "native error retains exception type and selected wording");
+        var message = JsonSerializer.SerializeToElement(NativeMessages.Describe(error));
+        Check(message.GetProperty("hostTextKey").GetString() == "native.touchpad.connectionKey", "native cause travels as a stable key");
+    }
+    const string value = "日本語/{{path}}/$t(language.label)";
+    Check(NativeMessages.Text("native.hostPackage.runtimeBundled", new { path = value }) == "Cannot bundle: " + value, "native interpolation preserves variable text literally");
+    Check((string)NativeMessages.Describe(new IOException(value)) == value, "external exception text is untouched");
+    foreach (var translate in new[] { false, true }) {
+        using var input = new MessageInput(); using var output = new MessageOutput();
+        await using var peer = new AppDock.Runtime.JsonRpcConnection(input, output, translate ? NativeMessages.Describe : null);
+        var reading = peer.ReadAsync((method, parameters) => throw NativeMessages.Error("native.touchpad.connectionKey", text => new ArgumentException(text)));
+        input.Messages.Writer.TryWrite("{\"jsonrpc\":\"2.0\",\"id\":\"fixture\",\"method\":\"invalid\"}");
+        var reply = JsonSerializer.Deserialize<JsonElement>(await output.Received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        input.Messages.Writer.Complete(); await reading;
+        var error = reply.GetProperty("error");
+        Check(error.GetProperty("code").GetInt32() == -32000 && error.GetProperty("message").GetString() == "Choose a connection key.", "RPC retains error code and message");
+        Check(error.TryGetProperty("data", out var data) == translate, "only host-native RPC adds message data");
+        if (translate) Check(data.GetProperty("hostTextKey").GetString() == "native.touchpad.connectionKey", "native RPC serializes the cause key");
+    }
+    NativeMessages.Set(JsonSerializer.SerializeToElement(new { }));
+}
 for (var key = 13; key <= 24; key++) foreach (var modifiers in new[] { "", "Ctrl+", "Alt+", "Shift+", "Win+", "Ctrl+Alt+Shift+Win+" })
     Check(TouchpadWindowsModel.Decode(TouchpadWindowsModel.Encode(modifiers + "F" + key)) == modifiers + "F" + key, "codec " + modifiers + "F" + key);
 foreach (var mode in new uint[] { 0, 1, 2, 3, 0xFFFF }) foreach (var target in TouchpadWindowsModel.Descriptors) {
@@ -38,3 +66,15 @@ sealed class FakeValues : ITouchpadValues {
     public void Write(string name, TouchpadValue value) { if (++Writes == FailAt) throw new IOException("injected failure"); Values[name] = value; }
 }
 sealed class FakeCache(FakeValues values) : ITouchpadCache { public uint Read(string name) => values.Read(name).Value; public void Changed(string name) { } public void Dispose() { } }
+
+sealed class MessageInput : TextReader {
+    internal readonly System.Threading.Channels.Channel<string> Messages = System.Threading.Channels.Channel.CreateUnbounded<string>();
+    public override async ValueTask<string?> ReadLineAsync(CancellationToken token) {
+        try { return await Messages.Reader.ReadAsync(token); }
+        catch (System.Threading.Channels.ChannelClosedException) { return null; }
+    }
+}
+sealed class MessageOutput : StringWriter {
+    internal readonly TaskCompletionSource<string> Received = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public override Task WriteLineAsync(string? value) { Received.TrySetResult(value!); return Task.CompletedTask; }
+}

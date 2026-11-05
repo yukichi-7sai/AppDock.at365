@@ -179,6 +179,7 @@ test('folder host update adds/removes managed assets in the existing transaction
     JSON.stringify({
       schemaVersion: 2,
       operationId: randomUUID(),
+      nativeMessages: { ...require('../out/main/main/core/native-messages').nativeMessages(), 'native.package.applied': 'Applied before replacing the dictionary.' },
       baseDirectory: f.base,
       executable: path.join(f.base, 'AppDock.at365.exe'),
       args: ['--recover', f.base],
@@ -193,6 +194,7 @@ test('folder host update adds/removes managed assets in the existing transaction
   assert.equal(fs.readFileSync(path.join(f.base, 'resources/app.asar'), 'utf8'), 'new resources');
   const result = JSON.parse(fs.readFileSync(path.join(f.base, 'data/update-result.json')));
   assert(result.ok);
+  assert.equal(result.message, 'Applied before replacing the dictionary.');
   assert.deepEqual(
     result.updated.map((item) => item.id),
     ['host'],

@@ -6,6 +6,8 @@ import {
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
+import { createInterface } from 'node:readline';
+import { nativeLogLine, nativeRpcMessage } from './native-messages';
 import {
   getGestureSettings,
   nativeGestureRows,
@@ -454,11 +456,19 @@ export class InputCaptureManager {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    const peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => this.event(method, p));
+    const peer = new JsonLinePeer(
+      child.stdout,
+      child.stdin,
+      (method, p) => this.event(method, p),
+      undefined,
+      nativeRpcMessage,
+    );
     this.child = child;
     this.peer = peer;
     child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (data) => this.report(String(data).slice(0, 2000).trim()));
+    const diagnostics = createInterface({ input: child.stderr });
+    diagnostics.on('line', (line) => this.report(nativeLogLine(line).slice(0, 2000).trim()));
+    peer.once('closed', () => diagnostics.close());
     child.on('error', (error) => {
       this.report(error.message);
       peer.close();
@@ -543,7 +553,7 @@ export class InputCaptureManager {
       dialogShortcuts: dialogNavigationShortcuts,
       assistancePaused: this.sessionPaused,
     };
-    const fingerprint = JSON.stringify(config);
+    const fingerprint = JSON.stringify([config, state.settings.host.language]);
     if (!force && fingerprint === this.fingerprint && !this.faultSettings) return this.statuses;
     if (
       !this.peer &&

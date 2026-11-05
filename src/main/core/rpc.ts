@@ -29,6 +29,7 @@ class JsonLinePeer extends EventEmitter {
     output: Writable,
     handler: (method: string, params: any) => Promise<unknown>,
     timeout = RPC_TIMEOUT_MS,
+    private readonly transformInbound?: (message: any) => any,
   ) {
     super();
     this.input = input;
@@ -65,6 +66,7 @@ class JsonLinePeer extends EventEmitter {
     try {
       msg = JSON.parse(line);
       if (!msg || msg.jsonrpc !== '2.0') throw new Error(hostText('services.rpc.versionRequired'));
+      if (this.transformInbound) msg = this.transformInbound(msg);
     } catch (e) {
       this.emit('protocolError', e);
       return;

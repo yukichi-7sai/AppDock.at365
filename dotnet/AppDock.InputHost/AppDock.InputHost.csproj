@@ -6,4 +6,5 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../AppDock.Runtime/AppDock.Runtime.csproj" /></ItemGroup>
+  <ItemGroup><Compile Include="../NativeMessages.cs" Link="NativeMessages.cs" /></ItemGroup>
 </Project>
