@@ -10,18 +10,25 @@ import { decodeRegisteredImage } from './registered-image-decoder';
 export class LibrarySoundPreview {
   private active?: { owner: string; controller: AbortController; status: LibraryPlayback };
   error = '';
+  private errorOwner?: string;
   constructor(
     private files: RegisteredSoundLibrary,
     private changed: () => void,
     private failed: () => void,
     private playAudio = audioPlayback.play.bind(audioPlayback),
   ) {}
-  snapshot() {
-    return this.active ? { ...this.active.status } : undefined;
+  snapshot(owner?: string) {
+    return this.active && (!owner || owner === this.active.owner)
+      ? { ...this.active.status }
+      : undefined;
+  }
+  errorFor(owner: string) {
+    return owner === this.errorOwner ? this.error : '';
   }
   async play(ref: LibraryRef, owner: string) {
     this.stop();
     this.error = '';
+    this.errorOwner = owner;
     const current = {
       owner,
       controller: new AbortController(),

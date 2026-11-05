@@ -57,6 +57,7 @@ export function NotificationTypeDialog({
     },
   });
   const speaking = row.speak === true;
+  const sounding = row.sound === true;
   const eventSending = row.mcpEvents === true;
   return (
     <SettingsDialog
@@ -97,6 +98,17 @@ export function NotificationTypeDialog({
             />
           ))}
           <SettingsChoice
+            label={translate('settings.notificationSettings.sound')}
+            description={
+              sounding && !settings.notificationPreferences?.sound
+                ? translate('settings.notificationSettings.soundUnset')
+                : undefined
+            }
+            ariaLabel={translate('settings.notificationSettings.soundLabel', { title: type.title })}
+            checked={sounding}
+            onChange={(sound) => change({ sound })}
+          />
+          <SettingsChoice
             label={translate('settings.notificationSettings.speech')}
             description={translate('settings.notificationSettings.speechDescription')}
             ariaLabel={translate('settings.notificationSettings.speechLabel', {
@@ -120,10 +132,10 @@ export function NotificationTypeDialog({
           ariaLabel={translate('settings.notificationSettings.centerLabel', {
             title: type.title,
           })}
-          checked={!policy.selectedTargets.length && !speaking && !eventSending}
+          checked={!policy.selectedTargets.length && !speaking && !sounding && !eventSending}
           disabled={!!type.requiredTargets.length}
           onChange={(on) => {
-            if (on) change({ targets: [], speak: false, mcpEvents: false });
+            if (on) change({ targets: [], sound: false, speak: false, mcpEvents: false });
           }}
         />
       </SettingsField>

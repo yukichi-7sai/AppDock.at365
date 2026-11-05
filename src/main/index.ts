@@ -253,6 +253,7 @@ import { HostSession } from './core/host-session';
 import { NotificationAvailability } from './core/notification-availability';
 import { NativeNotificationState } from './core/native-notification-state';
 import { NotificationSpeechService } from './core/notification-speech';
+import { NotificationToneService } from './core/notification-tone';
 import { resolveNotificationSpeech } from '../shared/notification-types';
 import { defaultTtsSettings } from '../shared/tts';
 import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
@@ -412,6 +413,7 @@ let settingsHealthNotifications: SettingsHealthNotifications | undefined;
 let settingsRecoveryBusy = false;
 const settingsOperationBusy = () => settingsRecoveryBusy || launch.isBusy;
 let notificationSpeech: NotificationSpeechService | undefined;
+let notificationTone: NotificationToneService | undefined;
 let notificationAvailability: NotificationAvailability | undefined;
 let hostSession: HostSession | undefined;
 let sessionLocked = false;
@@ -2138,6 +2140,7 @@ async function executeHostAction(id: string, invocation?: InputInvocation) {
   } else if (id === 'appdock.audio.stopAll') {
     soundLibrary.preview.stop();
     notificationSpeech?.stopAll();
+    notificationTone?.stopAll();
     notificationSounds.stopAll();
     await Promise.all([tts.stopAll(), audioPlayback.stopAll()]);
   } else {
@@ -2749,6 +2752,11 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
   if (id === 'notifications')
     return {
       notificationTypes: notificationCatalog(orderApplets(applets, settings.value.appletOrder)),
+      notificationSound: {
+        playback: soundLibrary.preview.snapshot('notification-settings'),
+        enabled: settings.value.host.soundEnabled,
+        error: soundLibrary.preview.errorFor('notification-settings'),
+      },
       notificationSpeech: {
         defaults: {
           defaultVoice: settings.value.tts?.defaultVoice ?? '',
@@ -2873,6 +2881,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
 let settingsRecording = false;
 let settingsPalette: string | undefined;
 function releaseSettingsView() {
+  soundLibrary.preview.stop('notification-settings');
   void updater?.discardPackagePlans();
   aiSettings.cancelModels();
   if (settingsRecording) {
@@ -3243,6 +3252,46 @@ function settingsPageActions(
     };
   }
   if (page.id === 'notifications') {
+    actions.notificationSoundSelect = async () => {
+      assertSettingsWritable();
+      soundLibrary.preview.stop('notification-settings');
+      const original = settings.value.notificationPreferences?.sound;
+      const scope = settings.settingScope(['notificationPreferences']);
+      const source = navigation.state.request;
+      const live = () =>
+        !quitting &&
+        settingsPageHost?.isOpen() === true &&
+        settingsEditing.metadata().pageId === 'notifications' &&
+        navigation.state.request === source;
+      const selection = await soundLibrary.pick(original?.file, live);
+      if (!live() || !selection) return;
+      if (
+        scope !== settings.settingScope(['notificationPreferences']) ||
+        JSON.stringify(original) !== JSON.stringify(settings.value.notificationPreferences?.sound)
+      )
+        throw Error(hostText('settings.notificationSettings.soundConflict'));
+      assertSettingsWritable();
+      commitSettings(
+        prepareSettings({
+          ...settings.value,
+          notificationPreferences: {
+            ...settings.value.notificationPreferences,
+            overrides: settings.value.notificationPreferences?.overrides ?? [],
+            sound: selection,
+          },
+        }),
+        settings.revision,
+      );
+    };
+    actions.notificationSoundPreview = async () => {
+      const sound = settings.value.notificationPreferences?.sound;
+      if (sound)
+        await soundLibrary.preview.play(
+          { file: sound.file.slice('@library/'.length) },
+          'notification-settings',
+        );
+    };
+    actions.notificationSoundStop = async () => soundLibrary.preview.stop('notification-settings');
     actions.notificationOpenWindows = async () => shell.openExternal('ms-settings:notifications');
     actions.notificationSavePreference = async ([type, original, draft]) => {
       assertSettingsWritable();
@@ -4468,6 +4517,7 @@ async function initialize() {
     ai.reconcile();
     automation?.reconcileEvents();
     notificationSpeech?.reconcile();
+    notificationTone?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
     for (const e of manager.items.values())
@@ -4487,6 +4537,7 @@ async function initialize() {
       ai.reconcile();
       automation?.reconcileEvents();
       notificationSpeech?.reconcile();
+      notificationTone?.reconcile();
       tts.reconcile();
       typedNotifications?.reconcile();
       settings.health.clear('apply-services', settings.revision);
@@ -4674,6 +4725,26 @@ async function initialize() {
     failed: (id, code) =>
       log.write('error', 'notifications', '[TTS] notificationId=' + id + ' code=' + code),
   });
+  notificationTone = new NotificationToneService({
+    settings: () => settings.value,
+    applets: () => manager.snapshot(),
+    ready: () => startupReady && !quitting,
+    generation: (id) => {
+      const item = manager.items.get(id);
+      return item && ['starting', 'running'].includes(item.state) ? item.runtimeSession : undefined;
+    },
+    service: notificationService,
+    availability: notificationAvailability,
+    read: async (file) =>
+      (
+        await soundLibrary.files.read({ file: file.slice('@library/'.length) }, undefined, {
+          cachePreview: false,
+        })
+      ).bytes,
+    play: (request) => audioPlayback.play(request),
+    failed: (id, code) =>
+      log.write('error', 'notifications', '[Sound] notificationId=' + id + ' code=' + code),
+  });
   typedNotifications = new TypedNotifications(notificationService, {
     settings: () => settings.value,
     applets: () => manager.snapshot(),
@@ -4682,8 +4753,11 @@ async function initialize() {
       return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
     },
     changed,
-    published: (event) => automation?.publishEvent(event),
-    presented: (event) => notificationSpeech?.publish(event),
+    published: (event) => {
+      if (notificationService?.isPaused()) void notificationTone?.publish(event);
+      automation?.publishEvent(event);
+    },
+    presented: (event) => notificationSpeech?.publish(event, notificationTone?.publish(event)),
     publicationFailed: () =>
       log.write('error', 'notifications', hostText('services.index.notificationSpeechFailed')),
     policyChanged: (id) => {
@@ -5436,6 +5510,7 @@ async function initialize() {
   });
   settingsHealthNotifications.refresh();
   notificationSpeech?.reconcile();
+  notificationTone?.reconcile();
   automation = new AutomationService({
     localDirectory: dataDirectory,
     baseDirectory,
@@ -5745,6 +5820,7 @@ app.on('before-quit', (event) => {
   notificationDesktop?.dispose();
   notificationWindows?.dispose();
   notificationSpeech?.dispose();
+  notificationTone?.dispose();
   notificationAvailability?.dispose();
   hostSession?.dispose();
   commandSession.dispose();

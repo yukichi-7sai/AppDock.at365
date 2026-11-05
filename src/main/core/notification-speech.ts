@@ -16,6 +16,7 @@ type Record = Omit<NotificationPublication, 'title' | 'body'> & {
   done: boolean;
   ended: boolean;
   timer?: ReturnType<typeof setTimeout>;
+  waitingSound?: boolean;
 };
 export class NotificationSpeechService {
   private records = new Map<string, Record>();
@@ -83,7 +84,7 @@ export class NotificationSpeechService {
       [...this.records.values()].some((r) => !r.done),
     );
   }
-  publish(event: NotificationPublication) {
+  publish(event: NotificationPublication, soundQueued?: Promise<void>) {
     if (this.closed || this.records.has(event.notificationId)) return;
     const { title, body, ...identity } = event;
     const r: Record = { ...identity, done: false, ended: false };
@@ -111,6 +112,16 @@ export class NotificationSpeechService {
       requestId: 'notification:' + r.notificationId,
     };
     r.timer = setTimeout(() => this.cancel(r), Math.max(0, this.deadline(r) - Date.now()));
+    if (soundQueued) {
+      r.waitingSound = true;
+      // Capture speech settings and its deadline now, but enqueue the chime first.
+      void soundQueued
+        .catch(() => {})
+        .then(() => {
+          r.waitingSound = false;
+          this.reconcile();
+        });
+    }
     this.updateUse();
     this.options.availability.prepareDelivery();
     this.reconcile();
@@ -156,7 +167,7 @@ export class NotificationSpeechService {
         this.cancel(r);
         continue;
       }
-      if (!this.options.ready() || status !== 'allowed' || !r.input) continue;
+      if (!this.options.ready() || status !== 'allowed' || !r.input || r.waitingSound) continue;
       try {
         const job = this.options.tts.speak('notification:' + r.notificationId, r.input, {
           startBefore: this.deadline(r),

@@ -114,7 +114,7 @@ function setup(t, extra = {}) {
     generation: () => generation,
     changed: () => {},
     policyChanged: () => {},
-    published: (e) => speech.publish(e),
+    published: (e) => speech.publish(e, extra.soundQueued),
   });
   t.after(async () => {
     speech.dispose();
@@ -420,4 +420,30 @@ test('a new eligibility check retains authorized speech while new speech waits f
   }
   assert.equal(f.speech.allows('notification:' + second.notificationId), false);
   assert.equal(f.played.length, 1, 'new speech never starts using the older permission');
+});
+
+test('speech waits for its notification sound admission and retains the original start deadline', async (t) => {
+  let queued;
+  const f = setup(t, {
+    soundQueued: new Promise((resolve) => {
+      queued = resolve;
+    }),
+  });
+  f.publish();
+  await new Promise(setImmediate);
+  assert.equal(f.posts.length, 0);
+  queued();
+  await wait(() => f.played.length === 1);
+  let late;
+  const expired = setup(t, {
+    startMs: 20,
+    soundQueued: new Promise((resolve) => {
+      late = resolve;
+    }),
+  });
+  expired.publish();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  late();
+  await new Promise(setImmediate);
+  assert.equal(expired.posts.length, 0);
 });

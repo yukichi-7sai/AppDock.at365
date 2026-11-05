@@ -112,6 +112,11 @@ export interface SettingsPageAuxiliary {
     jobs: import('./tts').TtsJob[];
   };
   notificationTypes?: import('./notification-types').NotificationTypeEntry[];
+  notificationSound?: {
+    playback?: import('./registered-images').LibraryPlayback;
+    enabled: boolean;
+    error: string;
+  };
   applets?: ExtensionSnapshot[];
   commands?: UiCommand[];
   statuses?: GlobalHotKeyStatus[];

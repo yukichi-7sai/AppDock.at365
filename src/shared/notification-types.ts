@@ -1,5 +1,6 @@
 import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
+import { soundLibraryReference } from './library-assets';
 import type { ExtensionSnapshot, Settings } from './contracts';
 import type { NotificationLevel, NotificationLifetime, NotificationTarget } from './notifications';
 export interface NotificationOwner {
@@ -28,6 +29,7 @@ export interface NotificationPreference extends NotificationOwner {
   targets?: NotificationTarget[];
   durationSeconds?: number | null;
   speak?: boolean;
+  sound?: boolean;
   mcpEvents?: boolean;
 }
 export interface NotificationSpeechSettings {
@@ -36,6 +38,7 @@ export interface NotificationSpeechSettings {
 }
 export interface NotificationPreferences {
   speech?: NotificationSpeechSettings;
+  sound?: { file: string; name: string };
   overrides: NotificationPreference[];
 }
 export interface NotificationPolicy {
@@ -162,7 +165,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
   if (value === undefined) return { overrides: [] };
   if (
     !object(value) ||
-    Object.keys(value).some((k) => !['overrides', 'speech'].includes(k)) ||
+    Object.keys(value).some((k) => !['overrides', 'speech', 'sound'].includes(k)) ||
     !Array.isArray(value.overrides)
   )
     throw Error(hostText('settings.notification-types.format'));
@@ -179,6 +182,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
             'targets',
             'durationSeconds',
             'speak',
+            'sound',
             'mcpEvents',
           ].includes(k),
       ) ||
@@ -187,6 +191,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
       !id(v.typeId) ||
       (v.enabled !== undefined && typeof v.enabled !== 'boolean') ||
       (v.speak !== undefined && typeof v.speak !== 'boolean') ||
+      (v.sound !== undefined && typeof v.sound !== 'boolean') ||
       (v.mcpEvents !== undefined && typeof v.mcpEvents !== 'boolean') ||
       (v.targets !== undefined && !targets(v.targets)) ||
       (v.durationSeconds !== undefined && !duration(v.durationSeconds))
@@ -212,7 +217,23 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
           speech.speed > 4)))
   )
     throw Error(hostText('settings.notification-types.speech'));
-  return { overrides: rows, ...(speech === undefined ? {} : { speech: structuredClone(speech) }) };
+  const sound = value.sound;
+  if (
+    sound !== undefined &&
+    (!object(sound) ||
+      Object.keys(sound).some((key) => !['file', 'name'].includes(key)) ||
+      !soundLibraryReference(sound.file) ||
+      typeof sound.name !== 'string' ||
+      !sound.name.trim() ||
+      sound.name.length > 200 ||
+      /[\u0000-\u001f\u007f]/.test(sound.name))
+  )
+    throw Error(hostText('settings.notificationSettings.invalidSound'));
+  return {
+    overrides: rows,
+    ...(speech === undefined ? {} : { speech: structuredClone(speech) }),
+    ...(sound === undefined ? {} : { sound: structuredClone(sound) }),
+  };
 }
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
   return [
@@ -410,5 +431,14 @@ export function notificationSpeechEnabled(
     settings.notificationPreferences?.overrides.find(
       (r) => notificationTypeKey(r) === notificationTypeKey(type),
     )?.speak === true
+  );
+}
+export function notificationSoundEnabled(type: NotificationTypeEntry, settings: Settings): boolean {
+  return (
+    !!settings.notificationPreferences?.sound &&
+    resolveNotificationPolicy(type, settings).enabled &&
+    settings.notificationPreferences.overrides.find(
+      (row) => notificationTypeKey(row) === notificationTypeKey(type),
+    )?.sound === true
   );
 }

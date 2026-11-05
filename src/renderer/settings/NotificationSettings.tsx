@@ -48,6 +48,7 @@ export function NotificationSettings({
   editor,
   types,
   auxiliary,
+  soundState,
   invoke,
   busy,
   select,
@@ -56,6 +57,7 @@ export function NotificationSettings({
   editor: FormEditor;
   types: NotificationTypeEntry[];
   auxiliary?: SettingsPageAuxiliary['notificationSpeech'];
+  soundState?: SettingsPageAuxiliary['notificationSound'];
   invoke(name: string, args?: unknown[]): Promise<any>;
   busy: boolean;
   select(id: string): void;
@@ -64,6 +66,7 @@ export function NotificationSettings({
   const { t: translate } = useHostTranslation();
   const settings = editor.value;
   const speech = settings.notificationPreferences?.speech ?? {};
+  const sound = settings.notificationPreferences?.sound;
   const effective = resolveNotificationSpeech(settings, auxiliary?.defaults);
   const voiceListRevision = useRef(auxiliary?.voiceListRevision);
   voiceListRevision.current = auxiliary?.voiceListRevision;
@@ -125,7 +128,7 @@ export function NotificationSettings({
       failed: translate('settings.notificationSettings.failed'),
       canceled: translate('settings.notificationSettings.canceled'),
     }[previewJob.state];
-  useSettingsFeedback({ busy: pending, error });
+  useSettingsFeedback({ busy: pending, error: error || soundState?.error });
   return (
     <div className="settings-sections notification-settings">
       <SettingsSection
@@ -241,6 +244,73 @@ export function NotificationSettings({
             </button>
           </SettingsActions>
         </SettingsField>
+        <SettingsSection
+          title={translate('settings.notificationSettings.sound')}
+          description={sound?.name ?? translate('settings.notificationSettings.noSound')}
+          hint={translate('settings.notificationSettings.soundHint')}
+          data-testid="notification-sound"
+          variant="row"
+          collapsible
+        >
+          <SettingsField
+            title={translate('settings.notificationSettings.sound')}
+            {...settingAnchor('notifications', 'sound')}
+            description={
+              soundState?.enabled === false
+                ? translate('settings.notificationSettings.soundDisabled')
+                : soundState?.playback
+                  ? translate(
+                      soundState.playback.state === 'playing'
+                        ? 'settings.notificationSettings.playing'
+                        : 'settings.notificationSettings.waitingPlayback',
+                    )
+                  : undefined
+            }
+          >
+            <SettingsActions>
+              <button
+                disabled={busy || pending}
+                onClick={() => void run('notificationSoundSelect')}
+              >
+                {translate('settings.notificationSettings.selectSound')}
+              </button>
+              <button
+                disabled={
+                  busy ||
+                  pending ||
+                  !sound ||
+                  soundState?.enabled === false ||
+                  !!soundState?.playback
+                }
+                onClick={() => void run('notificationSoundPreview')}
+              >
+                {translate('settings.notificationSettings.preview')}
+              </button>
+              <button
+                disabled={pending || !soundState?.playback}
+                onClick={() => void run('notificationSoundStop')}
+              >
+                {translate('settings.notificationSettings.stopPreview')}
+              </button>
+              <button
+                disabled={busy || pending || !sound}
+                onClick={() => {
+                  void run('notificationSoundStop');
+                  editor.edit({
+                    ...settings,
+                    notificationPreferences: {
+                      ...settings.notificationPreferences,
+                      overrides,
+                      sound: undefined,
+                    },
+                  });
+                }}
+              >
+                {translate('settings.notificationSettings.clearSound')}
+              </button>
+            </SettingsActions>
+          </SettingsField>
+        </SettingsSection>
         <SettingsSection
           title={translate('settings.notificationSettings.speech')}
           data-testid="notification-speech"
@@ -381,6 +451,7 @@ export function NotificationSettings({
               <th scope="col">{translate('settings.notificationSettings.name')}</th>
               <th scope="col">{translate('settings.notificationSettings.targets')}</th>
               <th scope="col">{translate('settings.notificationSettings.durationTitle')}</th>
+              <th scope="col">{translate('settings.notificationSettings.sound')}</th>
               <th scope="col">{translate('settings.notificationSettings.speech')}</th>
               <th scope="col">MCP Events</th>
               <th scope="col" className="settings-list-actions-heading">
@@ -447,6 +518,12 @@ export function NotificationSettings({
                     {duration}
                     {type.lifetimePolicy !== 'userDuration' && (
                       <small>{translate('settings.notificationSettings.fixed')}</small>
+                    )}
+                  </td>
+                  <td className="settings-list-wrap">
+                    {row?.sound === true ? 'ON' : 'OFF'}
+                    {row?.sound === true && !sound && (
+                      <small>{translate('settings.notificationSettings.soundUnset')}</small>
                     )}
                   </td>
                   <td className="settings-list-wrap">

@@ -13,6 +13,7 @@ interface NotificationSpeechSettings {
 interface NotificationPreferences {
   overrides: NotificationPreference[];
   speech?: NotificationSpeechSettings;
+  sound?: { file: string; name: string };
 }
 
 interface NotificationPreference extends NotificationOwner {
@@ -20,6 +21,8 @@ interface NotificationPreference extends NotificationOwner {
   targets?: NotificationTarget[];
   durationSeconds?: number | null;
   speak?: boolean;
+  sound?: boolean;
+  mcpEvents?: boolean;
 }
 ```
 
@@ -31,9 +34,9 @@ interface NotificationPreference extends NotificationOwner {
 | 接続先・モデル・APIキー | 通知設定には追加しない | 共通TTS設定とPC専用秘密領域 |
 | 速度適用方式 | 通知設定には追加しない | `tts.speedMode` |
 
-新規項目の`null`や不明なプロパティは拒否する。既存`durationSeconds:null`の契約は維持する。設定は既存の共有`settings.json`に保存し、新しい保存ファイルを作らない。未導入・停止中の通知種類の設定を保持する。
+新規項目の`null`や不明なプロパティは拒否する。既存`durationSeconds:null`の契約は維持する。設定は通知ページで選択した共有／PC専用の既存保存先へ保存し、新しい保存ファイルを作らない。未導入・停止中の通知種類の設定を保持する。
 
-通知種類編集で`notificationPreferences`を再構築するとき、`speech`を保持する。逆に声・速度の編集で`overrides`を置換しない。ページ投影・部分JSON・外部設定変更にも同じ検証を適用する。
+通知種類編集で`notificationPreferences`を再構築するとき、`speech`と共通の`sound`を保持する。逆に声・速度の編集で`overrides`や共通の`sound`を置換しない。ページ投影・部分JSON・外部設定変更にも同じ検証を適用する。
 
 通知用の声・速度は受付時に実効値を確定し、既存TTSの`voice`・`speed`引数へ明示指定する。通知全体の上書き変更は次の新規通知・試聴から適用し、待機・生成・再生中の値を変更しない。
 
@@ -108,3 +111,5 @@ TTS未設定など事前に判別できる状態と試聴の失敗は設定画�
 ## 共通再生キューとの接続
 
 生成済み音声は[共通音声再生API](audio-playback.md)へ渡し、通知音・試聴と一つずつ再生します。waitingPlayback中も60秒の開始期限と取消を維持し、playingの通知時に開始期限を解除します。
+
+本体の種類別通知音もONの場合は、音が共通FIFOへ入るまで読み上げの生成開始を待ちます。声・速度・本文は通知受付時に確定し、開始期限にこの待機も含めます。音の失敗・取消・省略では待機を解放し、読み上げ自身の設定・寿命・抑制条件で継続可否を判定します。通知音設定の保存と保留の詳細は[通知基盤](notifications.md#通知音)を正本とします。

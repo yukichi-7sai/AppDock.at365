@@ -178,6 +178,37 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
   };
 }
 
+test('notification sound uses atomic public settings, selected storage, dryRun, revision and reset', (t) => {
+  const f = fixture(t, { device: true });
+  const target = 'service.notifications.sound';
+  const sound = { file: '@library/@assigned/' + 'a'.repeat(64) + '.wav', name: 'Chime' };
+  const original = structuredClone(f.store.value.notificationPreferences.overrides);
+  f.store.setHostPageLocalSettings('notifications', true, f.store.revision);
+  const shared = fs.readFileSync(f.store.file, 'utf8');
+  const dry = f.request(target, [{ kind: 'set', changes: sound }], true);
+  f.call('apply', dry);
+  assert.equal(f.store.value.notificationPreferences.sound, undefined);
+  f.call('apply', f.request(target, [{ kind: 'set', changes: sound }]));
+  assert.deepEqual(f.values(target), sound);
+  assert.equal(fs.readFileSync(f.store.file, 'utf8'), shared);
+  assert.deepEqual(f.store.value.notificationPreferences.overrides, original);
+  const stale = f.request(target, [{ kind: 'reset', keys: ['file', 'name'] }]);
+  f.call('apply', f.request(target, [{ kind: 'set', changes: { name: 'New name' } }]));
+  assert.throws(() => f.call('apply', stale));
+  const before = fs.readFileSync(f.store.device.file, 'utf8');
+  assert.throws(() =>
+    f.call('apply', f.request(target, [{ kind: 'set', changes: { file: 'C:\\invalid.wav' } }])),
+  );
+  assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), before);
+  const notice = f.notification(f.types[0]);
+  assert.equal(f.values(notice).sound, false);
+  f.call('apply', f.request(notice, [{ kind: 'set', changes: { sound: true } }]));
+  assert.equal(f.values(notice).sound, true);
+  f.call('apply', f.request(target, [{ kind: 'reset', keys: ['file', 'name'] }]));
+  assert.equal(f.store.value.notificationPreferences.sound, undefined);
+  assert.equal(f.values(notice).sound, true);
+});
+
 test('notification and update service settings read, write and reset the selected host page file', (t) => {
   const f = fixture(t, { device: true });
   for (const { pageId, targetId, key, value } of [

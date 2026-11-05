@@ -177,6 +177,7 @@ export function SettingsForm({
         editor={editor}
         types={aux.notificationTypes ?? []}
         auxiliary={aux.notificationSpeech}
+        soundState={aux.notificationSound}
         invoke={invoke}
         busy={busy}
         select={select}

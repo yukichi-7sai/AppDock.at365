@@ -2,7 +2,7 @@
 
 ## 目的と境界
 
-AppDockが鳴らす読み上げ、Appletの通知音、設定画面の試聴を、一つのFIFOキューで再生する。今後追加する音声再生もこのAPIを基本とし、機能ごとのBrowserWindow/Audio/システムビープや別キューを作らない。Webサイト自身や別アプリ、Windowsが独自に鳴らす音は制御対象外。独自通知音を使う種類指定通知では`silent: true`を指定し、Windows通知の音を重ねない。
+AppDockが鳴らす読み上げ、本体とAppletの通知音、設定画面の試聴を、一つのFIFOキューで再生する。今後追加する音声再生もこのAPIを基本とし、機能ごとのBrowserWindow/Audio/システムビープや別キューを作らない。Webサイト自身や別アプリ、Windowsが独自に鳴らす音は制御対象外。本体の[種類別通知音](notifications.md#通知音)はWindows音を自動的に抑制する。Applet独自の通知音を使う種類指定通知では`silent: true`を指定し、Windows通知の音を重ねない。
 
 TTS生成と再生を分離し、音声が準備できて再生キューへ入った順に処理する。生成中は再生枠を予約しない。TTS同士の生成は従来どおり直列で、前のTTSの再生終了後に次の生成へ進む。通知音や試聴はその間にも受付できる。
 
@@ -17,6 +17,7 @@ OFFでは再生中を中断してプレイヤーを回収し、共通キュー�
 ## APIと責務
 
 - 本体内部は`src/main/core/audio-service.ts`の単一`audioPlayback.play(request)`を使う。受付時に待ち行列へ登録し、戻り値のPromiseは再生・取消・回収の完了を表す。
+- 本体の種類別通知音は`NotificationToneService`が通知ID・設定・発行元世代・ロック保留・開始期限を管理する。音を共通FIFOへ登録してから同じ通知の読み上げ生成を許可し、順番を保証する。通知の更新や設定ONだけでは過去の音を再投入しない。Appletの独自通知音の経路とは独立する。
 - 入力は検証済みWAVの`bytes`、任意の`signal`、`speed`、開始直前の`beforePlay`、必須の`playbackTimeoutMs`。秘密・接続先・本文を渡さない。呼出元はファイルの権限・サイズ・形式と所有者寿命を検証する。
 - `AudioPlaybackQueue`は順番、待機の取消、容量、待ち時間、終了を管理する。`audio-player.ts`だけがsandbox/contextIsolation付きの一時プレイヤーを作る。前のプレイヤーの回収が終わるまで次を開始しない。
 - Applet通知音は`NotificationSounds`でロック・サスペンド中の受付を最大32件保留し、解除後に共通音声キューへ渡す。ファイル読取・再生開始前の再ロックも保留し、開始済みの通知音は停止して再生し直さない。発行元が停止した待機音は捨てる。詳細は[ロック中の保留](notifications.md#ロック中の保留)を参照する。

@@ -5,6 +5,7 @@ import {
   notificationCatalog,
   notificationTypeKey,
   resolveNotificationPolicy,
+  notificationSoundEnabled,
   type NotificationOwner,
   type NotificationPolicy,
   type NotificationPublishResult,
@@ -132,6 +133,8 @@ export class TypedNotifications {
     const lifetime = previous && !content.restartTimer ? previous[1].lifetime : policy.lifetime;
     const input: NotificationInput = {
       ...content,
+      windowsSilent:
+        content.windowsSilent || notificationSoundEnabled(type, this.options.settings()),
       dedupeKey: key,
       lifetime,
       targets: policy.targets,

@@ -155,6 +155,7 @@ export class SettingsServiceTargets {
         ),
         this.tts(),
         this.speech(),
+        this.notificationSound(),
         ...this.options.notifications().map((type) => this.notification(type)),
       ].map((target) => this.target(target)),
       this.aiConnections(),
@@ -1042,6 +1043,43 @@ export class SettingsServiceTargets {
       plan: (rows, revision) => owner.plan({ manualVoices: rows }, [], revision),
     };
   }
+  private notificationSound(): Target {
+    const fields: Field[] = [
+      {
+        key: 'file',
+        title: hostText('settings.notificationSettings.sound'),
+        type: 'string',
+        default: '',
+      },
+      {
+        key: 'name',
+        title: hostText('settings.notificationSettings.soundName'),
+        type: 'string',
+        default: '',
+        maxLength: 200,
+      },
+    ];
+    return {
+      id: 'service.notifications.sound',
+      rewriteScope: () => this.options.settings.settingScope(['notificationPreferences']),
+      ui: settingsUiGroup('notifications', 'sound'),
+      title: hostText('settings.notificationSettings.sound'),
+      category: 'notifications',
+      fields,
+      values: (settings) => settings.notificationPreferences?.sound ?? { file: '', name: '' },
+      overrides: (raw) => project(object(raw.notificationPreferences).sound, fields),
+      replace: (settings, changes, reset) => {
+        const sound = { ...settings.notificationPreferences?.sound };
+        updateRecord(sound, changes, reset, fields);
+        settings.notificationPreferences = {
+          ...settings.notificationPreferences,
+          overrides: settings.notificationPreferences?.overrides ?? [],
+          sound: !sound.file && !sound.name ? undefined : (sound as { file: string; name: string }),
+        };
+        return settings;
+      },
+    };
+  }
   private speech(): Target {
     const defaults = resolveNotificationSpeech({
       ...this.options.settings.value,
@@ -1124,6 +1162,12 @@ export class SettingsServiceTargets {
         default: false,
       },
       { key: 'mcpEvents', title: 'MCP Events', type: 'boolean', default: false },
+      {
+        key: 'sound',
+        title: hostText('settings.notificationSettings.sound'),
+        type: 'boolean',
+        default: false,
+      },
     ];
     return {
       id: 'service.notification.' + Buffer.from(key).toString('base64url'),
@@ -1140,6 +1184,7 @@ export class SettingsServiceTargets {
           targets: policy.selectedTargets,
           durationSeconds: policy.durationSeconds,
           speak: current?.speak ?? false,
+          sound: current?.sound ?? false,
           mcpEvents: current?.mcpEvents ?? false,
         };
       },
