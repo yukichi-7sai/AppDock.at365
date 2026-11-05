@@ -45,6 +45,7 @@ const { settingsCatalog, settingsProjection } = require(
 );
 function fixture(pageId = 'touchpad-gestures', actions = {}) {
   const settings = createDefaultSettings();
+  settings.ai.connections = [require('../out/main/shared/ai').newAiConnection('fixture')];
   const page = settingsCatalog([], settings).find((item) => item.id === pageId);
   let model = {
     id: 'view',
@@ -380,15 +381,15 @@ test('an asynchronous editor rejects a changed field instead of silently overwri
   f.behavior(async (op) => f.save(op));
   const editor = f.client.editor(f.displayed);
   f.external((values) => {
-    values.ai.commonPrompt = 'external prompt';
+    values.ai.connections[0].alwaysPrompt = 'external prompt';
   });
-  editor.value.ai.commonPrompt = 'pending prompt';
+  editor.value.ai.connections[0].alwaysPrompt = 'pending prompt';
   editor.edit(editor.value);
   await f.client.flush();
   assert(f.error, 'the stale input must report a conflict');
-  assert.equal(f.client.model.content.values.ai.commonPrompt, 'external prompt');
+  assert.equal(f.client.model.content.values.ai.connections[0].alwaysPrompt, 'external prompt');
   assert.equal(
-    f.displayed.content.values.ai.commonPrompt,
+    f.displayed.content.values.ai.connections[0].alwaysPrompt,
     'pending prompt',
     'failed text stays local',
   );
@@ -473,13 +474,13 @@ test('three queued JSON replacements of the same field remain ordered', async ()
   f.behavior(async (op) => f.save(op));
   const value = structuredClone(f.displayed.content.values);
   for (const prompt of ['first', 'second', 'third']) {
-    value.ai.commonPrompt = prompt;
+    value.ai.connections[0].alwaysPrompt = prompt;
     f.client.setText(JSON.stringify(value));
   }
   await f.client.flush();
   assert.equal(f.calls, 3);
   assert.equal(f.error, '');
-  assert.equal(f.displayed.content.values.ai.commonPrompt, 'third');
+  assert.equal(f.displayed.content.values.ai.connections[0].alwaysPrompt, 'third');
 });
 test('interleaved JSON confirmations use each input creation revision', async () => {
   const f = fixture('ai');
@@ -495,36 +496,36 @@ test('interleaved JSON confirmations use each input creation revision', async ()
     f.save(op);
   });
   const value = structuredClone(f.displayed.content.values);
-  value.ai.commonPrompt = 'first';
+  value.ai.connections[0].alwaysPrompt = 'first';
   f.client.setText(JSON.stringify(value));
-  value.ai.commonPrompt = 'second';
+  value.ai.connections[0].alwaysPrompt = 'second';
   f.client.setText(JSON.stringify(value));
   gates[0].resolve();
   for (let i = 0; i < 50 && f.calls < 2; i++) await new Promise((resolve) => setImmediate(resolve));
   assert.equal(f.calls, 2);
-  assert.equal(f.client.model.content.values.ai.commonPrompt, 'first');
-  value.ai.commonPrompt = 'third';
+  assert.equal(f.client.model.content.values.ai.connections[0].alwaysPrompt, 'first');
+  value.ai.connections[0].alwaysPrompt = 'third';
   f.client.setText(JSON.stringify(value));
   gates[1].resolve();
   gates[2].resolve();
   await f.client.flush();
   assert.equal(f.calls, 3);
   assert.equal(f.error, '');
-  assert.equal(f.displayed.content.values.ai.commonPrompt, 'third');
+  assert.equal(f.displayed.content.values.ai.connections[0].alwaysPrompt, 'third');
 });
 test('correcting a rejected form compares against saved values, not the rejected display', async () => {
   const f = fixture('ai');
   f.edit((settings) => {
-    settings.ai.commonPrompt = 'rejected';
+    settings.ai.connections[0].alwaysPrompt = 'rejected';
   });
   await f.client.flush();
   f.behavior(async (op) => f.save(op));
   f.edit((settings) => {
-    settings.ai.commonPrompt = 'corrected';
+    settings.ai.connections[0].alwaysPrompt = 'corrected';
   });
   await f.client.flush();
   assert.equal(f.error, '');
-  assert.equal(f.displayed.content.values.ai.commonPrompt, 'corrected');
+  assert.equal(f.displayed.content.values.ai.connections[0].alwaysPrompt, 'corrected');
 });
 test('a retained failed form is not silently dropped when a later field is saved', async () => {
   const f = fixture('general');
@@ -546,7 +547,7 @@ test('a retained failed form is not silently dropped when a later field is saved
 test('presentation-only model copies retain the saved basis of rejected input', async () => {
   const f = fixture('ai');
   f.edit((settings) => {
-    settings.ai.commonPrompt = 'rejected';
+    settings.ai.connections[0].alwaysPrompt = 'rejected';
   });
   await f.client.flush();
   const resized = {
@@ -555,11 +556,14 @@ test('presentation-only model copies retain the saved basis of rejected input', 
   };
   const editor = f.client.editor(resized);
   f.behavior(async (op) => f.save(op));
-  editor.value.ai.commonPrompt = 'corrected after resize';
+  editor.value.ai.connections[0].alwaysPrompt = 'corrected after resize';
   editor.edit(editor.value);
   await f.client.flush();
   assert.equal(f.error, '');
-  assert.equal(f.client.model.content.values.ai.commonPrompt, 'corrected after resize');
+  assert.equal(
+    f.client.model.content.values.ai.connections[0].alwaysPrompt,
+    'corrected after resize',
+  );
 });
 
 test('an optimistic form handler still accepts the next color after its preceding save drains the queue', async () => {

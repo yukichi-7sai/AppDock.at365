@@ -70,7 +70,7 @@ export function TtsManualVoices({
   };
   return (
     <SettingsField
-      className="tts-editor-full"
+      className="server-editor-full"
       title={t('settings.ttsSettings.manualList')}
       hint={t('settings.ttsEditor.manualHint')}
       error={error}

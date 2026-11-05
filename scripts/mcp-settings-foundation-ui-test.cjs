@@ -38,10 +38,10 @@ Object.assign(settings.updates, {
 settings.keybindings = [];
 settings.gestures.enabled = false;
 settings.ai = {
-  commonPrompt: 'Initial policy',
   connections: [
     {
       ...require('../out/main/shared/ai').newAiConnection('service-fixture'),
+      alwaysPrompt: 'Initial policy',
       name: 'Service fixture',
       baseUrl: 'http://127.0.0.1:9/v1',
       defaultModel: 'fixture-model',

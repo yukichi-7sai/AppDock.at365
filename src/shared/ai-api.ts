@@ -18,14 +18,19 @@ export const aiOperations = {
     permissions: ['read', 'execute', 'useAi'],
     name: 'appdock_ai_generate_text',
     description:
-      '共通の接続設定とプロンプトで文章を生成します。modelとadditionalPromptは今回だけ指定できます。接続先へ入力を送信し、課金される場合があります。受付後jobIdを返し、完了と結果はai.jobs.getで取得します。',
+      '選択したサーバーの設定とプロンプトで文章を生成します。modelとadditionalPromptは今回だけ指定できます。サーバーのalwaysPromptは毎回追加し、additionalPrompt省略時はdefaultPromptを使います。接続先へ入力を送信し、課金される場合があります。受付後jobIdを返し、完了と結果はai.jobs.getで取得します。',
     inputSchema: {
       type: 'object',
       properties: {
         requestId: { type: 'string', minLength: 1, maxLength: 100 },
         connectionId: { type: 'string', minLength: 1, maxLength: 100 },
         model: { type: 'string', minLength: 1, maxLength: 200 },
-        additionalPrompt: { type: 'string', maxLength: 2048 },
+        additionalPrompt: {
+          type: 'string',
+          maxLength: 2048,
+          description:
+            '省略時はサーバーのdefaultPromptを使用。空文字・空白だけを明示すると既定を使わず、alwaysPromptだけを加えます。',
+        },
         input: { type: 'string', maxLength: 8192 },
         timeoutMs: {
           type: 'integer',

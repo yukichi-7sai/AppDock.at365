@@ -604,7 +604,6 @@ async function checkSectionTitles() {
     if (localizationOnly || serviceLocalizationOnly) {
       delete initial.host.language;
       initial.ai = {
-        commonPrompt: '',
         connections: [
           {
             ...require('../out/main/shared/ai').newAiConnection('localization'),

@@ -193,10 +193,7 @@ export function AiSettingsForm({
           </tbody>
         </SettingsListLayout>
       </SettingsContent>
-      <SettingsSection
-        title={translate('settings.aiSettings.common')}
-        hint={translate('settings.aiSettings.commonHint')}
-      >
+      <SettingsSection>
         <SettingsField
           title={translate('settings.aiSettings.defaultConnection')}
           {...settingAnchor('ai', 'defaultConnectionId')}
@@ -220,18 +217,6 @@ export function AiSettingsForm({
               </option>
             ))}
           </select>
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.aiSettings.prompt')}
-          hint={translate('settings.aiSettings.promptHint')}
-          {...settingAnchor('ai', 'commonPrompt')}
-        >
-          <SettingsTextarea
-            aria-label={translate('settings.aiSettings.prompt')}
-            maxLength={2048}
-            value={value.commonPrompt}
-            onChange={(e) => change({ ...value, commonPrompt: e.target.value })}
-          />
         </SettingsField>
       </SettingsSection>
       {dialog?.kind === 'edit' && (
@@ -271,7 +256,6 @@ export function AiSettingsForm({
       )}
       <SettingsSection
         title={translate('settings.aiSettings.test')}
-        collapsible
         description={translate('settings.aiSettings.testHint')}
         {...settingAnchor('ai', 'preview')}
       >
@@ -302,7 +286,10 @@ export function AiSettingsForm({
             onChange={(e) => setModel(e.target.value)}
           />
         </SettingsField>
-        <SettingsField title={translate('settings.aiSettings.extraPrompt')}>
+        <SettingsField
+          title={translate('settings.aiSettings.extraPrompt')}
+          description={translate('settings.aiSettings.extraPromptHint')}
+        >
           <SettingsTextarea
             aria-label={translate('settings.aiSettings.extraPromptLabel')}
             commitOn="input"
@@ -326,7 +313,7 @@ export function AiSettingsForm({
               pending ||
               active ||
               !c ||
-              !(value.commonPrompt.trim() || prompt.trim() || input.trim())
+              !(c.alwaysPrompt.trim() || c.defaultPrompt.trim() || prompt.trim() || input.trim())
             }
             onClick={() =>
               void run(async () => {
@@ -335,7 +322,7 @@ export function AiSettingsForm({
                     requestId: crypto.randomUUID(),
                     connectionId: c!.id,
                     ...(model ? { model } : {}),
-                    additionalPrompt: prompt,
+                    ...(prompt.trim() ? { additionalPrompt: prompt } : {}),
                     input,
                   },
                 ]);

@@ -1,0 +1,75 @@
+.settings-modal.settings-group-dialog.server-connection-dialog[open] {
+  width: min(800px, calc(100vw - 32px));
+  height: min(680px, calc(100dvh - 40px));
+  --dialog-max-height: 680px;
+}
+.server-connection-dialog > .settings-dialog-body,
+.server-connection-dialog .settings-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.server-connection-dialog [hidden] {
+  display: none !important;
+}
+.server-editor-tabs {
+  flex: none;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.server-connection-dialog .settings-dialog-body .server-editor-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px 6px 8px;
+  margin: 0;
+}
+.server-connection-dialog .server-editor-panel > .settings-section-content {
+  display: block;
+  padding: 0;
+}
+.server-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px 20px;
+  align-items: start;
+}
+.server-connection-dialog .settings-dialog-body .settings-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.server-connection-dialog .settings-dialog-body .settings-field-label > .settings-title-with-hint {
+  min-height: 0;
+}
+.server-connection-dialog .settings-field-control,
+.server-connection-dialog .settings-input-actions > .settings-combobox {
+  min-width: 0;
+}
+.server-connection-dialog .settings-field-control > select {
+  width: 100%;
+}
+.server-editor-full {
+  grid-column: 1 / -1;
+}
+.server-connection-dialog textarea {
+  min-height: 64px;
+}
+.server-connection-dialog > footer {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+@container settings-dialog (max-width: 560px) {
+  .server-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

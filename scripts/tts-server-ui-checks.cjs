@@ -347,6 +347,19 @@ module.exports = async function ({
     voicesSource: 'manual',
     manualVoices: [{ id: 'voice-a', name: 'Voice A' }],
   });
+  // An opened dialog intentionally keeps its own snapshot. Wait for the page's
+  // external settings projection before opening a fresh editor.
+  await page.getByRole('button', { name: 'JSON', exact: true }).click();
+  await until(async () => {
+    const projected = JSON.parse(
+      await page.getByLabel('設定JSON', { exact: true }).inputValue(),
+    ).tts;
+    return (
+      projected.connections.find((c) => c.id === projected.defaultConnectionId)
+        ?.alwaysInstructions === alwaysInstructions
+    );
+  }, 'page received external TTS settings');
+  await page.getByRole('button', { name: 'フォーム', exact: true }).click();
   dialog = await edit('Primary');
   await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
   await until(

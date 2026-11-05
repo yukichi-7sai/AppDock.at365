@@ -96,11 +96,6 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
   ],
   ai: [
     [
-      'commonPrompt',
-      hostText('settings.settings-catalog.aiPrompt'),
-      hostText('settings.settings-catalog.aiPromptHint'),
-    ],
-    [
       'defaultConnectionId',
       hostText('settings.settings-catalog.aiDefault'),
       hostText('settings.settings-catalog.aiDefaultHint'),

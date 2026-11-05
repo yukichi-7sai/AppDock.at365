@@ -142,7 +142,7 @@ export class AiService {
       /[\x00-\x1f\x7f]/.test(value.requestId) ||
       (value.model !== undefined &&
         (!aiString(value.model, 200) || !value.model.trim() || /[\r\n]/.test(value.model))) ||
-      !aiString(value.additionalPrompt ?? '', 2048) ||
+      (value.additionalPrompt !== undefined && !aiString(value.additionalPrompt, 2048)) ||
       !aiString(value.input ?? '', 8192) ||
       (value.timeoutMs !== undefined &&
         (!Number.isInteger(value.timeoutMs) ||
@@ -153,16 +153,16 @@ export class AiService {
       return aiFail('INVALID_ARGUMENT', hostText('services.aiService.requestFormat'));
     const input = {
       ...value,
-      additionalPrompt: value.additionalPrompt ?? '',
+      additionalPrompt: value.additionalPrompt,
       input: value.input ?? '',
-    } as unknown as AiGenerateInput & { additionalPrompt: string; input: string };
+    } as unknown as AiGenerateInput & { input: string };
     // Canonical fields make idempotency independent of JSON property order.
     const fingerprint = createHash('sha256')
       .update(
         JSON.stringify([
           input.connectionId ?? null,
           input.model ?? null,
-          input.additionalPrompt,
+          input.additionalPrompt ?? null,
           input.input,
           input.timeoutMs ?? null,
           input.maxOutputTokens ?? null,
@@ -178,11 +178,12 @@ export class AiService {
         aiFail('AI_REQUEST_CONFLICT', hostText('services.aiService.requestIdConflict'));
       return { ...this.view(prior), completion: 'accepted' };
     }
-    const { settings, c, key } = this.connection(input.connectionId);
+    const { c, key } = this.connection(input.connectionId);
     const model = input.model ?? c.defaultModel;
     if (!model?.trim())
       return aiFail('AI_MODEL_REQUIRED', hostText('services.aiService.selectModel'));
-    if (![settings.commonPrompt, input.additionalPrompt, input.input].some((v) => v.trim()))
+    const prompt = input.additionalPrompt ?? c.defaultPrompt;
+    if (![c.alwaysPrompt, prompt, input.input].some((v) => v.trim()))
       aiFail('INVALID_ARGUMENT', hostText('services.aiService.promptRequired'));
     const pending = [...this.records.values()].filter((j) => j.ended === undefined);
     if (
@@ -192,7 +193,7 @@ export class AiService {
       aiFail('AI_QUEUE_FULL', hostText('services.aiService.queueLimit'));
     const body = JSON.stringify({
       model,
-      messages: aiMessages(settings.commonPrompt, input.additionalPrompt, input.input),
+      messages: aiMessages(c.alwaysPrompt, prompt, input.input),
       stream: false,
       [c.compatibility.tokenLimitField]: input.maxOutputTokens ?? c.defaultMaxOutputTokens,
       ...(c.compatibility.temperature === undefined
@@ -226,7 +227,7 @@ export class AiService {
       key,
       abort: new AbortController(),
       deadline: now + (input.timeoutMs ?? c.defaultTimeoutSeconds * 1000),
-      configSignature: JSON.stringify([settings.commonPrompt, c]),
+      configSignature: JSON.stringify(c),
       view: {
         jobId: randomUUID(),
         state: 'queued',
@@ -303,7 +304,7 @@ export class AiService {
     if (!j.c || !this.options.canUse(j.owner, 'generate')) return false;
     const current = this.options.settings();
     const c = current.connections.find((v) => v.id === j.c!.id);
-    return !!c && JSON.stringify([current.commonPrompt, c]) === j.configSignature;
+    return !!c && JSON.stringify(c) === j.configSignature;
   }
   private pump() {
     if (this.closed) return;

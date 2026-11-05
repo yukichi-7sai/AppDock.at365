@@ -291,24 +291,29 @@ const disk = () =>
     checks.push('page JSON uses the same confirmation/cancellation without exposing partial input');
 
     await select('文章生成AI');
-    const prompt = page.getByLabel('共通プロンプト', { exact: true });
-    await pending(prompt, 'first line', (s) => s.ai?.commonPrompt ?? '');
+    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
+    const prompt = dialog.getByLabel('いつも加えるプロンプト', { exact: true });
+    await pending(prompt, 'first line', (s) => s.ai?.connections.length ?? 0);
     await prompt.press('End');
     await prompt.press('Shift+Enter');
     await prompt.pressSequentially('second line');
     assert.equal(await prompt.inputValue(), 'first line\nsecond line');
-    assert.equal((await saved()).ai.commonPrompt, '');
+    assert.equal((await saved()).ai?.connections.length ?? 0, 0);
     await prompt.press('Escape');
     assert.equal(await prompt.inputValue(), '');
     await prompt.fill('Saved multiline\nprompt');
     await prompt.press('Enter');
     await settleSettings(page);
-    assert.equal(disk().ai.commonPrompt, 'Saved multiline\nprompt');
+    assert.equal(disk().ai?.connections.length ?? 0, 0);
+    await dialog.getByRole('tab', { name: '接続', exact: true }).click();
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
+    assert.equal(await prompt.inputValue(), 'Saved multiline\nprompt');
     checks.push(
-      'multiline text uses Shift+Enter for a line, Enter for save, Escape for field cancellation',
+      'multiline text uses Shift+Enter for a line, Enter for local confirmation, Escape for field cancellation, and survives tab switches',
     );
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
-    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     const connection = page.getByLabel('AI接続の名前', { exact: true });
     const originalName = await connection.inputValue();
     await connection.fill('Cancelled local name');
@@ -318,7 +323,7 @@ const disk = () =>
     await connection.fill('Confirmed local name');
     await connection.press('Enter');
     assert.equal(
-      (await saved()).ai.connections.length,
+      (await saved()).ai?.connections.length ?? 0,
       0,
       'field Enter does not save a grouped record',
     );
@@ -346,6 +351,7 @@ const disk = () =>
     await settleSettings(page);
     assert.equal(disk().ai.connections[0].name, 'Dialog IME confirmed');
     assert.equal(disk().ai.connections[0].baseUrl, 'http://127.0.0.1:1/v1');
+    assert.equal(disk().ai.connections[0].alwaysPrompt, 'Saved multiline\nprompt');
     checks.push(
       'dialog Enter and IME stay local; Ctrl+Enter saves the record with the latest blur-confirmed URL',
     );

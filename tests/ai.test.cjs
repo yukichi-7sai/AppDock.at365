@@ -34,11 +34,11 @@ async function until(fn, ms = 2500) {
 }
 function setup(t, extra = {}) {
   let config = {
-    commonPrompt: '共通方針',
     defaultConnectionId: 'local',
     connections: [
       {
         ...newAiConnection('local'),
+        alwaysPrompt: 'いつもの方針',
         baseUrl: 'http://localhost:11434/proxy/v1',
         defaultModel: 'default',
       },
@@ -78,7 +78,7 @@ function setup(t, extra = {}) {
 }
 const request = (id, patch = {}) => ({ requestId: id, input: '入力データ', ...patch });
 test('AI settings accept old files and validate URL, keys, ids and compatibility', () => {
-  assert.deepEqual(parseAiSettings(), { commonPrompt: '', connections: [] });
+  assert.deepEqual(parseAiSettings(), { connections: [] });
   const settings = createDefaultSettings();
   delete settings.ai;
   assert.deepEqual(parseSettings(settings).ai, parseAiSettings());
@@ -118,7 +118,17 @@ test('AI settings accept old files and validate URL, keys, ids and compatibility
   ])
     assert.throws(() => parseAiSettings({ connections: [{ ...c, ...patch }] }));
   assert.throws(() => parseAiSettings({ connections: [c, c] }));
-  assert.throws(() => parseAiSettings({ connections: [], commonPrompt: 'x'.repeat(2049) }));
+  assert.deepEqual(parseAiSettings({ connections: [], commonPrompt: 'discarded' }), {
+    connections: [],
+  });
+  for (const key of ['alwaysPrompt', 'defaultPrompt']) {
+    assert.equal(
+      parseAiSettings({ connections: [{ ...c, [key]: '😀'.repeat(2048) }] }).connections[0][key],
+      '😀'.repeat(2048),
+    );
+    for (const invalid of [null, 42, 'x'.repeat(2049)])
+      assert.throws(() => parseAiSettings({ connections: [{ ...c, [key]: invalid }] }));
+  }
 });
 test('model overrides and prompt composition preserve shared values and isolate input', async (t) => {
   const f = setup(t);
@@ -140,7 +150,8 @@ test('model overrides and prompt composition preserve shared values and isolate 
   assert.equal(body.messages[1].content, '分離対象の架空データ');
   assert(!body.messages[0].content.includes('分離対象の架空データ'));
   assert(
-    body.messages[0].content.indexOf('共通方針') < body.messages[0].content.indexOf('用途の指示'),
+    body.messages[0].content.indexOf('いつもの方針') <
+      body.messages[0].content.indexOf('用途の指示'),
   );
   assert.equal(JSON.stringify(f.settings()), before);
   assert.equal(f.calls[0].url, 'http://localhost:11434/proxy/v1/chat/completions');
@@ -170,7 +181,7 @@ test('model overrides and prompt composition preserve shared values and isolate 
     () => f.s.generate('owner', request('a', { model: 'different' })),
     (e) => e.code === 'AI_REQUEST_CONFLICT',
   );
-  f.set({ commonPrompt: '変更後' });
+  f.connection({ alwaysPrompt: '変更後' });
   assert.equal(
     f.s.generate(
       'owner',
@@ -182,6 +193,43 @@ test('model overrides and prompt composition preserve shared values and isolate 
     ).jobId,
     a.jobId,
   );
+});
+test('server prompts select defaults only on omission and keep every caller on the same composition path', async (t) => {
+  const f = setup(t);
+  f.connection({ alwaysPrompt: '  Always\nline  ', defaultPrompt: 'Default task' });
+  for (const [id, override, expected] of [
+    ['omitted', undefined, 'Default task'],
+    ['override', 'One-time task', 'One-time task'],
+    ['empty', '', ''],
+    ['whitespace', '  ', ''],
+  ]) {
+    const job = f.s.generate('owner', {
+      requestId: id,
+      ...(override === undefined ? {} : { additionalPrompt: override }),
+    });
+    await until(() => f.s.get('owner', job.jobId).state === 'completed');
+    const text = JSON.parse(f.calls.at(-1).init.body).messages[0].content;
+    assert(text.endsWith('  Always\nline  ' + (expected ? '\n' + expected : '')));
+  }
+  assert.throws(() => f.s.generate('owner', { requestId: 'omitted', additionalPrompt: '' }), {
+    code: 'AI_REQUEST_CONFLICT',
+  });
+  const second = {
+    ...newAiConnection('second'),
+    baseUrl: 'http://localhost:11434/v1',
+    defaultModel: 'second-model',
+    defaultPrompt: 'Second default',
+  };
+  f.set({ connections: [...f.settings().connections, second] });
+  const secondJob = f.s.generate('owner', { requestId: 'second', connectionId: 'second' });
+  await until(() => f.s.get('owner', secondJob.jobId).state === 'completed');
+  const secondText = JSON.parse(f.calls.at(-1).init.body).messages[0].content;
+  assert(secondText.endsWith('Second default'));
+  assert(!secondText.includes('Always'));
+  f.connection({ alwaysPrompt: '', defaultPrompt: '' });
+  assert.throws(() => f.s.generate('owner', { requestId: 'no-instructions' }), {
+    code: 'INVALID_ARGUMENT',
+  });
 });
 test('empty input, explicit token dialect and authentication are supported without hidden retries', async (t) => {
   const f = setup(t, { key: () => 'fake-secret' });
@@ -225,6 +273,7 @@ test('invalid arguments, missing authorization and bearer keys fail before sendi
     { timeoutMs: null },
     { input: 'x'.repeat(8193) },
     { additionalPrompt: 'x'.repeat(2049) },
+    { additionalPrompt: null },
     { apiKey: 'secret' },
     { connectionId: 12 },
   ])
@@ -418,7 +467,7 @@ test('prompt/key/permission changes cancel work and revoke result access without
   const a = f.s.generate('owner', request('a'));
   await until(() => f.s.get('owner', a.jobId).state === 'completed');
   const b = f.s.generate('owner', request('b'));
-  f.set({ commonPrompt: 'changed' });
+  f.connection({ alwaysPrompt: 'changed' });
   assert.equal(f.s.get('owner', b.jobId).state, 'canceled');
   const c = f.s.generate('owner', request('c'));
   f.s.reconcile(true);

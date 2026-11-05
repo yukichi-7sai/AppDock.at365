@@ -58,7 +58,7 @@ test('OK saves a whole connection once and preserves unrelated settings', () => 
   assert(!fs.readFileSync(f.file, 'utf8').includes('saved-key'));
   const original = structuredClone(f.settings.value.ai.connections[0]);
   f.settings.save(
-    { ...f.settings.value, ai: { ...f.settings.value.ai, commonPrompt: 'external' } },
+    { ...f.settings.value, ai: { ...f.settings.value.ai, defaultConnectionId: 'external' } },
     f.settings.revision,
   );
   f.controller.save(
@@ -66,6 +66,8 @@ test('OK saves a whole connection once and preserves unrelated settings', () => 
       ...original,
       name: 'edited',
       defaultModel: 'm',
+      alwaysPrompt: 'Always',
+      defaultPrompt: 'Default',
       defaultMaxOutputTokens: 100000,
       defaultTimeoutSeconds: 120,
     },
@@ -73,11 +75,13 @@ test('OK saves a whole connection once and preserves unrelated settings', () => 
     undefined,
     f.secrets.revision(f.c.id),
   );
-  assert.equal(f.settings.value.ai.commonPrompt, 'external');
+  assert.equal(f.settings.value.ai.defaultConnectionId, 'external');
   assert.equal(f.settings.value.ai.connections[0].name, 'edited');
   const saved = JSON.parse(fs.readFileSync(f.file, 'utf8')).ai.connections[0];
   assert.equal(saved.defaultMaxOutputTokens, 100000);
   assert.equal(saved.defaultTimeoutSeconds, 120);
+  assert.equal(saved.alwaysPrompt, 'Always');
+  assert.equal(saved.defaultPrompt, 'Default');
 });
 test('conflicting connection or key edits cannot overwrite the current values', () => {
   const f = fixture();

@@ -117,22 +117,35 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   await apply('service.ai', [
     {
       kind: 'set',
-      changes: { commonPrompt: 'MCP policy', defaultConnectionId: 'service-fixture' },
+      changes: { defaultConnectionId: 'service-fixture' },
     },
   ]);
   await apply(ai.targetId, [
-    { kind: 'set', changes: { defaultModel: 'MCP model', defaultMaxOutputTokens: 2048 } },
+    {
+      kind: 'set',
+      changes: {
+        defaultModel: 'MCP model',
+        defaultMaxOutputTokens: 2048,
+        alwaysPrompt: 'MCP policy',
+        defaultPrompt: 'MCP default',
+      },
+    },
   ]);
   await select('文章生成AI');
+  await page.getByRole('button', { name: 'Service fixtureの設定', exact: true }).click();
+  const aiDialog = page.getByRole('dialog');
+  await aiDialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
   await until(
     async () =>
-      (await page.getByLabel('共通プロンプト', { exact: true }).inputValue()) === 'MCP policy',
+      (await aiDialog.getByLabel('いつも加えるプロンプト', { exact: true }).inputValue()) ===
+      'MCP policy',
     'AI UI received MCP save',
   );
-  await page.getByLabel('共通プロンプト', { exact: true }).fill('UI policy');
-  await page.getByLabel('共通プロンプト', { exact: true }).press('Tab');
+  assert.equal(await aiDialog.getByLabel('指定がないときのプロンプト').inputValue(), 'MCP default');
+  await aiDialog.getByLabel('いつも加えるプロンプト', { exact: true }).fill('UI policy');
+  await aiDialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(
-    async () => (await vals('service.ai')).commonPrompt === 'UI policy',
+    async () => (await vals(ai.targetId)).alwaysPrompt === 'UI policy',
     'AI UI save reached MCP',
   );
   const original = (await snapshot()).settings.value.ai.connections[0],

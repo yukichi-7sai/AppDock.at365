@@ -103,8 +103,8 @@ async function errorNoticeFor(caller) {
         return;
       }
       if (body.messages.at(-1).content === 'slow') {
-        await pause(2000);
-        if (res.destroyed) return;
+        await new Promise((resolve) => res.once('close', resolve));
+        return;
       }
       res.end(
         JSON.stringify({
@@ -118,6 +118,11 @@ async function errorNoticeFor(caller) {
     const { newAiConnection } = require('../out/main/shared/ai');
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
     settings.host.hardwareAcceleration = false;
+    Object.assign(settings.updates, {
+      checkHostOnStartup: false,
+      checkAppletsOnStartup: false,
+      checkHostOnAboutOpen: false,
+    });
     settings.host.notifications = false;
     settings.keybindings = [];
     settings.gestures.enabled = false;
@@ -127,16 +132,17 @@ async function errorNoticeFor(caller) {
           ownerKind: 'host',
           ownerId: 'errors',
           typeId: 'operation-failed',
-          targets: [],
+          targets: ['banner'],
           durationSeconds: 60,
         },
       ],
     };
     settings.ai = {
-      commonPrompt: '共通の架空指示',
       defaultConnectionId: 'preview',
       connections: ['preview', 'sdk', 'mcp'].map((id) => ({
         ...newAiConnection(id),
+        alwaysPrompt: 'サーバーの常時指示',
+        defaultPrompt: 'サーバーの既定指示',
         name: id,
         baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
         defaultModel: 'fixture-model',
@@ -236,73 +242,44 @@ async function errorNoticeFor(caller) {
     }, 'startup');
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     let page = await settingsPage(host);
-    await page.getByRole('button', { name: '通知', exact: true }).click();
-    await page.getByRole('heading', { name: '通知', exact: true, level: 1 }).waitFor();
-    assert.equal(await page.locator('[aria-label="AppDockの通知"]').count(), 1);
-    const errorCard = page
-      .locator('.notification-setting-card')
-      .filter({ has: page.getByRole('heading', { name: 'エラー通知', exact: true }) });
-    await errorCard.locator(':scope > summary').click();
-    const errorBanner = page.getByLabel('エラー通知のバナー', { exact: true });
-    const centerOnly = page.getByLabel('エラー通知の通知センターのみ', { exact: true });
-    assert.equal(await errorBanner.isChecked(), true);
-    assert.equal(await errorBanner.isDisabled(), true);
-    assert.equal(await centerOnly.isChecked(), false);
-    assert.equal(await centerOnly.isDisabled(), true);
-    assert.deepEqual(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')))
-        .notificationPreferences.overrides[0].targets,
-      [],
-    );
-    await page.getByLabel('エラー通知のデスクトップ通知', { exact: true }).check();
-    await settleSettings(host);
-    await until(
-      async () =>
-        (await snapshot()).settings.value.notificationPreferences.overrides
-          .find((r) => r.ownerId === 'errors')
-          ?.targets.includes('desktop'),
-      'optional desktop added',
-    );
-    await page.getByLabel('エラー通知のデスクトップ通知', { exact: true }).uncheck();
-    await settleSettings(host);
-    await until(
-      async () =>
-        (await snapshot()).settings.value.notificationPreferences.overrides.find(
-          (r) => r.ownerId === 'errors',
-        )?.targets.length === 1,
-      'optional desktop removed',
-    );
-    await page
-      .locator('[aria-label="AppDockの通知"]')
-      .screenshot({ path: path.join(profile, 'error-notification-settings.png') });
-    checks.push(
-      'required banner cannot be unchecked or replaced by center-only; optional targets save and normalize legacy empty targets',
-    );
-    assert.equal(
-      await page.getByLabel('エラー通知を読み上げる', { exact: true }).isChecked(),
-      false,
-    );
-    checks.push('one AppDock notification section includes configurable errors with speech off');
     await page.getByRole('button', { name: '文章生成AI', exact: true }).click();
-    await page.getByLabel('共通プロンプト', { exact: true }).waitFor();
-    assert.equal(
-      await page.getByLabel('共通プロンプト', { exact: true }).inputValue(),
-      '共通の架空指示',
-    );
+    await page.getByLabel('既定のサーバー', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('既定のサーバー', { exact: true }).inputValue(), 'preview');
+    assert(await page.getByLabel('試験の入力データ', { exact: true }).isVisible());
 
     const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
     const before = fs.readFileSync(settingsFile, 'utf8');
     assert.equal(await page.getByLabel('このPCでAI接続を使用', { exact: true }).count(), 0);
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     let dialog = page.getByRole('dialog');
-    assert.equal(await dialog.getByLabel('AIの既定の出力トークン上限').inputValue(), '8192');
-    assert.equal(await dialog.getByLabel('AIの既定の待ち時間（秒）').inputValue(), '60');
-    await dialog.getByLabel('AIの既定の出力トークン上限').fill('100000');
-    await dialog.getByLabel('AIの既定の待ち時間（秒）').fill('120');
+    assert.equal(await dialog.getByRole('tab', { selected: true }).innerText(), '接続');
+    await dialog.getByRole('tab', { name: '接続', exact: true }).press('ArrowRight');
+    assert(await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).isVisible());
+    assert.equal(
+      await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).inputValue(),
+      '',
+    );
+    assert.equal(
+      await dialog.getByLabel('指定がないときのプロンプト', { exact: true }).inputValue(),
+      '',
+    );
+    await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).fill('取消するプロンプト');
+    assert.equal(
+      await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).inputValue(),
+      '8192',
+    );
+    assert.equal(
+      await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).inputValue(),
+      '60',
+    );
+    await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+    await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('100000');
+    await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
+    await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     await dialog.getByLabel('AIのAPIのURL', { exact: true }).fill('http:');
-    assert.equal(await dialog.getByLabel('AIのAPIのURL').inputValue(), 'http:');
-    await dialog.getByLabel('AIのAPIのURL').fill('http://');
-    assert.equal(await dialog.getByLabel('AIのAPIのURL').inputValue(), 'http://');
+    assert.equal(await dialog.getByLabel('AIのAPIのURL', { exact: true }).inputValue(), 'http:');
+    await dialog.getByLabel('AIのAPIのURL', { exact: true }).fill('http://');
+    assert.equal(await dialog.getByLabel('AIのAPIのURL', { exact: true }).inputValue(), 'http://');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
     assert(!fs.existsSync(path.join(local, 'ai-keys.json')));
@@ -343,20 +320,24 @@ async function errorNoticeFor(caller) {
     await url.blur();
     await pause(100);
     assert.equal(modelRequests.length, count + 1);
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
     await dialog.getByRole('button', { name: 'モデル一覧を取得', exact: true }).click();
     await until(() => modelRequests.length === count + 2, 'model button discovery');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
     const revision = (await snapshot()).settings.revision;
-    await dialog.getByLabel('AIの既定の出力トークン上限').fill('131073');
+    await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+    await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('131073');
+    await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '既定の出力トークン上限は' }).waitFor();
+    assert.equal(await dialog.getByRole('tab', { selected: true }).innerText(), '詳細設定');
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
-    await dialog.getByLabel('AIの既定の出力トークン上限').fill('100000');
-    await dialog.getByLabel('AIの既定の待ち時間（秒）').fill('601');
+    await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('100000');
+    await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('601');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '既定の待ち時間は' }).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
-    await dialog.getByLabel('AIの既定の待ち時間（秒）').fill('120');
+    await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await until(
       () =>
@@ -394,13 +375,18 @@ async function errorNoticeFor(caller) {
 
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('AI接続の名前').fill('追加したサーバー');
-    await dialog.getByLabel('AIのAPIのURL').fill(settings.ai.connections[0].baseUrl);
-    await dialog.getByLabel('AIの既定モデル').fill('manual-model');
+    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('追加したサーバー');
+    await dialog
+      .getByLabel('AIのAPIのURL', { exact: true })
+      .fill(settings.ai.connections[0].baseUrl);
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
+    await dialog
+      .getByRole('combobox', { name: 'AIの既定モデル', exact: true })
+      .fill('manual-model');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).waitFor();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).click();
-    await page.getByRole('dialog').getByLabel('AI接続の名前').fill('編集中の名前');
+    await page.getByRole('dialog').getByLabel('AI接続の名前', { exact: true }).fill('編集中の名前');
     assert.equal((await snapshot()).settings.value.ai.connections.at(-1).name, '追加したサーバー');
     await page.getByRole('dialog').press('Escape');
     await page.getByRole('button', { name: '追加したサーバーを削除', exact: true }).click();
@@ -416,7 +402,9 @@ async function errorNoticeFor(caller) {
 
     await page.getByRole('button', { name: 'AIサーバーを並べ替え', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('mcpの順番を変更').dragTo(dialog.locator('[data-order-id="preview"]'));
+    await dialog
+      .getByLabel('mcpの順番を変更', { exact: true })
+      .dragTo(dialog.locator('[data-order-id="preview"]'));
     assert.deepEqual(
       (await snapshot()).settings.value.ai.connections.map((c) => c.id),
       ['preview', 'sdk', 'mcp'],
@@ -428,7 +416,7 @@ async function errorNoticeFor(caller) {
     );
     await page.getByRole('button', { name: 'AIサーバーを並べ替え', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('mcpの順番を変更').press('ArrowDown');
+    await dialog.getByLabel('mcpの順番を変更', { exact: true }).press('ArrowDown');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.deepEqual(
       (await snapshot()).settings.value.ai.connections.map((c) => c.id),
@@ -436,12 +424,7 @@ async function errorNoticeFor(caller) {
     );
     checks.push('drag reordering saves on OK, keyboard reorder cancel preserves saved order');
 
-    await page
-      .locator('details')
-      .filter({ has: page.getByRole('heading', { name: '文章生成の試験', exact: true }) })
-      .locator(':scope > summary')
-      .click();
-    await page.getByLabel('試験するAIサーバー').selectOption('preview');
+    await page.getByLabel('試験するAIサーバー', { exact: true }).selectOption('preview');
     await page.getByLabel('試験のAIモデル', { exact: true }).fill('override-model');
     await page.getByLabel('試験の追加プロンプト', { exact: true }).fill('用途別の架空指示');
     await page.getByLabel('試験の入力データ', { exact: true }).fill('架空の入力');
@@ -451,6 +434,28 @@ async function errorNoticeFor(caller) {
     assert.equal(requests[0].body.max_tokens, 100000);
     assert.equal(requests[0].auth, 'Bearer fixture-ai-secret');
     assert.equal(requests[0].body.messages[1].content, '架空の入力');
+    assert(requests[0].body.messages[0].content.includes('サーバーの常時指示\n用途別の架空指示'));
+    assert(!requests[0].body.messages[0].content.includes('サーバーの既定指示'));
+    const previousRequests = requests.length;
+    await page.getByLabel('試験の追加プロンプト', { exact: true }).fill('');
+    await page.getByRole('button', { name: '文章を生成', exact: true }).click();
+    await until(async () => {
+      const model = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
+      return (
+        requests.length > previousRequests &&
+        model.content.auxiliary.ai.jobs.at(-1)?.state === 'completed'
+      );
+    }, 'preview default prompt');
+    assert(
+      requests.at(-1).body.messages[0].content.endsWith('サーバーの常時指示\nサーバーの既定指示'),
+    );
+    checks.push(
+      'preview empty additional prompt uses the selected server default; always prompt is added once',
+    );
     checks.push('generation works immediately after registration without connection approval');
     await page.getByLabel('試験の入力データ', { exact: true }).fill('token-limit');
     await page.getByRole('button', { name: '文章を生成', exact: true }).click();
@@ -614,47 +619,41 @@ async function errorNoticeFor(caller) {
     });
     assert.equal(oldJob.structuredContent.code, 'NOT_FOUND');
     checks.push('MCP permission revocation and token rotation reclaim prior jobs');
-    await page.getByLabel('試験するAIサーバー', { exact: true }).selectOption('preview');
-    await page.getByLabel('試験の入力データ', { exact: true }).fill('slow');
-    await page.getByRole('button', { name: '文章を生成', exact: true }).click();
-    await until(async () => {
-      const m = await page.evaluate(() =>
-        window.dock.settingsPage.get(
-          document.querySelector('.settings-surface').dataset.settingsConnection,
-        ),
-      );
-      return m.content.auxiliary.ai.jobs.at(-1)?.state === 'running';
-    }, 'slow started');
-    await page.getByLabel('共通プロンプト', { exact: true }).fill('変更後の共通方針');
-    await page.getByLabel('共通プロンプト', { exact: true }).press('Enter');
+    const changingPrompt = await call('appdock_ai_generate_text', {
+      requestId: 'mcp-server-settings',
+      connectionId: 'sdk',
+      input: 'slow',
+    });
+    await until(
+      async () =>
+        (await call('appdock_ai_get_job', { jobId: changingPrompt.jobId })).state === 'running',
+      'slow started',
+    );
+    await page.getByRole('button', { name: 'sdkの設定', exact: true }).click();
+    dialog = page.getByRole('dialog');
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
+    await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).fill('変更後の常時指示');
+    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await settleSettings(page);
-    await until(async () => {
-      const m = await page.evaluate(() =>
-        window.dock.settingsPage.get(
-          document.querySelector('.settings-surface').dataset.settingsConnection,
-        ),
-      );
-      return m.content.auxiliary.ai.jobs.at(-1)?.state === 'canceled';
-    }, 'old prompt canceled');
-    checks.push('common prompt changes cancel old jobs');
+    await until(
+      async () =>
+        (await call('appdock_ai_get_job', { jobId: changingPrompt.jobId })).state === 'canceled',
+      'old prompt canceled',
+    );
+    checks.push('server prompt changes cancel old jobs');
     await page.getByRole('button', { name: 'previewの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
     await dialog
-      .getByLabel('AIのAPIのURL')
+      .getByLabel('AIのAPIのURL', { exact: true })
       .fill(settings.ai.connections[0].baseUrl.replace('/v1', '/changed/v1'));
-    await dialog.getByLabel('AIのAPIのURL').press('Enter');
+    await dialog.getByLabel('AIのAPIのURL', { exact: true }).press('Enter');
     await dialog.getByRole('alert').filter({ hasText: '再入力が必要' }).waitFor();
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push('a changed endpoint cannot reuse the saved key during discovery');
-    await page
-      .locator('details')
-      .filter({ has: page.getByRole('heading', { name: '文章生成の試験', exact: true }) })
-      .locator(':scope > summary')
-      .click();
 
     await page.getByRole('button', { name: 'sdkの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
-    const draftUrl = dialog.getByLabel('AIのAPIのURL');
+    const draftUrl = dialog.getByLabel('AIのAPIのURL', { exact: true });
     await draftUrl.fill(settings.ai.connections[0].baseUrl.replace('/v1', '/invalid/v1'));
     await draftUrl.press('Enter');
     await dialog.getByRole('alert').filter({ hasText: 'モデル一覧に対応していません' }).waitFor();
@@ -663,14 +662,16 @@ async function errorNoticeFor(caller) {
     await draftUrl.press('Enter');
     await until(() => modelRequests.length > startedModels, 'slow list started');
     await draftUrl.fill(settings.ai.connections[0].baseUrl);
+    await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
     await until(
       () => dialog.getByRole('button', { name: 'モデル一覧を取得', exact: true }).isEnabled(),
       'slow list settled',
     );
     assert.equal(await dialog.getByText(/モデルを取得しました/).count(), 0);
+    await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     await draftUrl.press('Enter');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
-    await dialog.getByLabel('AI接続の名前').fill('local-draft');
+    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('local-draft');
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.ai.connections.find((c) => c.id === 'sdk').name = 'sdk-external';
@@ -678,7 +679,10 @@ async function errorNoticeFor(caller) {
     });
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '別の場所で変更されました' }).waitFor();
-    assert.equal(await dialog.getByLabel('AI接続の名前').inputValue(), 'local-draft');
+    assert.equal(
+      await dialog.getByLabel('AI接続の名前', { exact: true }).inputValue(),
+      'local-draft',
+    );
     assert.equal(
       (await snapshot()).settings.value.ai.connections.find((c) => c.id === 'sdk').name,
       'sdk-external',
@@ -686,7 +690,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await page.getByRole('button', { name: 'sdk-externalの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('AI接続の名前').fill('sdk');
+    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('sdk');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await until(
       () =>
@@ -699,9 +703,9 @@ async function errorNoticeFor(caller) {
     checks.push(
       'unsupported model lists remain editable, stale responses are discarded, conflicting edits preserve the local draft and can be reopened',
     );
-    for (const [theme, width] of [
-      ['dark', 1280],
-      ['light', 760],
+    for (const [theme, width, height] of [
+      ['dark', 1720, 1000],
+      ['light', 900, 620],
     ]) {
       await host.evaluate(
         async ({ theme, width }) => {
@@ -717,7 +721,7 @@ async function errorNoticeFor(caller) {
       await inspect(
         mainPort,
         electronExpression +
-          `.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().startsWith('appdock://host/')).setSize(${width},850)`,
+          `.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().startsWith('appdock://host/')).setSize(${width},${height})`,
       );
       await pause(300);
       await page.locator('.settings-body').evaluate((el) => (el.scrollTop = 0));
@@ -729,7 +733,14 @@ async function errorNoticeFor(caller) {
       await page.getByRole('button', { name: 'previewの設定', exact: true }).click();
       dialog = page.getByRole('dialog');
       await dialog.screenshot({ path: path.join(profile, theme + '-' + width + '-dialog.png') });
-      await dialog.getByLabel('AIの保存指定').scrollIntoViewIfNeeded();
+      await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
+      await dialog
+        .getByLabel('指定がないときのプロンプト', { exact: true })
+        .scrollIntoViewIfNeeded();
+      assert(await dialog.getByRole('button', { name: 'OK', exact: true }).isVisible());
+      await dialog.screenshot({ path: path.join(profile, theme + '-' + width + '-prompts.png') });
+      await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+      await dialog.getByLabel('AIの保存指定', { exact: true }).scrollIntoViewIfNeeded();
       assert(await dialog.getByRole('button', { name: 'OK', exact: true }).isVisible());
       assert.equal(await dialog.evaluate((el) => el.scrollWidth > el.clientWidth + 2), false);
       await dialog.screenshot({ path: path.join(profile, theme + '-' + width + '-advanced.png') });

@@ -637,24 +637,6 @@ pre.ai-preview-result {
 .ai-model-name {
   font-size: 12px;
 }
-.ai-model-picker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ai-model-picker > input {
-  flex: 1;
-  min-width: 0;
-}
-.ai-model-picker > button {
-  font-size: 23px;
-}
-.ai-connection-dialog[open] {
-  height: min(740px, calc(100dvh - 40px));
-}
-.ai-connection-dialog .settings-dialog-body {
-  flex: 1;
-}
 .applet-catalog {
   margin-top: 24px;
 }

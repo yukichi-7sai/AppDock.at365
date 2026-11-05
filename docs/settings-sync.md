@@ -94,7 +94,7 @@ notificationPreferences.overridesはsettings.jsonの任意フィールドです�
 
 TTSの通常設定は共有settings.jsonのtts、APIキーはPC専用rootのtts-keys.json（safeStorage暗号化・登録IDと接続先ハッシュに紐付け）へ保存します。生成音声とジョブはメモリ上だけで保持し、共有data/と登録素材へ追加しません。詳細は[TTS連携](tts-design.md#設定と保存)を参照してください。
 
-AIの接続設定と共通プロンプトは共有settings.jsonのai、APIキーはPC専用rootのai-keys.jsonへ保存します。接続ごとのPC許可ファイルは使用しません。接続ダイアログ内の入力はOKで一括保存し、キャンセルでは変更しません。生成入力・結果・ジョブはメモリー上だけで保持します。Applet/MCPのuseAiは各操作許可のファイルで独立して管理し、共有設定から許可しません。詳細は[AI文章生成](ai.md)を参照してください。
+AIの接続設定とサーバーごとのプロンプトは共有settings.jsonのai、APIキーはPC専用rootのai-keys.jsonへ保存します。接続ごとのPC許可ファイルは使用しません。接続ダイアログ内の入力はOKで一括保存し、キャンセルでは変更しません。生成入力・結果・ジョブはメモリー上だけで保持します。Applet/MCPのuseAiは各操作許可のファイルで独立して管理し、共有設定から許可しません。詳細は[AI文章生成](ai.md)を参照してください。
 
 ## ファイル配置と端末の識別
 

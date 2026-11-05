@@ -634,13 +634,6 @@ export class SettingsServiceTargets {
   private aiGeneral(): Target {
     const fields: Field[] = [
       {
-        key: 'commonPrompt',
-        title: hostText('settings.aiSettings.prompt'),
-        type: 'string',
-        maxLength: 2048,
-        default: '',
-      },
-      {
         key: 'defaultConnectionId',
         title: hostText('settings.aiSettings.defaultConnection'),
         type: 'select',
@@ -653,7 +646,7 @@ export class SettingsServiceTargets {
     return {
       id: 'service.ai',
       ui: settingsUiFields('ai'),
-      title: hostText('settings.aiSettings.common'),
+      title: hostText('settings.aiSettings.defaultConnection'),
       category: 'ai',
       fields,
       values: (settings) => project(parseAiSettings(settings.ai), fields),
@@ -756,6 +749,20 @@ export class SettingsServiceTargets {
         title: hostText('settings.aiConnectionDialog.model'),
         type: 'string',
         maxLength: 200,
+        default: '',
+      },
+      {
+        key: 'alwaysPrompt',
+        title: hostText('settings.aiConnectionDialog.alwaysPrompt'),
+        type: 'string',
+        maxLength: 2048,
+        default: '',
+      },
+      {
+        key: 'defaultPrompt',
+        title: hostText('settings.aiConnectionDialog.defaultPrompt'),
+        type: 'string',
+        maxLength: 2048,
         default: '',
       },
       {

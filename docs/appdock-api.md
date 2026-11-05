@@ -35,16 +35,16 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 画面ではread／write／executeを「情報の取得」「設定の変更」「コマンドの実行」と表示します。MCP列の情報取得はON固定・操作不可のトグルで、「MCP連携中は常に許可」と補足します。Applet列の情報取得は従来どおり切り替えられます。コマンド実行・Windows入力・プロセス起動・MCP利用・AI送信・TTS送信の6項目は、MCP列のトグル横に注意アイコンを表示します。許可がOFFでも表示し、マウスを重ねるかキーボードでフォーカスすると注意理由を読めます。アイコンは表示上の案内で、許可の判定や保存値を変更しません。
 
-| 操作 | 必要なApplet側の許可 |
-| --- | --- |
-| 読取り | 情報の取得（read） |
-| 通常の公開コマンド | read + execute |
-| 公開設定変更・生成ON/OFF/toggle | read + write |
-| Appletの有効・無効 | read + write |
-| Appletの再起動 | read + execute |
-| ショートカット等の編集 | read + write |
-| input.sendKeys / input.appCommand | sendInputのみ（MCPは直接呼出し不可） |
-| processes.start | read + execute + runProcesses（Applet専用） |
+| 操作                                   | 必要なApplet側の許可                                       |
+| -------------------------------------- | ---------------------------------------------------------- |
+| 読取り                                 | 情報の取得（read）                                         |
+| 通常の公開コマンド                     | read + execute                                             |
+| 公開設定変更・生成ON/OFF/toggle        | read + write                                               |
+| Appletの有効・無効                     | read + write                                               |
+| Appletの再起動                         | read + execute                                             |
+| ショートカット等の編集                 | read + write                                               |
+| input.sendKeys / input.appCommand      | sendInputのみ（MCPは直接呼出し不可）                       |
+| processes.start                        | read + execute + runProcesses（Applet専用）                |
 | 保存したキー送信／プロセス起動コマンド | read + execute + sendInput／runProcessesと、定義の外部公開 |
 
 許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。種類は`audit`で、重要度とは独立します。記録と画面の扱いは[ログ仕様](logging.md)を参照してください。
@@ -59,7 +59,9 @@ Applet専用操作`processes.start`は、appdock-api capabilityとread／execute
 
 ```ts
 await context.appdock.call('processes.start', {
-  mode: 'executable', executable: 'C:\\Tools\\Example.exe', arguments: ['file name.txt']
+  mode: 'executable',
+  executable: 'C:\\Tools\\Example.exe',
+  arguments: ['file name.txt'],
 });
 ```
 
@@ -153,7 +155,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## AI文章生成
 
-最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。本体の共通プロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
+最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。選択したサーバーのプロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。サーバーの常時/既定プロンプトは最低ホスト版0.157.0。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
 
 ## タッチパッドジェスチャー
 

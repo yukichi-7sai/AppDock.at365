@@ -17,6 +17,7 @@ import {
   type TtsPresetId,
 } from '../../shared/tts';
 import './tts-connection-editor.css';
+import '../settings-ui/server-connection-editor.css';
 
 const tabs = ['connection', 'speech', 'details'] as const;
 type EditorTab = (typeof tabs)[number];
@@ -47,7 +48,7 @@ export function TtsConnectionDialog({
   return (
     <SettingsDialog
       title={t(original ? 'settings.ttsServers.edit' : 'settings.ttsServers.add')}
-      className="tts-connection-dialog"
+      className="tts-connection-dialog server-connection-dialog"
       onClose={onClose}
       error={error}
       message={message}
@@ -84,7 +85,7 @@ export function TtsConnectionDialog({
       }}
     >
       <div
-        className="tabs tts-editor-tabs"
+        className="tabs server-editor-tabs"
         role="tablist"
         aria-label={t('settings.ttsEditor.tabs')}
       >
@@ -116,14 +117,14 @@ export function TtsConnectionDialog({
         ))}
       </div>
       <SettingsSection
-        className="tts-editor-panel"
+        className="server-editor-panel"
         variant="group"
         id={`${id}-panel-connection`}
         role="tabpanel"
         aria-labelledby={`${id}-tab-connection`}
         hidden={tab !== 'connection'}
       >
-        <div className="tts-editor-grid">
+        <div className="server-editor-grid">
           <SettingsField settingKey="name" title={t('settings.ttsServers.name')}>
             <SettingsInput
               data-initial-focus
@@ -154,7 +155,7 @@ export function TtsConnectionDialog({
             </select>
           </SettingsField>
           <SettingsField
-            className="tts-editor-full"
+            className="server-editor-full"
             settingKey="baseUrl"
             title={t('settings.ttsEditor.url')}
             hint={t('settings.ttsSettings.urlHint')}
@@ -176,7 +177,7 @@ export function TtsConnectionDialog({
             />
           </SettingsField>
           <SettingsField
-            className="tts-editor-full"
+            className="server-editor-full"
             title={t('settings.ttsSettings.apiKey')}
             {...settingAnchor('tts', 'apiKey')}
             description={t('settings.ttsSettings.apiKeyHint')}
@@ -206,7 +207,7 @@ export function TtsConnectionDialog({
         </div>
       </SettingsSection>
       <SettingsSection
-        className="tts-editor-panel"
+        className="server-editor-panel"
         variant="group"
         id={`${id}-panel-speech`}
         role="tabpanel"
@@ -225,7 +226,7 @@ export function TtsConnectionDialog({
         />
       </SettingsSection>
       <SettingsSection
-        className="tts-editor-panel"
+        className="server-editor-panel"
         variant="group"
         id={`${id}-panel-details`}
         role="tabpanel"

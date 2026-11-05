@@ -45,7 +45,7 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
   store.save(
     {
       ...store.value,
-      ai: { commonPrompt: '', connections: [connection] },
+      ai: { connections: [connection] },
       tts: {
         connections: [
           {
@@ -792,11 +792,9 @@ test('AI general and existing connection fields preserve ownership, integer limi
   const bytes = fs.readFileSync(f.aiFile, 'utf8');
   f.call(
     'apply',
-    f.request('service.ai', [
-      { kind: 'set', changes: { commonPrompt: 'Shared policy', defaultConnectionId: 'one' } },
-    ]),
+    f.request('service.ai', [{ kind: 'set', changes: { defaultConnectionId: 'one' } }]),
   );
-  assert.equal(f.values('service.ai').commonPrompt, 'Shared policy');
+  assert.equal(f.values('service.ai').defaultConnectionId, 'one');
   assert.deepEqual(
     f.call('options.list', { targetId: 'service.ai', key: 'defaultConnectionId' }).items,
     [{ value: 'one', label: 'One' }],
@@ -808,6 +806,8 @@ test('AI general and existing connection fields preserve ownership, integer limi
         kind: 'set',
         changes: {
           defaultModel: 'model-two',
+          alwaysPrompt: 'Server policy',
+          defaultPrompt: 'Fallback task',
           defaultMaxOutputTokens: 2048,
           'compatibility.temperature': 0.7,
           'compatibility.reasoningEffort': 'high',
@@ -816,6 +816,8 @@ test('AI general and existing connection fields preserve ownership, integer limi
     ]),
   );
   assert.equal(f.store.value.ai.connections[0].defaultModel, 'model-two');
+  assert.equal(f.values(id).alwaysPrompt, 'Server policy');
+  assert.equal(f.values(id).defaultPrompt, 'Fallback task');
   assert.equal(f.store.value.ai.connections[0].id, 'one');
   assert.equal(f.read(id, ['defaultMaxOutputTokens']).fields[0].inherited, null);
   f.call(
@@ -1005,14 +1007,18 @@ test('adding credentials invalidates older public schemas and AI prompts use the
   assert.throws(() => f.call('apply', request), { code: 'SCHEMA_CONFLICT' });
   f.call(
     'apply',
-    f.request('service.ai', [{ kind: 'set', changes: { commonPrompt: '😀'.repeat(2048) } }]),
+    f.request(f.target('ai', 'One').targetId, [
+      { kind: 'set', changes: { alwaysPrompt: '😀'.repeat(2048) } },
+    ]),
   );
-  assert.equal(Array.from(f.values('service.ai').commonPrompt).length, 2048);
+  assert.equal(Array.from(f.values(f.target('ai', 'One').targetId).alwaysPrompt).length, 2048);
   assert.throws(
     () =>
       f.call(
         'apply',
-        f.request('service.ai', [{ kind: 'set', changes: { commonPrompt: '😀'.repeat(2049) } }]),
+        f.request(f.target('ai', 'One').targetId, [
+          { kind: 'set', changes: { alwaysPrompt: '😀'.repeat(2049) } },
+        ]),
       ),
     { code: 'INVALID_ARGUMENT' },
   );
@@ -1138,10 +1144,7 @@ test('AI list add shares owner defaults and normalization, dryRun and replay nev
 
 test('AI first addition chooses a default and removing that default clears it without selecting another', (t) => {
   const f = fixture(t, { device: true });
-  f.store.save(
-    { ...f.store.value, ai: { commonPrompt: 'Kept', connections: [] } },
-    f.store.revision,
-  );
+  f.store.save({ ...f.store.value, ai: { connections: [] } }, f.store.revision);
   const device = fs.readFileSync(f.store.device.file, 'utf8');
   listApply(f, [addConnection('First')]);
   const first = f.store.value.ai.connections[0];
@@ -1153,7 +1156,6 @@ test('AI first addition chooses a default and removing that default clears it wi
   assert.equal(f.store.value.ai.defaultConnectionId, first.id);
   listApply(f, [{ kind: 'remove', itemRef: rows[0].itemRef }]);
   assert.equal(f.store.value.ai.defaultConnectionId, undefined);
-  assert.equal(f.store.value.ai.commonPrompt, 'Kept');
   assert.equal(f.store.value.ai.connections.length, 1);
   assert.equal(
     Object.hasOwn(JSON.parse(fs.readFileSync(f.store.shared.file)).ai, 'defaultConnectionId'),

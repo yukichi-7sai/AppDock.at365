@@ -1,71 +1,5 @@
-.settings-modal.settings-group-dialog.tts-connection-dialog[open] {
-  width: min(800px, calc(100vw - 32px));
-  height: min(680px, calc(100dvh - 40px));
-  --dialog-max-height: 680px;
-}
-.tts-connection-dialog > .settings-dialog-body,
-.tts-connection-dialog .settings-dialog-fields {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  scrollbar-gutter: auto;
-}
-.tts-connection-dialog [hidden] {
-  display: none !important;
-}
-.tts-editor-tabs {
-  flex: none;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.tts-connection-dialog .settings-dialog-body .tts-editor-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-  padding: 16px 6px 8px;
-  margin: 0;
-}
-.tts-connection-dialog .tts-editor-panel > .settings-section-content {
-  display: block;
-  padding: 0;
-}
-.tts-editor-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px 20px;
-  align-items: start;
-}
-.tts-connection-dialog .settings-dialog-body .settings-field {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  min-width: 0;
-}
-.tts-connection-dialog .settings-dialog-body .settings-field-label > .settings-title-with-hint {
-  min-height: 0;
-}
-.tts-connection-dialog .settings-field-control,
-.tts-connection-dialog .settings-input-actions > .settings-combobox {
-  min-width: 0;
-}
-.tts-connection-dialog .settings-field-control > select {
-  width: 100%;
-}
-.tts-editor-full {
-  grid-column: 1 / -1;
-}
 .tts-editor-speed .settings-field-control {
   max-width: 160px;
-}
-.tts-connection-dialog textarea {
-  min-height: 64px;
 }
 .tts-manual-voices {
   display: grid;
@@ -80,13 +14,4 @@
 .tts-voice-headings {
   color: var(--muted);
   font-size: 12px;
-}
-.tts-connection-dialog > footer {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-}
-@container settings-dialog (max-width: 560px) {
-  .tts-editor-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }

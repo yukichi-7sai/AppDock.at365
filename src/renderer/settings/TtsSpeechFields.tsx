@@ -75,7 +75,7 @@ export function TtsSpeechFields({
     }
   };
   return (
-    <div className="tts-editor-grid">
+    <div className="server-editor-grid">
       <SettingsField
         title={translate('settings.ttsEditor.model')}
         hint={translate('settings.ttsSettings.modelHint')}
@@ -123,7 +123,7 @@ export function TtsSpeechFields({
         </SettingsInputActions>
       </SettingsField>
       <SettingsField
-        className="tts-editor-full tts-editor-speed"
+        className="server-editor-full tts-editor-speed"
         title={translate('settings.ttsSettings.speed')}
         hint={translate('settings.ttsSettings.speedHint')}
         {...settingAnchor('tts', 'defaultSpeed')}
@@ -141,7 +141,7 @@ export function TtsSpeechFields({
         />
       </SettingsField>
       <SettingsField
-        className="tts-editor-full"
+        className="server-editor-full"
         title={translate('settings.ttsEditor.alwaysInstructions')}
         hint={translate('settings.ttsSettings.alwaysInstructionsHint')}
         description={
@@ -159,7 +159,7 @@ export function TtsSpeechFields({
         />
       </SettingsField>
       <SettingsField
-        className="tts-editor-full"
+        className="server-editor-full"
         title={translate('settings.ttsEditor.defaultInstructions')}
         hint={translate('settings.ttsSettings.defaultInstructionsHint')}
         {...settingAnchor('tts', 'defaultInstructions')}

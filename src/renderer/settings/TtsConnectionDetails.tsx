@@ -50,7 +50,7 @@ export function TtsConnectionDetails({
     manualValid && !speechPathError && !voicePathError && !parameterError && !extraError;
   useLayoutEffect(() => onValidityChange?.(valid), [valid, onValidityChange]);
   return (
-    <div className="tts-editor-grid">
+    <div className="server-editor-grid">
       <SettingsField
         error={speechPathError}
         title={t('settings.ttsSettings.speechPath')}
@@ -144,7 +144,7 @@ export function TtsConnectionDetails({
         visible={value.voicesSource === 'manual'}
       />
       <SettingsField
-        className="tts-editor-full"
+        className="server-editor-full"
         title={t('settings.ttsSettings.extraBody')}
         error={extraError}
         hint={t('settings.ttsSettings.extraBodyHint')}
