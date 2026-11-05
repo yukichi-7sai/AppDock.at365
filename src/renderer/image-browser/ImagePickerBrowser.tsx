@@ -1,3 +1,4 @@
+import { libraryText } from '../../shared/library-text';
 import { useLibraryMedia, soundDuration } from './LibraryMedia';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { assignedImage } from '../../shared/image-paths';
@@ -204,7 +205,9 @@ export function ImagePickerBrowser({
   const sizeControl = useRef<ReturnType<typeof mountGallerySizeControl>>(null);
   useLayoutEffect(() => {
     const view = mountImageGallery(grid.current!, {
-      errorText: media === 'sound' ? t('sounds.readFailed') : undefined,
+      get errorText() {
+        return media === 'sound' ? libraryText(media, 'sounds.readFailed') : undefined;
+      },
       scrollElement: scroll.current!,
       size: libraryGallerySize,
       expandLabels: true,
@@ -221,7 +224,9 @@ export function ImagePickerBrowser({
     });
     gallery.current = view;
     const control = mountGallerySizeControl(size.current!, {
-      label: media === 'sound' ? t('sounds.cardSize') : undefined,
+      get label() {
+        return media === 'sound' ? libraryText(media, 'sounds.cardSize') : undefined;
+      },
       range: libraryGallerySize,
       value: cardWidth,
       change: (value) => latest.current.onWidth(value),

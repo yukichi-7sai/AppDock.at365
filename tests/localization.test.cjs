@@ -240,7 +240,7 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
   );
 });
 
-test('localized settings views and owned diagnostic modules do not reintroduce inline Japanese', () => {
+test('host renderers and localized shared modules do not reintroduce inline Japanese', () => {
   const parser = require('prettier/plugins/typescript').parsers.typescript;
   const files = [
     ...fs
@@ -265,13 +265,16 @@ test('localized settings views and owned diagnostic modules do not reintroduce i
       'update-sources',
       'versions',
       'web-content',
+      'commands',
+      'mcp-command',
+      'update-commands',
+      'settings-commands',
+      'settings-defaults',
     ].map((name) => `src/shared/${name}.ts`),
-    ...['src/renderer/settings', 'src/renderer/settings-ui'].flatMap((directory) =>
-      fs
-        .readdirSync(directory)
-        .filter((name) => /\.tsx?$/.test(name))
-        .map((name) => `${directory}/${name}`),
-    ),
+    ...fs
+      .readdirSync('src/renderer', { recursive: true })
+      .filter((name) => /\.tsx?$/.test(name))
+      .map((name) => `src/renderer/${name}`),
     ...[
       'settings-catalog',
       'settings-navigation',
@@ -364,6 +367,32 @@ test('service messages preserve external text and complete lifecycle command lab
       ['appdock.applets.sample.restart', `${name}を再起動する`],
     ],
   );
+});
+
+test('host gallery and shortcut messages preserve names and saved identifiers', () => {
+  const name = '<b>日本語 {{title}} $t(language.ja)</b>';
+  assert.equal(hostText('gallery.select', { title: name }), `${name}を選択`);
+  assert.equal(hostText('gallery.enlarge', { title: name }), `${name}を拡大`);
+  assert.equal(hostText('workspace.bars.downloadProgress', { name }), `${name}の取得状況`);
+  assert.equal(hostText('workspace.notifications.more', { count: 4 }), 'ほか4件を表示');
+  const { normalizeShortcut, parseShortcuts } = require('../out/main/shared/commands');
+  assert.throws(
+    () => normalizeShortcut('Unknown+A'),
+    /ショートカット Unknown\+A の修飾キーを確認してください。/,
+  );
+  assert.throws(
+    () => parseShortcuts({ first: ['Ctrl+A'], second: ['Ctrl+A'] }),
+    /Ctrl\+A が first と second に重複しています。/,
+  );
+  const {
+    fillSettingDefaults,
+    omitSettingDefaults,
+  } = require('../out/main/shared/settings-defaults');
+  for (const key of ['__proto__', 'prototype', 'constructor']) {
+    const value = JSON.parse(`{"${key}":1}`);
+    assert.throws(() => fillSettingDefaults(value, {}), /設定キーが不正です。/);
+    assert.throws(() => omitSettingDefaults(value, {}), /設定キーが不正です。/);
+  }
 });
 
 test('owned service translation calls supply every named interpolation value', () => {

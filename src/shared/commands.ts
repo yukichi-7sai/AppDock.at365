@@ -32,7 +32,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.open',
     category: hostText('commands.category.navigation'),
-    title: 'AppDockを開く',
+    title: hostText('commands.basic.open'),
     description: hostText('commands.basic.openDescription'),
     extension: 'AppDock',
     available: true,
@@ -40,7 +40,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.commands.search',
     category: hostText('commands.category.navigation'),
-    title: 'コマンドを検索',
+    title: hostText('commands.palette.search'),
     description: hostText('commands.basic.searchDescription'),
     extension: 'AppDock',
     available: true,
@@ -56,7 +56,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.settings.open',
     category: hostText('commands.category.settings'),
-    title: '設定を開く',
+    title: hostText('commands.basic.settings'),
     description: hostText('commands.basic.settingsDescription'),
     extension: 'AppDock',
     available: true,
@@ -72,7 +72,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.image-library.open',
     category: hostText('commands.category.library'),
-    title: '画像ライブラリーを開く',
+    title: hostText('commands.basic.images'),
     description: hostText('commands.basic.imagesDescription'),
     extension: 'AppDock',
     available: true,
@@ -88,7 +88,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.applets.open',
     category: hostText('commands.category.settings'),
-    title: 'Applet一覧を開く',
+    title: hostText('commands.basic.applets'),
     description: hostText('commands.basic.appletsDescription'),
     extension: 'AppDock',
     available: true,
@@ -104,7 +104,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.notifications.open',
     category: hostText('commands.category.navigation'),
-    title: '通知センターを開く',
+    title: hostText('commands.basic.notifications'),
     description: hostText('commands.basic.notificationsDescription'),
     extension: 'AppDock',
     available: true,
@@ -112,7 +112,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.logs.open',
     category: hostText('commands.category.navigation'),
-    title: 'ログを開く',
+    title: hostText('commands.basic.logs'),
     description: hostText('commands.basic.logsDescription'),
     extension: 'AppDock',
     available: true,
@@ -127,7 +127,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.restart',
     category: hostText('commands.category.system'),
-    title: '再起動',
+    title: hostText('services.index.restart'),
     description: hostText('commands.basic.restartDescription'),
     extension: 'AppDock',
     available: true,
@@ -137,7 +137,7 @@ const fixedHostCommands = localizedMetadata(() => [
   {
     id: 'appdock.quit',
     category: hostText('commands.category.system'),
-    title: '終了',
+    title: hostText('services.index.quit'),
     description: hostText('commands.basic.quitDescription'),
     extension: 'AppDock',
     available: true,
@@ -213,7 +213,7 @@ const specialKeys: Record<string, string> = {
 };
 export function normalizeShortcut(value: unknown): string {
   if (typeof value !== 'string' || value.length > 80)
-    throw new Error('ショートカットの形式が正しくありません。');
+    throw new Error(hostText('commands.basic.invalidShortcut'));
   const parts = value.split('+').map((p) => p.trim());
   const rawKey = parts.pop()!;
   const modifiers = new Set<string>();
@@ -230,7 +230,7 @@ export function normalizeShortcut(value: unknown): string {
       } as Record<string, string>
     )[part.toLowerCase()];
     if (!modifier || modifiers.has(modifier))
-      throw new Error(`ショートカット ${value} の修飾キーを確認してください。`);
+      throw new Error(hostText('commands.basic.invalidModifiers', { value }));
     modifiers.add(modifier);
   }
   let key: string;
@@ -238,7 +238,7 @@ export function normalizeShortcut(value: unknown): string {
     key = rawKey.toUpperCase();
   else if (specialKeys[rawKey.toLowerCase()]) key = specialKeys[rawKey.toLowerCase()];
   else if (/^[,./\\;\[\]'=-]$/.test(rawKey)) key = rawKey;
-  else throw new Error(`ショートカット ${value} のキーを確認してください。`);
+  else throw new Error(hostText('commands.basic.invalidKey', { value }));
   return [...['Ctrl', 'Alt', 'Shift', 'Win'].filter((m) => modifiers.has(m)), key].join('+');
 }
 /** Unmodified keys owned by the focused dialog or palette. */
@@ -289,18 +289,24 @@ export function shortcutFromEvent(event: KeyStroke): string | null {
 }
 export function parseShortcuts(value: unknown): Record<string, string[]> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('shortcuts はコマンドIDとキー配列のオブジェクトです。');
+    throw new Error(hostText('commands.basic.invalidShortcutMap'));
   const result = structuredClone(defaultShortcuts);
   for (const [id, bindings] of Object.entries(value)) {
     if (!validCommandId(id) || !Array.isArray(bindings))
-      throw new Error(`ショートカット ${id} の形式が正しくありません。`);
+      throw new Error(hostText('commands.basic.invalidBinding', { id }));
     result[id] = bindings.map(normalizeShortcut);
   }
   const assigned = new Map<string, string>();
   for (const [id, bindings] of Object.entries(result))
     for (const binding of bindings) {
       if (assigned.has(binding))
-        throw new Error(`${binding} が ${assigned.get(binding)} と ${id} に重複しています。`);
+        throw new Error(
+          hostText('commands.basic.duplicateBinding', {
+            binding,
+            first: assigned.get(binding)!,
+            second: id,
+          }),
+        );
       assigned.set(binding, id);
     }
   return result;

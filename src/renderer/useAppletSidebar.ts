@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useHostTranslation } from './HostTranslation';
 import type { KeyboardEvent, PointerEvent } from 'react';
 
 const storageKey = 'appdock.applet-sidebar-width';
@@ -8,6 +9,7 @@ const defaultWidth = 280;
 const clamp = (value: number) => Math.round(Math.max(minimum, Math.min(maximum, value)));
 
 export function useAppletSidebar() {
+  const { t } = useHostTranslation();
   const [width, setWidth] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(storageKey));
@@ -32,7 +34,7 @@ export function useAppletSidebar() {
     separatorProps: {
       role: 'separator',
       tabIndex: 0,
-      'aria-label': 'Applet一覧の幅を変更',
+      'aria-label': t('workspace.resizeAppletSidebar'),
       'aria-orientation': 'vertical' as const,
       'aria-valuemin': minimum,
       'aria-valuemax': maximum,

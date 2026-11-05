@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 /** JSON objects use defaults recursively; arrays are complete, ordered values. */
 export const settingsObject = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -22,7 +23,7 @@ export function omitSettingDefaults(value: any, defaults: any): any {
   const result: Record<string, unknown> = {};
   for (const [key, part] of Object.entries(value)) {
     if (['__proto__', 'prototype', 'constructor'].includes(key))
-      throw Error('設定キーが不正です。');
+      throw Error(hostText('services.sharedSettingsInput.invalidKey'));
     const next = Object.hasOwn(defaults, key)
       ? omitSettingDefaults(part, defaults[key])
       : structuredClone(part);
@@ -37,7 +38,7 @@ export function fillSettingDefaults(value: any, defaults: any): any {
   const result = structuredClone(defaults);
   for (const [key, part] of Object.entries(value)) {
     if (['__proto__', 'prototype', 'constructor'].includes(key))
-      throw Error('設定キーが不正です。');
+      throw Error(hostText('services.sharedSettingsInput.invalidKey'));
     result[key] = fillSettingDefaults(part, defaults[key]);
   }
   return result;

@@ -250,7 +250,7 @@ function Editor({
         items={(current?.images ?? []).map((image) => ({ id: imageKey(image), title: image.file }))}
         onClose={close}
         onApply={(ids) => {
-          if (!current) throw Error('グループが見つかりません。');
+          if (!current) throw Error(t('libraryDialog.groupMissing'));
           const images = new Map(current.images.map((image) => [imageKey(image), image]));
           return save({
             kind: 'update',
@@ -332,7 +332,7 @@ function Editor({
         title={t('images.deleteImages')}
         onClose={close}
         onApply={() => save({ kind: 'delete-image' })}
-        applyLabel="削除"
+        applyLabel={t('common.delete')}
         valid={!r.deleteBlocked}
         description={t('images.deleteDescription', { count: r.images.length })}
         error={r.deleteBlocked ? t('services.imageLibraryHost.inUse') : error}
@@ -386,9 +386,9 @@ function Editor({
     add: t('images.groupAddTitle'),
     rename: t('images.groupRenameTitle'),
     delete: t('images.groupDeleteTitle'),
-    membership: '所属グループを編集',
-    'batch-add': 'グループに追加',
-    'batch-remove': 'グループから外す',
+    membership: t('images.editMembership'),
+    'batch-add': t('images.addToGroup'),
+    'batch-remove': t('images.removeFromGroup'),
   };
   const apply = async () => {
     if (r.kind === 'add')
@@ -416,12 +416,12 @@ function Editor({
       onApply={apply}
       applyLabel={
         r.kind === 'add'
-          ? '追加'
+          ? t('common.add')
           : r.kind === 'delete'
-            ? '削除'
+            ? t('common.delete')
             : r.kind === 'batch-remove'
-              ? '外す'
-              : '適用'
+              ? t('libraryDialog.remove')
+              : t('common.apply')
       }
       valid={
         ['add', 'rename'].includes(r.kind)
@@ -432,7 +432,7 @@ function Editor({
       }
     >
       {['add', 'rename'].includes(r.kind) && (
-        <SettingsField title="グループ名">
+        <SettingsField title={t('libraryDialog.groupName')}>
           <SettingsInput
             data-initial-focus
             aria-label={t('images.groupName')}
@@ -447,12 +447,8 @@ function Editor({
       )}
       {r.kind === 'membership' && (
         <SettingsField
-          title="所属グループ"
-          description={
-            r.groups.length
-              ? r.images[0].file
-              : 'ページの「グループを追加」から、先にグループを作成してください。'
-          }
+          title={t('libraryDialog.membership')}
+          description={r.groups.length ? r.images[0].file : t('libraryDialog.createGroupHint')}
         >
           {r.groups.map((g) => (
             <label className="image-group-choice" key={g.id}>
@@ -471,9 +467,9 @@ function Editor({
       {r.kind === 'batch-add' && (
         <>
           <p>{t('images.groupAddDescription', { count: r.images.length })}</p>
-          <SettingsField title="追加先">
+          <SettingsField title={t('libraryDialog.destination')}>
             <select
-              aria-label="追加先グループ"
+              aria-label={t('libraryDialog.destinationGroup')}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
             >
@@ -484,7 +480,7 @@ function Editor({
               ))}
             </select>
           </SettingsField>
-          {!r.groups.length && <p>先にグループを追加してください。</p>}
+          {!r.groups.length && <p>{t('libraryDialog.addGroupFirst')}</p>}
         </>
       )}
       {r.kind === 'batch-remove' && (

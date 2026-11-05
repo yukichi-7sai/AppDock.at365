@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HostTranslationProvider, useHostTranslation } from '../HostTranslation';
 import type { RibbonView, RibbonApi } from '../../shared/workspace-ui';
 import './style.css';
 import './ribbon-items.css';
@@ -14,6 +15,7 @@ declare global {
 }
 const api = window.appdockRibbon;
 function App() {
+  const { t } = useHostTranslation();
   const [model, setModel] = useState<RibbonView>();
   const [error, setError] = useState('');
   const [session, setSession] = useState('');
@@ -172,7 +174,7 @@ function App() {
     <aside
       className="activity-rail ribbon-surface"
       data-display-mode={model?.displayMode ?? 'compact'}
-      aria-label="リボン"
+      aria-label={t('workspace.ribbon')}
       data-revision={model?.revision}
       onKeyDown={(e) => {
         if (e.key !== 'Tab') return;
@@ -191,7 +193,7 @@ function App() {
     >
       <div
         className="ribbon-buttons ribbon-top"
-        aria-label="上寄せのリボン"
+        aria-label={t('workspace.ribbonTop')}
         onScroll={() => {
           void api.invalidateAnchor().catch(() => {});
         }}
@@ -201,7 +203,7 @@ function App() {
       <div className="rail-spacer" />
       <div
         className="ribbon-buttons ribbon-bottom"
-        aria-label="下寄せのリボン"
+        aria-label={t('workspace.ribbonBottom')}
         onScroll={() => {
           void api.invalidateAnchor().catch(() => {});
         }}
@@ -213,7 +215,7 @@ function App() {
           className="error"
           title={error}
           onClick={() => setError('')}
-          aria-label="操作エラー"
+          aria-label={t('workspace.operationError')}
         >
           !
         </button>
@@ -222,5 +224,7 @@ function App() {
   );
 }
 createRoot(document.getElementById('root')!).render(
-  window.appdockOverlay ? <OverlayApp /> : <App />,
+  <HostTranslationProvider>
+    {window.appdockOverlay ? <OverlayApp /> : <App />}
+  </HostTranslationProvider>,
 );

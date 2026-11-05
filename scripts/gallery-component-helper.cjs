@@ -10,8 +10,15 @@ exports.galleryComponentPage = async (app, host, profile) => {
   const root = path.resolve(__dirname, '..');
   const output = path.join(profile, 'gallery-component');
   const { build } = await import('vite');
+  // Component-only fixture: use the real base dictionary without a host preload.
+  const translations = path.join(profile, 'gallery-translations.mjs');
+  fs.writeFileSync(
+    translations,
+    `export const hostResources = ${JSON.stringify({ ja: require('../resources/translations/host.json') })}; export const readHostLanguage = () => 'ja';`,
+  );
   await build({
     configFile: false,
+    resolve: { alias: { '#host-translations': translations } },
     build: {
       outDir: output,
       emptyOutDir: true,

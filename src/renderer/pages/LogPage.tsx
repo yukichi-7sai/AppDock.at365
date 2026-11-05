@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useHostTranslation } from '../HostTranslation';
 import type {
   LogFilters,
   HostPageAction,
@@ -10,6 +11,7 @@ import { FilterSelect } from '../settings-ui/FilterSelect';
 import './logs.css';
 const api = window.dock.pages;
 export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
+  const { t } = useHostTranslation();
   const [model, setModel] = useState<LogPageModel>(initialModel);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<LogFilters>(initialModel.content.filters);
@@ -59,7 +61,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
   return (
     <section className="logs-page" data-embedded={content.scope.type !== 'all'}>
       <div className="page-heading compact">
-        {content.scope.type === 'all' ? <h1>ログ</h1> : <h3>ログ</h3>}
+        {content.scope.type === 'all' ? <h1>{t('logs.title')}</h1> : <h3>{t('logs.title')}</h3>}
         <button className="secondary" onClick={() => act({ id: model.id, type: 'open-directory' })}>
           <svg
             width="16"
@@ -72,7 +74,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
           >
             <path d="M3 7V5h6l2 2h10v13H3Z" />
           </svg>
-          保存先を開く
+          {t('logs.openDirectory')}
         </button>
       </div>
       <div className="log-toolbar">
@@ -91,8 +93,8 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
           </svg>
           <input
             type="search"
-            aria-label="ログを検索"
-            placeholder="ログを検索…"
+            aria-label={t('logs.search')}
+            placeholder={t('logs.searchPlaceholder')}
             value={filters.text}
             maxLength={4000}
             onChange={(e) => change({ ...filters, text: e.target.value })}
@@ -103,11 +105,11 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             <div className="log-source-filter">
               <FilterSelect
                 allValue=""
-                aria-label="ログのApplet"
+                aria-label={t('logs.source')}
                 value={filters.source}
                 onChange={(e) => change({ ...filters, source: e.target.value })}
               >
-                <option value="">すべてのApplet・本体</option>
+                <option value="">{t('logs.allSources')}</option>
                 {content.sources.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.title}
@@ -118,8 +120,8 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
                 <button
                   type="button"
                   className="log-filter-clear"
-                  title="Appletの絞り込みを解除"
-                  aria-label="Appletの絞り込みを解除"
+                  title={t('logs.clearSource')}
+                  aria-label={t('logs.clearSource')}
                   onClick={() => change({ ...filters, source: '' })}
                 >
                   <Icon name="close" size={16} />
@@ -128,23 +130,23 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             </div>
           )}
           <FilterSelect
-            aria-label="ログの種類"
+            aria-label={t('logs.category')}
             value={filters.category}
             onChange={(e) =>
               change({ ...filters, category: e.target.value as LogFilters['category'] })
             }
           >
-            <option value="all">すべての種類</option>
-            <option value="normal">通常</option>
-            <option value="audit">監査</option>
+            <option value="all">{t('logs.allCategories')}</option>
+            <option value="normal">{t('logs.normal')}</option>
+            <option value="audit">{t('logs.audit')}</option>
           </FilterSelect>
           <FilterSelect
-            aria-label="ログレベル"
+            aria-label={t('logs.level')}
             value={filters.level}
             onChange={(e) => change({ ...filters, level: e.target.value as LogFilters['level'] })}
           >
-            <option value="all">すべてのレベル</option>
-            <option value="standard">Info以上</option>
+            <option value="all">{t('logs.allLevels')}</option>
+            <option value="standard">{t('logs.standard')}</option>
             <option value="debug">Debug</option>
             <option value="info">Info</option>
             <option value="warn">Warning</option>
@@ -152,32 +154,32 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
           </FilterSelect>
           <button type="button" className="log-reset" disabled={!filtered} onClick={clearFilters}>
             <Icon name="close" size={16} />
-            絞り込みを解除
+            {t('logs.clearFilters')}
           </button>
         </div>
       </div>
       <div className="log-summary" aria-live="polite">
-        <span>{content.entries.length} 件</span>
-        {filters.category === 'normal' && <span>監査の警告・エラーも表示します</span>}
+        <span>{t('logs.count', { count: content.entries.length })}</span>
+        {filters.category === 'normal' && <span>{t('logs.auditHint')}</span>}
       </div>
       {error && <p role="alert">{error}</p>}
       {content.storage && (
         <div className="log-storage" role="status" data-mode={content.storage.mode}>
           <span>
             {content.storage.mode === 'memory'
-              ? 'ファイルへ保存できません。画面内のログだけ保持しています。'
+              ? t('logs.storageMemory')
               : content.storage.mode === 'local'
-                ? 'このPCに退避中（同期されません）'
-                : '端末別の共有ログ'}
+                ? t('logs.storageLocal')
+                : t('logs.storageShared')}
           </span>
           {content.storage.mode !== 'memory' && <span>{content.storage.directory}</span>}
         </div>
       )}
-      <div className="log-table" role="table" aria-label="ログ一覧">
+      <div className="log-table" role="table" aria-label={t('logs.table')}>
         <div className="log-head" role="row">
-          <span role="columnheader">時刻</span>
-          <span role="columnheader">レベル・種類</span>
-          <span role="columnheader">提供元 / メッセージ</span>
+          <span role="columnheader">{t('logs.time')}</span>
+          <span role="columnheader">{t('logs.levelCategory')}</span>
+          <span role="columnheader">{t('logs.sourceMessage')}</span>
         </div>
         {[...content.entries].reverse().map((l, i) => (
           <div className="log-row" role="row" key={i}>
@@ -192,7 +194,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             <div className="log-badges" role="cell">
               <span className={`log-level ${l.level}`}>{l.level}</span>
               <span className="log-kind" data-category={l.category ?? 'normal'}>
-                {l.category === 'audit' ? '監査' : '通常'}
+                {l.category === 'audit' ? t('logs.audit') : t('logs.normal')}
               </span>
             </div>
             <div role="cell">
@@ -201,12 +203,9 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             </div>
           </div>
         ))}
-        {!content.entries.length && <div className="empty">該当するログはありません。</div>}
+        {!content.entries.length && <div className="empty">{t('logs.empty')}</div>}
       </div>
-      <p className="footnote">
-        直近{content.limit}
-        件から絞り込んで表示します。Debug・監査もファイルに記録されます。ファイルログは1MBでローテーションします。
-      </p>
+      <p className="footnote">{t('logs.retentionHint', { count: content.limit })}</p>
     </section>
   );
 }

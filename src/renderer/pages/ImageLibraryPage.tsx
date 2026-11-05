@@ -1,3 +1,4 @@
+import { libraryText } from '../../shared/library-text';
 import {
   LibraryMediaProvider,
   useLibraryMedia,
@@ -54,7 +55,7 @@ export function ImageLibraryPage(props: { initialModel: ImageLibraryPageModel })
   );
 }
 function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel }) {
-  const { t } = useLibraryTranslation();
+  const { t, language } = useLibraryTranslation();
   const media = useLibraryMedia();
   const captureDialogFocus = useImageLibraryDialogFocus();
   const [model, setModel] = useState(initialModel),
@@ -268,12 +269,13 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
   }, [initialModel]);
   useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
-      errorText:
-        media === 'text'
-          ? t('texts.invalidEncoding')
+      get errorText() {
+        return media === 'text'
+          ? libraryText(media, 'texts.invalidEncoding')
           : media === 'sound'
-            ? t('sounds.readFailed')
-            : undefined,
+            ? libraryText(media, 'sounds.readFailed')
+            : undefined;
+      },
       expandLabels: true,
       size: libraryGallerySize,
       scrollElement: scroll.current!,
@@ -300,7 +302,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             element,
             id: element.dataset.galleryGroup!,
             description: (count: number) =>
-              t('images.dragAddToGroup', { count, group: element.title }),
+              libraryText(media, 'images.dragAddToGroup', { count, group: element.title }),
           })),
           ...[
             ...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-folder]') ?? []),
@@ -310,9 +312,9 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
               element,
               id: 'folder:' + folder,
               description: (count: number) =>
-                t('images.dragMoveToFolder', {
+                libraryText(media, 'images.dragMoveToFolder', {
                   count,
-                  folder: folder || t('images.rootFolder'),
+                  folder: folder || libraryText(media, 'images.rootFolder'),
                 }),
               hover: () => {
                 const current = layoutRef.current;
@@ -330,7 +332,8 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                   element: navigationButton.current,
                   id: 'navigation',
                   canDrop: false,
-                  description: (count: number) => t('images.dragChooseFolder', { count }),
+                  description: (count: number) =>
+                    libraryText(media, 'images.dragChooseFolder', { count }),
                   hover: () => setDrawer(true),
                 },
               ]
@@ -364,7 +367,9 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     });
     gallery.current = instance;
     sizeControl.current = mountGallerySizeControl(size.current!, {
-      label: media !== 'image' ? t('sounds.cardSize') : undefined,
+      get label() {
+        return media !== 'image' ? libraryText(media, 'sounds.cardSize') : undefined;
+      },
       range: libraryGallerySize,
       value: latest.current.content.cardWidth,
       change: (value) => {
@@ -421,7 +426,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     }
     const frame = requestAnimationFrame(maybeMore);
     return () => cancelAnimationFrame(frame);
-  }, [model, width, layout.sidebarWidth, dialogPending, morePending]);
+  }, [model, width, layout.sidebarWidth, dialogPending, morePending, language]);
   useEffect(
     () => setMenu(null),
     [model.content.group, model.content.folder, model.content.query, model.id],

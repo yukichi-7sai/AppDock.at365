@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import {
   gallerySize,
   validGalleryWidth,
@@ -94,14 +95,14 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       card.loading = true;
       card.requested = edge;
       active++;
-      card.status.textContent = card.image.hasAttribute('src') ? '' : '読み込み中';
+      card.status.textContent = card.image.hasAttribute('src') ? '' : hostText('gallery.loading');
       card.status.dataset.state = 'loading';
       void options
         .image(assetId, edge)
         .then(async (source) => {
           if (disposed || generation !== card.generation || !card.visible) return;
           // Only image URLs supplied by the adapter; never interpret markup.
-          if (!safeImage(source)) throw Error(options.errorText ?? '画像を読み込めません');
+          if (!safeImage(source)) throw Error(options.errorText ?? hostText('gallery.readFailed'));
           const decoded = new Image();
           decoded.src = source;
           await decoded.decode();
@@ -112,7 +113,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         })
         .catch(() => {
           if (!disposed && generation === card.generation) {
-            card.status.textContent = options.errorText ?? '画像を読み込めません';
+            card.status.textContent = options.errorText ?? hostText('gallery.readFailed');
             card.status.dataset.state = 'error';
           }
         })
@@ -280,10 +281,15 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.checkArea.hidden = next.selection !== 'multiple';
         card.check.checked = !!item.selected;
         card.check.disabled = item.selectable === false;
-        card.check.setAttribute('aria-label', `${item.title}を選択`);
+        card.check.setAttribute('aria-label', hostText('gallery.select', { title: item.title }));
         card.button.setAttribute(
           'aria-label',
-          `${item.title}${next.selection === 'single' || options.clickSelect ? 'を選択' : 'を拡大'}`,
+          hostText(
+            next.selection === 'single' || options.clickSelect
+              ? 'gallery.select'
+              : 'gallery.enlarge',
+            { title: item.title },
+          ),
         );
         if (next.selection === 'single' || options.clickSelect)
           card.button.setAttribute('aria-pressed', String(!!item.selected));
@@ -297,7 +303,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.detail.textContent = item.detail;
         const tags = options.expandLabels ? item.labels : item.labels.slice(0, 2);
         if (!options.expandLabels && item.labels.length > 2)
-          tags.push(`ほか${item.labels.length - 2}件`);
+          tags.push(hostText('gallery.moreLabels', { count: item.labels.length - 2 }));
         if (card.labels.dataset.signature !== JSON.stringify(tags)) {
           card.labels.replaceChildren(
             ...tags.map((v) => {
@@ -316,11 +322,14 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         }
         if (item.state !== 'ready')
           card.status.textContent = {
-            missing: '未到着・読取待ち',
-            error: options.errorText ?? '画像を読み込めません',
-            loading: '読み込み中',
+            missing: hostText('gallery.missing'),
+            error: options.errorText ?? hostText('gallery.readFailed'),
+            loading: hostText('gallery.loading'),
           }[item.state];
         else if (card.edge || isText) card.status.textContent = '';
+        else if (card.status.dataset.state === 'error')
+          card.status.textContent = options.errorText ?? hostText('gallery.readFailed');
+        else if (card.loading) card.status.textContent = hostText('gallery.loading');
         for (const old of [...card.actions.children])
           if (!item.actions.some((a) => a.id === (old as HTMLElement).dataset.action)) old.remove();
         item.actions.forEach((action) => {
@@ -383,22 +392,29 @@ export function mountGallerySizeControl(
     commit(value: number): void;
   },
 ) {
-  const label = element('label', 'ad-gallery-size', options.label ?? '画像サイズ');
-  const small = element('span', '', '小'),
-    large = element('span', '', '大');
+  const label = element('label', 'ad-gallery-size', options.label ?? hostText('gallery.size'));
+  const small = element('span', '', hostText('gallery.small')),
+    large = element('span', '', hostText('gallery.large'));
   const input = element('input', '');
   input.type = 'range';
   const range = options.range ?? gallerySize;
   input.min = String(range.min);
   input.max = String(range.max);
   input.step = String(range.step);
-  input.setAttribute('aria-label', options.label ?? '画像サイズ');
+  input.setAttribute('aria-label', options.label ?? hostText('gallery.size'));
   let committed = options.value;
   const setValue = (value: number) => {
     input.value = String(value);
     input.setAttribute(
       'aria-valuetext',
-      `${value === gallerySize.initial ? '標準' : value < gallerySize.initial ? '小さめ' : '大きめ'} ${value}`,
+      hostText(
+        value === gallerySize.initial
+          ? 'gallery.sizeDefault'
+          : value < gallerySize.initial
+            ? 'gallery.sizeSmaller'
+            : 'gallery.sizeLarger',
+        { value },
+      ),
     );
   };
   const commit = () => {
@@ -457,10 +473,14 @@ export function mountGallerySizeControl(
   container.append(label);
   return {
     setValue(value: number) {
+      label.firstChild!.textContent = options.label ?? hostText('gallery.size');
+      small.textContent = hostText('gallery.small');
+      large.textContent = hostText('gallery.large');
+      input.setAttribute('aria-label', options.label ?? hostText('gallery.size'));
       if (!dragging && !keyDown) {
         committed = value;
         setValue(value);
-      }
+      } else setValue(Number(input.value));
     },
     dispose() {
       window.removeEventListener('pointerup', pointerEnd);
@@ -494,22 +514,25 @@ export function mountGalleryPreview(
   let sequence = 0,
     previous = '',
     disposed = false;
+  let statusKey: 'gallery.empty' | 'gallery.readFailed' | 'gallery.loading' | undefined;
   return {
     setModel(model: GalleryPreviewModel) {
       picture.alt = model.title;
       detail.textContent = model.detail;
       labels.textContent = model.labels.join(' / ');
+      if (statusKey) status.textContent = hostText(statusKey);
       const key = `${model.assetId}:${model.state}`;
       if (key === previous || disposed) return;
       previous = key;
       const current = ++sequence;
       picture.removeAttribute('src');
-      status.textContent =
+      statusKey =
         model.state === 'missing'
-          ? '画像がありません'
+          ? 'gallery.empty'
           : model.state === 'error'
-            ? '画像を読み込めません'
-            : '読み込み中';
+            ? 'gallery.readFailed'
+            : 'gallery.loading';
+      status.textContent = hostText(statusKey);
       if (model.state !== 'ready') return;
       void options
         .image(model.assetId)
@@ -520,10 +543,14 @@ export function mountGalleryPreview(
           await decoded.decode();
           if (disposed || current !== sequence) return;
           picture.src = source;
+          statusKey = undefined;
           status.textContent = '';
         })
         .catch(() => {
-          if (!disposed && current === sequence) status.textContent = '画像を読み込めません';
+          if (!disposed && current === sequence) {
+            statusKey = 'gallery.readFailed';
+            status.textContent = hostText(statusKey);
+          }
         });
     },
     dispose() {

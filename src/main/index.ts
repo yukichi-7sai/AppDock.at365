@@ -1370,7 +1370,7 @@ customCommands.registerHost(
   },
 );
 customCommands.registerHost(
-  mcpCommandType,
+  () => mcpCommandType,
   async (config, context) => {
     const caller = context.apiCaller ?? context.origin;
     const actor =

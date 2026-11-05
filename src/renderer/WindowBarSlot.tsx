@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef } from 'react';
+import { useHostTranslation } from './HostTranslation';
 import type { WindowBarRegion } from '../shared/window-bars';
 
 /** Only reserves space and transfers focus; all bar rendering belongs to the host. */
 export function WindowBarSlot({ region }: { region: WindowBarRegion }) {
+  const { t } = useHostTranslation();
   const slot = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = slot.current!;
@@ -53,7 +55,9 @@ export function WindowBarSlot({ region }: { region: WindowBarRegion }) {
       className="shell-bar-slot"
       data-region={region}
       tabIndex={0}
-      aria-label={region === 'titlebar' ? 'タイトルバーに移動' : 'ステータスバーに移動'}
+      aria-label={
+        region === 'titlebar' ? t('workspace.focusTitlebar') : t('workspace.focusStatusbar')
+      }
       onFocus={(event) => {
         const from = event.relatedTarget;
         const before =

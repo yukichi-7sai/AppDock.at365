@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HostTranslationProvider, useHostTranslation } from '../HostTranslation';
+import { hostText } from '../../shared/i18n';
 import { Icon } from '../../shared/ui-icons';
 import { shortcutFromEvent } from '../../shared/commands';
 import type { WindowBarApi, WindowBarModel } from '../../shared/window-bars';
@@ -20,6 +22,7 @@ const controls = () =>
   );
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 function App() {
+  const { t } = useHostTranslation();
   const [model, setModel] = useState<WindowBarModel>();
   const [session, setSession] = useState('');
   const [error, setError] = useState('');
@@ -47,7 +50,7 @@ function App() {
           setSession(connection.sessionId);
         }
       })
-      .catch(() => setError('画面を接続できません。AppDockを再起動してください。'));
+      .catch(() => setError(hostText('workspace.bars.connectFailed')));
     const focus = api.onFocus((edge) => {
       const items = controls();
       (edge === 'first' ? items[0] : items.at(-1))?.focus();
@@ -68,7 +71,7 @@ function App() {
       }
       const key = shortcutFromEvent(event);
       if (key)
-        void api.shortcut(key).catch(() => setError('ショートカットを実行できませんでした。'));
+        void api.shortcut(key).catch(() => setError(hostText('workspace.bars.shortcutFailed')));
     };
     document.addEventListener('keydown', keys);
     return () => {
@@ -80,7 +83,7 @@ function App() {
   }, []);
   useEffect(() => {
     if (session && model)
-      void api.ready(session).catch(() => setError('画面を表示できませんでした。'));
+      void api.ready(session).catch(() => setError(hostText('workspace.bars.readyFailed')));
   }, [session, !!model]);
   const act = (operation: keyof WindowBarModel['actions']) => {
     const actionId = model?.actions[operation];
@@ -89,15 +92,16 @@ function App() {
     setPending(true);
     void api
       .invoke({ sessionId: session, actionId, requestId: crypto.randomUUID() })
-      .catch(() =>
-        setError('操作を完了できませんでした。ログと通信環境を確認して、もう一度お試しください。'),
-      )
+      .catch(() => setError(hostText('workspace.bars.operationFailed')))
       .finally(() => setPending(false));
   };
   if (!model) return null;
   const progress = model.update.progress;
   const updateOperation = model.update.busy && (
-    <section className={`update-operation${error ? ' has-error' : ''}`} aria-label="更新の進捗">
+    <section
+      className={`update-operation${error ? ' has-error' : ''}`}
+      aria-label={t('workspace.bars.updateProgress')}
+    >
       <Icon name="refresh" size={14} />
       <span
         className="update-operation-message"
@@ -109,7 +113,7 @@ function App() {
       {progress && (
         <>
           <progress
-            aria-label={`${progress.name}の取得状況`}
+            aria-label={t('workspace.bars.downloadProgress', { name: progress.name })}
             max={progress.totalBytes ?? 1}
             value={
               progress.totalBytes
@@ -131,10 +135,10 @@ function App() {
           if (actionId)
             void api
               .invoke({ sessionId: session, actionId, requestId: crypto.randomUUID() })
-              .catch(() => setError('更新をキャンセルできませんでした。'));
+              .catch(() => setError(hostText('workspace.bars.cancelFailed')));
         }}
       >
-        キャンセル
+        {t('common.cancel')}
       </button>
     </section>
   );
@@ -147,8 +151,8 @@ function App() {
               key={direction}
               data-direction={direction}
               disabled={!model.actions[direction]}
-              aria-label={direction === 'back' ? '戻る' : '進む'}
-              title={direction === 'back' ? '戻る' : '進む'}
+              aria-label={direction === 'back' ? t('navigation.back') : t('navigation.forward')}
+              title={direction === 'back' ? t('navigation.back') : t('navigation.forward')}
               onClick={() => act(direction)}
             >
               <Icon name="arrow" size={22} />
@@ -166,15 +170,17 @@ function App() {
           </span>
         </div>
         <button className="titlebar-search" onClick={() => act('palette')}>
-          <Icon name="search" size={15} /> コマンドを検索{' '}
+          <Icon name="search" size={15} /> {t('commands.palette.search')}{' '}
           {model.paletteKey && <kbd>{model.paletteKey}</kbd>}
         </button>
         <button
           className="titlebar-notifications"
           data-testid="notification-center"
           data-active={model.activeNotificationCount > 0 || undefined}
-          aria-label={`通知センターを開く（アクティブ ${model.activeNotificationCount}件）`}
-          title={`通知センター（アクティブ ${model.activeNotificationCount}件）`}
+          aria-label={t('workspace.bars.openNotifications', {
+            count: model.activeNotificationCount,
+          })}
+          title={t('workspace.bars.notifications', { count: model.activeNotificationCount })}
           onClick={() => act('notifications')}
         >
           <Icon name="bell" size={17} />
@@ -183,7 +189,13 @@ function App() {
           {(['minimize', 'maximize', 'close'] as const).map((operation, i) => (
             <button
               key={operation}
-              aria-label={['最小化', model.maximized ? '元に戻す' : '最大化', '閉じる'][i]}
+              aria-label={
+                [
+                  t('workspace.bars.minimize'),
+                  model.maximized ? t('workspace.bars.restore') : t('workspace.bars.maximize'),
+                  t('common.close'),
+                ][i]
+              }
               className={operation === 'close' ? 'window-close' : ''}
               onClick={() => act(operation)}
             >
@@ -203,7 +215,7 @@ function App() {
     <footer className="statusbar">
       <span className="statusbar-activity">
         <i />
-        実行中 {model.runningApplets} Applet
+        {t('workspace.bars.runningApplets', { count: model.runningApplets })}
       </span>
       <span>
         AppDock.at365 <span className="muted">v{model.version}</span>
@@ -211,10 +223,10 @@ function App() {
           <button
             className="text-button"
             disabled={pending || !model.actions.update}
-            title={model.update.blocked ? '設定の処理が完了するまでお待ちください。' : undefined}
+            title={model.update.blocked ? t('workspace.bars.updateBlocked') : undefined}
             onClick={() => act('update')}
           >
-            {pending ? '処理中…' : 'AppDockを更新'}
+            {pending ? t('images.working') : t('workspace.bars.update')}
           </button>
         </span>
       </span>
@@ -226,4 +238,8 @@ function App() {
     </footer>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <HostTranslationProvider>
+    <App />
+  </HostTranslationProvider>,
+);

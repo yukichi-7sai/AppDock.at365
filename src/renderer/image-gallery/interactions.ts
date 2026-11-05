@@ -1,4 +1,5 @@
 import type { GalleryModel } from '../../shared/image-gallery';
+import { hostText } from '../../shared/i18n';
 
 export interface GalleryDropTarget {
   element: HTMLElement;
@@ -110,7 +111,8 @@ export function mountGalleryInteractions(
         g.target?.hover?.();
       }
       if (g.count !== undefined)
-        count.textContent = target?.description?.(g.count) ?? `${g.count}枚`;
+        count.textContent =
+          target?.description?.(g.count) ?? hostText('images.imageCount', { count: g.count });
       g.insertion = undefined;
       insertion.remove();
       const card = hit?.closest<HTMLElement>('[data-image-id]');

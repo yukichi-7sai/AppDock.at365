@@ -36,7 +36,7 @@ export function validateSettingCommandIds(
     [...reserved].some((id) => id.length > 180) ||
     registered.some((c) => reserved.has(c.id) || c.aliases?.some((id) => reserved.has(id)))
   )
-    throw Error('設定から生成するコマンドIDが長すぎるか、登録コマンドと重複しています。');
+    throw Error(hostText('services.settingCommands.invalidId'));
 }
 
 export function settingInputSchema(field: SettingDefinition): Record<string, unknown> {

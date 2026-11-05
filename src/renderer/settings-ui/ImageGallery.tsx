@@ -21,7 +21,7 @@ export function ImageGallery({
   resetKey?: string;
   children?: ReactNode;
 }) {
-  const { t: translate } = useHostTranslation();
+  const { t: translate, language } = useHostTranslation();
   const container = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const current = useRef({ model, options });
@@ -44,7 +44,7 @@ export function ImageGallery({
   }, []);
   useEffect(() => {
     mounted.current?.setModel(model);
-  }, [model]);
+  }, [model, language]);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
   }, [resetKey]);
@@ -68,6 +68,7 @@ export function GallerySizeControl({
   onChange(value: number): void;
   onCommit(value: number): void;
 }) {
+  const { language } = useHostTranslation();
   const container = useRef<HTMLDivElement>(null);
   const current = useRef({ value, onChange, onCommit });
   current.current = { value, onChange, onCommit };
@@ -86,7 +87,7 @@ export function GallerySizeControl({
   }, []);
   useEffect(() => {
     mounted.current?.setValue(value);
-  }, [value]);
+  }, [value, language]);
   return <div className="image-picker-size" ref={container} />;
 }
 export function ImageGalleryPreview({
@@ -96,6 +97,7 @@ export function ImageGalleryPreview({
   model: GalleryPreviewModel;
   image(assetId: string): Promise<string>;
 }) {
+  const { language } = useHostTranslation();
   const container = useRef<HTMLDivElement>(null);
   const current = useRef({ model, image });
   current.current = { model, image };
@@ -113,6 +115,6 @@ export function ImageGalleryPreview({
   }, []);
   useEffect(() => {
     mounted.current?.setModel(model);
-  }, [model]);
+  }, [model, language]);
   return <div className="image-gallery-preview-content" ref={container} />;
 }

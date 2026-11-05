@@ -1,6 +1,6 @@
 import { SettingsControlsProvider } from './settings-ui/api';
 import { hostText } from '../shared/i18n';
-import { HostTranslationProvider } from './HostTranslation';
+import { HostTranslationProvider, useHostTranslation } from './HostTranslation';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { HostPageSlot } from './pages/HostPageSlot';
@@ -31,6 +31,7 @@ declare global {
 }
 type Page = PageRoute;
 function App() {
+  const { t } = useHostTranslation();
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
@@ -335,8 +336,7 @@ function App() {
         void window.dock
           .dispatchShortcut(shortcut)
           .then((result) => {
-            if (result?.failed)
-              setError('ショートカットの一部を実行できませんでした。ログを確認してください。');
+            if (result?.failed) setError(hostText('workspace.shortcutPartial'));
           })
           .catch((error) => setError(String(error)));
       }
@@ -423,7 +423,7 @@ function App() {
         className="shell-ribbon-slot"
         ref={ribbonSlot}
         tabIndex={0}
-        aria-label="リボンに移動"
+        aria-label={t('workspace.focusRibbon')}
         onFocus={(event) => {
           const from = event.relatedTarget;
           const before =
@@ -452,13 +452,13 @@ function App() {
         {error && (
           <div className="error-banner" role="alert">
             {error}
-            <button aria-label="エラーを閉じる" onClick={() => setError('')}>
+            <button aria-label={t('workspace.closeError')} onClick={() => setError('')}>
               <Icon name="close" size={14} />
             </button>
           </div>
         )}
         {!snapshot ? (
-          <div className="loading">Dockに接続しています…</div>
+          <div className="loading">{t('workspace.connecting')}</div>
         ) : (
           <div className="page-content">
             {page.startsWith('page:') && (
@@ -475,27 +475,27 @@ function App() {
                         disabled={!snapshot.webPages[a.id]?.canGoBack}
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'back'))}
                       >
-                        戻る
+                        {t('navigation.back')}
                       </button>
                       <button
                         disabled={!snapshot.webPages[a.id]?.canGoForward}
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'forward'))}
                       >
-                        進む
+                        {t('navigation.forward')}
                       </button>
                       <button
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'reload'))}
                       >
-                        リロード
+                        {t('services.pageCollections.reload')}
                       </button>
                       <button
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'home'))}
                       >
-                        開始ページへ
+                        {t('services.pageCollections.home')}
                       </button>
                       <span>
                         {snapshot.webPages[a.id]?.loading
-                          ? '読み込み中…'
+                          ? t('workspace.loading')
                           : snapshot.webPages[a.id]?.error || snapshot.webPages[a.id]?.origin}
                       </span>
                     </div>
@@ -503,7 +503,7 @@ function App() {
                 <div
                   className="applet-page-viewport"
                   ref={appletPageRef}
-                  aria-label="Appletページ"
+                  aria-label={t('workspace.appletPage')}
                 />
               </div>
             )}

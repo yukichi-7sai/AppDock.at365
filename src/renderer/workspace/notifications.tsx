@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HostTranslationProvider, useHostTranslation } from '../HostTranslation';
+import { hostText } from '../../shared/i18n';
 import { NotificationDismissButton } from '../notifications/DismissButton';
 import type {
   NotificationBannerApi,
@@ -13,8 +15,13 @@ declare global {
   }
 }
 const api = window.appdockNotifications;
-const labels = { info: 'インフォメーション', warning: '警告', error: 'エラー' };
+const levelKeys = {
+  info: 'workspace.notifications.info',
+  warning: 'notifications.warning',
+  error: 'notifications.error',
+} as const;
 function App() {
+  const { t } = useHostTranslation();
   const [model, setModel] = useState<NotificationBannerModel>();
   const [session, setSession] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -35,7 +42,14 @@ function App() {
       fresh.forEach((i) => announced.current.add(i.id));
       if (fresh.length)
         setAnnouncement({
-          text: fresh.map((i) => labels[i.level] + '、' + i.title).join('。'),
+          text: fresh
+            .map((i) =>
+              hostText('workspace.notifications.announcement', {
+                level: hostText(levelKeys[i.level]),
+                title: i.title,
+              }),
+            )
+            .join('。'),
           urgent: fresh.some((i) => i.level === 'error'),
         });
     };
@@ -139,7 +153,7 @@ function App() {
               <span aria-hidden="true">
                 {item.level === 'info' ? 'ⓘ' : item.level === 'warning' ? '⚠' : '⛔'}
               </span>{' '}
-              {labels[item.level]}
+              {t(levelKeys[item.level])}
             </span>
             <strong>{item.title}</strong>
             <p>{item.body}</p>
@@ -153,7 +167,7 @@ function App() {
                   disabled={item.busy || action.disabled}
                   onClick={() => act(item, 'invoke', action.id)}
                 >
-                  {item.busy && action.primary ? '処理中…' : action.label}
+                  {item.busy && action.primary ? t('images.working') : action.label}
                 </button>
               ))}
             </div>
@@ -169,7 +183,9 @@ function App() {
       ))}
       {all.length > 3 && (
         <button className="notification-more" onClick={() => setExpanded(!expanded)}>
-          {expanded ? '折りたたむ' : 'ほか' + (all.length - 3) + '件を表示'}
+          {expanded
+            ? t('workspace.notifications.collapse')
+            : t('workspace.notifications.more', { count: all.length - 3 })}
         </button>
       )}
       {model.surface === 'desktop' && (
@@ -177,7 +193,7 @@ function App() {
           className="notification-more"
           onClick={() => void api.openCenter().catch((e) => setError(String(e)))}
         >
-          通知センターを開く（{all.length}件）
+          {t('workspace.notifications.openCenter', { count: all.length })}
         </button>
       )}
       {error && all.length > 0 && (
@@ -188,4 +204,8 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <HostTranslationProvider>
+    <App />
+  </HostTranslationProvider>,
+);

@@ -232,10 +232,12 @@ exports.checkGalleryInteractions = async ({
   const orderDialog = page.getByRole('dialog', { name: '画像を並べ替え', exact: true });
   const firstHandle = orderDialog.locator('.shortcut-order-handle').first();
   const handleId = await firstHandle.getAttribute('data-testid');
+  const targetRow = orderDialog.locator('[data-order-id]').nth(2);
+  const targetBox = await targetRow.boundingBox();
   await orderDialog
     .locator('.shortcut-order-command strong')
     .first()
-    .dragTo(orderDialog.locator('[data-order-id]').nth(2));
+    .dragTo(targetRow, { targetPosition: { x: 100, y: targetBox.height - 3 } });
   assert(await orderDialog.getByTestId(handleId).evaluate((el) => document.activeElement === el));
   await orderDialog.getByTestId(handleId).press('ArrowUp');
   await orderDialog.getByTestId('settings-dialog-confirm').click();
