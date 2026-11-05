@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
-import { SettingsField, SettingsSection, SettingsActions } from '../settings-ui/SettingsSections';
+import { SettingsField, SettingsActions, SettingsSection } from '../settings-ui/SettingsSections';
 import { SettingsInput, SettingsUrlInput } from '../settings-ui/SettingsInput';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { TtsConnectionDetails } from './TtsConnectionDetails';
@@ -12,9 +12,14 @@ import {
   newTtsServer,
   ttsBaseUrl,
   ttsPresetIds,
+  parseTtsServer,
   type TtsServer,
   type TtsPresetId,
 } from '../../shared/tts';
+import './tts-connection-editor.css';
+
+const tabs = ['connection', 'speech', 'details'] as const;
+type EditorTab = (typeof tabs)[number];
 
 export function TtsConnectionDialog({
   original,
@@ -28,6 +33,8 @@ export function TtsConnectionDialog({
   onClose(): void;
 }) {
   const { t } = useHostTranslation();
+  const id = useId();
+  const [tab, setTab] = useState<EditorTab>('connection');
   const [draft, setDraft] = useState(() =>
     structuredClone(original ?? newTtsServer(crypto.randomUUID())),
   );
@@ -40,108 +47,172 @@ export function TtsConnectionDialog({
   return (
     <SettingsDialog
       title={t(original ? 'settings.ttsServers.edit' : 'settings.ttsServers.add')}
-      className="ai-connection-dialog"
+      className="tts-connection-dialog"
       onClose={onClose}
       error={error}
       message={message}
-      valid={!!draft.name.trim() && !!draft.baseUrl.trim() && detailsValid}
-      onApply={() => invoke('ttsSaveConnection', [draft, original, apiKey, status?.keyRevision])}
-    >
-      <SettingsField settingKey="name" title={t('settings.ttsServers.name')}>
-        <SettingsInput
-          data-initial-focus
-          aria-label={t('settings.ttsServers.name')}
-          maxLength={200}
-          value={draft.name}
-          onChange={(e) => change({ name: e.target.value })}
-        />
-      </SettingsField>
-      <SettingsSection title={t('settings.ttsSettings.connection')}>
-        <SettingsField
-          settingKey="preset"
-          title={t('settings.ttsSettings.preset')}
-          description={
-            isTtsPresetCustomized(draft) ? t('settings.ttsSettings.customized') : undefined
-          }
-        >
-          <select
-            aria-label={t('settings.ttsSettings.preset')}
-            value={draft.preset}
-            onChange={(e) => change(applyTtsPreset(draft, e.target.value as TtsPresetId))}
+      errorAction={
+        !detailsValid && tab !== 'details' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setTab('details');
+              document.getElementById(`${id}-tab-details`)?.focus();
+            }}
           >
-            {ttsPresetIds.map((id) => (
-              <option key={id} value={id}>
-                {t(`settings.ttsSettings.preset.${id}`)}
-              </option>
-            ))}
-          </select>
-          {draft.preset !== 'custom' && (
+            {t('settings.ttsEditor.checkDetails')}
+          </button>
+        ) : undefined
+      }
+      valid={!!draft.name.trim() && !!draft.baseUrl.trim() && detailsValid}
+      onApply={() => {
+        try {
+          parseTtsServer(draft);
+        } catch (reason) {
+          setTab(
+            !Number.isFinite(draft.defaultSpeed) ||
+              draft.defaultSpeed < 0.25 ||
+              draft.defaultSpeed > 4 ||
+              draft.model.length > 200 ||
+              draft.defaultVoice.length > 200
+              ? 'speech'
+              : 'connection',
+          );
+          throw reason;
+        }
+        return invoke('ttsSaveConnection', [draft, original, apiKey, status?.keyRevision]);
+      }}
+    >
+      <div
+        className="tabs tts-editor-tabs"
+        role="tablist"
+        aria-label={t('settings.ttsEditor.tabs')}
+      >
+        {tabs.map((item, index) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            id={`${id}-tab-${item}`}
+            aria-controls={`${id}-panel-${item}`}
+            aria-selected={tab === item}
+            tabIndex={tab === item ? 0 : -1}
+            className={tab === item ? 'selected' : ''}
+            onClick={() => setTab(item)}
+            onKeyDown={(event) => {
+              let next: number;
+              if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+              else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+              else if (event.key === 'Home') next = 0;
+              else if (event.key === 'End') next = tabs.length - 1;
+              else return;
+              event.preventDefault();
+              setTab(tabs[next]);
+              document.getElementById(`${id}-tab-${tabs[next]}`)?.focus();
+            }}
+          >
+            {t(`settings.ttsEditor.tab.${item}`)}
+          </button>
+        ))}
+      </div>
+      <SettingsSection
+        className="tts-editor-panel"
+        variant="group"
+        id={`${id}-panel-connection`}
+        role="tabpanel"
+        aria-labelledby={`${id}-tab-connection`}
+        hidden={tab !== 'connection'}
+      >
+        <div className="tts-editor-grid">
+          <SettingsField settingKey="name" title={t('settings.ttsServers.name')}>
+            <SettingsInput
+              data-initial-focus
+              aria-label={t('settings.ttsServers.name')}
+              maxLength={200}
+              value={draft.name}
+              onChange={(e) => change({ name: e.target.value })}
+            />
+          </SettingsField>
+          <SettingsField
+            settingKey="preset"
+            title={t('settings.ttsEditor.preset')}
+            hint={t('settings.ttsSettings.presetHint')}
+            description={
+              isTtsPresetCustomized(draft) ? t('settings.ttsSettings.customized') : undefined
+            }
+          >
+            <select
+              aria-label={t('settings.ttsEditor.preset')}
+              value={draft.preset}
+              onChange={(e) => change(applyTtsPreset(draft, e.target.value as TtsPresetId))}
+            >
+              {ttsPresetIds.map((id) => (
+                <option key={id} value={id}>
+                  {t(`settings.ttsSettings.preset.${id}`)}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+          <SettingsField
+            className="tts-editor-full"
+            settingKey="baseUrl"
+            title={t('settings.ttsEditor.url')}
+            hint={t('settings.ttsSettings.urlHint')}
+          >
+            <SettingsUrlInput
+              aria-label={t('settings.ttsEditor.url')}
+              value={draft.baseUrl}
+              spellCheck={false}
+              placeholder="http://server:8001/v1"
+              onChange={(e) => {
+                try {
+                  change({ baseUrl: ttsBaseUrl(e.target.value.trim()) });
+                  setError('');
+                } catch (reason) {
+                  change({ baseUrl: e.target.value });
+                  setError((reason as Error).message);
+                }
+              }}
+            />
+          </SettingsField>
+          <SettingsField
+            className="tts-editor-full"
+            title={t('settings.ttsSettings.apiKey')}
+            {...settingAnchor('tts', 'apiKey')}
+            description={t('settings.ttsSettings.apiKeyHint')}
+          >
+            <SettingsInput
+              aria-label={t('settings.ttsSettings.apiKey')}
+              type="password"
+              autoComplete="off"
+              value={apiKey ?? ''}
+              maxLength={8192}
+              placeholder={t(
+                savedKey && apiKey === undefined
+                  ? 'settings.ttsSettings.storedKey'
+                  : 'settings.ttsSettings.noKey',
+              )}
+              onChange={(e) => setApiKey(e.target.value || undefined)}
+            />
             <SettingsActions>
-              <button
-                disabled={!isTtsPresetCustomized(draft)}
-                onClick={() => change(applyTtsPreset(draft, draft.preset))}
-              >
-                {t('settings.ttsSettings.presetReset')}
+              <button disabled={!savedKey && !apiKey} onClick={() => setApiKey('')}>
+                {t('settings.ttsServers.removeKey')}
               </button>
             </SettingsActions>
-          )}
-        </SettingsField>
-        <SettingsField
-          settingKey="baseUrl"
-          title={t('settings.ttsSettings.url')}
-          hint={t('settings.ttsSettings.urlHint')}
-        >
-          <SettingsUrlInput
-            aria-label={t('settings.ttsSettings.url')}
-            value={draft.baseUrl}
-            spellCheck={false}
-            placeholder="http://server:8001/v1"
-            onChange={(e) => {
-              try {
-                change({ baseUrl: ttsBaseUrl(e.target.value.trim()) });
-                setError('');
-              } catch (reason) {
-                change({ baseUrl: e.target.value });
-                setError((reason as Error).message);
-              }
-            }}
-          />
-        </SettingsField>
-        <SettingsField
-          title={t('settings.ttsSettings.apiKey')}
-          {...settingAnchor('tts', 'apiKey')}
-          description={t('settings.ttsSettings.apiKeyHint')}
-        >
-          <SettingsInput
-            aria-label={t('settings.ttsSettings.apiKey')}
-            type="password"
-            autoComplete="off"
-            value={apiKey ?? ''}
-            maxLength={8192}
-            placeholder={t(
-              savedKey && apiKey === undefined
-                ? 'settings.ttsSettings.storedKey'
-                : 'settings.ttsSettings.noKey',
+            {apiKey === '' && (
+              <small className="muted">{t('settings.ttsServers.keyWillBeRemoved')}</small>
             )}
-            onChange={(e) => setApiKey(e.target.value || undefined)}
-          />
-          <SettingsActions>
-            <button disabled={!savedKey && !apiKey} onClick={() => setApiKey('')}>
-              {t('settings.ttsServers.removeKey')}
-            </button>
-          </SettingsActions>
-          {apiKey === '' && (
-            <small className="muted">{t('settings.ttsServers.keyWillBeRemoved')}</small>
-          )}
-        </SettingsField>
-        <TtsConnectionDetails
-          value={draft}
-          change={change}
-          setError={setError}
-          onValidityChange={setDetailsValid}
-        />
+          </SettingsField>
+        </div>
       </SettingsSection>
-      <SettingsSection title={t('settings.ttsSettings.modelsAndVoices')}>
+      <SettingsSection
+        className="tts-editor-panel"
+        variant="group"
+        id={`${id}-panel-speech`}
+        role="tabpanel"
+        aria-labelledby={`${id}-tab-speech`}
+        hidden={tab !== 'speech'}
+      >
         <TtsSpeechFields
           value={draft}
           change={change}
@@ -152,6 +223,27 @@ export function TtsConnectionDialog({
             invoke(kind === 'models' ? 'ttsDraftModels' : 'ttsDraftVoices', [draft, apiKey])
           }
         />
+      </SettingsSection>
+      <SettingsSection
+        className="tts-editor-panel"
+        variant="group"
+        id={`${id}-panel-details`}
+        role="tabpanel"
+        aria-labelledby={`${id}-tab-details`}
+        hidden={tab !== 'details'}
+      >
+        <TtsConnectionDetails value={draft} change={change} onValidityChange={setDetailsValid} />
+        {draft.preset !== 'custom' && (
+          <SettingsActions>
+            <button
+              type="button"
+              disabled={!isTtsPresetCustomized(draft)}
+              onClick={() => change(applyTtsPreset(draft, draft.preset))}
+            >
+              {t('settings.ttsEditor.resetPreset')}
+            </button>
+          </SettingsActions>
+        )}
       </SettingsSection>
     </SettingsDialog>
   );

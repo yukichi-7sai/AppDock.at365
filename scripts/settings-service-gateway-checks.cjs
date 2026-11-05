@@ -65,6 +65,7 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   await apply(tts, [{ kind: 'set', changes: { defaultSpeed: 1.75, model: 'mcp-model' } }]);
   await select('音声生成AI');
   await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
+  await page.getByRole('tab', { name: '声・話し方', exact: true }).click();
   await until(
     async () => (await page.getByLabel('読み上げ速度', { exact: true }).inputValue()) === '1.75',
     'TTS UI received MCP save',

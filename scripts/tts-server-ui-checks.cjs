@@ -25,11 +25,11 @@ module.exports = async function ({
   assert.equal(await defaultSelect.inputValue(), 'default');
   const assertDefaultsInDialogOnly = async () => {
     for (const label of [
-      'TTSモデル',
-      '既定のボイス',
+      'モデル',
+      '声',
       '読み上げ速度',
-      '常に付与するニュアンス',
-      '既定のニュアンス',
+      'いつも加える話し方',
+      '指定がないときの話し方',
     ])
       assert.equal(await page.getByLabel(label, { exact: true }).count(), 0, label);
   };
@@ -42,6 +42,18 @@ module.exports = async function ({
     return dialog;
   };
   const field = async (scope, name, value) => {
+    const speech = ['モデル', '声', '読み上げ速度', 'いつも加える話し方', '指定がないときの話し方'];
+    const connection = ['登録名', 'サーバーURL', 'APIキー'];
+    await scope
+      .getByRole('tab', {
+        name: speech.includes(name)
+          ? '声・話し方'
+          : connection.includes(name)
+            ? '接続'
+            : '詳細設定',
+        exact: true,
+      })
+      .click();
     const control = scope.getByLabel(name, { exact: true });
     await control.fill(value);
     await control.press('Tab');
@@ -55,7 +67,21 @@ module.exports = async function ({
   await field(dialog, '登録名', 'Canceled');
   await field(dialog, 'APIキー', 'canceled-secret');
   await field(dialog, '読み上げ速度', '2');
-  const preset = dialog.getByLabel('接続プリセット', { exact: true });
+  await field(dialog, '読み上げ速度', '9');
+  await dialog.getByRole('tab', { name: '接続', exact: true }).click();
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await until(
+    () =>
+      dialog
+        .getByRole('tab', { name: '声・話し方', exact: true })
+        .getAttribute('aria-selected')
+        .then((v) => v === 'true'),
+    'invalid speed returns to its tab',
+  );
+  assert.equal((await snapshot()).settings.value.tts.connections[0].name, 'Primary');
+  await field(dialog, '読み上げ速度', '2');
+  await dialog.getByRole('tab', { name: '接続', exact: true }).click();
+  const preset = dialog.getByLabel('サーバーの種類', { exact: true });
   await preset.selectOption('qwen3-tts');
   await until(
     async () =>
@@ -68,7 +94,7 @@ module.exports = async function ({
       (await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).inputValue()) === 'manual',
     'MLX preset reflected in draft',
   );
-  assert.equal(await dialog.getByLabel('TTSモデル', { exact: true }).inputValue(), 'test');
+  assert.equal(await dialog.getByLabel('モデル', { exact: true }).inputValue(), 'test');
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   assert.equal((await snapshot()).settings.value.tts.connections[0].name, 'Primary');
   assert.equal(
@@ -82,8 +108,17 @@ module.exports = async function ({
   assert(!fs.readFileSync(keyfile, 'utf8').includes('fixture-secret'));
   const firstCipher = fs.readFileSync(keyfile);
   dialog = await edit('Primary');
+  await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
   await dialog.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-  await dialog.getByLabel('取得したボイス', { exact: true }).waitFor();
+  await dialog
+    .getByRole('button', { name: '声の候補を表示', exact: true })
+    .waitFor({ state: 'visible' });
+  await until(
+    () => dialog.getByRole('button', { name: '声の候補を表示', exact: true }).isEnabled(),
+    'voice candidates loaded',
+  );
+  await dialog.getByRole('combobox', { name: '声', exact: true }).click();
+  await dialog.getByRole('option', { name: 'voice-a Voice A', exact: true }).click();
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   checks.push(
     'main page selects only the default server; speech defaults belong to the dialog and cancel preserves settings and credentials',
@@ -92,10 +127,10 @@ module.exports = async function ({
   await page.getByRole('button', { name: '音声サーバーを追加', exact: true }).click();
   dialog = page.getByRole('dialog');
   await field(dialog, '登録名', 'Secondary');
-  await field(dialog, 'APIのURL', settings.tts.connections[0].baseUrl);
+  await field(dialog, 'サーバーURL', settings.tts.connections[0].baseUrl);
   await field(dialog, 'APIキー', 'secondary-secret');
-  await field(dialog, 'TTSモデル', 'second-model');
-  await field(dialog, '既定のボイス', 'second-voice');
+  await field(dialog, 'モデル', 'second-model');
+  await field(dialog, '声', 'second-voice');
   await field(dialog, '読み上げ速度', '1.5');
   assert.equal((await snapshot()).settings.value.tts.connections.length, 1);
   assert.deepEqual(fs.readFileSync(keyfile), firstCipher);
@@ -108,16 +143,16 @@ module.exports = async function ({
   assert.deepEqual((await snapshot()).settings.value.tts.connections[1], second);
   await assertDefaultsInDialogOnly();
   dialog = await edit('Secondary');
-  assert.equal(await dialog.getByLabel('TTSモデル', { exact: true }).inputValue(), 'second-model');
+  assert.equal(await dialog.getByLabel('モデル', { exact: true }).inputValue(), 'second-model');
   await field(dialog, '読み上げ速度', '1.6');
-  await dialog.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
+  await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
   await dialog.getByLabel('速度の適用先', { exact: true }).selectOption('server');
   assert.equal((await snapshot()).settings.value.tts.connections[1].defaultSpeed, 1.5);
   await save(dialog);
   await defaultSelect.selectOption('default');
   await settleSettings(page);
   dialog = await edit('Primary');
-  assert.equal(await dialog.getByLabel('TTSモデル', { exact: true }).inputValue(), 'test');
+  assert.equal(await dialog.getByLabel('モデル', { exact: true }).inputValue(), 'test');
   assert.equal(
     await dialog.getByLabel('読み上げ速度', { exact: true }).inputValue(),
     String(settings.tts.connections[0].defaultSpeed),
@@ -145,14 +180,57 @@ module.exports = async function ({
   );
 
   dialog = await edit('Secondary');
-  await dialog.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
-  await field(dialog, '手動ボイス一覧', '{}');
+  await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+  await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('manual');
+  assert.equal(await dialog.getByLabel('ボイス一覧のパス', { exact: true }).isVisible(), false);
+  await dialog.getByRole('button', { name: '声を追加', exact: true }).click();
   await until(
     () => dialog.getByRole('button', { name: 'OK', exact: true }).isDisabled(),
     'invalid manual voices cannot be saved',
   );
+  await field(dialog, '1行目の声のID', 'second-voice');
+  await field(dialog, '1行目の声の表示名', 'Second');
+  await dialog.getByRole('button', { name: '声を追加', exact: true }).click();
+  await field(dialog, '2行目の声のID', 'second-voice');
+  assert.equal(await dialog.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
+  await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
+  await dialog.getByRole('button', { name: '詳細設定の入力を確認', exact: true }).click();
+  assert.equal(
+    await dialog.getByLabel('2行目の声のID', { exact: true }).inputValue(),
+    'second-voice',
+  );
+  await dialog.getByRole('button', { name: '2行目の声を削除', exact: true }).click();
+  await dialog.getByRole('button', { name: 'JSONで編集', exact: true }).click();
+  await field(dialog, '手動ボイス一覧', '{}');
+  assert.equal(await dialog.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
   await field(dialog, '手動ボイス一覧', '[{"id":"second-voice","name":"Second"}]');
+  await dialog.getByRole('button', { name: '一覧で編集', exact: true }).click();
+  await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('endpoint');
+  await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('manual');
+  assert.equal(
+    await dialog.getByLabel('1行目の声のID', { exact: true }).inputValue(),
+    'second-voice',
+  );
+  await field(dialog, '追加パラメーター（JSON）', '{');
+  const invalidExtra = dialog.getByLabel('追加パラメーター（JSON）', { exact: true });
+  await invalidExtra.press('Control+Enter');
+  assert.equal(await dialog.isVisible(), true);
+  assert.equal(await dialog.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
+  await dialog.getByRole('tab', { name: '接続', exact: true }).click();
+  await dialog.getByRole('button', { name: '詳細設定の入力を確認', exact: true }).click();
+  assert.equal(await invalidExtra.inputValue(), '{');
+  await field(dialog, '追加パラメーター（JSON）', '{}');
+  await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
+  assert.equal(
+    await dialog.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).count(),
+    0,
+  );
+  await dialog.getByRole('combobox', { name: '声', exact: true }).click();
+  await dialog.getByRole('option', { name: 'second-voice Second', exact: true }).click();
   await save(dialog);
+  checks.push(
+    'tabs retain invalid drafts and candidates; duplicate IDs and invalid JSON cannot save through OK or Ctrl+Enter',
+  );
   await page.getByRole('button', { name: 'サーバーを並べ替え', exact: true }).click();
   dialog = page.getByRole('dialog');
   const up = dialog.getByRole('button', { name: /上へ/ });
@@ -190,8 +268,35 @@ module.exports = async function ({
     await defaultSelect.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, theme + '-defaults.png') });
     dialog = await edit('Primary');
-    await dialog.getByLabel('TTSモデル', { exact: true }).scrollIntoViewIfNeeded();
+    await dialog.getByRole('tab', { name: '接続', exact: true }).focus();
+    await dialog.getByRole('tab', { name: '接続', exact: true }).press('ArrowRight');
+    assert.equal(
+      await dialog
+        .getByRole('tab', { name: '声・話し方', exact: true })
+        .getAttribute('aria-selected'),
+      'true',
+    );
+    await dialog.getByLabel('モデル', { exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, theme + '-dialog.png') });
+    const positions = [];
+    for (const name of ['接続', '声・話し方', '詳細設定']) {
+      await dialog.getByRole('tab', { name, exact: true }).click();
+      const confirm = dialog.getByRole('button', { name: 'OK', exact: true });
+      const box = await confirm.boundingBox();
+      assert(box && box.y >= 0 && box.y + box.height <= (await page.evaluate(() => innerHeight)));
+      positions.push(box.y);
+      assert.equal(await dialog.getByRole('tabpanel').count(), 1);
+      assert.equal(await dialog.getByRole('tabpanel', { name, exact: true }).isVisible(), true);
+      assert.equal(
+        await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
+        true,
+      );
+      await page.screenshot({ path: path.join(profile, `${theme}-dialog-${name}.png`) });
+    }
+    assert(
+      Math.max(...positions) - Math.min(...positions) < 2,
+      'tab changes retain footer position',
+    );
     await field(dialog, '登録名', 'Primary');
     await save(dialog);
   }
@@ -211,7 +316,7 @@ module.exports = async function ({
   dialog = await edit('Primary');
   await until(
     async () =>
-      (await dialog.getByLabel('常に付与するニュアンス', { exact: true }).inputValue()) ===
+      (await dialog.getByLabel('いつも加える話し方', { exact: true }).inputValue()) ===
       alwaysInstructions,
     'settings reflected before restart',
   );
@@ -225,7 +330,7 @@ module.exports = async function ({
   await assertDefaultsInDialogOnly();
   dialog = await edit('Primary');
   assert.equal(
-    await dialog.getByLabel('常に付与するニュアンス', { exact: true }).inputValue(),
+    await dialog.getByLabel('いつも加える話し方', { exact: true }).inputValue(),
     alwaysInstructions,
   );
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -250,12 +355,12 @@ module.exports = async function ({
     keyfile,
     setAlwaysInstructions: async (value) => {
       const editDialog = await edit('Primary');
-      await field(editDialog, '常に付与するニュアンス', value);
+      await field(editDialog, 'いつも加える話し方', value);
       await save(editDialog);
     },
     setNuanceMode: async (mode) => {
       const editDialog = await edit('Primary');
-      await editDialog.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
+      await editDialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
       await editDialog.getByLabel('ニュアンスの送信方式', { exact: true }).selectOption(mode);
       await save(editDialog);
     },

@@ -130,7 +130,16 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     };
     await select('音声生成AI');
     assert.equal(requests.length, 0, 'opening settings does not contact server');
-    const editTts = () => page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
+    const editTts = async () => {
+      await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
+      await page.getByRole('tab', { name: '声・話し方', exact: true }).click();
+    };
+    const choose = async (label, name) => {
+      const toggle = page.getByRole('button', { name: label + 'の候補を表示', exact: true });
+      await until(() => toggle.isEnabled(), label + ' candidates loaded');
+      await toggle.click();
+      await page.getByRole('option', { name, exact: true }).click();
+    };
     const saveTts = async () => {
       await page.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
       await page.getByRole('dialog').waitFor({ state: 'hidden' });
@@ -138,7 +147,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     };
     await editTts();
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
-    await page.getByLabel('取得したTTSモデル', { exact: true }).selectOption('model-b');
+    await choose('モデル', 'model-b');
     assert.equal((await snapshot()).settings.value.tts.connections[0].model, '');
     await saveTts();
     await until(
@@ -146,8 +155,8 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       'selected model saved',
     );
     await editTts();
-    await page.getByLabel('TTSモデル', { exact: true }).fill('custom-model');
-    await page.getByLabel('TTSモデル', { exact: true }).press('Enter');
+    await page.getByRole('combobox', { name: 'モデル', exact: true }).fill('custom-model');
+    await page.getByRole('combobox', { name: 'モデル', exact: true }).press('Enter');
     await saveTts();
     assert.equal((await snapshot()).settings.value.tts.connections[0].model, 'custom-model');
     await editTts();
@@ -170,15 +179,18 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       ],
     };
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
-    const modelChoices = page.getByLabel('取得したTTSモデル', { exact: true });
-    await modelChoices.selectOption('1.7B-Base');
-    assert.deepEqual(await modelChoices.locator('option').allTextContents(), [
-      '一覧から選択…',
+    await choose('モデル', '1.7B-Base');
+    await page.getByRole('button', { name: 'モデルの候補を表示', exact: true }).click();
+    assert.deepEqual(await page.getByRole('listbox').getByRole('option').allTextContents(), [
       '1.7B-Base',
     ]);
-    assert.equal(await page.getByLabel('TTSモデル', { exact: true }).inputValue(), '1.7B-Base');
+    await page.getByRole('combobox', { name: 'モデル', exact: true }).press('Escape');
+    assert.equal(
+      await page.getByRole('combobox', { name: 'モデル', exact: true }).inputValue(),
+      '1.7B-Base',
+    );
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    await page.getByLabel('取得したボイス', { exact: true }).selectOption('voice-a');
+    await choose('声', 'voice-a Voice A');
     await settleSettings(page);
     await page.getByLabel('読み上げ速度', { exact: true }).fill('1.45');
     await page.getByLabel('読み上げ速度', { exact: true }).press('Enter');

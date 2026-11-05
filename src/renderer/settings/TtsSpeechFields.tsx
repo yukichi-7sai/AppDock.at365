@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
+import { SettingsField, SettingsInputActions } from '../settings-ui/SettingsSections';
+import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import type { TtsSettings, TtsVoice } from '../../shared/tts';
 
@@ -26,8 +27,6 @@ export function TtsSpeechFields({
   const [models, setModels] = useState<TtsVoice[]>([]),
     [voices, setVoices] = useState<TtsVoice[]>([]);
   const [pending, setPending] = useState(false);
-  const modelsId = useId(),
-    voicesId = useId();
   const signature = JSON.stringify([value, discoveryRevision]),
     current = useRef(signature),
     mounted = useRef(true),
@@ -76,93 +75,55 @@ export function TtsSpeechFields({
     }
   };
   return (
-    <>
+    <div className="tts-editor-grid">
       <SettingsField
-        title={translate('settings.ttsSettings.modelLabel')}
+        title={translate('settings.ttsEditor.model')}
         hint={translate('settings.ttsSettings.modelHint')}
         {...settingAnchor('tts', 'model')}
       >
-        <SettingsInput
-          aria-label={translate('settings.ttsSettings.modelLabel')}
-          list={modelsId}
-          value={value.model}
-          placeholder={translate('settings.ttsSettings.modelId')}
-          onChange={(e) => change({ model: e.target.value })}
-        />
-        <datalist id={modelsId}>
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </datalist>
-        {models.length > 0 && (
-          <select
-            aria-label={translate('settings.ttsSettings.fetchedModels')}
-            value={models.some((m) => m.id === value.model) ? value.model : ''}
-            onChange={(e) => {
-              if (e.target.value) change({ model: e.target.value });
-            }}
+        <SettingsInputActions wrap>
+          <SettingsCombobox
+            label={translate('settings.ttsEditor.model')}
+            value={value.model}
+            options={models}
+            onChange={(model) => change({ model })}
+          />
+          <button
+            type="button"
+            disabled={busy || pending || !value.baseUrl}
+            aria-label={translate('settings.ttsSettings.refreshModels')}
+            onClick={() => load('models')}
           >
-            <option value="">{translate('settings.ttsSettings.select')}</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <SettingsActions>
-          <button disabled={busy || pending || !value.baseUrl} onClick={() => load('models')}>
-            {translate('settings.ttsSettings.refreshModels')}
+            {translate('settings.ttsEditor.fetchOptions')}
           </button>
-        </SettingsActions>
+        </SettingsInputActions>
       </SettingsField>
       <SettingsField
-        title={translate('settings.ttsSettings.defaultVoice')}
+        title={translate('settings.ttsEditor.voice')}
         hint={translate('settings.ttsSettings.defaultVoiceHint')}
         {...settingAnchor('tts', 'defaultVoice')}
       >
-        <SettingsInput
-          aria-label={translate('settings.ttsSettings.defaultVoice')}
-          list={voicesId}
-          value={value.defaultVoice}
-          placeholder={translate('settings.ttsSettings.voiceId')}
-          onChange={(e) => change({ defaultVoice: e.target.value })}
-        />
-        <datalist id={voicesId}>
-          {voiceOptions.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-            </option>
-          ))}
-        </datalist>
-        {voiceOptions.length > 0 && (
-          <select
-            aria-label={translate('settings.ttsSettings.fetchedVoices')}
-            value={voiceOptions.some((v) => v.id === value.defaultVoice) ? value.defaultVoice : ''}
-            onChange={(e) => {
-              if (e.target.value) change({ defaultVoice: e.target.value });
-            }}
-          >
-            <option value="">{translate('settings.ttsSettings.select')}</option>
-            {voiceOptions.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <SettingsActions>
-          <button
-            disabled={busy || pending || (value.voicesSource === 'endpoint' && !value.baseUrl)}
-            onClick={() => load('voices')}
-          >
-            {translate('settings.ttsSettings.refreshVoices')}
-          </button>
-        </SettingsActions>
+        <SettingsInputActions wrap>
+          <SettingsCombobox
+            label={translate('settings.ttsEditor.voice')}
+            value={value.defaultVoice}
+            options={voiceOptions}
+            onChange={(defaultVoice) => change({ defaultVoice })}
+          />
+          {value.voicesSource === 'endpoint' && (
+            <button
+              type="button"
+              disabled={busy || pending || !value.baseUrl}
+              aria-label={translate('settings.ttsSettings.refreshVoices')}
+              onClick={() => load('voices')}
+            >
+              {translate('settings.ttsEditor.fetchOptions')}
+            </button>
+          )}
+        </SettingsInputActions>
       </SettingsField>
       <SettingsField
+        className="tts-editor-full tts-editor-speed"
         title={translate('settings.ttsSettings.speed')}
         hint={translate('settings.ttsSettings.speedHint')}
         {...settingAnchor('tts', 'defaultSpeed')}
@@ -180,7 +141,8 @@ export function TtsSpeechFields({
         />
       </SettingsField>
       <SettingsField
-        title={translate('settings.ttsSettings.alwaysInstructions')}
+        className="tts-editor-full"
+        title={translate('settings.ttsEditor.alwaysInstructions')}
         hint={translate('settings.ttsSettings.alwaysInstructionsHint')}
         description={
           value.instructionsMode === 'none'
@@ -190,28 +152,26 @@ export function TtsSpeechFields({
         {...settingAnchor('tts', 'alwaysInstructions')}
       >
         <SettingsTextarea
-          aria-label={translate('settings.ttsSettings.alwaysInstructions')}
+          aria-label={translate('settings.ttsEditor.alwaysInstructions')}
+          rows={2}
           value={value.alwaysInstructions}
           onChange={(e) => change({ alwaysInstructions: e.target.value })}
         />
       </SettingsField>
       <SettingsField
-        title={translate('settings.ttsSettings.defaultInstructions')}
+        className="tts-editor-full"
+        title={translate('settings.ttsEditor.defaultInstructions')}
         hint={translate('settings.ttsSettings.defaultInstructionsHint')}
-        description={
-          value.instructionsMode === 'none'
-            ? translate('settings.ttsSettings.instructionsDisabled')
-            : undefined
-        }
         {...settingAnchor('tts', 'defaultInstructions')}
       >
         <SettingsTextarea
-          aria-label={translate('settings.ttsSettings.defaultInstructions')}
+          aria-label={translate('settings.ttsEditor.defaultInstructions')}
+          rows={2}
           value={value.defaultInstructions}
           placeholder={translate('settings.ttsSettings.instructionsPlaceholder')}
           onChange={(e) => change({ defaultInstructions: e.target.value })}
         />
       </SettingsField>
-    </>
+    </div>
   );
 }

@@ -47,11 +47,16 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     const name = JSON.parse(fs.readFileSync(sharedFile)).tts.connections[0].name;
     await page.getByRole('button', { name: name + 'の設定', exact: true }).click();
-    await dialog.locator('summary').filter({ hasText: 'サーバーに合わせた詳細設定' }).click();
+    await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
+    await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('manual');
+    await dialog.getByRole('button', { name: 'JSONで編集', exact: true }).click();
     manual = dialog.locator('[data-testid="tts-manual-voices"]');
   };
   const saveManual = async () => {
     const dialog = page.getByRole('dialog');
+    await dialog
+      .getByLabel('ボイス一覧の取得方式', { exact: true })
+      .selectOption(ttsBefore.voicesSource);
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.waitFor({ state: 'hidden' });
     await refresh();

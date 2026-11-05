@@ -99,7 +99,7 @@ export function SettingsSection({
     <section
       {...props}
       className={`settings-section settings-section-${variant} ${props.className ?? ''}`}
-      aria-labelledby={title ? id : undefined}
+      aria-labelledby={title ? id : props['aria-labelledby']}
     >
       {title && <header>{heading}</header>}
       <div className="settings-section-content">

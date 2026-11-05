@@ -1,44 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
-import { parseTtsExtraBody, parseTtsVoices, type TtsConnectionSettings } from '../../shared/tts';
+import {
+  parseTtsExtraBody,
+  ttsInstructionsPath,
+  ttsVoicesPath,
+  type TtsConnectionSettings,
+} from '../../shared/tts';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsField } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { TtsManualVoices } from './TtsManualVoices';
 
 /** Connection-only fields for the server registration dialog. */
 export function TtsConnectionDetails({
   value,
   change,
-  setError,
   onValidityChange,
 }: {
   value: TtsConnectionSettings;
   change(patch: Partial<TtsConnectionSettings>): void;
-  setError(message: string): void;
   onValidityChange?(valid: boolean): void;
 }) {
   const { t } = useHostTranslation();
-  const [manual, setManual] = useState<string>();
+  const [manualValid, setManualValid] = useState(true);
   const [extra, setExtra] = useState<string>();
-  useEffect(() => setManual(undefined), [JSON.stringify(value.manualVoices)]);
   useEffect(() => setExtra(undefined), [JSON.stringify(value.extraBody)]);
-  useEffect(() => {
+  const validationError = (validate: () => unknown) => {
     try {
-      if (manual !== undefined) parseTtsVoices(JSON.parse(manual));
-      if (extra !== undefined) parseTtsExtraBody(JSON.parse(extra), value.instructionsParameter);
-      onValidityChange?.(true);
-    } catch {
-      onValidityChange?.(false);
+      validate();
+      return '';
+    } catch (reason) {
+      return reason instanceof Error ? reason.message : String(reason);
     }
-  }, [manual, extra, value.instructionsParameter, onValidityChange]);
+  };
+  const speechPathError = validationError(() => ttsVoicesPath(value.speechPath));
+  const voicePathError = validationError(() => ttsVoicesPath(value.voicesPath));
+  const parameterError = validationError(() => ttsInstructionsPath(value.instructionsParameter));
+  const extraError = validationError(() => {
+    try {
+      return parseTtsExtraBody(
+        extra === undefined ? value.extraBody : JSON.parse(extra),
+        value.instructionsParameter,
+      );
+    } catch {
+      throw Error(t('settings.tts.extraBodyInvalid'));
+    }
+  });
+  const valid =
+    manualValid && !speechPathError && !voicePathError && !parameterError && !extraError;
+  useLayoutEffect(() => onValidityChange?.(valid), [valid, onValidityChange]);
   return (
-    <SettingsSection
-      title={t('settings.ttsSettings.advanced')}
-      hint={t('settings.ttsSettings.advancedHint')}
-      variant="row"
-      collapsible
-    >
+    <div className="tts-editor-grid">
       <SettingsField
+        error={speechPathError}
         title={t('settings.ttsSettings.speechPath')}
         hint={t('settings.ttsSettings.speechPathHint')}
         {...settingAnchor('tts', 'speechPath')}
@@ -83,6 +97,8 @@ export function TtsConnectionDetails({
       </SettingsField>
       <SettingsField
         title={t('settings.ttsSettings.instructionsParameter')}
+        error={parameterError}
+        hidden={value.instructionsMode !== 'json' && !parameterError}
         hint={t('settings.ttsSettings.instructionsParameterHint')}
         {...settingAnchor('tts', 'instructionsParameter')}
       >
@@ -92,31 +108,7 @@ export function TtsConnectionDetails({
           onChange={(e) => change({ instructionsParameter: e.target.value })}
         />
       </SettingsField>
-      <SettingsField
-        title={t('settings.ttsSettings.extraBody')}
-        hint={t('settings.ttsSettings.extraBodyHint')}
-        {...settingAnchor('tts', 'extraBody')}
-      >
-        <SettingsTextarea
-          aria-label={t('settings.ttsSettings.extraBody')}
-          value={extra ?? JSON.stringify(value.extraBody, null, 2)}
-          placeholder={'{"language":"Japanese"}'}
-          spellCheck={false}
-          onChange={(e) => {
-            setExtra(e.target.value);
-            try {
-              const extraBody = parseTtsExtraBody(
-                JSON.parse(e.target.value),
-                value.instructionsParameter,
-              );
-              change({ extraBody });
-              setError('');
-            } catch {
-              setError(t('settings.tts.extraBodyInvalid'));
-            }
-          }}
-        />
-      </SettingsField>
+
       <SettingsField
         title={t('settings.ttsSettings.voiceMode')}
         {...settingAnchor('tts', 'voicesSource')}
@@ -134,6 +126,8 @@ export function TtsConnectionDetails({
       </SettingsField>
       <SettingsField
         title={t('settings.ttsSettings.voicePath')}
+        error={voicePathError}
+        hidden={value.voicesSource !== 'endpoint' && !voicePathError}
         hint={t('settings.ttsSettings.voicePathHint')}
         {...settingAnchor('tts', 'voicesPath')}
       >
@@ -143,28 +137,38 @@ export function TtsConnectionDetails({
           onChange={(e) => change({ voicesPath: e.target.value })}
         />
       </SettingsField>
+      <TtsManualVoices
+        value={value.manualVoices}
+        onChange={(manualVoices) => change({ manualVoices })}
+        onValidityChange={setManualValid}
+        visible={value.voicesSource === 'manual'}
+      />
       <SettingsField
-        title={t('settings.ttsSettings.manualList')}
-        description={t('settings.ttsSettings.manualListExample')}
-        hint={t('settings.ttsSettings.manualListHint')}
-        {...settingAnchor('tts', 'manualVoices')}
+        className="tts-editor-full"
+        title={t('settings.ttsSettings.extraBody')}
+        error={extraError}
+        hint={t('settings.ttsSettings.extraBodyHint')}
+        {...settingAnchor('tts', 'extraBody')}
       >
         <SettingsTextarea
-          aria-label={t('settings.ttsSettings.manualList')}
-          data-testid="tts-manual-voices"
-          value={manual ?? JSON.stringify(value.manualVoices, null, 2)}
+          aria-label={t('settings.ttsSettings.extraBody')}
+          value={extra ?? JSON.stringify(value.extraBody, null, 2)}
+          placeholder={'{"language":"Japanese"}'}
+          spellCheck={false}
           onChange={(e) => {
-            const text = e.target.value.trim() ? e.target.value : '[]';
-            setManual(text);
+            setExtra(e.target.value);
             try {
-              change({ manualVoices: parseTtsVoices(JSON.parse(text)) });
-              setError('');
+              const extraBody = parseTtsExtraBody(
+                JSON.parse(e.target.value),
+                value.instructionsParameter,
+              );
+              change({ extraBody });
             } catch {
-              setError(t('settings.ttsSettings.manualListInvalid'));
+              // Invalid JSON stays local until corrected; the common field reports the error.
             }
           }}
         />
       </SettingsField>
-    </SettingsSection>
+    </div>
   );
 }

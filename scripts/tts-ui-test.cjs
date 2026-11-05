@@ -91,6 +91,9 @@ async function configure(patch) {
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+    settings.updates.checkHostOnAboutOpen = false;
+    settings.updates.checkHostOnStartup = false;
+    settings.updates.checkAppletsOnStartup = false;
     settings.host.hardwareAcceleration = false;
     settings.host.notifications = false;
     settings.keybindings = [];
