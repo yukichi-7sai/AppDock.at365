@@ -52,7 +52,7 @@ shortcut-listも宣言から共通一覧へ投影し、ID/名前/キーの編集
 | `replaceOwnList`                                             | 自己設定/UI向けの一覧置換と競合検査がある           | 外部APIは行操作から候補を作り、共通保存へ渡す  |
 | [操作許可](../src/shared/appdock-api.ts)                     | 16種類の許可。設定変更に複数の編集許可を重ねる      | 設定編集をwriteへ統合し、8種類へ整理           |
 | [MCP接続管理](../src/main/core/mcp-client-settings.ts)       | token/environmentの書込みと、削除時の秘密消去が可能 | MCP起点では秘密に触れる経路を拒否              |
-| [AI設定](../src/main/core/ai-settings.ts)                    | 設定と秘密を同じトランザクションで保存・削除        | 秘密を保持した通常設定の更新経路を分離         |
+| [文章生成AI設定](../src/main/core/ai-settings.ts)                    | 設定と秘密を同じトランザクションで保存・削除        | 秘密を保持した通常設定の更新経路を分離         |
 | [MCP transport](../src/main/core/automation-mcp.ts)          | 固定tools/list、設定とコマンド情報は応答データ      | この分離を維持して汎用設定APIを追加            |
 
 通常設定を公開する判定と、manifestの通常コマンドを公開する判定は別である。`DeclaredCommand.automation` やカスタムコマンドの公開指定を既定ONへ変更しない。

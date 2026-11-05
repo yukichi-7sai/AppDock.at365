@@ -224,14 +224,14 @@ async function configure(patch) {
           width: innerWidth,
           height: innerHeight,
           buttons: [...document.querySelectorAll('button')]
-            .filter((b) => b.textContent.trim() === 'TTS')
+            .filter((b) => b.textContent.trim() === '音声生成AI')
             .map((b) => ({ rect: b.getBoundingClientRect().toJSON(), html: b.outerHTML })),
         })),
         null,
         2,
       ),
     );
-    await page.getByRole('button', { name: 'TTS', exact: true }).click();
+    await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
     await page.getByLabel('TTSモデル', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
     await page
@@ -428,7 +428,7 @@ async function configure(patch) {
       await page.getByRole('button', { name: '表示', exact: true }).click();
       await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
       await settleSettings(page);
-      await page.getByRole('button', { name: 'TTS', exact: true }).click();
+      await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
       await page.getByLabel('接続プリセット', { exact: true }).waitFor({ state: 'visible' });
       const details = page.locator('details').filter({ hasText: 'サーバーに合わせた詳細設定' });
       assert.equal(
@@ -532,7 +532,7 @@ async function configure(patch) {
     assert.deepEqual((await snapshot()).settings.value.tts.extraBody, extraBody);
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     page = await settingsPage(host);
-    await page.getByRole('button', { name: 'TTS', exact: true }).click();
+    await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
     assert.equal(
       await page.getByLabel('常に付与するニュアンス', { exact: true }).inputValue(),
       alwaysInstructions,

@@ -16,8 +16,11 @@ module.exports = async function ({
 }) {
   assert.equal((await snapshot()).version, require('../package.json').version);
   const name = '<b>language.ja</b> {{name}} $t(language.ja)';
-  const sharedBefore = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
-  await select('AI');
+  const sharedBefore = fs.readFileSync(
+    require('./test-settings.cjs').file(profile, 'settings.json'),
+    'utf8',
+  );
+  await select('文章生成AI');
   await host.locator('[data-ai-connection="localization"] .ai-row-actions button').first().click();
   const editor = host.getByRole('dialog');
   await editor.getByRole('button', { name: 'モデル一覧を取得', exact: true }).click();
@@ -29,7 +32,10 @@ module.exports = async function ({
   assert(!(await editor.innerText()).includes('private server detail'));
   await host.screenshot({ path: path.join(profile, 'service-ai-authentication.png') });
   await editor.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), sharedBefore);
+  assert.equal(
+    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+    sharedBefore,
+  );
   checks.push(
     'AI service HTTP failure reaches the settings dialog in Japanese; custom name and shared settings remain unchanged',
   );

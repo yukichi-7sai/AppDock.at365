@@ -204,8 +204,8 @@ async function checkSectionTitles() {
         '表示',
         '一般',
         '通知',
-        'AI',
-        'TTS',
+        '文章生成AI',
+        '音声生成AI',
         'リボン',
         'マウスジェスチャー',
         'MCPサーバー',
@@ -1359,7 +1359,7 @@ async function checkSectionTitles() {
 
     await host.evaluate(() => window.dock.navigate('settings'));
     await settingsPage(host);
-    await select('TTS');
+    await select('音声生成AI');
     await hints(false);
     const models = host.getByRole('button', { name: 'モデル一覧を更新', exact: true });
     const preview = host.getByRole('heading', { name: '試聴', exact: true });

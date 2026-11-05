@@ -70,7 +70,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       model: '',
       defaultVoice: '',
     };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(initial),
+    );
     const config = path.join(profile, 'codex', 'config.toml');
     fs.mkdirSync(path.dirname(config));
     fs.writeFileSync(config, '# fixture\n');
@@ -118,7 +121,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       await page.getByRole('button', { name, exact: true }).click();
       await page.getByRole('heading', { name, level: 1, exact: true }).waitFor();
     };
-    await select('TTS');
+    await select('音声生成AI');
     assert.equal(requests.length, 0, 'opening settings does not contact server');
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page.getByLabel('取得したTTSモデル', { exact: true }).selectOption('model-b');
@@ -241,7 +244,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       .getByTestId('notification-speech')
       .getByRole('button', { name: '設定を開く', exact: true })
       .click();
-    await page.getByRole('heading', { name: 'TTS', exact: true, level: 1 }).waitFor();
+    await page.getByRole('heading', { name: '音声生成AI', exact: true, level: 1 }).waitFor();
     await select('通知');
     const events = page
       .locator('.settings-section')

@@ -327,7 +327,7 @@ AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出し�
 - 設定検索のアンカーを、閉じたダイアログ内だけでなく常設の一覧・項目に置く。検索対象や画面モデルへ秘密値を載せない。
 - 実装の影響に応じて保存境界・競合の回帰と隔離したUI確認を行う。実サービスの成功とfixtureの成功は分けて記録する。
 
-既存の確認例は[AI設定UI試験](../scripts/ai-ui-test.cjs)、[URL入力試験](../scripts/settings-url-ui-test.cjs)、[設定操作の回帰](../tests/ai-settings.test.cjs)を参照する。製品の変更・発行がある場合の検証範囲は[開発手順](development-workflow.md)に従う。
+既存の確認例は[文章生成AI設定UI試験](../scripts/ai-ui-test.cjs)、[URL入力試験](../scripts/settings-url-ui-test.cjs)、[設定操作の回帰](../tests/ai-settings.test.cjs)を参照する。製品の変更・発行がある場合の検証範囲は[開発手順](development-workflow.md)に従う。
 
 背景と入力の確認例は[モーダルGUI試験](../scripts/host-modal-ui-test.cjs)、Shell間の実フォーカス・ドラッグ領域の確認例は[バーGUI試験](../scripts/shell-bars-ui-test.cjs)を参照する。両試験は現在のダイアログ・パレット・既存操作の検証例であり、将来追加するShell起点の編集ダイアログの接続を実装・検証済みとするものではない。WebContentsViewを含む見た目はWindows合成画像と実入力で確認する。
 

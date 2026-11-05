@@ -29,8 +29,8 @@ module.exports = async function ({
     'カスタムコマンド',
     'Webアカウント',
     '操作の許可',
-    'TTS',
-    'AI',
+    '音声生成AI',
+    '文章生成AI',
     'MCPサーバー',
     'MCPクライアント',
     'AppDockについて',
@@ -66,7 +66,7 @@ module.exports = async function ({
         `${electronExpression}.BrowserWindow.getAllWindows()[0].setSize(${width},1000)`,
       );
       for (const [title, label, dialogTitle, field] of [
-        ['AI', 'AIサーバーを追加', 'AIサーバーの追加', 'AI接続の名前'],
+        ['文章生成AI', 'AIサーバーを追加', 'AIサーバーの追加', 'AI接続の名前'],
         ['カスタムコマンド', 'コマンドを追加', 'カスタムコマンドの追加', '名前'],
         ['MCPクライアント', '接続先を追加', 'MCP接続先の追加', '名前'],
       ]) {
@@ -88,7 +88,7 @@ module.exports = async function ({
         assert(geometry.inHeader && geometry.visible);
         assert.equal(geometry.width, 30);
         assert.equal(geometry.height, 30);
-        assert.match(geometry.text, title === 'AI' ? /サーバー/ : /名前/);
+        assert.match(geometry.text, title === '文章生成AI' ? /サーバー/ : /名前/);
         const before = (await snapshot()).settings.value;
         await add.click();
         const dialog = host.getByRole('dialog');
@@ -96,7 +96,7 @@ module.exports = async function ({
         // Assert the actual add dialog opened, independent of whether it says server or connection.
         assert.match(
           await dialog.innerText(),
-          title === 'AI' ? /AI.*追加/ : new RegExp(dialogTitle),
+          title === '文章生成AI' ? /AI.*追加/ : new RegExp(dialogTitle),
         );
         const name = dialog.getByLabel(field, { exact: true });
         await name.fill('Temporary draft');
@@ -150,7 +150,7 @@ module.exports = async function ({
       checks.push(`header-add-cancel-focus-permissions-bindings-${theme}-${width}`);
     }
   }
-  for (const title of ['TTS', 'MCPサーバー', 'MCPクライアント']) await select(title);
+  for (const title of ['音声生成AI', 'MCPサーバー', 'MCPクライアント']) await select(title);
   await select('操作の許可');
   const appletRead = host
     .locator('.permission-table tbody tr')

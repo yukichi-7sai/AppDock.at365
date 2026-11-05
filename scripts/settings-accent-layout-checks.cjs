@@ -73,7 +73,7 @@ module.exports = async function ({
       const colors = [];
       for (const [page, kind, selector] of [
         ['AppDockについて', 'update', '.update-primary'],
-        [portable ? 'Applet管理' : 'AI', 'add', '.applet-shortcut-add'],
+        [portable ? 'Applet管理' : '文章生成AI', 'add', '.applet-shortcut-add'],
       ]) {
         await select(page);
         const button = host.locator(selector).first();
@@ -113,7 +113,7 @@ module.exports = async function ({
       for (const page of [
         'ショートカット',
         'マウスジェスチャー',
-        'AI',
+        '文章生成AI',
         'カスタムコマンド',
         'MCPクライアント',
         'Applet管理',

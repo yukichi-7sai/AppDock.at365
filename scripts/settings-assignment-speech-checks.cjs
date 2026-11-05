@@ -109,7 +109,7 @@ module.exports = async function ({
       await host.getByTestId('notification-delivery').locator(':scope > summary').click();
       const speech = host.getByTestId('notification-speech');
       await speech.locator(':scope > summary').click();
-      assert.equal(await field('TTS設定').count(), 1);
+      assert.equal(await field('音声生成AI').count(), 1);
       assert.equal(await field('読み上げ設定').count(), 0);
       assert.equal(await description('声').innerText(), '現在の声: fixture-voice');
       assert.equal(await description('速度').innerText(), '現在の速度: 1.25');
@@ -159,8 +159,8 @@ module.exports = async function ({
   checks.push(
     'notification-voice-speed-overrides-save-and-inheritance-restores-effective-descriptions',
   );
-  await field('TTS設定').getByRole('button', { name: '設定を開く', exact: true }).click();
-  await host.getByRole('heading', { name: 'TTS', exact: true, level: 1 }).waitFor();
+  await field('音声生成AI').getByRole('button', { name: '設定を開く', exact: true }).click();
+  await host.getByRole('heading', { name: '音声生成AI', exact: true, level: 1 }).waitFor();
   await select('通知');
   await card('通知の受け取り方').locator(':scope > summary').click();
   await field('MCP連携設定').getByRole('button', { name: '設定を開く', exact: true }).click();

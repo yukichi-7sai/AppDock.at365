@@ -283,7 +283,7 @@ async function errorNoticeFor(caller) {
       false,
     );
     checks.push('one AppDock notification section includes configurable errors with speech off');
-    await page.getByRole('button', { name: 'AI', exact: true }).click();
+    await page.getByRole('button', { name: '文章生成AI', exact: true }).click();
     await page.getByLabel('共通プロンプト', { exact: true }).waitFor();
     assert.equal(
       await page.getByLabel('共通プロンプト', { exact: true }).inputValue(),

@@ -73,7 +73,10 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     fs.writeFileSync(path.join(fixture, 'index.cjs'), 'module.exports={};');
     require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
     settings.extensions['fixture.url'] = { enabled: false, settings: {} };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(settings),
+    );
     const port = await freePort(),
       env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
@@ -156,7 +159,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
         'Enter then blur does not write twice: ' + label,
       );
     }
-    await select('AI');
+    await select('文章生成AI');
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     const ai = page.getByLabel('AIのAPIのURL', { exact: true });
     await ai.fill(base + '/v1///');
@@ -173,7 +176,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     checks.push(
       'AI dialog URL confirms locally, fetches models on Enter, and cancels without saving',
     );
-    await select('TTS');
+    await select('音声生成AI');
     await confirmed(
       'APIのURL',
       (s) => s.tts.baseUrl,
@@ -205,7 +208,8 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       'github:yukichi-7sai/AppDock.at365',
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).updates?.hostSource,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')))
+        .updates?.hostSource,
       undefined,
     );
     checks.push('GitHub default reset saves immediately');

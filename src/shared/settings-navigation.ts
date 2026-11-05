@@ -3,28 +3,31 @@ import { hostText } from './i18n';
 import type { ExtensionSnapshot } from './contracts';
 
 /** The settings index and its commands share these stable page IDs and labels. */
-export const hostSettingsPages = localizedMetadata(() => [
-  ['appearance', hostText('pages.appearance.title')],
-  ['general', hostText('pages.general.title')],
-  ['notifications', hostText('settings.settings-navigation.notifications')],
-  ['text-palette', hostText('inputPalette.settings')],
-  ['ribbon', hostText('settings.settings-navigation.ribbon')],
-  ['statusbar', hostText('settings.settings-navigation.statusbar')],
-  ['tray', hostText('settings.settings-navigation.tray')],
-  ['command-triggers', hostText('settings.commandTriggers.title')],
-  ['shortcuts', hostText('settings.settings-navigation.shortcuts')],
-  ['gestures', hostText('settings.settings-navigation.gestures')],
-  ['touchpad-gestures', hostText('settings.settings-navigation.touchpad')],
-  ['custom-commands', hostText('settings.settings-navigation.customCommands')],
-  ['web-accounts', hostText('settings.settings-navigation.webAccounts')],
-  ['permissions', hostText('settings.settings-navigation.permissions')],
-  ['tts', 'TTS'],
-  ['ai', 'AI'],
-  ['codex', hostText('settings.settings-navigation.codex')],
-  ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
-  ['about', hostText('settings.settings-navigation.about')],
-  ['applets', hostText('settings.settings-navigation.applets')],
-] as const);
+export const hostSettingsPages = localizedMetadata(
+  () =>
+    [
+      ['appearance', hostText('pages.appearance.title')],
+      ['general', hostText('pages.general.title')],
+      ['notifications', hostText('settings.settings-navigation.notifications')],
+      ['text-palette', hostText('inputPalette.settings')],
+      ['ribbon', hostText('settings.settings-navigation.ribbon')],
+      ['statusbar', hostText('settings.settings-navigation.statusbar')],
+      ['tray', hostText('settings.settings-navigation.tray')],
+      ['command-triggers', hostText('settings.commandTriggers.title')],
+      ['shortcuts', hostText('settings.settings-navigation.shortcuts')],
+      ['gestures', hostText('settings.settings-navigation.gestures')],
+      ['touchpad-gestures', hostText('settings.settings-navigation.touchpad')],
+      ['custom-commands', hostText('settings.settings-navigation.customCommands')],
+      ['web-accounts', hostText('settings.settings-navigation.webAccounts')],
+      ['permissions', hostText('settings.settings-navigation.permissions')],
+      ['tts', hostText('pages.tts.title')],
+      ['ai', hostText('pages.ai.title')],
+      ['codex', hostText('settings.settings-navigation.codex')],
+      ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
+      ['about', hostText('settings.settings-navigation.about')],
+      ['applets', hostText('settings.settings-navigation.applets')],
+    ] as const,
+);
 
 export const appletSettingsPageId = (id: string) => `applet:${id}`;
 function pageCommand(pageId: string, title: string, id: string) {
@@ -38,17 +41,19 @@ function pageCommand(pageId: string, title: string, id: string) {
     available: true,
   };
 }
-export const hostSettingsPageCommands = localizedMetadata(() => hostSettingsPages.map(([pageId, title]) =>
-  pageCommand(
-    pageId,
-    title,
-    pageId === 'ribbon'
-      ? 'appdock.ribbon.settings.open'
-      : pageId === 'about'
-        ? 'appdock.updates.open'
-        : `appdock.settings.${pageId}.open`,
+export const hostSettingsPageCommands = localizedMetadata(() =>
+  hostSettingsPages.map(([pageId, title]) =>
+    pageCommand(
+      pageId,
+      title,
+      pageId === 'ribbon'
+        ? 'appdock.ribbon.settings.open'
+        : pageId === 'about'
+          ? 'appdock.updates.open'
+          : `appdock.settings.${pageId}.open`,
+    ),
   ),
-));
+);
 /** Opening settings belongs to the host and never starts or enables the Applet. */
 export function appletSettingsPageCommands(
   applets: Pick<ExtensionSnapshot, 'id' | 'displayName'>[],

@@ -150,7 +150,7 @@ module.exports = async function ({
     'all host settings pages render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
   );
 
-  await select('AI');
+  await select('文章生成AI');
   const serverName = '<b>language.ja</b> {{name}} $t(language.ja)';
   await host.getByRole('button', { name: `${serverName}を削除`, exact: true }).click();
   const confirmation = host.getByRole('dialog', { name: 'AIサーバーを削除', exact: true });

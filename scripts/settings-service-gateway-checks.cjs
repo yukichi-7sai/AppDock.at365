@@ -63,7 +63,7 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   assert.equal((await read(tts)).revision, before.revision);
   assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
   await apply(tts, [{ kind: 'set', changes: { defaultSpeed: 1.75, model: 'mcp-model' } }]);
-  await select('TTS');
+  await select('音声生成AI');
   await until(
     async () => (await page.getByLabel('読み上げ速度', { exact: true }).inputValue()) === '1.75',
     'TTS UI received MCP save',
@@ -104,7 +104,7 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   await apply(ai.targetId, [
     { kind: 'set', changes: { defaultModel: 'MCP model', defaultMaxOutputTokens: 2048 } },
   ]);
-  await select('AI');
+  await select('文章生成AI');
   await until(
     async () =>
       (await page.getByLabel('共通プロンプト', { exact: true }).inputValue()) === 'MCP policy',

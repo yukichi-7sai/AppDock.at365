@@ -31,7 +31,8 @@ async function until(fn, label) {
 }
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const saved = async () => (await snapshot()).settings.value;
-const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+const disk = () =>
+  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
 (async () => {
   try {
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -79,7 +80,10 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
       enabled: false,
       settings: { text: 'Original text', amount: 1, url: 'https://example.invalid/old' },
     };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(initial),
+    );
     let exe = require('electron');
     if (process.argv[2]) {
       exe = testHostPath(profile);
@@ -286,7 +290,7 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
     assert.equal(disk().extensions['fixture.input'].settings.amount, 9);
     checks.push('page JSON uses the same confirmation/cancellation without exposing partial input');
 
-    await select('AI');
+    await select('文章生成AI');
     const prompt = page.getByLabel('共通プロンプト', { exact: true });
     await pending(prompt, 'first line', (s) => s.ai?.commonPrompt ?? '');
     await prompt.press('End');

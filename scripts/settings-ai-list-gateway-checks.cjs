@@ -46,7 +46,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   const addedId = rows[1].values.id;
   assert.notEqual(addedId, rows[0].values.id);
   await page.evaluate(() => window.dock.navigate('settings'));
-  await page.getByRole('button', { name: 'AI', exact: true }).click();
+  await page.getByRole('button', { name: '文章生成AI', exact: true }).click();
   const table = page.getByTestId('ai-connections');
   await until(
     async () => (await table.locator('tbody tr[data-ai-connection]').count()) === 2,

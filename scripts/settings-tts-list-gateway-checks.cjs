@@ -39,7 +39,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     saved = await value('appdock_settings_apply', save);
   assert.deepEqual(await value('appdock_settings_apply', save), saved);
   await page.evaluate(() => window.dock.navigate('settings'));
-  await page.getByRole('button', { name: 'TTS', exact: true }).click();
+  await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
   const details = page.locator('details:has([data-testid="tts-manual-voices"])');
   if ((await details.getAttribute('open')) === null) await details.locator('summary').click();
   const manual = page.getByTestId('tts-manual-voices');

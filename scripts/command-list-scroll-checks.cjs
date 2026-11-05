@@ -367,7 +367,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
       checks.push(`applet-management-sticky-filter-${theme}-${width}`);
     }
   }
-  await select('AI');
+  await select('文章生成AI');
   assert.equal(await host.locator('.command-list-page-scroll').count(), 0);
   assert(await host.locator('.command-list-scrollbar-slot').evaluate((e) => e.hidden));
   assert.equal(
@@ -393,8 +393,8 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         'タスクトレイ',
         'Webアカウント',
         '操作の許可',
-        'TTS',
-        'AI',
+        '音声生成AI',
+        '文章生成AI',
         'MCPサーバー',
         'MCPクライアント',
         'AppDockについて',
@@ -418,7 +418,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
           assert(g.top > 0 && Math.abs(g.moved - g.top) < 1, title + JSON.stringify(g));
         };
         await checkHeader();
-        if (['一般', 'AI', 'Hint fixture'].includes(title)) {
+        if (['一般', '文章生成AI', 'Hint fixture'].includes(title)) {
           const original = (await host.evaluate(() => window.dock.snapshot())).settings;
           await host.getByRole('button', { name: 'JSON', exact: true }).click();
           const editor = host.getByRole('textbox', { name: '設定JSON', exact: true });

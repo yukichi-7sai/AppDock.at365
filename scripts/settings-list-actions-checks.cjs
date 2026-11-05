@@ -27,7 +27,7 @@ module.exports = async ({
     ['ショートカットキー', '.command-binding-table .settings-list-icon'],
     ['マウスジェスチャー', '.command-binding-table .settings-list-icon'],
     ['カスタムコマンド', '.settings-list tbody .settings-list-icon'],
-    ['AI', '.ai-connection-table .settings-list-icon'],
+    ['文章生成AI', '.ai-connection-table .settings-list-icon'],
     ['MCPクライアント', '.settings-list tbody .settings-list-icon'],
   ];
   const change = (patch) =>
@@ -65,7 +65,7 @@ module.exports = async ({
       let reference;
       for (const [title, selector] of pages) {
         await select(title);
-        if (['Applet管理', 'AI', 'MCPクライアント'].includes(title)) {
+        if (['Applet管理', '文章生成AI', 'MCPクライアント'].includes(title)) {
           const order = host.getByRole('button', { name: /並べ替え/ });
           assert.equal(await order.count(), 1, title + ' has one order action');
           assert.equal(
