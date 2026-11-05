@@ -97,7 +97,10 @@ if (legacyDll) {
   require('./copy-host.cjs').copyHost(legacyDll, path.join(dir, 'AppDock.Extensions.Demo.dll'));
   settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
   assert.equal(hash(testHostPath(profile)), hash(portable));
@@ -264,8 +267,8 @@ async function grant(id, permissions) {
       'コマンド・プロセスの起動',
       'MCP接続先の管理',
       'MCP接続先の利用',
-      'AIサーバーへの送信・文章生成',
-      'TTSサーバーへの送信・読み上げ',
+      '文章生成AIサーバーへの送信・文章生成',
+      '音声生成AIサーバーへの送信・読み上げ',
     ]);
     assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 15);
     assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 15);
@@ -280,8 +283,8 @@ async function grant(id, permissions) {
       ['sendInput', 'Windowsへのキー・操作メッセージ送信'],
       ['runProcesses', 'コマンド・プロセスの起動'],
       ['useMcp', 'MCP接続先の利用'],
-      ['useAi', 'AIサーバーへの送信・文章生成'],
-      ['useTts', 'TTSサーバーへの送信・読み上げ'],
+      ['useAi', '文章生成AIサーバーへの送信・文章生成'],
+      ['useTts', '音声生成AIサーバーへの送信・読み上げ'],
     ];
     assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
     assert.equal(await panel.locator('[data-caller="Applet"] .permission-warning-icon').count(), 0);
