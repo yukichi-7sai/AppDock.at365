@@ -39,7 +39,7 @@ export const appDockOperations = localizedMetadata(() => ({
         instructions: {
           type: 'string',
           description:
-            '話し方・感情などのニュアンス。省略時は既定値、空文字は指定なし。送信しない接続設定では無視して読み上げます。',
+            '話し方・感情などのニュアンス。省略時は既定値、空文字・空白のみは既定値を使いません。設定された常時付与分は毎回追加します。送信しない接続設定ではすべて無視して読み上げます。',
         },
         requestId: {
           type: 'string',

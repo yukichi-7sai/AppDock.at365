@@ -663,6 +663,7 @@ test('TTS preset applies dependent fields atomically, preserves credentials and 
       changes: {
         preset: 'openai-speech',
         defaultInstructions: 'やさしく',
+        alwaysInstructions: '自然な日本語で',
         instructionsParameter: 'generation.instruct',
         extraBody: { language: 'Japanese', generation: { temperature: 0.5 } },
       },
@@ -671,6 +672,7 @@ test('TTS preset applies dependent fields atomically, preserves credentials and 
   f.call('apply', f.request(id, operations, true));
   assert.equal(f.writes(), 0);
   assert.equal(f.values(id).preset, 'custom');
+  assert.equal(f.values(id).alwaysInstructions, '');
   f.call('apply', f.request(id, operations));
   assert.equal(f.writes(), 1);
   const values = f.values(id);
@@ -678,6 +680,7 @@ test('TTS preset applies dependent fields atomically, preserves credentials and 
   assert.equal(values.instructionsMode, 'json');
   assert.equal(values.instructionsParameter, 'generation.instruct');
   assert.equal(values.defaultInstructions, 'やさしく');
+  assert.equal(values.alwaysInstructions, '自然な日本語で');
   assert.deepEqual(values.extraBody, { language: 'Japanese', generation: { temperature: 0.5 } });
   for (const key of ['baseUrl', 'model', 'defaultVoice']) assert.equal(values[key], before[key]);
   assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
@@ -722,8 +725,13 @@ test('TTS preset applies dependent fields atomically, preserves credentials and 
   assert.equal(f.values(id).instructionsParameter, 'instruct');
   assert.deepEqual(f.values(id).extraBody, values.extraBody);
   assert.equal(f.values(id).defaultInstructions, '静かに');
+  assert.equal(f.values(id).alwaysInstructions, '自然な日本語で');
   for (const key of ['baseUrl', 'model', 'defaultVoice'])
     assert.equal(f.values(id)[key], before[key]);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: ['alwaysInstructions'] }]));
+  assert.equal(f.values(id).alwaysInstructions, '');
+  assert.equal(f.values(id).defaultInstructions, '静かに');
   assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
 });
 

@@ -13,6 +13,7 @@ MCPの[固定設定API](settings-api.md)から通常値と手動ボイス一覧�
 | `tts.defaultVoice`          | 省略時に使うボイスID。未設定は空                                                                |
 | `tts.defaultSpeed`          | 0.25～4.0の有限数。既定1.0                                                                      |
 | `tts.defaultInstructions`   | 省略時のニュアンス。既定は空文字                                                                |
+| `tts.alwaysInstructions`    | 毎回付与するニュアンス。既定は空文字。0.154.0以上                                                |
 | `tts.preset`                | custom（既定）／openai-speech／qwen3-tts／mlx-audio／ollama。詳細値の初期入力に使ったプリセット |
 | `tts.speechPath`            | 音声生成APIの相対パス。既定audio/speech                                                         |
 | `tts.instructionsMode`      | none（既定、送信しない）／json（指定JSON項目へ送信）                                            |
@@ -61,7 +62,15 @@ MLX-AudioはベースURLを`/v1`まで指定し、ニュアンスを`instruct`�
 
 Qwen3-TTSの公式Python APIのgenerate_custom_voiceはtext・language・speaker・instructを受け付ける。日本語はlanguage="Japanese"、ニュアンスはinstructで指定する。1.7B CustomVoiceはニュアンス制御に対応するが、0.6B CustomVoiceとBaseは同じ制御を保証しない。AppDockのQwen3-TTSプリセットはinstructを受け付けるOpenAI互換HTTPサーバー向けであり、Python APIへの直接接続や全HTTPサーバーのAPIを保証しない。保存済みのinstructionsParameterは自動変更せず、プリセットの再選択／詳細設定への復元でinstructを反映する。OpenAI Speech APIはニュアンス対応モデルを使用する。OpenAIの2026-10-01告知では従来TTSモデルの2027-01-06終了とRealtime APIへの移行が案内されているが、本プリセットは既存Speech API用で、Realtime通信を実装したものではない。Ollamaは現行の音声APIでinstructionsが未対応のため初期値をnoneとし、将来の対応版や別実装では手動変更できる。
 
-共通instructionsは話し方の文章を渡す契約で、全モデルで同じ声色になることは保証しない。非対応の数値スタイルへ自由文を自動変換せず、本文へ指示を連結しない。instructionsModeがnoneの場合、既定値・呼び出し時の指定のどちらも無視し、ニュアンスを送信せずに読み上げを続ける。保存済みの既定ニュアンスは保持する。instructionsの文字列型検証とrequestIdの重複判定は送信方式にかかわらず適用する。
+共通instructionsは話し方の文章を渡す契約で、全モデルで同じ声色になることは保証しない。非対応の数値スタイルへ自由文を自動変換せず、本文へ指示を連結しない。instructionsModeがnoneの場合、常時付与・既定値・呼び出し時の指定をすべて無視し、ニュアンスを送信せずに読み上げを続ける。保存済みのニュアンス設定は保持する。instructionsの文字列型検証とrequestIdの重複判定は送信方式にかかわらず適用する。
+
+### 常に付与するニュアンス
+
+「モデルと声」に「常に付与するニュアンス」を既定のニュアンスの直前へ配置する。`tts.alwaysInstructions`は既定値と同じ共通TTS設定に属し、プリセット選択・詳細設定の復元でも保持する。公開設定APIは`service.tts.alwaysInstructions`から取得・変更・リセットできる。空欄が既定なので、未設定の既存環境の動作は変わらない。
+
+発話受付時に、常時付与分、発話ごとの指定（省略時は既定値）の順で、空文字・空白のみの部分を除いて改行1文字で連結する。各部分の本文や内部改行は保持する。発話ごとの明示空文字・空白指定は既定値を使わず、常時付与分だけを送る。両方空ならニュアンス項目を送らない。合成結果は設定済みのinstruct／instructions等へ送り、読み上げ本文へ追加しない。
+
+MCP・Node/.NET Applet・試聴・通知読み上げは共通TtsServiceで一度だけ合成する。受付済みジョブの内容を後から差し替えず、設定変更時は既存仕様に従い再生開始前のジョブを取り消す。再生中は受付時の内容を保ち、同じrequestIdによる再送は取消済みの場合も最初のジョブを返す。常時付与分に特別なモデル上の優先権は与えず、矛盾する指示の解釈や音声への反映はモデルに依存する。
 
 送信先は英字/アンダースコアで始まり英数字/アンダースコア/ハイフンを含む項目名のドット区切り。空要素、配列添字、prototype関連の項目名、本文等の標準項目（model/input/voice/speed/response_format）との衝突は保存時に拒否する。配列や実行コードの式は扱わない。
 
@@ -75,7 +84,7 @@ Qwen3-TTSの公式Python APIのgenerate_custom_voiceはtext・language・speaker
 
 文字列・有限数・真偽値・null・配列・入れ子のJSONを保持する。固定の項目数上限は設けず、既存の保存／共通通信の制約に従う。循環参照、非JSON値、prototype関連のキーを拒否する。標準のmodel/input/voice/speed/response_formatと、設定されたニュアンス送信先への重複は保存時に拒否する。ニュアンス送信先の途中のオブジェクトを配列・文字列・nullなどで置き換える指定も拒否する。
 
-例として送信先generation.instructと追加設定{"generation":{"temperature":0.7}}は併用でき、temperatureを保持したままinstructを追加する。各ジョブが受付時の追加設定を複製し、本文やニュアンスを追加しても保存済み設定を変更しない。空のinstructions指定は追加設定を保持し、ニュアンスだけを送信しない。UIはEnter/blur確定とEscape取消を使い、不正JSONを保存しない。プリセット選択／詳細リセットでも追加設定を保持する。
+例として送信先generation.instructと追加設定{"generation":{"temperature":0.7}}は併用でき、temperatureを保持したままinstructを追加する。各ジョブが受付時の追加設定を複製し、本文やニュアンスを追加しても保存済み設定を変更しない。空のinstructions指定でも追加設定と常時付与するニュアンスは保持する。UIはEnter/blur確定とEscape取消を使い、不正JSONを保存しない。プリセット選択／詳細リセットでも追加設定を保持する。
 
 ### 将来の複数接続への境界
 
@@ -148,7 +157,7 @@ OpenAI互換はボイス一覧APIの互換性まで保証しない。404/405は�
 
 voice/speed省略時は受付時の既定値を使用する。voiceも既定値も空の場合はINVALID_ARGUMENT。未知のプロパティを拒否する。URL・モデル・キーはAPI引数に含めず、設定済み接続先を使う。
 
-instructions省略時は受付時のdefaultInstructionsを使用し、指定時はその発話だけ上書きする。空文字・空白だけの指定は既定値を使わず、その発話のニュアンス項目を送信しない。型は文字列だけを受け付け、上限は共通通信本文の制限と接続先の仕様に従う。ニュアンスは本文と同様に公開ジョブ・監査ログへ含めず、ジョブ終了時に参照を解放する。通知読み上げと設定の試聴も同じ既定値を使う。
+instructions省略時は受付時のdefaultInstructionsを使用し、指定時はその発話だけ上書きする。空文字・空白だけの指定は既定値を使わない。0.154.0以上では、いずれの場合も設定されたalwaysInstructionsを前に付与する。常時付与分も空ならニュアンス項目を送信しない。型は文字列だけを受け付け、上限は共通通信本文の制限と接続先の仕様に従う。ニュアンスは本文と同様に公開ジョブ・監査ログへ含めず、ジョブ終了時に参照を解放する。通知読み上げと設定の試聴も同じ合成規則を使う。
 
 requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・同じID・同じ入力の再送は保持期間内に限り既存ジョブを返す。同じIDで入力が異なる場合はTTS_REQUEST_CONFLICT。instructionsも入力のハッシュへ含め、省略と明示空文字を区別する。既定値や設定revisionが変わっても、同じ入力の再送は最初のジョブを返す。再送時も現在の許可を検査する。
 

@@ -933,6 +933,12 @@ export class SettingsServiceTargets {
         default: defaults.speechPath,
       },
       {
+        key: 'alwaysInstructions',
+        title: hostText('settings.ttsSettings.alwaysInstructions'),
+        type: 'string',
+        default: defaults.alwaysInstructions,
+      },
+      {
         key: 'defaultInstructions',
         title: hostText('settings.ttsSettings.defaultInstructions'),
         type: 'string',

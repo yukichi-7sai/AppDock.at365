@@ -121,6 +121,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
     ['preset', hostText('settings.ttsSettings.preset')],
     ['speechPath', hostText('settings.ttsSettings.speechPath')],
     ['defaultInstructions', hostText('settings.ttsSettings.defaultInstructions')],
+    ['alwaysInstructions', hostText('settings.ttsSettings.alwaysInstructions')],
     ['instructionsMode', hostText('settings.ttsSettings.instructionsMode')],
     ['instructionsParameter', hostText('settings.ttsSettings.instructionsParameter')],
     ['extraBody', hostText('settings.ttsSettings.extraBody')],

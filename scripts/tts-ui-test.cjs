@@ -121,7 +121,7 @@ async function configure(patch) {
           id,
           name: id,
           version: '1.0.0',
-          minimumHostVersion: '0.153.0',
+          minimumHostVersion: '0.154.0',
           runtime: dotnet ? 'dotnet' : 'node',
           entry: dotnet ? 'AppDock.Extensions.TtsProbe.dll' : 'index.cjs',
           ...(dotnet ? { type: 'AppDock.Extensions.TtsProbe.TtsProbe' } : {}),
@@ -375,6 +375,16 @@ async function configure(patch) {
     await page.getByLabel('ニュアンスの送信先', { exact: true }).fill('generation.instruct');
     await page.getByLabel('ニュアンスの送信先', { exact: true }).press('Enter');
     await settleSettings(page);
+    const alwaysInstructions = '自然な日本語で\n聞き取りやすく';
+    const alwaysControl = page.getByLabel('常に付与するニュアンス', { exact: true });
+    await alwaysControl.fill('取り消す常時付与');
+    await alwaysControl.press('Escape');
+    await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, '');
+    await alwaysControl.fill(alwaysInstructions);
+    await alwaysControl.press('Tab');
+    await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
     await page.getByLabel('既定のニュアンス', { exact: true }).fill('やさしく、落ち着いて');
     await page.getByLabel('既定のニュアンス', { exact: true }).press('Escape');
     await settleSettings(page);
@@ -430,6 +440,7 @@ async function configure(patch) {
         ['ニュアンスの送信先', 'connection-details'],
         ['追加パラメーター（JSON）', 'additional-parameters'],
         ['手動ボイス一覧', 'manual-voices'],
+        ['常に付与するニュアンス', 'always-instructions'],
         ['既定のニュアンス', 'default-instructions'],
       ]) {
         const control = page.getByLabel(label, { exact: true });
@@ -517,10 +528,15 @@ async function configure(patch) {
     );
     assert.equal((await snapshot()).settings.value.tts.defaultInstructions, 'やさしく、落ち着いて');
     assert.deepEqual(fs.readFileSync(keyfile), savedKey);
+    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
     assert.deepEqual((await snapshot()).settings.value.tts.extraBody, extraBody);
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     page = await settingsPage(host);
     await page.getByRole('button', { name: 'TTS', exact: true }).click();
+    assert.equal(
+      await page.getByLabel('常に付与するニュアンス', { exact: true }).inputValue(),
+      alwaysInstructions,
+    );
     assert.equal(
       await page.getByLabel('既定のニュアンス', { exact: true }).inputValue(),
       'やさしく、落ち着いて',
@@ -541,7 +557,10 @@ async function configure(patch) {
     }, 'preview ended');
     assert.equal(requests.at(-1).auth, 'Bearer fixture-secret');
     assert.equal(requests.at(-1).body.speed, 1);
-    assert.equal(requests.at(-1).body.generation.instruct, 'やさしく、落ち着いて');
+    assert.equal(
+      requests.at(-1).body.generation.instruct,
+      alwaysInstructions + '\nやさしく、落ち着いて',
+    );
     assert.equal(requests.at(-1).body.language, 'Japanese');
     assert.equal(requests.at(-1).body.generation.temperature, 0.4);
     checks.push('settings preview ends and playback speed avoids double speed');
@@ -569,7 +588,9 @@ async function configure(patch) {
       checks.push(id + ' SDK accepted and completed');
       assert.equal(
         requests.at(-1).body.generation.instruct,
-        id.endsWith('dotnet') ? '.NETのニュアンス' : 'Nodeのニュアンス',
+        alwaysInstructions +
+          '\n' +
+          (id.endsWith('dotnet') ? '.NETのニュアンス' : 'Nodeのニュアンス'),
       );
       assert.equal(requests.at(-1).body.language, 'Japanese');
     }
@@ -621,14 +642,20 @@ async function configure(patch) {
       a.jobId,
     );
     await until(async () => (await state(a)).state === 'completed', 'MCP completed');
-    assert.equal(requests.at(-1).body.generation.instruct, 'MCPのニュアンス');
+    assert.equal(
+      requests.at(-1).body.generation.instruct,
+      alwaysInstructions + '\nMCPのニュアンス',
+    );
     const empty = await call('appdock_tts_speak', {
       text: '指定なし',
       requestId: 'mcp-empty',
       instructions: '',
     });
     await until(async () => (await state(empty)).state === 'completed', 'empty override completed');
-    assert.deepEqual(requests.at(-1).body.generation, { temperature: 0.4 });
+    assert.deepEqual(requests.at(-1).body.generation, {
+      temperature: 0.4,
+      instruct: alwaysInstructions,
+    });
     assert.equal(requests.at(-1).body.language, 'Japanese');
     const conflicting = await client.callTool({
       name: 'appdock_tts_speak',
@@ -676,7 +703,25 @@ async function configure(patch) {
     assert.equal((await snapshot()).settings.value.tts.defaultInstructions, 'やさしく、落ち着いて');
     await nuanceMode.selectOption('json');
     await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, alwaysInstructions);
     checks.push('disabled nuance is ignored for settings preview and MCP while speech completes');
+    await page.getByLabel('常に付与するニュアンス', { exact: true }).fill('');
+    await page.getByLabel('常に付与するニュアンス', { exact: true }).press('Enter');
+    await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.tts.alwaysInstructions, '');
+    const cleared = await call('appdock_tts_speak', {
+      text: '常時付与なし',
+      instructions: ' \n ',
+      requestId: 'always-cleared',
+    });
+    await until(
+      async () => (await state(cleared)).state === 'completed',
+      'cleared always nuance completed',
+    );
+    assert.deepEqual(requests.at(-1).body.generation, { temperature: 0.4 });
+    checks.push(
+      'always nuance saves and cancels, survives restart, combines with preview and SDK/MCP overrides, and can be cleared',
+    );
     const long = await call('appdock_tts_speak', { text: 'long', requestId: 'long' });
     await until(async () => (await state(long)).state === 'playing', 'long playback');
     const audioPage = await until(

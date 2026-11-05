@@ -247,7 +247,12 @@ export class TtsService {
     const selectedInstructions =
       config.instructionsMode === 'none'
         ? ''
-        : ((instructions as string | undefined) ?? config.defaultInstructions);
+        : [
+            config.alwaysInstructions,
+            (instructions as string | undefined) ?? config.defaultInstructions,
+          ]
+            .filter((part) => part.trim())
+            .join('\n');
     const selected = (voice as string | undefined) ?? config.defaultVoice;
     if (!selected) fail('INVALID_ARGUMENT', hostText('services.ttsService.voiceRequired'));
     if ([...this.jobs.values()].filter((j) => !j.ended).length >= this.limits.capacity)
@@ -267,7 +272,7 @@ export class TtsService {
       text: text as string,
       voice: selected,
       speed: (speed as number | undefined) ?? config.defaultSpeed,
-      instructions: selectedInstructions.trim() ? selectedInstructions : '',
+      instructions: selectedInstructions,
       config,
       key,
       abort: new AbortController(),

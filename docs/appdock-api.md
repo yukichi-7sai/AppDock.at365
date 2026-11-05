@@ -149,7 +149,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## TTS読み上げ
 
-最低ホスト版0.35.0。任意instructions引数は0.149.0以上。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
+最低ホスト版0.35.0。任意instructions引数は0.149.0以上、常時付与するニュアンス設定は0.154.0以上。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
 ## AI文章生成
 

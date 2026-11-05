@@ -3518,6 +3518,8 @@
   "settings.tts.voiceSource": "ボイス一覧方式はendpoint/manualです。",
   "settings.ttsSettings.advanced": "サーバーに合わせた詳細設定",
   "settings.ttsSettings.advancedHint": "音声生成のパス、ニュアンスの送信先、追加パラメーター、速度の適用先、ボイス一覧の取得方法を調整できます。",
+  "settings.ttsSettings.alwaysInstructions": "常に付与するニュアンス",
+  "settings.ttsSettings.alwaysInstructionsHint": "発話ごとの指定や既定のニュアンスの前に、改行でつないで毎回付与します。呼び出し時に空文字を指定しても、この内容は残ります。空欄なら追加しません。",
   "settings.ttsSettings.apiKey": "APIキー",
   "settings.ttsSettings.apiKeyHint": "このPCだけに暗号化保存します。接続先を変更したら再設定してください。",
   "settings.ttsSettings.canceled": "取消",

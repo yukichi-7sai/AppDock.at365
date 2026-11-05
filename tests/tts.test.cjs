@@ -86,6 +86,7 @@ test('connection presets preserve identity and speech defaults; custom edits sur
     model: 'saved-model',
     defaultVoice: 'saved-voice',
     defaultInstructions: '穏やかに',
+    alwaysInstructions: '自然な日本語で',
     defaultSpeed: 1.3,
     manualVoices: [{ id: 'saved-voice', name: 'Saved' }],
     extraBody: { language: 'Japanese' },
@@ -98,6 +99,7 @@ test('connection presets preserve identity and speech defaults; custom edits sur
       'defaultVoice',
       'defaultSpeed',
       'defaultInstructions',
+      'alwaysInstructions',
       'manualVoices',
       'extraBody',
     ])
@@ -139,6 +141,8 @@ test('connection presets preserve identity and speech defaults; custom edits sur
     { preset: 'unknown' },
     { instructionsMode: 'unknown' },
     { defaultInstructions: null },
+    { alwaysInstructions: null },
+    { alwaysInstructions: 1 },
     { speechPath: '../speech' },
     { speechPath: 'https://other/speech' },
   ])
@@ -261,41 +265,66 @@ test('extra parameters reject invalid JSON values and conflicts with owned paylo
     );
   assert.deepEqual(parseTtsSettings({}).extraBody, {});
 });
-test('speech uses default, per-call and empty instructions with nested mapping and deduplication', async (t) => {
+for (const alwaysInstructions of ['', '常時付与', ' \n '])
+  test(`speech preserves default, per-call, empty and deduplication rules with alwaysInstructions=${JSON.stringify(alwaysInstructions)}`, async (t) => {
+    const f = setup(t);
+    const prefix = alwaysInstructions.trim() ? alwaysInstructions + '\n' : '';
+    f.config({
+      instructionsMode: 'json',
+      alwaysInstructions,
+      defaultInstructions: '既定の声色',
+      instructionsParameter: 'generation.instruct',
+      speechPath: 'synthesize',
+    });
+    const first = f.s.speak('a', input('default'));
+    await wait(() => f.s.get('a', first.jobId).state === 'completed');
+    assert.equal(f.posts[0].u, 'http://localhost:8080/v1/synthesize');
+    assert.deepEqual(JSON.parse(f.posts[0].o.body).generation, { instruct: prefix + '既定の声色' });
+    const explicit = { ...input('override'), instructions: '明るく' };
+    const second = f.s.speak('a', explicit);
+    await wait(() => f.s.get('a', second.jobId).state === 'completed');
+    assert.equal(JSON.parse(f.posts[1].o.body).generation.instruct, prefix + '明るく');
+    assert.equal(f.s.speak('a', explicit).jobId, second.jobId);
+    assert.throws(() => f.s.speak('a', { ...explicit, instructions: '静かに' }), {
+      code: 'TTS_REQUEST_CONFLICT',
+    });
+    f.config({ defaultInstructions: '変更後' });
+    assert.equal(f.s.speak('a', input('default')).jobId, first.jobId);
+    for (const [index, instructions] of ['', ' \n '].entries()) {
+      const job = f.s.speak('a', { ...input('empty-' + index), instructions });
+      await wait(() => f.s.get('a', job.jobId).state === 'completed');
+      const body = JSON.parse(f.posts[2 + index].o.body);
+      assert.deepEqual(body.generation, prefix ? { instruct: alwaysInstructions } : undefined);
+    }
+    assert(!JSON.stringify(f.s.get('a', second.jobId)).includes('明るく'));
+    assert.equal(f.s.jobs.get(second.jobId).instructions, undefined);
+    assert.throws(() => f.s.speak('a', { ...input('bad'), instructions: 1 }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  });
+test('queued speech captures nuance once and settings changes cancel pending jobs without rewriting retries', async (t) => {
   const f = setup(t);
-  f.config({
-    instructionsMode: 'json',
-    defaultInstructions: '既定の声色',
-    instructionsParameter: 'generation.instruct',
-    speechPath: 'synthesize',
-  });
-  const first = f.s.speak('a', input('default'));
-  await wait(() => f.s.get('a', first.jobId).state === 'completed');
-  assert.equal(f.posts[0].u, 'http://localhost:8080/v1/synthesize');
-  assert.deepEqual(JSON.parse(f.posts[0].o.body).generation, { instruct: '既定の声色' });
-  const explicit = { ...input('override'), instructions: '明るく' };
-  const second = f.s.speak('a', explicit);
-  await wait(() => f.s.get('a', second.jobId).state === 'completed');
-  assert.equal(JSON.parse(f.posts[1].o.body).generation.instruct, '明るく');
-  assert.equal(f.s.speak('a', explicit).jobId, second.jobId);
-  assert.throws(() => f.s.speak('a', { ...explicit, instructions: '静かに' }), {
-    code: 'TTS_REQUEST_CONFLICT',
-  });
-  f.config({ defaultInstructions: '変更後' });
-  assert.equal(f.s.speak('a', input('default')).jobId, first.jobId);
-  const third = f.s.speak('a', { ...input('empty'), instructions: '' });
-  await wait(() => f.s.get('a', third.jobId).state === 'completed');
-  assert.equal(Object.hasOwn(JSON.parse(f.posts[2].o.body), 'generation'), false);
-  assert(!JSON.stringify(f.s.get('a', second.jobId)).includes('明るく'));
-  assert.equal(f.s.jobs.get(second.jobId).instructions, undefined);
-  assert.throws(() => f.s.speak('a', { ...input('bad'), instructions: 1 }), {
-    code: 'INVALID_ARGUMENT',
-  });
+  f.config({ instructionsMode: 'json', alwaysInstructions: '共通A', defaultInstructions: '既定A' });
+  const first = f.s.speak('a', input('first'));
+  const queued = f.s.speak('a', { ...input('queued'), instructions: '個別A' });
+  assert.equal(f.s.jobs.get(first.jobId).instructions, '共通A\n既定A');
+  assert.equal(f.s.jobs.get(queued.jobId).instructions, '共通A\n個別A');
+  f.config({ alwaysInstructions: '共通B', defaultInstructions: '既定B' });
+  assert.equal(f.s.get('a', first.jobId).state, 'canceled');
+  assert.equal(f.s.get('a', queued.jobId).state, 'canceled');
+  assert.equal(f.s.speak('a', input('first')).jobId, first.jobId);
+  assert.equal(f.posts.length, 0);
+  const latest = f.s.speak('a', input('latest'));
+  await wait(() => f.s.get('a', latest.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.posts[0].o.body).instructions, '共通B\n既定B');
+  assert(!JSON.stringify(f.s.get('a', queued.jobId)).includes('共通A'));
+  assert.equal(f.s.jobs.get(queued.jobId).instructions, undefined);
 });
 test('disabled nuance ignores default and per-call instructions while speech and extra parameters remain usable', async (t) => {
   const f = setup(t);
   f.config({
     defaultInstructions: '落ち着いて',
+    alwaysInstructions: '聞き取りやすく',
     instructionsParameter: 'generation.instruct',
     extraBody: { language: 'Japanese', generation: { temperature: 0.4 } },
   });
@@ -318,7 +347,7 @@ test('disabled nuance ignores default and per-call instructions while speech and
   f.config({ instructionsMode: 'json' });
   const enabled = f.s.speak('a', input('enabled'));
   await wait(() => f.s.get('a', enabled.jobId).state === 'completed');
-  assert.equal(JSON.parse(f.posts[4].o.body).generation.instruct, '落ち着いて');
+  assert.equal(JSON.parse(f.posts[4].o.body).generation.instruct, '聞き取りやすく\n落ち着いて');
 });
 test('streamed WAV length sentinels are finalized before the common player; malformed sizes still fail', async (t) => {
   const streaming = wave();

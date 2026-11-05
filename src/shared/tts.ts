@@ -22,6 +22,7 @@ export interface TtsConnectionSettings {
 export interface TtsSettings extends TtsConnectionSettings {
   defaultSpeed: number;
   defaultInstructions: string;
+  alwaysInstructions: string;
 }
 export const ttsPresetIds = [
   'custom',
@@ -94,6 +95,7 @@ export const defaultTtsSettings = (): TtsSettings => ({
   defaultVoice: '',
   defaultSpeed: 1,
   defaultInstructions: '',
+  alwaysInstructions: '',
   preset: 'custom',
   speechPath: 'audio/speech',
   instructionsMode: 'none',
@@ -208,6 +210,7 @@ export function parseTtsSettings(value: unknown): TtsSettings {
     'voicesPath',
     'speechPath',
     'defaultInstructions',
+    'alwaysInstructions',
     'instructionsParameter',
   ] as const)
     if (typeof v[key] !== 'string') throw Error(hostText('settings.tts.strings'));

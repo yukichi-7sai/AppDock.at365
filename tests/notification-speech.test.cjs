@@ -194,8 +194,13 @@ test('notification speech settings inherit independently and reject invalid or s
 });
 test('new notifications speak once across dedupe, timer restart, reads and target changes; recurrence speaks again', async (t) => {
   const f = setup(t);
+  f.settings.tts.instructionsMode = 'json';
+  f.settings.tts.alwaysInstructions = '自然な日本語で';
+  f.settings.tts.defaultInstructions = '落ち着いて';
+  f.reconcile();
   const a = f.publish();
   await wait(() => f.posts.length === 1 && f.played.length === 1);
+  assert.equal(f.posts[0].instructions, '自然な日本語で\n落ち着いて');
   f.publish('episode', { body: 'changed', restartTimer: true });
   f.service.centerEntries();
   f.settings.notificationPreferences.overrides[0].targets = ['banner', 'desktop'];

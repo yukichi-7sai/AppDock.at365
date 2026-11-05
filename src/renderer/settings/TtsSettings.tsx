@@ -329,6 +329,22 @@ export function TtsSettingsForm({
           />
         </SettingsField>
         <SettingsField
+          title={translate('settings.ttsSettings.alwaysInstructions')}
+          hint={translate('settings.ttsSettings.alwaysInstructionsHint')}
+          description={
+            value.instructionsMode === 'none'
+              ? translate('settings.ttsSettings.instructionsDisabled')
+              : undefined
+          }
+          {...settingAnchor('tts', 'alwaysInstructions')}
+        >
+          <SettingsTextarea
+            aria-label={translate('settings.ttsSettings.alwaysInstructions')}
+            value={value.alwaysInstructions}
+            onChange={(e) => change({ alwaysInstructions: e.target.value })}
+          />
+        </SettingsField>
+        <SettingsField
           title={translate('settings.ttsSettings.defaultInstructions')}
           hint={translate('settings.ttsSettings.defaultInstructionsHint')}
           description={
