@@ -7,14 +7,31 @@ const { parseProcessLaunch, processCommandType } = require('../out/main/shared/p
 const { compileCustomType } = require('../out/main/main/core/custom-commands');
 const { operationsFor } = require('../out/main/shared/appdock-api');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function publishResult(file, value) {
+  const fs = require('node:fs');
+  fs.writeFileSync(file + '.tmp', value);
+  fs.renameSync(file + '.tmp', file);
+}
+function powershellResult(file, value) {
+  const quote = (text) => "'" + text.replaceAll("'", "''") + "'";
+  return (
+    `[IO.File]::WriteAllText(${quote(file + '.tmp')}, ${quote(value)}, [Text.Encoding]::UTF8);` +
+    `[IO.File]::Move(${quote(file + '.tmp')}, ${quote(file)});`
+  );
+}
 function fixture(t) {
   fs.mkdirSync('.artifacts/process-launch-unit', { recursive: true });
   const dir = fs.mkdtempSync(path.resolve('.artifacts/process-launch-unit/case-'));
+  fs.writeFileSync(
+    path.join(dir, 'write-result.cjs'),
+    'module.exports=' + publishResult.toString(),
+  );
   const service = new ProcessLaunchService(dir);
   t.after(() => service.close());
   return { dir, service };
 }
-async function exists(file) {
+// Fixture writers rename a completed result into place, so existence means the write finished.
+async function readPublishedResult(file) {
   for (let i = 0; i < 100; i++) {
     if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
     await sleep(50);
@@ -51,7 +68,7 @@ test('direct executable preserves argv and cwd and acknowledges launch without e
     out = path.join(dir, 'argv.json');
   fs.writeFileSync(
     script,
-    "console.log('ignored output');console.error('ignored error');require('node:fs').writeFileSync(process.argv[2],JSON.stringify({args:process.argv.slice(3),cwd:process.cwd()}));process.exitCode=17;",
+    "console.log('ignored output');console.error('ignored error');require('./write-result.cjs')(process.argv[2],JSON.stringify({args:process.argv.slice(3),cwd:process.cwd()}));process.exitCode=17;",
   );
   const args = ['', '日本語', 'space value', 'embedded"quote', 'trail\\', '&|<>%^!'];
   const result = await service.start({
@@ -61,7 +78,7 @@ test('direct executable preserves argv and cwd and acknowledges launch without e
     workingDirectory: dir,
   });
   assert.deepEqual(result, { completion: 'processStarted', effectVerified: false });
-  assert.deepEqual(JSON.parse(await exists(out)), { args, cwd: dir });
+  assert.deepEqual(JSON.parse(await readPublishedResult(out)), { args, cwd: dir });
 });
 test('explicit cmd and encoded PowerShell execute only their supplied fixture code', async (t) => {
   const { dir, service } = fixture(t),
@@ -70,7 +87,7 @@ test('explicit cmd and encoded PowerShell execute only their supplied fixture co
     psOut = path.join(dir, 'ps.txt');
   fs.writeFileSync(
     recorder,
-    "require('node:fs').writeFileSync(process.argv[2],JSON.stringify(process.argv.slice(3)));",
+    "require('./write-result.cjs')(process.argv[2],JSON.stringify(process.argv.slice(3)));",
   );
   const args = ['literal & | < > ^ ! 100%', '日本語'];
   const command =
@@ -86,14 +103,13 @@ test('explicit cmd and encoded PowerShell execute only their supplied fixture co
     args[1] +
     '"';
   await service.start({ mode: 'cmd', command, workingDirectory: dir });
-  assert.deepEqual(JSON.parse(await exists(cmdOut)), args);
-  const literal = "'" + psOut.replaceAll("'", "''") + "'";
+  assert.deepEqual(JSON.parse(await readPublishedResult(cmdOut)), args);
   await service.start({
     mode: 'powershell',
-    script: '[IO.File]::WriteAllText(' + literal + ', "PowerShell 日本語", [Text.Encoding]::UTF8)',
+    script: powershellResult(psOut, 'PowerShell 日本語'),
     workingDirectory: dir,
   });
-  assert.equal(await exists(psOut), 'PowerShell 日本語');
+  assert.equal(await readPublishedResult(psOut), 'PowerShell 日本語');
 });
 test('closed service does not terminate an already started process; new launches are refused', async (t) => {
   const { dir, service } = fixture(t),
@@ -101,7 +117,7 @@ test('closed service does not terminate an already started process; new launches
     script = path.join(dir, 'survive.cjs');
   fs.writeFileSync(
     script,
-    "setTimeout(()=>require('node:fs').writeFileSync(process.argv[2],'alive'),300);",
+    "setTimeout(()=>require('./write-result.cjs')(process.argv[2],'alive'),300);",
   );
   await service.start({
     mode: 'executable',
@@ -109,7 +125,7 @@ test('closed service does not terminate an already started process; new launches
     arguments: [script, file],
   });
   service.close();
-  assert.equal(await exists(file), 'alive');
+  assert.equal(await readPublishedResult(file), 'alive');
   await assert.rejects(
     service.start({ mode: 'executable', executable: process.execPath, arguments: [] }),
     (e) => e.code === 'NOT_READY',
@@ -127,9 +143,7 @@ test('launched processes survive the actual launcher process exiting', async (t)
       ');const service=new ProcessLaunchService(' +
       JSON.stringify(dir) +
       ');service.start({mode:"powershell",script:' +
-      JSON.stringify(
-        "Start-Sleep -Milliseconds 400; [IO.File]::WriteAllText('" + file + "', 'alive')",
-      ) +
+      JSON.stringify('Start-Sleep -Milliseconds 400; ' + powershellResult(file, 'alive')) +
       '}).then(()=>service.close(),()=>{service.close();process.exitCode=1;});',
   );
   const { spawn } = require('node:child_process');
@@ -141,7 +155,7 @@ test('launched processes survive the actual launcher process exiting', async (t)
     }),
     0,
   );
-  assert.equal(await exists(file), 'alive');
+  assert.equal(await readPublishedResult(file), 'alive');
 });
 test('cancellation, caller revocation, missing files and cwd fail before execution', async (t) => {
   const { dir, service } = fixture(t),

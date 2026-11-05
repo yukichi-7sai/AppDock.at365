@@ -40,6 +40,8 @@ AppDock本体とAppletのテストを追加・修正・整理するときの判�
 
 `tests/mcp-result-retention.test.cjs`は、結果なし/処理中だけの空待機、保持期限の境界、複数結果の期限順序、時計変更時の取得と終了時の予約解除を検査する。`tests/notification-sound-lifetime.test.cjs`は、取得待ちでの周期確認なし、発行元停止時の即時取消と他の発行元の継続、ロック保留、OFF/ONと遅延応答、取消購読の解放を検査する。`scripts/audio-playback-ui-test.cjs [固定EXE]`は既存の無音WAV再生/保存/取消に加え、実Appletの再起動・異常終了からの音声取消と新世代の再生受付を確認する。
 
+`tests/process-launch.test.cjs`は、実プロセスの引数・作業ディレクトリ、cmd/PowerShellの明示実行、サービス終了・親プロセス終了後の子プロセスの継続、新規起動の拒否を確認する。fixtureは一時ファイルへの書き込みを完了してから結果ファイルへrenameし、作成直後の空・書き込み途中の内容を完了結果として読まない。起動受付と実行結果の確認は分ける。
+
 - 値の検証、計画、条件、保存データの保護は、可能なら`tests/*.test.cjs`の小さな入力と出力で確認する。純粋関数の全組み合わせをGUIでも繰り返さない。
 - GUIは、利用者の入力、ダイアログの確定・取消、フォーカス、画面と保存値の接続を確認する。通常は`getByRole`・`getByLabel`、安定した操作対象には`data-testid`を使う。内部classは既存部品の識別に必要な範囲へとどめる。
 - 明暗テーマや狭幅は共通部品の代表的な条件を選ぶ。テーマ×画面幅×全ページの総当たりを標準にしない。特定の組み合わせだけで起きた不具合には、その条件を明示した検査を残す。
@@ -129,6 +131,8 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 | `tests/settings-editing.test.cjs`、`tests/command-triggers.test.cjs`、`tests/command-stacks.test.cjs`                        | 保存範囲、競合、安定ID、条件と実行順を保つデータ操作                                                                                                                                    |
 
 各スクリプトの引数・前提は現物と機能別文書で確認します。標準の`.\dev.bat test`はビルドと`tests/*.test.cjs`を実行し、上記の専用GUIスクリプトを一律には実行しません。
+
+`scripts/settings-hints-ui-test.cjs [固定EXE] --localization-only`は、全本体設定ページの翻訳キー露出、言語の入力・保存・検索・再起動、利用者の名前の無変換を確認する。通常ページの横はみ出し検査は維持するが、[横スクロールを仕様として持つコマンドトリガー](command-triggers.md#スクロール)には適用しない。同ページの翻訳検査は維持し、横スクロールによる操作への到達、キーボード操作、ダイアログ終了後のスクロール・フォーカス復帰は`command-triggers-ui-test.cjs --usability-only`で確認する。
 
 `scripts/applet-information-ui-test.cjs [固定EXE]`は、概要のプレーンテキスト表示、停止・開始待ち・失敗・再起動中の計測、読み取り専用データ、概要からの検索移動、設定の確定保存、選択Appletに限定した更新確認と他対象/全体更新の拒否を隔離fixtureで確認する。配布元リンクは外部ブラウザー呼出しを捕捉し、クリック/Enter/中クリック、更新先の上書きとの独立、起動失敗時の閲覧、起動エラーの表示と再試行、保存値と設定ページの保持を確認する。情報パネルが唯一の見出しとしてツールバーの上にあること、両ページの「起動時間の計測」が最下部にあること、Aboutのフォーム/JSON切替と自動確認の抑制は、専用Applet試験と`scripts/about-ui-test.cjs [固定EXE]`で確認する。Aboutのコマンド数リンクはクリック/Enter、前のApplet・検索・状態・カテゴリ・種類・タブの解除、全コマンド表示と設定不変を同試験で確認する。既存の本体計測の共通表示は`scripts/host-startup-timing-ui-test.cjs [固定EXE]`を使う。
 

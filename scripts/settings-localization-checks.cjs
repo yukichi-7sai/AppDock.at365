@@ -125,11 +125,16 @@ module.exports = async function ({
           ),
         );
         assert.deepEqual(untranslated, [], `${page}/${theme}/${width} untranslated keys`);
-        assert.equal(
-          await host.locator('.settings-body').evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
-          true,
-          `${page}/${theme}/${width} horizontal overflow`,
-        );
+        // Command triggers intentionally scroll horizontally. Keyboard reachability and
+        // scroll/focus restoration are covered by command-triggers-ui-test.cjs --usability-only.
+        if (id !== 'command-triggers')
+          assert.equal(
+            await host
+              .locator('.settings-body')
+              .evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
+            true,
+            `${page}/${theme}/${width} horizontal overflow`,
+          );
         await host.screenshot({
           path: path.join(profile, `localization-${id}-${theme}-${width}.png`),
         });
@@ -147,7 +152,7 @@ module.exports = async function ({
   await sound.click();
   await settleSettings(host);
   checks.push(
-    'all host settings pages render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
+    'all host settings pages render without raw translation keys at 1280/760 in light/dark; pages without intentional horizontal scrolling fit the body; General toggle saves',
   );
 
   await select('文章生成AI');
