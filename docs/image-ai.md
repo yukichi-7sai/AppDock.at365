@@ -12,13 +12,13 @@
 
 通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。PC専用rootのgeneration-ai.jsonへ保存する。各ダイアログのMCP利用許可も同じファイルで管理する。現在のMCP API公開範囲は変更しない。[生成AIのPC専用設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
 
-設定ページの「画像生成の試験」は現在の保存済み登録へ送信し、生成画像を表示する。試験画面では選択先の既定モデルを使い、空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
+設定ページの「画像生成の試験」は選択したサーバー登録のモデルで生成し、生成画像を表示する。空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
 
 OpenAIの現在の生成契約に合わせ、枚数は1～10、プロンプトは結合後32,000文字以内。サイズ・品質の対応範囲はモデルに依存する。圧縮品質はJPEG/WebPのみ0～100、透過背景はPNG/WebPのみ。PNGでは圧縮品質を空欄にする。待ち時間は待機列を含み、既定600秒。HTTP失敗・取消時の自動再送、他サーバーへの自動切替は行わない。旧DALL-EのURL返却や画像編集は対象外。
 
 ## 公開範囲と内部処理
 
-Applet向けには `ai.image.connections.list` を提供する。`appdock-api` capabilityとread + useImageAi許可が必要で、Nodeは`context.appdock.call('ai.image.connections.list', {})`、.NETは`context.AppDock.CallAsync("ai.image.connections.list", new {}, token)`を使う。登録ID・名前・種類・既定モデル・対応機能・既定IDを返し、認証情報やプロンプトを返さず、生成サーバーへの通信も開始しない。
+Applet向けには `ai.image.connections.list` を提供する。`appdock-api` capabilityとread + useImageAi許可が必要で、Nodeは`context.appdock.call('ai.image.connections.list', {})`、.NETは`context.AppDock.CallAsync("ai.image.connections.list", new {}, token)`を使う。登録ID・名前・種類・登録のモデル（`defaultModel`）・対応機能・既定IDを返し、認証情報やプロンプトを返さず、生成サーバーへの通信も開始しない。
 
 付随する`ai.image.jobs.get`（read）と`ai.image.jobs.cancel`（read + execute）も維持する。引数は`{jobId}`で、呼び出し元のApplet実行世代に属するジョブだけを取得・取消する。他のAppletや本体の試験ジョブはNOT_FOUNDになる。状態取得は画像本体を返さない。現在はAppletから新しい画像生成ジョブを作る公開入口はなく、生成登録APIの追加時に登録までの状態・取消へ接続する。
 
@@ -26,7 +26,7 @@ Applet向けには `ai.image.connections.list` を提供する。`appdock-api` c
 
 「操作の許可」の画像生成AI（`useImageAi`）は項目と保存値を維持する。現在の接続一覧と、後続の「生成してライブラリーに登録するAPI」で使い、公開終了を理由に廃止・移行しない。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は従来どおり許可する。MCP列は引き続き未対応と表示する。許可がONでも非公開の操作は呼び出せない。
 
-本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, additionalPrompt?, input?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
+本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, additionalPrompt?, input?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。モデルは登録の設定から確定する。`model`引数や空欄のモデル設定はINVALID_ARGUMENT。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
 
 同じ所有者のrequestIdと同じ引数は、保持中の既存ジョブを返す。異なる引数への再利用はIMAGE_AI_REQUEST_CONFLICT。`completion:'accepted'` は受付で、生成成功ではない。stateはqueued/running/completed/failed/canceled。失敗時は安全なcode/messageを返し、サーバーの応答本文は公開しない。
 

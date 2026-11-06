@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-11-07 文章・画像生成を登録モデルに固定（0.170.0）
+
+- `63e9b98`を基点に専用worktreeの`codex/generation-preset-models`で実装した。追加・編集の表示とアクセシブル名を「モデル」に揃え、文章生成の公開スキーマと文章・画像の生成入力から`model`を除いた。保存済みの`defaultModel`を使用し、`connectionId`省略時は既定のサーバーを選ぶ。直接モデルを指定した要求は`INVALID_ARGUMENT`で拒否する。
+- 発行前に画面、型、Applet/MCPの共通スキーマ、要求検証と送信モデル、保存済み設定、再送と文書をレビューした。Applet向け公開引数の削除につきマイナー更新とし、本体を0.169.1から0.170.0にした。
+- 型検査、ビルド、両.NET Applet試験用プロジェクトのReleaseビルド、変更したスクリプトの構文、差分空白検査が成功。初回の直列回帰の4失敗は、廃止済みShellへの外観検査と新規checkoutでのExtensionHost準備不足によるものだった。現行rendererの配色検査を保ち、標準試験で共通.NETホストを生成してページ試験も同じ出力を使うように修正した。対処後の`dev.bat test`は1,799/1,799件成功、失敗・skip 0。
+- `publish.bat`終了0。発行先は`A:/40.ARTIFACT/AppDock.at365-generation-preset-models/`。版とfeedのサイズ・SHA256を確認し、ビルド出力・発行物・更新ZIP・固定試験共用runtimeの101ファイルが一致した。EXE SHA256は`f1e201a769b64861d8ea35e6fe5a30ed79ba34325529b91a163f19d8e1691639`。更新ZIPは175,185,267 bytes、SHA256は`e95996567a67c582884f8565e650ef80f653fb677421d04ef6caeeb1abae6b7c`。
+- 固定EXEの隔離profileで文章生成17項目、画像生成8項目、生成設定18項目とスモークが成功した。Node/.NET AppletとMCPによるサーバーID指定、MCPでの`model`拒否と通信なし、画像試験で登録したモデルを送信して結果が表示されることをローカルfixtureで確認した。
+- スモークの専用コピーはプロセス終了と配布物との一致を確認し、manifestを残して100ファイルを削除した。保持した結果・設定など83ファイルのSHA256が一致した。GUIの成功profileと共用runtime、元の失敗ログは保持した。詳細なレビュー、入力・ログ・配布物のhashとstage/commitの照合は`.artifacts/commit-validation-generation-preset-models/`を参照する。
+
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 
 - `5c26091`の設計に基づき、MCP接続と独立したMCPツールコマンドを`data/settings-<端末名>.json`へ固定保存した。Bearerとstdio環境変数の名前・値は配置別LocalAppDataの`mcp-client-secrets.json`へsafeStorageで暗号化する。旧名簿・旧秘密ファイル・旧カスタム種類を引き継がず、他の設定と割り当て参照は保持する。

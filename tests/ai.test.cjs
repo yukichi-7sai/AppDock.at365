@@ -131,22 +131,21 @@ test('AI settings accept old files and validate URL, keys, ids and compatibility
       assert.throws(() => parseAiSettings({ connections: [{ ...c, [key]: invalid }] }));
   }
 });
-test('model overrides and prompt composition preserve shared values and isolate input', async (t) => {
+test('the registered model and composed prompts preserve settings and isolate input', async (t) => {
   const f = setup(t);
   const before = JSON.stringify(f.settings());
   const a = f.s.generate(
     'owner',
     request('a', {
-      model: 'override',
       additionalPrompt: '用途の指示',
       input: '分離対象の架空データ',
     }),
   );
   assert.equal(a.state, 'queued');
-  assert.equal(a.model, 'override');
+  assert.equal(a.model, 'default');
   await until(() => f.s.get('owner', a.jobId).state === 'completed');
   const body = JSON.parse(f.calls[0].init.body);
-  assert.equal(body.model, 'override');
+  assert.equal(body.model, 'default');
   assert.equal(body.max_tokens, 8192);
   assert.equal(body.messages[1].content, '分離対象の架空データ');
   assert(!body.messages[0].content.includes('分離対象の架空データ'));
@@ -172,28 +171,29 @@ test('model overrides and prompt composition preserve shared values and isolate 
   assert.equal(
     f.s.generate('owner', {
       input: '分離対象の架空データ',
-      model: 'override',
       additionalPrompt: '用途の指示',
       requestId: 'a',
     }).jobId,
     a.jobId,
   );
   assert.throws(
-    () => f.s.generate('owner', request('a', { model: 'different' })),
+    () =>
+      f.s.generate(
+        'owner',
+        request('a', { additionalPrompt: 'different', input: '分離対象の架空データ' }),
+      ),
     (e) => e.code === 'AI_REQUEST_CONFLICT',
   );
-  f.connection({ alwaysPrompt: '変更後' });
-  assert.equal(
-    f.s.generate(
-      'owner',
-      request('a', {
-        model: 'override',
-        additionalPrompt: '用途の指示',
-        input: '分離対象の架空データ',
-      }),
-    ).jobId,
-    a.jobId,
+  f.connection({ defaultModel: 'updated-model', alwaysPrompt: '変更後' });
+  const replay = f.s.generate(
+    'owner',
+    request('a', {
+      additionalPrompt: '用途の指示',
+      input: '分離対象の架空データ',
+    }),
   );
+  assert.equal(replay.jobId, a.jobId);
+  assert.equal(replay.model, a.model);
 });
 test('server prompts select defaults only on omission and keep every caller on the same composition path', async (t) => {
   const f = setup(t);
@@ -224,7 +224,10 @@ test('server prompts select defaults only on omission and keep every caller on t
   f.set({ connections: [...f.settings().connections, second] });
   const secondJob = f.s.generate('owner', { requestId: 'second', connectionId: 'second' });
   await until(() => f.s.get('owner', secondJob.jobId).state === 'completed');
-  const secondText = JSON.parse(f.calls.at(-1).init.body).messages[0].content;
+  const secondBody = JSON.parse(f.calls.at(-1).init.body);
+  assert.equal(secondJob.model, 'second-model');
+  assert.equal(secondBody.model, 'second-model');
+  const secondText = secondBody.messages[0].content;
   assert(secondText.endsWith('Second default'));
   assert(!secondText.includes('Always'));
   f.connection({ alwaysPrompt: '', defaultPrompt: '' });
@@ -263,8 +266,7 @@ test('empty input, explicit token dialect and authentication are supported witho
 test('invalid arguments, missing authorization and bearer keys fail before sending', (t) => {
   const f = setup(t);
   for (const patch of [
-    { model: ' ' },
-    { model: 'm\n' },
+    { model: 'override' },
     { timeoutMs: 1 },
     { maxOutputTokens: 31 },
     { maxOutputTokens: 131073 },
@@ -278,9 +280,14 @@ test('invalid arguments, missing authorization and bearer keys fail before sendi
     { apiKey: 'secret' },
     { connectionId: 12 },
   ])
-    assert.throws(() => f.s.generate('owner', request('a', patch)));
+    assert.throws(() => f.s.generate('owner', request('a', patch)), { code: 'INVALID_ARGUMENT' });
+  assert.throws(() => f.s.generate('owner', request('a', { connectionId: 'missing' })), {
+    code: 'AI_NOT_CONFIGURED',
+  });
+  f.connection({ defaultModel: '' });
+  assert.throws(() => f.s.generate('owner', request('a')), { code: 'AI_MODEL_REQUIRED' });
   assert.equal(f.calls.length, 0);
-  f.connection({ authentication: 'bearer' });
+  f.connection({ authentication: 'bearer', defaultModel: 'default' });
   assert.throws(
     () => f.s.generate('owner', request('a')),
     (e) => e.code === 'AI_AUTH_FAILED',
@@ -410,7 +417,7 @@ test('queues serialize each connection, bound owners and allow two different con
     ],
   });
   const a = f.s.generate('one', request('a'));
-  const b = f.s.generate('one', request('b', { model: 'queued' }));
+  const b = f.s.generate('one', request('b'));
   assert.throws(
     () => f.s.generate('one', request('c')),
     (e) => e.code === 'AI_QUEUE_FULL',
@@ -420,7 +427,7 @@ test('queues serialize each connection, bound owners and allow two different con
   assert.deepEqual(runs, ['default', 'second']);
   releases.shift()();
   await until(() => runs.length === 3);
-  assert.equal(runs[2], 'queued');
+  assert.equal(runs[2], 'default');
   for (const release of releases) release();
   await until(
     () =>
@@ -698,6 +705,11 @@ test('shared dispatcher enforces independent Applet/MCP grants and the same AI s
   assert.deepEqual(calls, ['applet']);
   mcp = true;
   await api.call('ai.text.generate', request('a'));
+  assert.deepEqual(calls, ['applet', undefined]);
+  for (const caller of ['applet', undefined])
+    assert.throws(() => api.call('ai.text.generate', request('a', { model: 'override' }), caller), {
+      code: 'INVALID_ARGUMENT',
+    });
   assert.deepEqual(calls, ['applet', undefined]);
   await api.call(
     'ai.text.generate',

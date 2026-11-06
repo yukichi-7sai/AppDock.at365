@@ -132,7 +132,6 @@ export class AiService {
           ![
             'requestId',
             'connectionId',
-            'model',
             'additionalPrompt',
             'input',
             'timeoutMs',
@@ -143,8 +142,6 @@ export class AiService {
       !value.requestId ||
       value.requestId.length > 100 ||
       /[\x00-\x1f\x7f]/.test(value.requestId) ||
-      (value.model !== undefined &&
-        (!aiString(value.model, 200) || !value.model.trim() || /[\r\n]/.test(value.model))) ||
       (value.additionalPrompt !== undefined && !aiString(value.additionalPrompt, 2048)) ||
       !aiString(value.input ?? '', 8192) ||
       (value.timeoutMs !== undefined &&
@@ -164,7 +161,6 @@ export class AiService {
       .update(
         JSON.stringify([
           input.connectionId ?? null,
-          input.model ?? null,
           input.additionalPrompt ?? null,
           input.input,
           input.timeoutMs ?? null,
@@ -189,7 +185,7 @@ export class AiService {
       return { ...this.view(prior), completion: 'accepted' };
     }
     const { c, key } = this.connection(input.connectionId, owner);
-    const model = input.model ?? c.defaultModel;
+    const model = c.defaultModel;
     if (!model?.trim())
       return aiFail('AI_MODEL_REQUIRED', hostText('services.aiService.selectModel'));
     const prompt = input.additionalPrompt ?? c.defaultPrompt;

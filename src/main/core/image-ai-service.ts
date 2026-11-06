@@ -101,10 +101,7 @@ export class ImageAiService {
     if (
       !aiObject(value) ||
       Object.keys(value).some(
-        (k) =>
-          !['requestId', 'connectionId', 'additionalPrompt', 'input', 'model', 'options'].includes(
-            k,
-          ),
+        (k) => !['requestId', 'connectionId', 'additionalPrompt', 'input', 'options'].includes(k),
       ) ||
       typeof value.requestId !== 'string' ||
       !value.requestId ||
@@ -112,7 +109,6 @@ export class ImageAiService {
       /[\x00-\x1f\x7f]/.test(value.requestId) ||
       (value.connectionId !== undefined &&
         (typeof value.connectionId !== 'string' || !value.connectionId)) ||
-      (value.model !== undefined && (typeof value.model !== 'string' || !value.model.trim())) ||
       (value.additionalPrompt !== undefined && typeof value.additionalPrompt !== 'string') ||
       (value.input !== undefined && typeof value.input !== 'string') ||
       (value.options !== undefined && !aiObject(value.options))
@@ -154,7 +150,7 @@ export class ImageAiService {
     const prompt = [c.alwaysPrompt, input.additionalPrompt ?? c.defaultPrompt, input.input ?? '']
       .filter((p) => p.trim())
       .join('\n');
-    const model = input.model ?? c.defaultModel;
+    const model = c.defaultModel;
     if (!model.trim() || !prompt.trim()) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     let generationOptions;
     try {

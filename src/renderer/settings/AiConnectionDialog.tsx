@@ -351,7 +351,7 @@ export function AiConnectionDialog({
           >
             <SettingsInputActions wrap>
               <SettingsCombobox
-                label={translate('settings.aiConnectionDialog.modelLabel')}
+                label={translate('settings.aiConnectionDialog.model')}
                 options={models}
                 value={draft.defaultModel ?? ''}
                 onChange={(defaultModel) => setDraft({ ...draft, defaultModel })}

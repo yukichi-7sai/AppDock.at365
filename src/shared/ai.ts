@@ -26,7 +26,6 @@ export interface AiSettings {
 export interface AiGenerateInput {
   requestId: string;
   connectionId?: string;
-  model?: string;
   additionalPrompt?: string;
   input?: string;
   timeoutMs?: number;

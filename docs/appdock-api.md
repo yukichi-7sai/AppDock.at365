@@ -158,7 +158,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## AI文章生成
 
-最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。選択したサーバーのプロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。サーバーの常時/既定プロンプトは最低ホスト版0.157.0。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
+現行の生成引数は最低ホスト版0.170.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。生成ではconnectionIdで登録を選び（省略時は既定）、登録したモデルを使います。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
 
 ## タッチパッドジェスチャー
 
