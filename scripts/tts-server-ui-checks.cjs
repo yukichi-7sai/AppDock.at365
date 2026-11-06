@@ -48,6 +48,8 @@ module.exports = async function ({
         exact: true,
       })
       .click();
+    if (name === 'APIキー')
+      await scope.getByLabel('認証方式', { exact: true }).selectOption('bearer');
     const control = scope.getByLabel(name, { exact: true });
     await control.fill(value);
     await control.press('Tab');
@@ -57,7 +59,15 @@ module.exports = async function ({
     await dialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
   };
+  assert.equal(await defaultSelect.locator('option[value=""]').innerText(), '呼び出し時に指定');
+  for (const label of ['話し方', '入力データ']) {
+    const input = page.getByLabel(label, { exact: true });
+    assert.equal(await input.inputValue(), '');
+    assert((await input.getAttribute('placeholder')).length > 10);
+  }
   let dialog = await edit('Primary');
+  assert.equal(await dialog.getByLabel('認証方式', { exact: true }).inputValue(), 'none');
+  assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
   await field(dialog, '登録名', 'Canceled');
   await field(dialog, 'APIキー', 'canceled-secret');
   await field(dialog, 'モデル', 'x'.repeat(201));
@@ -157,8 +167,8 @@ module.exports = async function ({
     (await snapshot()).settings.value.tts.connections[1].defaultInstructions,
     'updated instructions',
   );
-  await page.getByLabel('試聴するサーバー', { exact: true }).selectOption(second.id);
-  await page.getByLabel('試聴するテキスト', { exact: true }).fill('別サーバーの試聴');
+  await page.getByLabel('試験するサーバー', { exact: true }).selectOption(second.id);
+  await page.getByLabel('入力データ', { exact: true }).fill('別サーバーの試聴');
   await page.getByRole('button', { name: '試聴する', exact: true }).click();
   await until(async () => {
     const model = await page.evaluate(() =>
@@ -186,7 +196,7 @@ module.exports = async function ({
   await save(dialog);
   const beforePreview = (await snapshot()).settings.value.tts;
   for (const instructions of ['試聴だけの話し方', '']) {
-    await page.getByLabel('試聴の話し方', { exact: true }).fill(instructions);
+    await page.getByLabel('話し方', { exact: true }).fill(instructions);
     const count = requests.length;
     await page.getByRole('button', { name: '試聴する', exact: true }).click();
     await until(() => requests.length > count, 'blank voice preview request');
@@ -297,7 +307,7 @@ module.exports = async function ({
     await page.getByRole('button', { name: '音声生成AI', exact: true }).click();
     await defaultSelect.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, theme + '-defaults.png') });
-    await page.getByLabel('試聴の話し方', { exact: true }).scrollIntoViewIfNeeded();
+    await page.getByLabel('話し方', { exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, theme + '-preview.png') });
     dialog = await edit('Primary');
     await dialog.getByRole('tab', { name: '接続', exact: true }).focus();
@@ -343,27 +353,17 @@ module.exports = async function ({
     voicesSource: 'manual',
     manualVoices: [{ id: 'voice-a', name: 'Voice A' }],
   });
-  // An opened dialog intentionally keeps its own snapshot. Wait for the page's
-  // external settings projection before opening a fresh editor.
-  await page.getByRole('button', { name: 'JSON', exact: true }).click();
+  // Dialogs keep their opening snapshot. Reopen through the form until its
+  // external settings projection is current; these pages have no JSON mode.
   await until(async () => {
-    const projected = JSON.parse(
-      await page.getByLabel('設定JSON', { exact: true }).inputValue(),
-    ).tts;
-    return (
-      projected.connections.find((c) => c.id === projected.defaultConnectionId)
-        ?.alwaysInstructions === alwaysInstructions
-    );
-  }, 'page received external TTS settings');
-  await page.getByRole('button', { name: 'フォーム', exact: true }).click();
-  dialog = await edit('Primary');
-  await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
-  await until(
-    async () =>
+    dialog = await edit('Primary');
+    await dialog.getByRole('tab', { name: '声・話し方', exact: true }).click();
+    const ready =
       (await dialog.getByLabel('いつも加える話し方', { exact: true }).inputValue()) ===
-      alwaysInstructions,
-    'settings reflected before restart',
-  );
+      alwaysInstructions;
+    if (!ready) await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    return ready;
+  }, 'form received external TTS settings before restart');
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   const persisted = (await snapshot()).settings.value.tts;
   page = await restart();
@@ -381,7 +381,7 @@ module.exports = async function ({
   checks.push(
     'server records, default selection, speech defaults and encrypted credentials survive a real process restart',
   );
-  await page.getByLabel('試聴するテキスト', { exact: true }).fill('設定画面の音声テスト。');
+  await page.getByLabel('入力データ', { exact: true }).fill('設定画面の音声テスト。');
   await page.getByRole('button', { name: '試聴する', exact: true }).click();
   await until(
     () =>
@@ -390,7 +390,8 @@ module.exports = async function ({
   );
   assert.equal(requests.at(-1).auth, 'Bearer fixture-secret');
   dialog = await edit('Primary');
-  await dialog.getByRole('button', { name: 'APIキーを削除', exact: true }).click();
+  await dialog.getByLabel('認証方式', { exact: true }).selectOption('none');
+  assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
   assert.deepEqual(fs.readFileSync(keyfile), firstCipher);
   await save(dialog);
   assert.deepEqual(JSON.parse(fs.readFileSync(keyfile)).entries, {});

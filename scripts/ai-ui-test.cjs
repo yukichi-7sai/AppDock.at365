@@ -292,8 +292,8 @@ async function errorNoticeFor(caller) {
 
     await page.getByRole('button', { name: 'previewの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('AIのAPIキー', { exact: true }).fill('fixture-ai-secret');
-    await dialog.getByLabel('AIのAPIキー', { exact: true }).press('Enter');
+    await dialog.getByLabel('APIキー', { exact: true }).fill('fixture-ai-secret');
+    await dialog.getByLabel('APIキー', { exact: true }).press('Enter');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
     assert.equal(modelRequests.at(-1).auth, 'Bearer fixture-ai-secret');
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
@@ -422,13 +422,17 @@ async function errorNoticeFor(caller) {
     );
     checks.push('drag reordering saves on OK, keyboard reorder cancel preserves saved order');
 
-    await page.getByLabel('試験するAIサーバー', { exact: true }).selectOption('preview');
-    await page.getByLabel('試験のAIモデル', { exact: true }).fill('override-model');
+    await page.getByLabel('試験するサーバー', { exact: true }).selectOption('preview');
+    for (const label of ['試験の追加プロンプト', '試験の入力データ']) {
+      const input = page.getByLabel(label, { exact: true });
+      assert.equal(await input.inputValue(), '');
+      assert((await input.getAttribute('placeholder')).length > 10);
+    }
     await page.getByLabel('試験の追加プロンプト', { exact: true }).fill('用途別の架空指示');
     await page.getByLabel('試験の入力データ', { exact: true }).fill('架空の入力');
     await page.getByRole('button', { name: '文章を生成', exact: true }).click();
     await page.getByText('架空の入力から生成した短い文章です。', { exact: true }).waitFor();
-    assert.equal(requests[0].body.model, 'override-model');
+    assert.equal(requests[0].body.model, 'fixture-model');
     assert.equal(requests[0].body.max_tokens, 100000);
     assert.equal(requests[0].auth, 'Bearer fixture-ai-secret');
     assert.equal(requests[0].body.messages[1].content, '架空の入力');

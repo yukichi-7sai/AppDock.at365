@@ -1,16 +1,12 @@
+import { GenerationPreviewActions } from './GenerationPreviewActions';
 import { HostMessage, useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useRef, useState } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultAiSettings, type AiConnectionSettings } from '../../shared/ai';
-import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import {
-  SettingsSection,
-  SettingsField,
-  SettingsActions,
-  SettingsContent,
-} from '../settings-ui/SettingsSections';
+import { SettingsTextarea } from '../settings-ui/SettingsInput';
+import { SettingsSection, SettingsField, SettingsContent } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
@@ -56,8 +52,7 @@ export function AiSettingsForm({
     | { kind: 'order'; connections: AiConnectionSettings[] }
     | null
   >(null);
-  const [model, setModel] = useState(''),
-    [prompt, setPrompt] = useState(''),
+  const [prompt, setPrompt] = useState(''),
     [input, setInput] = useState('');
   const [pending, setPending] = useState(false),
     [error, setError] = useState('');
@@ -259,7 +254,7 @@ export function AiSettingsForm({
         description={translate('settings.aiSettings.testHint')}
         {...settingAnchor('ai', 'preview')}
       >
-        <SettingsField title={translate('settings.aiSettings.testServer')}>
+        <SettingsField title={translate('settings.generation.server')}>
           <select
             aria-label={translate('settings.aiSettings.testServer')}
             value={c?.id ?? ''}
@@ -276,23 +271,13 @@ export function AiSettingsForm({
           </select>
         </SettingsField>
         <SettingsField
-          title={translate('settings.aiSettings.modelOverride')}
-          hint={translate('settings.aiSettings.modelOverrideHint')}
-        >
-          <SettingsInput
-            aria-label={translate('settings.aiSettings.testModel')}
-            commitOn="input"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          />
-        </SettingsField>
-        <SettingsField
           title={translate('settings.aiSettings.extraPrompt')}
           description={translate('settings.aiSettings.extraPromptHint')}
         >
           <SettingsTextarea
             aria-label={translate('settings.aiSettings.extraPromptLabel')}
             commitOn="input"
+            placeholder={translate('settings.aiSettings.extraPromptPlaceholder')}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
@@ -301,48 +286,42 @@ export function AiSettingsForm({
           <SettingsTextarea
             aria-label={translate('settings.aiSettings.inputLabel')}
             commitOn="input"
+            placeholder={translate('settings.aiSettings.inputPlaceholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-        </SettingsField>
-        <SettingsActions>
-          <button
-            className="primary"
-            disabled={
+          <GenerationPreviewActions
+            startLabel={translate('settings.aiSettings.generate')}
+            stopLabel={translate('settings.aiSettings.cancel')}
+            startDisabled={
               busy ||
               pending ||
               active ||
               !c ||
+              !c.defaultModel?.trim() ||
               !(c.alwaysPrompt.trim() || c.defaultPrompt.trim() || prompt.trim() || input.trim())
             }
-            onClick={() =>
+            stopDisabled={pending || !active}
+            onStart={() =>
               void run(async () => {
                 await invoke('aiPreview', [
                   {
                     requestId: crypto.randomUUID(),
                     connectionId: c!.id,
-                    ...(model ? { model } : {}),
                     ...(prompt.trim() ? { additionalPrompt: prompt } : {}),
                     input,
                   },
                 ]);
               })
             }
-          >
-            {translate('settings.aiSettings.generate')}
-          </button>
-          <button
-            disabled={pending || !active}
-            onClick={() =>
+            onStop={() =>
               void run(async () => {
                 for (const j of jobs.filter((j) => ['queued', 'running'].includes(j.state)))
                   await invoke('aiCancel', [j.jobId]);
               })
             }
-          >
-            {translate('settings.aiSettings.cancel')}
-          </button>
-        </SettingsActions>
+          />
+        </SettingsField>
 
         {job && (
           <SettingsField

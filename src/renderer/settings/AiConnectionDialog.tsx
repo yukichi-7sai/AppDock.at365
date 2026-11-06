@@ -1,3 +1,4 @@
+import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
@@ -317,42 +318,18 @@ export function AiConnectionDialog({
               }}
             />
           </SettingsField>
-          <SettingsField
-            className="server-editor-full"
-            settingKey="authentication"
-            title={translate('settings.aiConnectionDialog.auth')}
-          >
-            <select
-              aria-label={translate('settings.aiConnectionDialog.authLabel')}
-              value={draft.authentication}
-              onChange={(e) => patch({ authentication: e.target.value as 'none' | 'bearer' })}
-            >
-              <option value="none">{translate('settings.aiConnectionDialog.noAuth')}</option>
-              <option value="bearer">{translate('settings.aiConnectionDialog.bearer')}</option>
-            </select>
-            {draft.authentication === 'bearer' && (
-              <>
-                <SettingsInput
-                  aria-label={translate('settings.aiConnectionDialog.apiKey')}
-                  type="password"
-                  autoComplete="off"
-                  maxLength={8192}
-                  value={apiKey ?? ''}
-                  placeholder={
-                    savedKey
-                      ? translate('settings.aiConnectionDialog.storedKey')
-                      : translate('settings.aiConnectionDialog.enterKey')
-                  }
-                  onChange={(e) => {
-                    invalidate();
-                    setApiKey(e.target.value || undefined);
-                  }}
-                  onKeyDown={(e) => enter(e, 'key')}
-                />
-                <small className="muted">{translate('settings.aiConnectionDialog.keyHint')}</small>
-              </>
-            )}
-          </SettingsField>
+          <GenerationAuthentication
+            authentication={draft.authentication}
+            onAuthenticationChange={(authentication) => patch({ authentication })}
+            apiKey={apiKey}
+            savedKey={savedKey}
+            onKeyChange={(value) => {
+              invalidate();
+              setApiKey(value);
+            }}
+            onKeyDown={(e) => enter(e, 'key')}
+            hint={translate('settings.aiConnectionDialog.keyHint')}
+          />
         </div>
       </SettingsSection>
       <SettingsSection

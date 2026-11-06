@@ -1,3 +1,4 @@
+import { ttsApiKey } from './tts-secrets';
 import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
@@ -193,6 +194,9 @@ export class TtsService {
     this.signature = generationConfigurationSignature(options.settings());
     this.limits = { ...ttsLimits, ...options.limits };
   }
+  private apiKey(server: TtsServer) {
+    return ttsApiKey(server, () => this.options.key(server));
+  }
   private connection(id?: string) {
     const server = selectedTtsServer(this.options.settings(), id);
     if (!server)
@@ -367,7 +371,7 @@ export class TtsService {
     try {
       key = internal?.configuration
         ? internal.configuration.key
-        : this.options.key(this.connection(connectionId as string | undefined));
+        : this.apiKey(this.connection(connectionId as string | undefined));
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -651,7 +655,7 @@ export class TtsService {
     }
     let key: string | undefined;
     try {
-      key = configuration ? configuration.key : this.options.key(this.connection());
+      key = configuration ? configuration.key : this.apiKey(this.connection());
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
@@ -704,7 +708,7 @@ export class TtsService {
     }
     let key: string | undefined;
     try {
-      key = configuration ? configuration.key : this.options.key(this.connection());
+      key = configuration ? configuration.key : this.apiKey(this.connection());
     } catch {
       fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }

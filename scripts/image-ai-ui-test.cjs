@@ -143,7 +143,16 @@ const check = (name) => {
     dialog = page.getByRole('dialog');
     await dialog.getByLabel('登録名', { exact: true }).fill('Preview preset');
     await dialog.getByLabel('APIのURL', { exact: true }).fill(url);
-    await dialog.getByLabel('AIのAPIキー', { exact: true }).fill('fixture-api-key');
+    await dialog.getByLabel('認証方式', { exact: true }).selectOption('none');
+    assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
+    await dialog.getByLabel('認証方式', { exact: true }).selectOption('bearer');
+    await dialog.getByLabel('APIキー', { exact: true }).fill('fixture-api-key');
+    await dialog.getByLabel('認証方式', { exact: true }).selectOption('none');
+    await dialog.getByLabel('認証方式', { exact: true }).selectOption('bearer');
+    assert.equal(
+      await dialog.getByLabel('APIキー', { exact: true }).inputValue(),
+      'fixture-api-key',
+    );
     await dialog.getByRole('tab', { name: '生成設定', exact: true }).click();
     await dialog.getByLabel('指定がないときのモデル', { exact: true }).fill('fixture');
     await dialog.getByLabel('画像サイズ', { exact: true }).fill('1536x1024');
@@ -170,8 +179,14 @@ const check = (name) => {
       ),
     );
     check('preset dialog saves connection and generation options atomically without exposing key');
-    await page.getByLabel('試験するAIサーバー', { exact: true }).selectOption(saved.id);
-    await page.getByLabel('画像の説明', { exact: true }).fill('fixture landscape');
+    await page.getByLabel('試験するサーバー', { exact: true }).selectOption(saved.id);
+    for (const label of ['試験の追加プロンプト', '試験の入力データ']) {
+      const input = page.getByLabel(label, { exact: true });
+      assert.equal(await input.inputValue(), '');
+      assert((await input.getAttribute('placeholder')).length > 10);
+    }
+    await page.getByLabel('試験の追加プロンプト', { exact: true }).fill('watercolor');
+    await page.getByLabel('試験の入力データ', { exact: true }).fill('fixture landscape');
     await page.getByRole('button', { name: '画像を生成', exact: true }).click();
     await until(
       async () =>
@@ -183,7 +198,7 @@ const check = (name) => {
       'generated image rendered',
     );
     assert.equal(requests.at(-1).auth, 'Bearer fixture-api-key');
-    assert.equal(requests.at(-1).input.prompt, 'always\nfixture landscape');
+    assert.equal(requests.at(-1).input.prompt, 'always\nwatercolor\nfixture landscape');
     assert.equal(requests.at(-1).url, '/v1/images/generations');
     await page.locator('.image-ai-preview').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, 'image-ai-preview.png') });

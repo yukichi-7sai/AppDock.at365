@@ -101,7 +101,10 @@ export class ImageAiService {
     if (
       !aiObject(value) ||
       Object.keys(value).some(
-        (k) => !['requestId', 'connectionId', 'prompt', 'model', 'options'].includes(k),
+        (k) =>
+          !['requestId', 'connectionId', 'additionalPrompt', 'input', 'model', 'options'].includes(
+            k,
+          ),
       ) ||
       typeof value.requestId !== 'string' ||
       !value.requestId ||
@@ -110,7 +113,8 @@ export class ImageAiService {
       (value.connectionId !== undefined &&
         (typeof value.connectionId !== 'string' || !value.connectionId)) ||
       (value.model !== undefined && (typeof value.model !== 'string' || !value.model.trim())) ||
-      (value.prompt !== undefined && typeof value.prompt !== 'string') ||
+      (value.additionalPrompt !== undefined && typeof value.additionalPrompt !== 'string') ||
+      (value.input !== undefined && typeof value.input !== 'string') ||
       (value.options !== undefined && !aiObject(value.options))
     )
       return imageFail('INVALID_ARGUMENT', 'invalidRequest');
@@ -147,7 +151,7 @@ export class ImageAiService {
       return imageFail('IMAGE_AI_AUTH_FAILED', 'authentication');
     }
     if (c.authentication === 'bearer' && !key) imageFail('IMAGE_AI_AUTH_FAILED', 'authentication');
-    const prompt = [c.alwaysPrompt, input.prompt ?? c.defaultPrompt]
+    const prompt = [c.alwaysPrompt, input.additionalPrompt ?? c.defaultPrompt, input.input ?? '']
       .filter((p) => p.trim())
       .join('\n');
     const model = input.model ?? c.defaultModel;

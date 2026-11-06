@@ -118,6 +118,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
   ],
 
   tts: [
+    ['authentication', hostText('settings.aiConnectionDialog.auth')],
     [
       'connections',
       hostText('settings.ttsServers.registered'),

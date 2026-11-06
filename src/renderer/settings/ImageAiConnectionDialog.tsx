@@ -1,3 +1,4 @@
+import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
@@ -152,34 +153,13 @@ export function ImageAiConnectionDialog({
               onChange={(e) => patch({ baseUrl: e.target.value })}
             />
           </SettingsField>
-          <SettingsField settingKey="authentication" title={t('settings.aiConnectionDialog.auth')}>
-            <select
-              aria-label={t('settings.aiConnectionDialog.auth')}
-              value={draft.authentication}
-              onChange={(e) => patch({ authentication: e.target.value as 'none' | 'bearer' })}
-            >
-              <option value="bearer">{t('settings.aiConnectionDialog.bearer')}</option>
-              <option value="none">{t('settings.aiConnectionDialog.noAuth')}</option>
-            </select>
-          </SettingsField>
-          <SettingsField
-            title={t('settings.aiConnectionDialog.apiKey')}
-            description={t('imageAi.keyHint')}
-          >
-            <SettingsInput
-              type="password"
-              autoComplete="new-password"
-              aria-label={t('settings.aiConnectionDialog.apiKey')}
-              value={key ?? ''}
-              disabled={draft.authentication === 'none'}
-              placeholder={
-                status?.apiKeyConfigured && original?.baseUrl === draft.baseUrl
-                  ? t('settings.aiConnectionDialog.storedKey')
-                  : ''
-              }
-              onChange={(e) => setKey(e.target.value)}
-            />
-          </SettingsField>
+          <GenerationAuthentication
+            authentication={draft.authentication}
+            onAuthenticationChange={(authentication) => patch({ authentication })}
+            apiKey={key}
+            savedKey={status?.apiKeyConfigured && original?.baseUrl === draft.baseUrl}
+            onKeyChange={setKey}
+          />
         </div>
       </SettingsSection>
       <SettingsSection

@@ -26,6 +26,7 @@ function fixture(t) {
   const controller = new TtsSettingsController(store, keys, () => {});
   const server = (id) => ({
     ...newTtsServer(id),
+    authentication: 'bearer',
     name: id,
     baseUrl: 'http://fixture/v1',
     model: id,
@@ -103,9 +104,8 @@ test('canceling a draft leaves settings and credentials untouched; changed URLs 
   f.controller.save(one, null, 'first-secret');
   const settings = fs.readFileSync(f.store.file),
     keys = fs.readFileSync(f.file);
-  assert.equal(
-    f.controller.draftConfiguration({ ...one, baseUrl: 'http://other/v1' }, undefined).key,
-    undefined,
+  assert.throws(() =>
+    f.controller.draftConfiguration({ ...one, baseUrl: 'http://other/v1' }, undefined),
   );
   assert.equal(f.controller.draftConfiguration(one, 'temporary').key, 'temporary');
   assert.deepEqual(fs.readFileSync(f.store.file), settings);
@@ -116,7 +116,7 @@ test('canceling a draft leaves settings and credentials untouched; changed URLs 
     undefined,
     f.keys.revision(one.id),
   );
-  assert.equal(f.controller.configuration().key, undefined);
+  assert.throws(() => f.controller.configuration());
   assert.equal(f.keys.key(one), undefined);
 });
 test('delete and reorder preserve chosen defaults and reject stale edits', (t) => {
@@ -146,14 +146,43 @@ test('a failed settings write rolls back the credential transaction', (t) => {
   const previousSettings = fs.readFileSync(f.store.file),
     previousKeys = fs.readFileSync(f.file);
   const rename = fs.renameSync;
+  let attempted = false;
   t.mock.method(fs, 'renameSync', (from, to) => {
-    if (to === f.store.file) throw Object.assign(Error('write denied'), { code: 'EACCES' });
+    if (to === f.store.file) {
+      attempted = true;
+      throw Object.assign(Error('write denied'), { code: 'EACCES' });
+    }
     return rename(from, to);
   });
   assert.throws(() =>
-    f.controller.save({ ...one, name: 'Changed' }, one, 'replacement', f.keys.revision(one.id)),
+    f.controller.save({ ...one, authentication: 'none' }, one, undefined, f.keys.revision(one.id)),
   );
+  assert.equal(attempted, true);
   assert.deepEqual(fs.readFileSync(f.store.file), previousSettings);
   assert.deepEqual(fs.readFileSync(f.file), previousKeys);
   assert.equal(f.controller.configuration().key, 'first');
+});
+
+test('authentication drafts preserve credentials until OK, and none clears them atomically', (t) => {
+  const f = fixture(t),
+    one = f.server('one');
+  f.controller.save(one, null, 'saved-secret');
+  const before = fs.readFileSync(f.store.file),
+    cipher = fs.readFileSync(f.file);
+  const noAuth = { ...one, authentication: 'none' };
+  assert.equal(f.controller.draftConfiguration(noAuth, 'temporary').key, undefined);
+  assert.equal(f.controller.draftConfiguration(one, undefined).key, 'saved-secret');
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.deepEqual(fs.readFileSync(f.file), cipher);
+  f.controller.save(noAuth, one, 'temporary', f.keys.revision(one.id));
+  f.store.load();
+  assert.equal(f.store.value.tts.connections[0].authentication, 'none');
+  assert.equal(f.controller.configuration().key, undefined);
+  assert.equal(f.keys.key(one), undefined);
+  assert.throws(() => f.controller.draftConfiguration(one, undefined));
+  const { authentication, ...legacy } = one;
+  assert.equal(f.controller.draftConfiguration(legacy, 'legacy-secret').key, 'legacy-secret');
+  assert.throws(() =>
+    parseTtsConfiguration({ connections: [{ ...one, authentication: 'invalid' }] }),
+  );
 });

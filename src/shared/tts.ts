@@ -24,6 +24,8 @@ export interface TtsSettings extends TtsConnectionSettings {
 }
 export interface TtsServer extends TtsSettings {
   mcpEnabled?: boolean;
+  /** Omitted on older presets, which use a stored key when present. */
+  authentication?: 'none' | 'bearer';
   id: string;
   name: string;
 }
@@ -32,11 +34,17 @@ export interface TtsConfiguration {
   defaultConnectionId?: string;
 }
 export const defaultTtsConfiguration = (): TtsConfiguration => ({ connections: [] });
-export const newTtsServer = (id: string): TtsServer => ({ ...defaultTtsSettings(), id, name: '' });
+export const newTtsServer = (id: string): TtsServer => ({
+  ...defaultTtsSettings(),
+  id,
+  name: '',
+  authentication: 'none',
+});
 export function parseTtsServer(value: unknown): TtsServer {
   if (!object(value)) throw Error(hostText('settings.tts.object'));
-  const { id, name, mcpEnabled, ...speech } = value;
+  const { id, name, mcpEnabled, authentication, ...speech } = value;
   if (
+    (authentication !== undefined && authentication !== 'none' && authentication !== 'bearer') ||
     (mcpEnabled !== undefined && typeof mcpEnabled !== 'boolean') ||
     typeof id !== 'string' ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(id) ||
@@ -50,6 +58,7 @@ export function parseTtsServer(value: unknown): TtsServer {
     id,
     name: name.trim(),
     ...(mcpEnabled === undefined ? {} : { mcpEnabled }),
+    ...(authentication === undefined ? {} : { authentication }),
   };
 }
 export function parseTtsConfiguration(value: unknown): TtsConfiguration {
@@ -85,7 +94,13 @@ export function selectedTtsServer(value?: TtsConfiguration, id = value?.defaultC
 }
 export function ttsServerSpeech(server?: TtsServer): TtsSettings {
   if (!server) return defaultTtsSettings();
-  const { id: _id, name: _name, mcpEnabled: _mcp, ...speech } = server;
+  const {
+    id: _id,
+    name: _name,
+    mcpEnabled: _mcp,
+    authentication: _authentication,
+    ...speech
+  } = server;
   return parseTtsSettings(speech);
 }
 export const ttsPresetIds = [

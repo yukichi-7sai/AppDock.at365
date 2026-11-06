@@ -32,7 +32,8 @@ export interface ImageAiSettings {
 export interface ImageGenerateInput {
   requestId: string;
   connectionId?: string;
-  prompt?: string;
+  additionalPrompt?: string;
+  input?: string;
   model?: string;
   options?: Partial<Omit<ImageGenerationOptions, 'providerOptions'>> & {
     providerOptions?: Partial<ImageGenerationOptions['providerOptions']>;

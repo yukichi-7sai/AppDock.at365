@@ -7,7 +7,7 @@ import {
   type TtsServer,
 } from '../../shared/tts';
 import type { SettingsStore } from './settings';
-import type { TtsSecrets } from './tts-secrets';
+import { ttsApiKey, type TtsSecrets } from './tts-secrets';
 
 export class TtsSettingsController {
   constructor(
@@ -30,14 +30,17 @@ export class TtsSettingsController {
   configuration(id?: string) {
     const server = selectedTtsServer(this.current(), id);
     if (!server) throw Error(hostText('settings.ttsServers.missingServer'));
-    return { settings: ttsServerSpeech(server), key: this.secrets.key(server) };
+    return {
+      settings: ttsServerSpeech(server),
+      key: ttsApiKey(server, () => this.secrets.key(server)),
+    };
   }
   draftConfiguration(value: unknown, key: unknown) {
     const server = parseTtsServer(value);
     this.validateKey(key);
     return {
       settings: ttsServerSpeech(server),
-      key: key == null ? this.secrets.key(server) : (key as string),
+      key: ttsApiKey(server, () => (key == null ? this.secrets.key(server) : (key as string))),
     };
   }
   private validateKey(key: unknown) {
@@ -63,7 +66,11 @@ export class TtsSettingsController {
       defaultConnectionId:
         current.defaultConnectionId ?? (!current.connections.length ? server.id : undefined),
     });
-    const keyValue = key == null && before && before.baseUrl !== server.baseUrl ? '' : key;
+    const keyValue =
+      server.authentication === 'none' ||
+      (key == null && before && before.baseUrl !== server.baseUrl)
+        ? ''
+        : key;
     const asset = keyValue == null ? undefined : this.secrets.prepareKey(server, keyValue);
     this.settings.save({ ...this.settings.value, tts: next }, this.settings.revision, asset);
     this.changed(!!asset);

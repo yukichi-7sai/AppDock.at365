@@ -74,6 +74,27 @@ const completed = (s, id) =>
     const v = s.get('one', id);
     return v.state === 'completed' && v;
   });
+test('image instructions and input combine once, inherit omitted defaults and suppress explicit empty defaults', async (t) => {
+  const f = fixture(t),
+    c = connection();
+  c.alwaysPrompt = 'always';
+  c.defaultPrompt = 'default style';
+  f.set({ connections: [c], defaultConnectionId: c.id });
+  const cases = [
+    [{ input: 'subject' }, 'always\ndefault style\nsubject'],
+    [{ additionalPrompt: 'watercolor', input: 'subject' }, 'always\nwatercolor\nsubject'],
+    [{ additionalPrompt: '', input: 'subject' }, 'always\nsubject'],
+  ];
+  for (const [input, expected] of cases) {
+    const job = f.s.generate('one', { requestId: String(f.requests.length), ...input });
+    await completed(f.s, job.jobId);
+    assert.equal(f.requests.at(-1).body.prompt, expected);
+  }
+  assert.throws(() => f.s.generate('one', { requestId: 'bad', input: {} }), {
+    code: 'INVALID_ARGUMENT',
+  });
+  assert.equal(c.defaultPrompt, 'default style');
+});
 test('preset selection, defaults, per-call overrides and canonical request IDs', async (t) => {
   const f = fixture(t);
   const other = connection('two');
@@ -83,7 +104,7 @@ test('preset selection, defaults, per-call overrides and canonical request IDs',
   const input = {
     requestId: 'r',
     connectionId: 'two',
-    prompt: 'landscape',
+    additionalPrompt: 'landscape',
     options: { count: 2, providerOptions: { quality: 'high' } },
   };
   const j = f.s.generate('one', input);
@@ -91,13 +112,13 @@ test('preset selection, defaults, per-call overrides and canonical request IDs',
   assert.equal(
     f.s.generate('one', {
       options: { providerOptions: { quality: 'high' }, count: 2 },
-      prompt: 'landscape',
+      additionalPrompt: 'landscape',
       connectionId: 'two',
       requestId: 'r',
     }).jobId,
     j.jobId,
   );
-  assert.throws(() => f.s.generate('one', { ...input, prompt: 'different' }), {
+  assert.throws(() => f.s.generate('one', { ...input, additionalPrompt: 'different' }), {
     code: 'IMAGE_AI_REQUEST_CONFLICT',
   });
   const done = await completed(f.s, j.jobId);
@@ -237,7 +258,7 @@ test('adapter rejects malformed image bodies and never follows a returned URL', 
 });
 test('empty explicit prompt differs from omission; credentials and prompts stay out of discovery', async (t) => {
   const f = fixture(t);
-  assert.throws(() => f.s.generate('one', { requestId: 'empty', prompt: '' }), {
+  assert.throws(() => f.s.generate('one', { requestId: 'empty', additionalPrompt: '' }), {
     code: 'INVALID_ARGUMENT',
   });
   const list = f.s.connections('one');

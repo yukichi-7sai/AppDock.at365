@@ -1,3 +1,4 @@
+import { GenerationPreviewActions } from './GenerationPreviewActions';
 import { useState, useEffect, useRef } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
@@ -6,12 +7,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultTtsConfiguration, selectedTtsServer, type TtsServer } from '../../shared/tts';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
-import {
-  SettingsSection,
-  SettingsField,
-  SettingsActions,
-  SettingsContent,
-} from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField, SettingsContent } from '../settings-ui/SettingsSections';
 import {
   ListIcon,
   SettingsListLayout,
@@ -200,7 +196,7 @@ export function TtsSettingsForm({
               })
             }
           >
-            <option value="">{translate('settings.ttsServers.unselected')}</option>
+            <option value="">{translate('settings.aiSettings.perCall')}</option>
             {config.connections.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -271,11 +267,11 @@ export function TtsSettingsForm({
         {...settingAnchor('tts', 'preview')}
       >
         <SettingsField
-          title={translate('settings.ttsServers.previewServer')}
+          title={translate('settings.generation.server')}
           description={translate('settings.ttsServers.previewIndependent')}
         >
           <select
-            aria-label={translate('settings.ttsServers.previewServer')}
+            aria-label={translate('settings.aiSettings.testServer')}
             value={previewId}
             onChange={(e) => setPreviewId(e.target.value)}
           >
@@ -297,6 +293,7 @@ export function TtsSettingsForm({
             aria-label={translate('settings.ttsSettings.previewInstructions')}
             commitOn="input"
             rows={2}
+            placeholder={translate('settings.ttsSettings.instructionsPlaceholder')}
             value={previewInstructions}
             onChange={(event) => setPreviewInstructions(event.target.value)}
           />
@@ -317,41 +314,34 @@ export function TtsSettingsForm({
             placeholder={translate('settings.ttsSettings.textPlaceholder')}
             onChange={(e) => setText(e.target.value)}
           />
-          <SettingsActions>
-            <button
-              className="primary"
-              disabled={
-                busy ||
-                pending ||
-                active ||
-                !text.trim() ||
-                !previewServer?.baseUrl ||
-                !previewServer?.model
-              }
-              onClick={() =>
-                void run(async () => {
-                  await invoke('ttsPreview', [
-                    text,
-                    crypto.randomUUID(),
-                    previewServer?.id,
-                    previewInstructions.trim() ? previewInstructions : undefined,
-                  ]);
-                })
-              }
-            >
-              {translate('settings.ttsSettings.play')}
-            </button>
-            <button
-              disabled={pending}
-              onClick={() =>
-                void run(async () => {
-                  await invoke('ttsStop');
-                })
-              }
-            >
-              {translate('settings.ttsSettings.stop')}
-            </button>
-          </SettingsActions>
+          <GenerationPreviewActions
+            startLabel={translate('settings.ttsSettings.play')}
+            stopLabel={translate('settings.ttsSettings.stop')}
+            startDisabled={
+              busy ||
+              pending ||
+              active ||
+              !text.trim() ||
+              !previewServer?.baseUrl ||
+              !previewServer?.model
+            }
+            stopDisabled={pending}
+            onStart={() =>
+              void run(async () => {
+                await invoke('ttsPreview', [
+                  text,
+                  crypto.randomUUID(),
+                  previewServer?.id,
+                  previewInstructions.trim() ? previewInstructions : undefined,
+                ]);
+              })
+            }
+            onStop={() =>
+              void run(async () => {
+                await invoke('ttsStop');
+              })
+            }
+          />
         </SettingsField>
       </SettingsSection>
     </div>

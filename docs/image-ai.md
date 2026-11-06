@@ -8,11 +8,11 @@
 
 - 接続: 登録名、種類、APIのURL、認証方式、APIキー。OpenAIのURLは `https://api.openai.com/v1`。生成時に `/images/generations` を付加する。
 - 生成設定: モデルID、画像サイズ、枚数、PNG/JPEG/WebP、品質、背景、圧縮品質、待ち時間。モデルIDは利用する画像生成モデルを入力する。モデルの自動列挙は行わない。
-- プロンプト: 「いつも加えるプロンプト」と「指定がないときのプロンプト」。前者と、要求のprompt（省略時は後者）を改行で結合する。APIで明示した空文字は既定プロンプトを抑制する。両方が空なら送信しない。
+- プロンプト: 「いつも加えるプロンプト」と「指定がないときのプロンプト」。alwaysPrompt、今回のadditionalPrompt（省略時はdefaultPrompt）、入力データinputの順で、空白だけの部分を除いて改行で結合し、送信先のpromptへ渡す。明示した空文字のadditionalPromptは既定プロンプトを抑制する。合成結果が空なら送信しない。
 
 通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。PC専用rootのgeneration-ai.jsonへ保存する。各ダイアログのMCP利用許可も同じファイルで管理する。現在のMCP API公開範囲は変更しない。[生成AIのPC専用設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
 
-設定ページの「画像生成の試験」は現在の保存済み登録へ送信し、生成画像を表示する。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
+設定ページの「画像生成の試験」は現在の保存済み登録へ送信し、生成画像を表示する。試験画面では選択先の既定モデルを使い、空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
 
 OpenAIの現在の生成契約に合わせ、枚数は1～10、プロンプトは結合後32,000文字以内。サイズ・品質の対応範囲はモデルに依存する。圧縮品質はJPEG/WebPのみ0～100、透過背景はPNG/WebPのみ。PNGでは圧縮品質を空欄にする。待ち時間は待機列を含み、既定600秒。HTTP失敗・取消時の自動再送、他サーバーへの自動切替は行わない。旧DALL-EのURL返却や画像編集は対象外。
 
@@ -26,7 +26,7 @@ Applet向けには `ai.image.connections.list` を提供する。`appdock-api` c
 
 「操作の許可」の画像生成AI（`useImageAi`）は項目と保存値を維持する。現在の接続一覧と、後続の「生成してライブラリーに登録するAPI」で使い、公開終了を理由に廃止・移行しない。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は従来どおり許可する。MCP列は引き続き未対応と表示する。許可がONでも非公開の操作は呼び出せない。
 
-本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, prompt?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
+本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, additionalPrompt?, input?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
 
 同じ所有者のrequestIdと同じ引数は、保持中の既存ジョブを返す。異なる引数への再利用はIMAGE_AI_REQUEST_CONFLICT。`completion:'accepted'` は受付で、生成成功ではない。stateはqueued/running/completed/failed/canceled。失敗時は安全なcode/messageを返し、サーバーの応答本文は公開しない。
 

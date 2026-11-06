@@ -74,6 +74,11 @@ const check = (name) => {
         id,
       );
       await settingsPage(page);
+      const inputLabel = id === 'tts' ? '入力データ' : '試験の入力データ';
+      await page
+        .getByLabel(inputLabel, { exact: true })
+        .locator('xpath=ancestor::section[1]')
+        .screenshot({ path: path.join(profile, id + '-trial.png') });
       assert.equal(
         await page.getByRole('switch', { name: 'このPCで設定を保存する', exact: true }).count(),
         0,
@@ -85,11 +90,25 @@ const check = (name) => {
         return dialog;
       };
       let dialog = await open();
+      const authentication = dialog.getByLabel('認証方式', { exact: true });
+      assert.equal(await authentication.inputValue(), 'none');
+      assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
+      await authentication.selectOption('bearer');
+      await dialog.getByLabel('APIキー', { exact: true }).fill('discarded-fixture-key');
+      await authentication.selectOption('none');
+      assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
+      await authentication.selectOption('bearer');
+      assert.equal(
+        await dialog.getByLabel('APIキー', { exact: true }).inputValue(),
+        'discarded-fixture-key',
+      );
+      await dialog.screenshot({ path: path.join(profile, id + '-authentication.png') });
       let toggle = dialog.getByRole('switch', { name: 'MCPからの利用を許可', exact: true });
       assert.equal(await toggle.getAttribute('aria-checked'), 'false');
       await toggle.click();
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       assert.notEqual((await snapshot()).settings.value[key].connections[0].mcpEnabled, true);
+      assert.equal((await snapshot()).settings.value[key].connections[0].authentication, 'none');
       dialog = await open();
       toggle = dialog.getByRole('switch', { name: 'MCPからの利用を許可', exact: true });
       assert.equal(await toggle.getAttribute('aria-checked'), 'false');
@@ -106,6 +125,10 @@ const check = (name) => {
       );
       assert.equal(JSON.parse(fs.readFileSync(fixture.file(profile)))[key], undefined);
       check(id + ': local permission defaults OFF, cancel discards and OK saves');
+      check(
+        id +
+          ': authentication toggle preserves the draft and cancel leaves the saved mode unchanged',
+      );
     }
     // The image permission remains editable before the image MCP API is published.
     await page.getByRole('button', { name: 'Image fixtureの設定', exact: true }).click();

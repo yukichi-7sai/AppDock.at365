@@ -1405,6 +1405,13 @@ export class SettingsServiceTargets {
     const defaults = defaultTtsSettings();
     const fields: Field[] = [
       {
+        key: 'authentication',
+        title: hostText('settings.aiConnectionDialog.auth'),
+        type: 'select',
+        options: options(['none', 'bearer']),
+        default: 'none',
+      },
+      {
         key: 'preset',
         title: hostText('settings.ttsSettings.preset'),
         type: 'select',
@@ -1566,7 +1573,9 @@ export class SettingsServiceTargets {
         for (const c of before.connections) {
           const changed = byId.get(c.id);
           if (
-            (!changed || changed.baseUrl !== c.baseUrl) &&
+            (!changed ||
+              changed.baseUrl !== c.baseUrl ||
+              changed.authentication !== c.authentication) &&
             (this.options.tts.configurationState(c.id).protected || c.mcpEnabled === true)
           )
             fail('LOCAL_ACTION_REQUIRED');
@@ -1607,9 +1616,10 @@ export class SettingsServiceTargets {
       inputSchema: (field) => (field as Field).schema ?? settingInputSchema(field),
       writable: (field) => field.key !== 'id',
       itemWritable: (row, field) =>
-        field.key !== 'id' && (field.key !== 'baseUrl' || !protectedKey(row)),
+        field.key !== 'id' &&
+        (!['baseUrl', 'authentication'].includes(field.key) || !protectedKey(row)),
       removable: (row) => !protectedKey(row),
-      createRow: () => ({ ...defaultTtsSettings(), id: randomUUID() }),
+      createRow: () => ({ ...defaultTtsSettings(), authentication: 'none', id: randomUUID() }),
       prepareRow: (row, keys) => {
         if (!keys.includes('preset')) return;
         const explicit = Object.fromEntries(keys.map((key) => [key, row[key]]));

@@ -1561,6 +1561,15 @@ test('TTS server list adds, edits and reorders independently of the default and 
   );
   const before = fs.readFileSync(f.store.file),
     cipher = fs.readFileSync(f.ttsFile);
+  assert.throws(
+    () =>
+      apply([
+        { kind: 'update', itemRef: rows()[0].itemRef, changes: { authentication: 'bearer' } },
+      ]),
+    {
+      code: 'LOCAL_ACTION_REQUIRED',
+    },
+  );
   assert.throws(() => apply([{ kind: 'remove', itemRef: rows()[0].itemRef }]), {
     code: 'LOCAL_ACTION_REQUIRED',
   });

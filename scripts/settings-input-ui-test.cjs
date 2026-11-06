@@ -33,6 +33,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const saved = async () => (await snapshot()).settings.value;
 const disk = () =>
   JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+const generationDisk = () => {
+  const file = path.join(profile, 'local', 'generation-ai.json');
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
+};
 (async () => {
   try {
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -306,7 +310,7 @@ const disk = () =>
     await prompt.fill('Saved multiline\nprompt');
     await prompt.press('Enter');
     await settleSettings(page);
-    assert.equal(disk().ai?.connections.length ?? 0, 0);
+    assert.equal(generationDisk().ai?.connections.length ?? 0, 0);
     await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
     assert.equal(await prompt.inputValue(), 'Saved multiline\nprompt');
@@ -327,8 +331,8 @@ const disk = () =>
       0,
       'field Enter does not save a grouped record',
     );
-    await page.getByLabel('AIの認証方式').selectOption('bearer');
-    const secret = page.getByLabel('AIのAPIキー', { exact: true });
+    await page.getByLabel('認証方式').selectOption('bearer');
+    const secret = page.getByLabel('APIキー', { exact: true });
     await secret.fill('synthetic-cancel-only');
     await secret.press('Escape');
     assert.equal(await secret.inputValue(), '');
@@ -343,15 +347,16 @@ const disk = () =>
       el.blur();
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
     });
-    await page.getByLabel('AIの認証方式').selectOption('none');
+    await page.getByLabel('認証方式').selectOption('none');
     const aiUrl = page.getByLabel('AIのAPIのURL', { exact: true });
     await aiUrl.fill('http://127.0.0.1:1/v1');
     await aiUrl.press('Control+Enter');
     await dialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
-    assert.equal(disk().ai.connections[0].name, 'Dialog IME confirmed');
-    assert.equal(disk().ai.connections[0].baseUrl, 'http://127.0.0.1:1/v1');
-    assert.equal(disk().ai.connections[0].alwaysPrompt, 'Saved multiline\nprompt');
+    assert.equal(generationDisk().ai.connections[0].name, 'Dialog IME confirmed');
+    assert.equal(generationDisk().ai.connections[0].baseUrl, 'http://127.0.0.1:1/v1');
+    assert.equal(generationDisk().ai.connections[0].alwaysPrompt, 'Saved multiline\nprompt');
+    assert.equal(disk().ai, undefined);
     checks.push(
       'dialog Enter and IME stay local; Ctrl+Enter saves the record with the latest blur-confirmed URL',
     );

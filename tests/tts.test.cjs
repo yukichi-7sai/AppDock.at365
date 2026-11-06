@@ -41,6 +41,43 @@ const wait = async (fn) => {
   }
   throw Error('wait timed out');
 };
+test('explicit authentication controls speech and discovery headers and rejects missing bearer keys', async (t) => {
+  let keyReads = 0;
+  const requests = [];
+  const f = setup(t, {
+    key: () => {
+      keyReads++;
+      return 'fixture-secret';
+    },
+    fetcher: async (url, options) => {
+      requests.push({ url, options });
+      if (url.endsWith('/models')) return Response.json({ data: [] });
+      if (url.endsWith('/audio/voices')) return Response.json({ voices: [] });
+      return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
+    },
+  });
+  for (const authentication of ['none', 'bearer']) {
+    f.config({ authentication });
+    const job = f.s.speak('host', { requestId: authentication, text: 'fixture' });
+    await wait(() => f.s.get('host', job.jobId).state === 'completed');
+    await f.s.models('host');
+    await f.s.voices('host');
+    for (const { options } of requests.splice(0))
+      assert.equal(
+        options.headers?.Authorization,
+        authentication === 'bearer' ? 'Bearer fixture-secret' : undefined,
+      );
+    assert.equal(keyReads, authentication === 'bearer' ? 3 : 0);
+  }
+  const missing = setup(t);
+  missing.config({ authentication: 'bearer' });
+  assert.throws(() => missing.s.speak('host', { requestId: 'missing', text: 'fixture' }), {
+    code: 'TTS_AUTH_FAILED',
+  });
+  assert.throws(() => missing.s.models('host'), { code: 'TTS_AUTH_FAILED' });
+  assert.throws(() => missing.s.voices('host'), { code: 'TTS_AUTH_FAILED' });
+  assert.equal(missing.posts.length, 0);
+});
 function setup(t, extra = {}) {
   let config = {
       ...defaultTtsSettings(),

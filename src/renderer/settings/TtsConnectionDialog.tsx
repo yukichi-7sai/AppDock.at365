@@ -1,10 +1,10 @@
+import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField, SettingsActions, SettingsSection } from '../settings-ui/SettingsSections';
 import { SettingsInput, SettingsUrlInput } from '../settings-ui/SettingsInput';
-import { settingAnchor } from '../settings-ui/setting-anchor';
 import { TtsConnectionDetails } from './TtsConnectionDetails';
 import { TtsSpeechFields } from './TtsSpeechFields';
 import {
@@ -38,7 +38,16 @@ export function TtsConnectionDialog({
   const id = useId();
   const [tab, setTab] = useState<EditorTab>('connection');
   const [draft, setDraft] = useState(() =>
-    structuredClone(original ?? newTtsServer(crypto.randomUUID())),
+    structuredClone(
+      original
+        ? {
+            ...original,
+            authentication:
+              original.authentication ??
+              (status?.apiKeyConfigured ? ('bearer' as const) : ('none' as const)),
+          }
+        : newTtsServer(crypto.randomUUID()),
+    ),
   );
   const [apiKey, setApiKey] = useState<string | undefined>();
   const [error, setError] = useState(''),
@@ -175,34 +184,13 @@ export function TtsConnectionDialog({
               }}
             />
           </SettingsField>
-          <SettingsField
-            className="server-editor-full"
-            title={t('settings.ttsSettings.apiKey')}
-            {...settingAnchor('tts', 'apiKey')}
-            description={t('settings.ttsSettings.apiKeyHint')}
-          >
-            <SettingsInput
-              aria-label={t('settings.ttsSettings.apiKey')}
-              type="password"
-              autoComplete="off"
-              value={apiKey ?? ''}
-              maxLength={8192}
-              placeholder={t(
-                savedKey && apiKey === undefined
-                  ? 'settings.ttsSettings.storedKey'
-                  : 'settings.ttsSettings.noKey',
-              )}
-              onChange={(e) => setApiKey(e.target.value || undefined)}
-            />
-            <SettingsActions>
-              <button disabled={!savedKey && !apiKey} onClick={() => setApiKey('')}>
-                {t('settings.ttsServers.removeKey')}
-              </button>
-            </SettingsActions>
-            {apiKey === '' && (
-              <small className="muted">{t('settings.ttsServers.keyWillBeRemoved')}</small>
-            )}
-          </SettingsField>
+          <GenerationAuthentication
+            authentication={draft.authentication ?? 'none'}
+            onAuthenticationChange={(authentication) => change({ authentication })}
+            apiKey={apiKey}
+            savedKey={savedKey}
+            onKeyChange={setApiKey}
+          />
         </div>
       </SettingsSection>
       <SettingsSection
@@ -216,7 +204,7 @@ export function TtsConnectionDialog({
         <TtsSpeechFields
           value={draft}
           change={change}
-          discoveryRevision={JSON.stringify([status?.keyRevision, apiKey])}
+          discoveryRevision={JSON.stringify([status?.keyRevision, draft.authentication, apiKey])}
           onError={setError}
           onMessage={setMessage}
           discover={(kind) =>
