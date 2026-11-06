@@ -138,8 +138,6 @@ const checks = [];
     settings.keybindings = [];
     settings.gestures.enabled = false;
     settings.host.hardwareAcceleration = false;
-    settings.host.fileWatchAssistanceEnabled = true;
-    settings.host.fileWatchAssistanceIntervalSeconds = 2;
     settings.tts = {
       connections: [
         {
@@ -169,10 +167,17 @@ const checks = [];
         },
       ],
     };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(settings),
-    );
+    const settingsFixture = require('./test-settings.cjs');
+    settingsFixture.write(profile, settings);
+    const deviceFile = settingsFixture.deviceFile(profile);
+    const device = JSON.parse(fs.readFileSync(deviceFile));
+    device.hostPages.about = {
+      useLocalSettings: true,
+      configuration: {
+        host: { fileWatchAssistanceEnabled: true, fileWatchAssistanceIntervalSeconds: 2 },
+      },
+    };
+    fs.writeFileSync(deviceFile, JSON.stringify(device));
     const sound = path.join(profile, 'notice.wav');
     fs.writeFileSync(sound, wave());
     fs.writeFileSync(
@@ -270,7 +275,7 @@ const checks = [];
     await delay(2200);
     const held = await inspect(
       port,
-      `({paused:lockService.isPaused(),notice:lockService.list().find(i=>i.title==='Locked startup fixture'),targets:['banner','desktop','windows'].map(t=>lockService.targetItems(t).length),audio:lockAudio,windows:lockWindows,files:lockFileChecks,queries:lockQueries,fileOptions:lockFiles.options,inputPaused:JSON.parse(lockInputs.fingerprint).assistancePaused,queryPaused:lockAvailability.paused})`,
+      `({paused:lockService.isPaused(),notice:lockService.list().find(i=>i.title==='Locked startup fixture'),targets:['banner','desktop','windows'].map(t=>lockService.targetItems(t).length),audio:lockAudio,windows:lockWindows,files:lockFileChecks,queries:lockQueries,fileOptions:lockFiles.options,inputPaused:JSON.parse(lockInputs.fingerprint)[0].assistancePaused,queryPaused:lockAvailability.paused})`,
     );
     assert.equal(held.paused, true);
     assert.equal(held.notice.status, 'active');
@@ -303,7 +308,7 @@ const checks = [];
       () =>
         inspect(
           port,
-          'lockFileChecks>=1 && JSON.parse(lockInputs.fingerprint).assistancePaused===false',
+          'lockFileChecks>=1 && JSON.parse(lockInputs.fingerprint)[0].assistancePaused===false',
         ),
       'shared resume catch-up',
     );
@@ -328,7 +333,7 @@ const checks = [];
     checks.push('subsequent lock cycle does not replay an ended episode');
     await inspect(port, `${electronExpression}.powerMonitor.emit('suspend')`);
     await until(
-      () => inspect(port, 'JSON.parse(lockInputs.fingerprint).assistancePaused===true'),
+      () => inspect(port, 'JSON.parse(lockInputs.fingerprint)[0].assistancePaused===true'),
       'input pause on suspend',
     );
     const suspended = await inspect(port, '({files:lockFileChecks,queries:lockQueries})');

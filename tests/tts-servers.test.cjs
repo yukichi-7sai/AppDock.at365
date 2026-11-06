@@ -19,7 +19,7 @@ function fixture(t) {
   store.load();
   t.after(() => store.close());
   const file = path.join(dir, 'tts-keys.json');
-  const keys = new TtsSecrets(file, {
+  const keys = new TtsSecrets(dir, 'tts-keys', {
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
   });

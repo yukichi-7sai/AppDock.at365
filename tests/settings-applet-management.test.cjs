@@ -100,9 +100,10 @@ function fixture(t, device = false) {
       throw Error('Unexpected decryption');
     },
   };
+  const keyDirectory = device ? path.join(dir, 'local') : dir;
   const ai = new AiSettingsController(
     store,
-    new AiSecrets(path.join(dir, 'ai.json'), encryption),
+    new AiSecrets(keyDirectory, 'ai-keys', encryption),
     () => {},
   );
   const commands = new SettingsCommands({ settings: store, applets: () => [], save });
@@ -113,7 +114,7 @@ function fixture(t, device = false) {
     validate: parseSettings,
     save,
     ai,
-    tts: new TtsSecrets(path.join(dir, 'tts.json'), encryption),
+    tts: new TtsSecrets(keyDirectory, 'tts-keys', encryption),
     notifications: () => [],
     applets: snapshots,
     appletManagement: management,

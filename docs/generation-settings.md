@@ -1,14 +1,14 @@
-# 生成AIのPC専用設定
+# 生成AIの端末別設定
 
-音声生成AI・文章生成AI・画像生成AIの3ページは、すべてPC専用rootの`generation-ai.json`へ保存する。PC専用rootは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`。共有`data/settings.json`と端末別`data/settings-<端末名>.json`へ生成AIの設定を保存せず、共有／端末別の切替も提供しない。配置IDと保存領域の寿命は[設定同期](settings-sync.md)に従う。
+音声生成AI・文章生成AI・画像生成AIの3ページは、EXE隣の`data/settings-<端末名>.json`の`generationAi`へ固定保存する。AppDockは起動端末に対応する設定を適用する。同期やバックアップには接続URL・プロンプト・プリセット別MCP許可も含まれる。端末名と保存領域の寿命は[設定同期](settings-sync.md)に従う。
 
-`version:1`、`ai`、`tts`、`imageAi`、任意の`notificationConnectionId`を持つ。サーバー一覧、表示順、既定サーバー、モデル、声、プロンプト、通信・生成設定を含む。試験入力・結果・ジョブは従来どおり一時データであり、永続化しない。APIキーは既存の種類別キー保存ファイルで暗号化を維持する。
+`generationAi`は`version:1`、`ai`、`tts`、`imageAi`、任意の`notificationConnectionId`を持つ。サーバー一覧、表示順、既定サーバー、モデル、声、プロンプト、通信・生成設定を含む。試験入力・結果・ジョブはメモリーに保持する。APIキーは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`の`tts-keys.json`、`ai-keys.json`、`image-ai-keys.json`へsafeStorageで暗号化して保存する。キーは登録IDと正規化URLで照合する。PC交換時は端末別の定義を復元し、必要なキーをそのPCで再入力する。
 
 3ページのツールバーの表示モードは「フォーム」だけを表示し、JSONへの切り替えを設けない。プリセットの編集は各追加／編集ダイアログから行う。
 
-通知の`notificationPreferences.speech.connectionId`は実行時の投影であり、保存時には同じローカルファイルの`notificationConnectionId`へ分離する。通知用の話し方・通知先・通知種類の許可などは通知ページの保存区分を維持する。通知ページの共有／端末別を切り替えても、読み上げ先は変えない。明示したサーバーが存在しない場合、別のサーバーへ自動切替しない。
+通知の`notificationPreferences.speech.connectionId`は実行時の投影であり、端末別ファイルの`generationAi.notificationConnectionId`に保存する。通知用の話し方・通知先・通知種類の許可は通知ページで選択した区分に従う。読み上げ先IDは通知ページの保存先から独立する。明示したサーバーが存在しない場合、別のサーバーへ自動切替しない。
 
-旧共有・端末別設定から生成AI設定と通知のサーバーIDを取り込まない。旧項目が残るファイルもその値を適用せず、そのファイルを保存するときに除去する。ローカルファイルが壊れている場合も共有設定へフォールバックしない。設定バックアップ・復旧・revision・外部変更検出・関連するキーとの原子的保存を共通設定ストアへ接続する。復旧画面と「設定ファイルを開く」はローカル保存先を表示する。
+旧LocalAppDataの`generation-ai.json`と共有・端末別ファイルに残る旧項目は読み継がず、`generationAi`がなければ登録なしで起動する。バックアップ・復旧・revision・外部変更検出を端末別の共通設定ストアで処理する。設定とキーを一緒に変更するときは、PC専用のジャーナルで端末別JSONと暗号化ファイルを一体で復旧する。
 
 ## プリセットごとのMCP利用許可
 
@@ -18,7 +18,7 @@ MCPからの生成には、種類全体の利用許可・情報取得・実行�
 
 MCPから公開Appletコマンドを経由する場合も、ホストが発行する元のMCP呼出し元をジョブ所有者へ引き継ぐ。受付・実行・応答採用・音声再生前に許可を検査し、取消時は対象の待機／実行中ジョブと一覧取得を中断する。重複requestIdの再送も現在の個別許可を検査する。状態取得と停止はそれぞれ既存の所有者と必要権限を使う。サーバー内部の処理・課金の停止は保証しない。
 
-通常値の設定APIはこのPCのファイルを編集できるが、`mcpEnabled`は公開しない。MCPによる追加は個別許可OFF、通常値の部分編集や並べ替えは既存許可を保持する。許可済み接続の送信先変更は本体設定画面で行う。秘密値・暗号化キーの操作制限も維持する。
+通常値の設定APIは自端末のファイルを編集できるが、`mcpEnabled`は公開しない。MCPによる追加は個別許可OFF、通常値の部分編集や並べ替えは既存許可を保持する。許可済み接続の送信先変更は本体設定画面で行う。秘密値・暗号化キーの操作制限も維持する。
 
 サーバー一覧の「MCP公開」列は、登録ごとの保存済みの許可を「公開」「非公開」で表示する。画像の`mcpEnabled`は後続の生成登録API用に保存する。MCPの画像生成API・接続一覧・ジョブ操作は未公開で、画像生成AIのページとダイアログにはMCPからの画像生成が未対応であることを表示する。後続のAPIは同じ個別許可判定と種類全体の許可へ接続する。
 
@@ -34,4 +34,4 @@ MCPから公開Appletコマンドを経由する場合も、ホストが発行�
 
 ## 検証
 
-`tests/generation-local.test.cjs`で端末分離、旧値非継承、通知先、競合、失敗時のロールバック、ローカル復旧と各生成サービスの拒否・取消を確認する。設定APIの変更保護は`tests/settings-service-targets.test.cjs`、実画面の保存・取消・再起動は`scripts/generation-local-ui-test.cjs [固定EXE]`、生成・通知との連携は既存のAI/TTS/画像/通知試験を使用する。設定fixtureは`scripts/test-settings.cjs`の`write(profile, value, localRoot?)`で共有・ローカルの保存先を明示的に準備する。
+`tests/generation-device.test.cjs`で端末分離、旧値非継承、通知先、競合、失敗・中断時のロールバック、端末ファイルの復旧と各生成サービスの拒否・取消を確認する。設定APIの変更保護は`tests/settings-service-targets.test.cjs`、実画面の保存・暗号化・取消・再起動は`scripts/generation-device-ui-test.cjs [固定EXE]`、生成・通知との連携は既存のAI/TTS/画像/通知試験を使用する。設定fixtureは`scripts/test-settings.cjs`の`write(profile, value)`で共有・端末別の保存先を準備する。

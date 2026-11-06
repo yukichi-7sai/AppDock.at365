@@ -11,8 +11,11 @@ import {
   SettingsStore,
   SettingsConflictError,
   atomicWrite,
+  settingsCredentialFiles,
   type SettingsRecoveryPlan,
   type SettingsAsset,
+  type SettingsCredentialScope,
+  type SettingsScope,
   storedSettingRecord,
 } from './settings';
 import type { Settings, ExtensionManifest, ExtensionSnapshot } from '../../shared/contracts';
@@ -48,21 +51,21 @@ import {
   type DeviceSettings,
 } from './device-settings';
 
-import {
-  generationSettings,
-  parseGenerationSettings,
-  withGenerationSettings,
-  withoutGenerationSettings,
-  type GenerationSettings,
-} from './generation-settings';
+import { withGenerationSettings, withoutGenerationSettings } from './generation-settings';
 
-type Scope = 'shared' | 'device' | 'local';
+type TransactionFile = {
+  scope: SettingsScope | SettingsCredentialScope;
+  before: string | null;
+  after: string;
+};
 interface Journal {
   version: 1;
   machineName: string;
   committed: boolean;
-  files: { scope: Scope | 'mcp-secrets'; before: string | null; after: string }[];
+  files: (TransactionFile | { scope: 'local' })[];
 }
+const isCredentialScope = (scope: string): scope is SettingsCredentialScope =>
+  Object.hasOwn(settingsCredentialFiles, scope);
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const read = (file: string) => {
   return fs.readFileSync(file);
@@ -71,7 +74,6 @@ const read = (file: string) => {
 /** One persisted settings view shared by GUI, Applets and automation. */
 export class DeviceSettingsStore extends SettingsStore {
   readonly shared: SettingsStore;
-  readonly local: SettingsStore<GenerationSettings>;
   readonly device: SettingsStore<DeviceSettings>;
   private readonly marker: string;
   private readonly journal: string;
@@ -127,13 +129,12 @@ export class DeviceSettingsStore extends SettingsStore {
       (this.device.value.hostPages[pageId]?.useLocalSettings ?? false)
     );
   }
-  override settingScope(path: readonly string[]): Scope {
-    if (path[0] === 'mcpClient') return 'device';
+  override settingScope(path: readonly string[]): SettingsScope {
     if (
-      ['ai', 'tts', 'imageAi'].includes(path[0]) ||
+      ['ai', 'tts', 'imageAi', 'mcpClient'].includes(path[0]) ||
       (path[0] === 'notificationPreferences' && path[1] === 'speech' && path[2] === 'connectionId')
     )
-      return 'local';
+      return 'device';
     const pageId = hostPageForPath(path);
     if (pageId) return this.hostPageLocalSettings(pageId) ? 'device' : 'shared';
     return path[0] === 'host' && (deviceHostKeys as readonly string[]).includes(path[1])
@@ -158,7 +159,7 @@ export class DeviceSettingsStore extends SettingsStore {
       if (isDeviceOnlyHostPage(pageId) || entry?.useLocalSettings)
         applyHostPageConfiguration(result, entry?.configuration ?? {}, pageId);
     }
-    return withGenerationSettings(result, this.local.value);
+    return withGenerationSettings(result, this.device.value.generationAi);
   }
   override appletConfigurationScope(owner: string): 'shared' | 'device' {
     return this.localSettings(owner) ? 'device' : 'shared';
@@ -217,7 +218,7 @@ export class DeviceSettingsStore extends SettingsStore {
       {
         defaults: () => initialDeviceSettings(machineName),
         parse: (raw) => {
-          const value = parseDeviceSettings(withoutGenerationSettings(raw), machineName);
+          const value = parseDeviceSettings(raw, machineName);
           const applets = this.applets();
           for (const [owner, entry] of Object.entries(value.extensions))
             if (entry.configuration)
@@ -227,21 +228,12 @@ export class DeviceSettingsStore extends SettingsStore {
               );
           return value;
         },
-        serialize: (value) =>
-          withoutGenerationSettings(deviceSettingsStorageValue(value, this.applets())),
+        serialize: (value) => deviceSettingsStorageValue(value, this.applets()),
         transientChange: (before, after) =>
           this.configurationSignature(before) === this.configurationSignature(after),
       },
     );
-    this.local = new SettingsStore(
-      path.join(localRoot, 'generation-ai.json'),
-      path.join(backups, 'generation-ai'),
-      {
-        defaults: () => parseGenerationSettings({ version: 1 }),
-        parse: parseGenerationSettings,
-      },
-    );
-    for (const store of [this.shared, this.device, this.local]) {
+    for (const store of [this.shared, this.device]) {
       store.on('changed', () => {
         if (
           store === this.device &&
@@ -260,7 +252,6 @@ export class DeviceSettingsStore extends SettingsStore {
     for (const [scope, store] of [
       ['shared', this.shared],
       ['device', this.device],
-      ['local', this.local],
     ] as const) {
       for (const issue of store.health.all()) {
         const key = `${scope}-${issue.key}`;
@@ -272,11 +263,9 @@ export class DeviceSettingsStore extends SettingsStore {
           issue.immediate,
           hostText('services.deviceSettingsStore.scopedIssue', {
             scope: String(
-              scope === 'local'
-                ? hostText('settings.storage.local')
-                : scope === 'device'
-                  ? hostText('services.deviceSettingsStore.deviceScope')
-                  : hostText('services.deviceSettingsStore.sharedScope'),
+              scope === 'device'
+                ? hostText('services.deviceSettingsStore.deviceScope')
+                : hostText('services.deviceSettingsStore.sharedScope'),
             ),
             message: String(issue.message.replaceAll('settings.json', path.basename(store.file))),
           }),
@@ -285,7 +274,7 @@ export class DeviceSettingsStore extends SettingsStore {
     }
     for (const key of this.healthKeys) if (!keys.has(key)) this.health.clear(key);
     this.healthKeys = keys;
-    this.recovered = this.shared.recovered || this.device.recovered || this.local.recovered;
+    this.recovered = this.shared.recovered || this.device.recovered;
   }
   private refreshCombined(notify: boolean) {
     const initialized = initializeHostPageSettings(this.device.value, this.shared.value);
@@ -298,10 +287,9 @@ export class DeviceSettingsStore extends SettingsStore {
         this.mutating = mutating;
       }
     }
-    const value = hostStartupTiming.measure('settingsCombine', () =>
+    this.value = hostStartupTiming.measure('settingsCombine', () =>
       combineSettings(this.shared.value, initialized, this.collections()),
     );
-    this.value = withGenerationSettings(value, this.local.value);
     this.deviceConfiguration = this.configurationSignature(this.device.value);
     this.syncHealth();
     this.revision++;
@@ -339,7 +327,6 @@ export class DeviceSettingsStore extends SettingsStore {
     this.recoverTransaction();
     this.shared.load();
     this.loadDevice();
-    this.local.load();
     this.loaded = true;
     this.refreshCombined(false);
     return this.snapshot();
@@ -347,7 +334,7 @@ export class DeviceSettingsStore extends SettingsStore {
   override assertRevision(revision: number) {
     if (this.mutating || fs.existsSync(this.journal))
       throw Error(hostText('services.deviceSettingsStore.busy'));
-    for (const store of [this.shared, this.device, this.local]) {
+    for (const store of [this.shared, this.device]) {
       try {
         store.assertRevision(store.revision);
       } catch (error) {
@@ -358,12 +345,13 @@ export class DeviceSettingsStore extends SettingsStore {
     if (revision !== this.revision)
       throw new SettingsConflictError(hostText('services.deviceSettingsStore.revisionConflict'));
   }
-  private fileFor(scope: Scope | 'mcp-secrets') {
-    if (scope === 'mcp-secrets') return path.join(this.localRoot, 'mcp-client-secrets.json');
-    return this.storeFor(scope).file;
+  private fileFor(scope: SettingsScope | SettingsCredentialScope) {
+    return isCredentialScope(scope)
+      ? path.join(this.localRoot, settingsCredentialFiles[scope])
+      : this.storeFor(scope).file;
   }
-  private storeFor(scope: Scope) {
-    return scope === 'local' ? this.local : scope === 'device' ? this.device : this.shared;
+  private storeFor(scope: SettingsScope) {
+    return scope === 'device' ? this.device : this.shared;
   }
   private recoverTransaction() {
     if (!fs.existsSync(this.journal)) return;
@@ -378,25 +366,25 @@ export class DeviceSettingsStore extends SettingsStore {
         new Set(journal.files.map((item) => item.scope)).size !== journal.files.length
       )
         throw Error('journal schema');
-      for (const item of journal.files) {
+      // Older journals may include the retired generation file alongside active settings.
+      const files = journal.files.filter((item) => item.scope !== 'local');
+      for (const item of files) {
+        const credential = isCredentialScope(item.scope);
         if (
-          !['shared', 'device', 'local', 'mcp-secrets'].includes(item.scope) ||
-          (typeof item.before !== 'string' &&
-            !(item.scope === 'mcp-secrets' && item.before === null)) ||
+          (!credential && item.scope !== 'shared' && item.scope !== 'device') ||
+          (typeof item.before !== 'string' && !(credential && item.before === null)) ||
           typeof item.after !== 'string' ||
           !/^[A-Za-z0-9+/=]*$/.test((item.before ?? '') + item.after)
         )
           throw Error('journal entry');
         // An explicitly reset secret document may contain invalid original bytes.
-        for (const text of item.scope === 'mcp-secrets'
-          ? [item.after]
-          : [item.before!, item.after]) {
+        for (const text of credential ? [item.after] : [item.before!, item.after]) {
           const value = JSON.parse(
             Buffer.from(text, 'base64')
               .toString('utf8')
               .replace(/^\uFEFF/, ''),
           );
-          if (item.scope === 'mcp-secrets') {
+          if (credential) {
             if (
               !value ||
               value.version !== 1 ||
@@ -405,20 +393,20 @@ export class DeviceSettingsStore extends SettingsStore {
               Array.isArray(value.entries)
             )
               throw Error('secret journal schema');
-          } else if (item.scope === 'local') parseGenerationSettings(value);
-          else if (item.scope === 'shared') parseSettings(withoutGenerationSettings(value));
-          else parseDeviceSettings(withoutGenerationSettings(value), this.machineName);
+          } else if (item.scope === 'shared')
+            parseSettings(withoutDeviceMcp(withoutGenerationSettings(value)));
+          else parseDeviceSettings(value, this.machineName);
         }
       }
       if (!journal.committed) {
         // Check every target before restoring any file; never overwrite an external writer.
-        for (const item of journal.files) {
+        for (const item of files) {
           const file = this.fileFor(item.scope);
           const current = fs.existsSync(file) ? read(file).toString('base64') : null;
           if (current !== item.before && current !== item.after)
             throw Error('external settings change');
         }
-        for (const item of [...journal.files].reverse()) {
+        for (const item of files.reverse()) {
           const file = this.fileFor(item.scope),
             current = fs.existsSync(file) ? read(file) : undefined;
           if (current?.toString('base64') === item.after) {
@@ -439,14 +427,13 @@ export class DeviceSettingsStore extends SettingsStore {
     device: DeviceSettings,
     revision: number,
     asset?: SettingsAsset,
-    rewrite: Scope[] = [],
-    local = this.local.value,
+    rewrite: SettingsScope[] = [],
   ) {
     shared = parseSettings(withoutDeviceMcp(withoutGenerationSettings(shared)));
-    device = parseDeviceSettings(withoutGenerationSettings(device), this.machineName);
+    device = parseDeviceSettings(device, this.machineName);
     if (this.writesBlocked) throw Error(hostText('services.deviceSettingsStore.restoring'));
     this.assertRevision(revision);
-    const files: Journal['files'] = [];
+    const files: TransactionFile[] = [];
     if (!same(shared, this.shared.value) || rewrite.includes('shared'))
       files.push({
         scope: 'shared',
@@ -459,28 +446,23 @@ export class DeviceSettingsStore extends SettingsStore {
         before: read(this.device.file).toString('base64'),
         after: Buffer.from(this.device.serialize(device)).toString('base64'),
       });
-    if (!same(local, this.local.value) || rewrite.includes('local'))
-      files.push({
-        scope: 'local',
-        before: read(this.local.file).toString('base64'),
-        after: Buffer.from(this.local.serialize(local)).toString('base64'),
-      });
     for (const item of files)
-      if (item.scope !== 'mcp-secrets' && this.storeFor(item.scope).recovered)
+      if (!isCredentialScope(item.scope) && this.storeFor(item.scope).recovered)
         throw Error(hostText('services.deviceSettingsStore.targetRecoveryRequired'));
     if (asset?.recovery) files.unshift(asset.recovery);
     if (!files.length && !asset) return this.snapshot();
     this.mutating = true;
     const journal: Journal = { version: 1, machineName: this.machineName, committed: false, files };
+    let wroteJournal = false;
+    let writingSettings = false;
     try {
       atomicWrite(this.journal, JSON.stringify(journal), { previous: undefined });
+      wroteJournal = true;
       asset?.commit();
-      for (const item of files) {
-        if (item.scope === 'mcp-secrets') continue; // Written by the guarded asset transaction.
-        if (item.scope === 'local') this.local.save(local, this.local.revision);
-        else if (item.scope === 'shared') this.shared.save(shared, this.shared.revision);
-        else this.device.save(device, this.device.revision);
-      }
+      writingSettings = true;
+      for (const item of files)
+        if (item.scope === 'shared') this.shared.save(shared, this.shared.revision);
+        else if (item.scope === 'device') this.device.save(device, this.device.revision);
       journal.committed = true;
       atomicWrite(this.journal, JSON.stringify(journal));
       try {
@@ -491,11 +473,12 @@ export class DeviceSettingsStore extends SettingsStore {
     } catch (error) {
       try {
         asset?.rollback();
-        this.recoverTransaction();
+        if (writingSettings) this.recoverTransaction();
+        else if (wroteJournal) fs.unlinkSync(this.journal);
       } catch {
         this.health.set('transaction', 'save-failed');
       }
-      for (const store of [this.shared, this.device, this.local])
+      for (const store of [this.shared, this.device])
         try {
           store.reload();
         } catch {
@@ -512,7 +495,12 @@ export class DeviceSettingsStore extends SettingsStore {
     this.refreshCombined(true);
     return this.snapshot();
   }
-  override save(value: unknown, revision: number, asset?: SettingsAsset, rewrite: Scope[] = []) {
+  override save(
+    value: unknown,
+    revision: number,
+    asset?: SettingsAsset,
+    rewrite: SettingsScope[] = [],
+  ) {
     this.assertRevision(revision);
     const next = restoreSettingsCollections(parseSettings(value), this.applets());
     new AssignedImages(path.join(path.dirname(this.file), 'assets', 'images')).prepare(
@@ -521,20 +509,13 @@ export class DeviceSettingsStore extends SettingsStore {
       this.applets(),
     );
     const split = splitSettings(
-      parseSettings(withoutGenerationSettings(next)),
-      parseSettings(withoutGenerationSettings(this.value)),
+      next,
+      this.value,
       this.shared.value,
       this.device.value,
       this.collections(),
     );
-    return this.commitPair(
-      split.shared,
-      split.device,
-      revision,
-      asset,
-      rewrite,
-      generationSettings(next),
-    );
+    return this.commitPair(split.shared, split.device, revision, asset, rewrite);
   }
   setLocalSettings(
     owner: string,
@@ -629,11 +610,11 @@ export class DeviceSettingsStore extends SettingsStore {
     validate?.(combineSettings(shared, parsed, this.collections()));
     return this.commitPair(parseSettings(shared), parsed, revision);
   }
-  targetFile(scope: Scope) {
+  targetFile(scope: SettingsScope) {
     return this.fileFor(scope);
   }
   diagnostics() {
-    return (['shared', 'device', 'local'] as const).map((scope) => {
+    return (['shared', 'device'] as const).map((scope) => {
       const store = this.storeFor(scope);
       return {
         scope,
@@ -650,7 +631,6 @@ export class DeviceSettingsStore extends SettingsStore {
   ) {
     this.shared.watch(onError, assistance);
     this.device.watch(onError, assistance);
-    this.local.watch(onError, assistance);
   }
   override reload() {
     this.recoverTransaction();
@@ -659,8 +639,6 @@ export class DeviceSettingsStore extends SettingsStore {
       this.shared.reload();
       if (this.loaded) this.device.reload();
       else this.loadDevice();
-      if (this.loaded) this.local.reload();
-      else this.local.load();
     } finally {
       this.mutating = false;
       this.syncHealth();
@@ -669,14 +647,8 @@ export class DeviceSettingsStore extends SettingsStore {
     this.refreshCombined(true);
     return this.snapshot();
   }
-  private recoveryStore(scope?: Scope) {
-    return scope
-      ? this.storeFor(scope)
-      : this.local.recovered
-        ? this.local
-        : this.device.recovered
-          ? this.device
-          : this.shared;
+  private recoveryStore(scope?: SettingsScope) {
+    return scope ? this.storeFor(scope) : this.device.recovered ? this.device : this.shared;
   }
   override backupCandidate() {
     return this.recoveryStore().backupCandidate();
@@ -684,11 +656,11 @@ export class DeviceSettingsStore extends SettingsStore {
   recoveryPath() {
     return this.recoveryStore().file;
   }
-  override prepareRecovery(file?: string, scope?: Scope): SettingsRecoveryPlan {
+  override prepareRecovery(file?: string, scope?: SettingsScope): SettingsRecoveryPlan {
     const store = this.recoveryStore(scope);
     return {
       ...store.prepareRecovery(file),
-      scope: store === this.local ? 'local' : store === this.device ? 'device' : 'shared',
+      scope: store === this.device ? 'device' : 'shared',
     };
   }
   override restoreRecovery(plan: SettingsRecoveryPlan) {
@@ -706,7 +678,6 @@ export class DeviceSettingsStore extends SettingsStore {
   override close() {
     this.shared.close();
     this.device.close();
-    this.local.close();
     super.close();
   }
 }

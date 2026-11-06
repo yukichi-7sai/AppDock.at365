@@ -117,7 +117,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { SettingsConflictError } from './core/settings';
+import {
+  SettingsConflictError,
+  settingsCredentialFiles,
+  type SettingsScope,
+} from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
 import { readDeviceCollections, readDeviceManifests } from './core/device-settings';
 import { isHostPageSettingsId, canSwitchHostPageSettings } from '../shared/host-page-settings';
@@ -725,7 +729,7 @@ const settingsCommands = new SettingsCommands({
         ? pageCollections.settingOptions(owner)
         : [],
   save: (value, revision, reset) => {
-    const rewrite = new Set<'shared' | 'device' | 'local'>();
+    const rewrite = new Set<SettingsScope>();
     if (reset) {
       const owner = reset.collection?.owner ?? reset.ownerId;
       if (owner === 'appdock')
@@ -966,7 +970,7 @@ const sendInput =
     if (!id || !nativeInput) throw Error(hostText('services.index.inputNotReady'));
     return nativeInput.send(method, params, id, context);
   };
-const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-keys.json'), {
+const ttsSecrets = new TtsSecrets(dataDirectory, 'tts-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.keyEncryptionUnavailable'));
@@ -1018,7 +1022,7 @@ const ttsSettings = new TtsSettingsController(settings, ttsSecrets, (keyChanged 
   tts.reconcile(keyChanged);
   changed();
 });
-const aiSecrets = new AiSecrets(path.join(dataDirectory, 'ai-keys.json'), {
+const aiSecrets = new AiSecrets(dataDirectory, 'ai-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.credentialProtectionUnavailable'));
@@ -1030,7 +1034,7 @@ const aiSettings = new AiSettingsController(settings, aiSecrets, (id) => {
   ai.reconcile(id ?? false);
   changed();
 });
-const imageAiSecrets = new AiSecrets(path.join(dataDirectory, 'image-ai-keys.json'), {
+const imageAiSecrets = new AiSecrets(dataDirectory, 'image-ai-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.credentialProtectionUnavailable'));
@@ -1236,7 +1240,7 @@ function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
 }
 const mcpSettings = new McpClientSettings(
   settings,
-  path.join(dataDirectory, 'mcp-client-secrets.json'),
+  path.join(dataDirectory, settingsCredentialFiles['mcp-secrets']),
   {
     encrypt: (v) => {
       if (!safeStorage.isEncryptionAvailable())
@@ -2467,18 +2471,10 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
       await dialog.showMessageBox({
         type: 'warning',
         message: hostText(
-          plan.scope === 'local'
-            ? 'recovery.confirmLocal'
-            : plan.scope === 'device'
-              ? 'recovery.confirmDevice'
-              : 'recovery.confirmShared',
+          plan.scope === 'device' ? 'recovery.confirmDevice' : 'recovery.confirmShared',
         ),
         detail: hostText(
-          plan.scope === 'local'
-            ? 'recovery.detailLocal'
-            : plan.scope === 'device'
-              ? 'recovery.detailDevice'
-              : 'recovery.detailShared',
+          plan.scope === 'device' ? 'recovery.detailDevice' : 'recovery.detailShared',
           { modifiedAt: new Date(plan.modifiedAt).toLocaleString() },
         ),
         buttons: [hostText('recovery.cancel'), hostText('recovery.restore')],
@@ -2520,7 +2516,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     return (['restore', 'open', 'reload', 'quit'] as const)[result.response] ?? 'quit';
   },
 };
-async function restoreSettingsBackup(scope?: 'shared' | 'device' | 'local') {
+async function restoreSettingsBackup(scope?: SettingsScope) {
   if (settingsOperationBusy() || quitting) throw Error(hostText('services.index.settingsBusy'));
   settingsRecoveryBusy = true;
   settings.writesBlocked = true;
@@ -2553,7 +2549,7 @@ function commitSettings(
   value: Settings,
   revision: number,
   resetPage?: SettingsPageDefinition,
-  rewrite: ('shared' | 'device' | 'local')[] = [],
+  rewrite: SettingsScope[] = [],
   resetScope: SettingsResetScope = 'page',
 ) {
   assertSettingsWritable();
@@ -2586,7 +2582,9 @@ function commitSettings(
     revision,
     undefined,
     resetPage
-      ? settingsPageStorage(resetPage, resetScope).files.map((file) => file.scope)
+      ? settingsPageStorage(resetPage, resetScope).files.flatMap(({ scope }) =>
+          scope === 'local' ? [] : [scope],
+        )
       : rewrite,
   );
 }
@@ -2598,10 +2596,10 @@ function settingsPageStorage(
   const local =
     page.kind === 'applet'
       ? settings.localSettings(owner!)
-      : page.id === 'mcp-client' ||
+      : ['mcp-client', 'tts', 'ai', 'image-ai'].includes(page.id) ||
         (isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id));
-  const scopes = new Set<'shared' | 'device' | 'local'>();
-  if (page.id === 'notifications') scopes.add('local');
+  const scopes = new Set<SettingsScope>();
+  if (page.id === 'notifications') scopes.add('device');
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
   for (const p of settingsResetPaths(page, allApplets(), resetScope)) {
     scopes.add(
@@ -2622,6 +2620,11 @@ function settingsPageStorage(
         ?.settings?.some((field) => field.key === 'enabled'))
   )
     scopes.add('device');
+  const files: NonNullable<SettingsPageAuxiliary['storage']>['files'] = [...scopes].map(
+    (scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }),
+  );
+  if (page.id === 'mcp-client')
+    files.push({ scope: 'local', name: settingsCredentialFiles['mcp-secrets'] });
   return {
     canSwitch: (page.kind === 'applet' && !page.collection) || canSwitchHostPageSettings(page.id),
     local,
@@ -2636,11 +2639,7 @@ function settingsPageStorage(
           : ''
     }`,
     revision: settings.revision,
-    files: [...scopes]
-      .map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }))
-      .concat(
-        page.id === 'mcp-client' ? [{ scope: 'local', name: 'mcp-client-secrets.json' }] : [],
-      ),
+    files,
   };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
@@ -3315,9 +3314,12 @@ function settingsPageActions(
     actions['open-settings'] = async ([scope, revision]) => {
       if (typeof revision !== 'number') throw Error(hostText('settings.index.refreshStorage'));
       settings.assertRevision(revision);
-      if (!settingsPageStorage(page).files.some((file) => file.scope === scope))
+      if (
+        (scope !== 'shared' && scope !== 'device') ||
+        !settingsPageStorage(page).files.some((file) => file.scope === scope)
+      )
         throw Error(hostText('settings.index.wrongStorage'));
-      const file = settings.targetFile(scope as 'shared' | 'device' | 'local');
+      const file = settings.targetFile(scope);
       if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
@@ -3517,7 +3519,7 @@ function settingsPageActions(
   }
   if (page.id === 'about') {
     actions.restoreScopedSettings = async ([scope]) => {
-      if (scope !== 'shared' && scope !== 'device' && scope !== 'local')
+      if (scope !== 'shared' && scope !== 'device')
         throw Error(hostText('settings.index.invalidRecovery'));
       await restoreSettingsBackup(scope);
       return null;

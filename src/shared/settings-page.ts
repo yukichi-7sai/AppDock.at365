@@ -91,7 +91,7 @@ export interface SettingsPageAuxiliary {
     files: { scope: 'shared' | 'device' | 'local'; name: string }[];
   };
   settingsFiles?: {
-    scope: 'shared' | 'device' | 'local';
+    scope: 'shared' | 'device';
     path: string;
     recovered: boolean;
     errors: string[];

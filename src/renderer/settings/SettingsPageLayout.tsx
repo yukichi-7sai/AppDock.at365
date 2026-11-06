@@ -186,7 +186,7 @@ export function SettingsPageLayout({
                         hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
                       />
                     </label>
-                  ) : page.id === 'about' || page.id === 'mcp-client' ? (
+                  ) : page.kind === 'host' && storage?.local ? (
                     <span
                       className="settings-storage-toggle"
                       data-testid="settings-storage-device-only"

@@ -283,7 +283,7 @@ function settingsFixture(t) {
   fs.writeFileSync(file, JSON.stringify(createDefaultSettings()));
   const settings = new SettingsStore(file);
   settings.load();
-  const secrets = new AiSecrets(path.join(dir, 'keys.json'), {
+  const secrets = new AiSecrets(dir, 'image-ai-keys', {
     encrypt: (v) => Buffer.from(v).toString('base64'),
     decrypt: (v) => Buffer.from(v, 'base64').toString(),
   });

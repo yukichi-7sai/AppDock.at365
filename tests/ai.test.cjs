@@ -638,19 +638,19 @@ test('model refresh replaces an aborted request without losing the new in-flight
 });
 test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   const dir = temp(),
-    store = new AiSecrets(path.join(dir, 'keys.json'), {
+    store = new AiSecrets(dir, 'ai-keys', {
       encrypt: (v) => Buffer.from(v).toString('base64'),
       decrypt: (v) => Buffer.from(v, 'base64').toString(),
     });
   const c = { ...newAiConnection('local'), baseUrl: 'http://server/v1' };
   store.setKey(c, 'fake-secret');
   assert.equal(store.key(c), 'fake-secret');
-  assert(!fs.readFileSync(path.join(dir, 'keys.json'), 'utf8').includes('fake-secret'));
+  assert(!fs.readFileSync(path.join(dir, 'ai-keys.json'), 'utf8').includes('fake-secret'));
   assert.equal(store.key({ ...c, baseUrl: 'http://other/v1' }), undefined);
   assert.throws(() => store.setKey(c, 'secret\nheader'));
   store.setKey(c, '');
   assert.equal(store.key(c), undefined);
-  fs.writeFileSync(path.join(dir, 'keys.json'), '{broken');
+  fs.writeFileSync(path.join(dir, 'ai-keys.json'), '{broken');
   assert(store.status(c).error);
 });
 test('Applet AI defaults ON and existing grants retain their explicit permissions', () => {

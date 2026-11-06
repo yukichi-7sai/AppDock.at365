@@ -8,11 +8,12 @@ const { newAiConnection } = require('../out/main/shared/ai');
 const { newTtsServer } = require('../out/main/shared/tts');
 const { newImageAiConnection } = require('../out/main/shared/image-ai');
 const fixture = require('./test-settings.cjs');
-const profile = path.resolve('.artifacts/generation-local-ui-' + Date.now());
+const profile = path.resolve('.artifacts/generation-device-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const checks = [];
 let host;
 const snapshot = () => host.main.evaluate(() => window.dock.snapshot());
+const savedGeneration = () => JSON.parse(fs.readFileSync(fixture.deviceFile(profile))).generationAi;
 const check = (name) => {
   checks.push(name);
   console.log('PASS ' + name);
@@ -96,9 +97,10 @@ const check = (name) => {
         .getByLabel(inputLabel, { exact: true })
         .locator('xpath=ancestor::section[1]')
         .screenshot({ path: path.join(profile, id + '-trial.png') });
+      assert.equal(await page.getByTestId('settings-storage-local').count(), 0);
       assert.equal(
-        await page.getByRole('switch', { name: 'このPCで設定を保存する', exact: true }).count(),
-        0,
+        await page.getByTestId('settings-storage-device-only').innerText(),
+        'このPC専用',
       );
       const table = page.getByRole('table').filter({
         has: page.getByRole('columnheader', { name: 'MCP公開', exact: true }),
@@ -178,6 +180,9 @@ const check = (name) => {
       toggle = dialog.getByRole('switch', { name: 'MCPからの利用を許可', exact: true });
       assert.equal(await toggle.getAttribute('aria-checked'), 'false');
       await toggle.click();
+      const secret = id + '-fixture-key';
+      await dialog.getByLabel('認証方式', { exact: true }).selectOption('bearer');
+      await dialog.getByLabel('APIキー', { exact: true }).fill(secret);
       await dialog.getByRole('button', { name: 'OK', exact: true }).click();
       await until(
         async () => (await snapshot()).settings.value[key].connections[0].mcpEnabled === true,
@@ -186,13 +191,22 @@ const check = (name) => {
       await publication('公開').waitFor();
       await table.screenshot({ path: path.join(profile, id + '-servers.png') });
       check(id + ': server list shows the saved MCP publication state');
+      assert.equal(savedGeneration()[key].connections[0].mcpEnabled, true);
+      const local = path.join(profile, 'data');
+      const keyFile = path.join(local, id + '-keys.json');
+      const encrypted = JSON.parse(fs.readFileSync(keyFile)).entries[savedId].key;
+      const device = fs.readFileSync(fixture.deviceFile(profile), 'utf8');
+      assert(!device.includes(secret) && !device.includes(encrypted));
       assert.equal(
-        JSON.parse(fs.readFileSync(path.join(profile, 'data/generation-ai.json')))[key]
-          .connections[0].mcpEnabled,
-        true,
+        await host.app.evaluate(
+          ({ safeStorage }, value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+          encrypted,
+        ),
+        secret,
       );
       assert.equal(JSON.parse(fs.readFileSync(fixture.file(profile)))[key], undefined);
-      check(id + ': local permission defaults OFF, cancel discards and OK saves');
+      check(id + ': permission defaults OFF, cancel discards and OK saves device settings');
+      check(id + ': key is encrypted separately and absent from the device JSON');
       check(
         id +
           ': authentication toggle preserves the draft and cancel leaves the saved mode unchanged',
@@ -220,17 +234,14 @@ const check = (name) => {
         (await snapshot()).settings.value.notificationPreferences?.speech?.connectionId === 'voice',
       'notification server saved',
     );
-    assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'data/generation-ai.json')))
-        .notificationConnectionId,
-      'voice',
-    );
+    assert.equal(savedGeneration().notificationConnectionId, 'voice');
     assert.equal(
       JSON.parse(fs.readFileSync(fixture.file(profile))).notificationPreferences?.speech
         ?.connectionId,
       undefined,
     );
-    check('notification server saves only to the local generator file');
+    assert(!fs.existsSync(path.join(profile, 'data/generation-ai.json')));
+    check('notification server saves with the generators in the device JSON');
     await host.close();
     host = await launch(profile, process.argv[2]);
     const reopened = (await snapshot()).settings.value;

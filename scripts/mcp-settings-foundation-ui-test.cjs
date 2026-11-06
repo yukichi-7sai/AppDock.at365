@@ -63,7 +63,9 @@ settings.tts = {
   ],
 };
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
-require('./test-settings.cjs').write(profile, settings, local);
+const settingsFixture = require('./test-settings.cjs');
+const sharedSettingsFile = settingsFixture.file(profile);
+fs.writeFileSync(sharedSettingsFile, JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -152,6 +154,7 @@ require('./settings-web-profile-gateway-checks.cjs').install(profile);
 require('./settings-web-account-gateway-checks.cjs').install(profile, local);
 require('./settings-shortcut-list-gateway-checks.cjs').install(profile);
 require('./settings-image-group-gateway-checks.cjs').install(profile);
+settingsFixture.write(profile, JSON.parse(fs.readFileSync(sharedSettingsFile)));
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;

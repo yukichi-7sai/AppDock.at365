@@ -694,7 +694,7 @@ async function checkSectionTitles() {
     if (webAccountListOnly)
       require('./settings-web-fixture.cjs').installWebSettings(profile, initial);
     require('../out/main/shared/settings-schema').parseSettings(initial);
-    require('./test-settings.cjs').write(profile, initial, path.join(profile, 'local'));
+    require('./test-settings.cjs').write(profile, initial);
     if (source) {
       require('./copy-host.cjs').copyHost(source, testHostPath(profile));
       assert.equal(hash(source), hash(testHostPath(profile)));

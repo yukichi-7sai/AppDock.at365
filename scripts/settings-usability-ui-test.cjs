@@ -77,10 +77,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       ],
       defaultConnectionId: 'default',
     };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(initial),
-    );
+    require('./test-settings.cjs').write(profile, initial);
     const config = path.join(profile, 'codex', 'config.toml');
     fs.mkdirSync(path.dirname(config));
     fs.writeFileSync(config, '# fixture\n');
@@ -275,7 +272,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await notificationInstructions.press('Enter');
     await settleSettings(page);
     assert.equal(
-      (await snapshot()).settings.value.notificationPreferences.speech.instructions,
+      (await snapshot()).settings.value.notificationPreferences.speech?.instructions,
       undefined,
     );
     checks.push('empty notification instructions restore the selected server defaults');

@@ -209,7 +209,7 @@ async function main() {
       },
     ],
   };
-  require('./test-settings.cjs').write(profile, settings, local);
+  require('./test-settings.cjs').write(profile, settings);
   const sharedFile = require('./test-settings.cjs').file(profile),
     deviceFile = require('./test-settings.cjs').file(
       profile,

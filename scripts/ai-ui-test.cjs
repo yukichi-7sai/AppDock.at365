@@ -185,7 +185,7 @@ async function errorNoticeFor(caller) {
           `exports.activate=async c=>c.commands.register('${id}.generate','AI probe',async()=>{let r;try{await c.appdock.call('ai.models.list',{connectionId:'sdk'});const j=await c.appdock.call('ai.text.generate',{connectionId:'sdk',model:'node-model',additionalPrompt:'用途の架空指示',input:'架空の入力',requestId:require('node:crypto').randomUUID()});let v;do{await new Promise(r=>setTimeout(r,50));v=await c.appdock.call('ai.jobs.get',{jobId:j.jobId});}while(['queued','running'].includes(v.state));r={ok:v.state==='completed',jobId:j.jobId};}catch(e){r={code:e.code};}await c.log.info('ai-probe:'+JSON.stringify(r));});`,
         );
     }
-    require('./test-settings.cjs').write(profile, settings, local);
+    require('./test-settings.cjs').write(profile, settings);
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
     const port = probe.address().port;
@@ -245,8 +245,12 @@ async function errorNoticeFor(caller) {
     assert.equal(await page.getByLabel('既定のサーバー', { exact: true }).inputValue(), 'preview');
     assert(await page.getByLabel('試験の入力データ', { exact: true }).isVisible());
 
-    const settingsFile = path.join(local, 'generation-ai.json');
-    const before = fs.readFileSync(settingsFile, 'utf8');
+    const settingsFile = require('./test-settings.cjs').deviceFile(profile);
+    const readDeviceConfiguration = () => {
+      const { uiState: _uiState, ...configuration } = JSON.parse(fs.readFileSync(settingsFile));
+      return configuration;
+    };
+    const before = readDeviceConfiguration();
     assert.equal(await page.getByLabel('このPCでAI接続を使用', { exact: true }).count(), 0);
     await page.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
     let dialog = page.getByRole('dialog');
@@ -279,7 +283,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByLabel('APIのURL', { exact: true }).fill('http://');
     assert.equal(await dialog.getByLabel('APIのURL', { exact: true }).inputValue(), 'http://');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
-    assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
+    assert.deepEqual(readDeviceConfiguration(), before);
     assert(!fs.existsSync(path.join(local, 'ai-keys.json')));
     await until(
       () =>
@@ -296,7 +300,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByLabel('APIキー', { exact: true }).press('Enter');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
     assert.equal(modelRequests.at(-1).auth, 'Bearer fixture-ai-secret');
-    assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
+    assert.deepEqual(readDeviceConfiguration(), before);
     assert(!fs.existsSync(path.join(local, 'ai-keys.json')));
     const count = modelRequests.length;
     const url = dialog.getByLabel('APIのURL', { exact: true });
@@ -329,12 +333,12 @@ async function errorNoticeFor(caller) {
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '既定の出力トークン上限は' }).waitFor();
     assert.equal(await dialog.getByRole('tab', { selected: true }).innerText(), '詳細設定');
-    assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
+    assert.deepEqual(readDeviceConfiguration(), before);
     await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('100000');
     await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('601');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '既定の待ち時間は' }).waitFor();
-    assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
+    assert.deepEqual(readDeviceConfiguration(), before);
     await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await until(
@@ -347,11 +351,13 @@ async function errorNoticeFor(caller) {
     );
     assert.equal((await snapshot()).settings.revision, revision + 1);
     assert.equal(
-      JSON.parse(fs.readFileSync(settingsFile, 'utf8')).ai.connections[0].defaultMaxOutputTokens,
+      JSON.parse(fs.readFileSync(settingsFile, 'utf8')).generationAi.ai.connections[0]
+        .defaultMaxOutputTokens,
       100000,
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(settingsFile, 'utf8')).ai.connections[0].defaultTimeoutSeconds,
+      JSON.parse(fs.readFileSync(settingsFile, 'utf8')).generationAi.ai.connections[0]
+        .defaultTimeoutSeconds,
       120,
     );
     assert(

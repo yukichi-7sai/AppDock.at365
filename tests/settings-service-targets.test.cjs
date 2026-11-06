@@ -77,10 +77,11 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
       throw Error('Settings entry must not decrypt credentials');
     },
   };
-  const aiFile = path.join(dir, 'ai-keys.json'),
-    ttsFile = path.join(dir, 'tts-keys.json');
-  const aiSecrets = new AiSecrets(aiFile, encryption),
-    ttsSecrets = new TtsSecrets(ttsFile, encryption);
+  const keyDirectory = device ? path.join(dir, 'local') : dir;
+  const aiFile = path.join(keyDirectory, 'ai-keys.json'),
+    ttsFile = path.join(keyDirectory, 'tts-keys.json');
+  const aiSecrets = new AiSecrets(keyDirectory, 'ai-keys', encryption),
+    ttsSecrets = new TtsSecrets(keyDirectory, 'tts-keys', encryption);
   const ai = new AiSettingsController(
     store,
     aiSecrets,
@@ -93,7 +94,7 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
       },
     },
   );
-  const imageSecrets = new AiSecrets(path.join(dir, 'image-keys.json'), encryption);
+  const imageSecrets = new AiSecrets(keyDirectory, 'image-ai-keys', encryption);
   const imageAi = new ImageAiSettingsController(store, imageSecrets, () => {});
   const types = notificationCatalog([]);
   const validate = (value) => {
@@ -646,13 +647,17 @@ test('TTS updates share validation, are atomic and side-effect free in dryRun, p
     preview = f.call('apply', f.request(id, operations, true));
   assert.equal(preview.completion, 'validated');
   assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), before);
+  assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), device);
   assert.equal(f.writes(), 0);
   const request = f.request(id, operations),
     saved = f.call('apply', request);
   assert.deepEqual(f.call('apply', request), saved);
   assert.equal(f.writes(), 1);
   assert.equal(f.values(id).defaultInstructions, 'new instructions');
-  assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), device);
+  const expectedDevice = JSON.parse(device);
+  Object.assign(expectedDevice.generationAi.tts.connections[0], operations[0].changes);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)), expectedDevice);
+  assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), before);
   assert.throws(
     () =>
       f.call(
@@ -1213,7 +1218,10 @@ test('AI first addition chooses a default and removing that default clears it wi
   assert.equal(f.store.value.ai.defaultConnectionId, undefined);
   assert.equal(f.store.value.ai.connections.length, 1);
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(f.store.local.file)).ai, 'defaultConnectionId'),
+    Object.hasOwn(
+      JSON.parse(fs.readFileSync(f.store.device.file)).generationAi.ai,
+      'defaultConnectionId',
+    ),
     false,
   );
   rows = listRows(f);
@@ -1651,7 +1659,7 @@ test('Ollama preset initializes blank voice fields atomically and reapplies a mi
   assert.equal(f.values(id).defaultVoice, 'Zoey');
 });
 
-test('TTS manual voices use explicit server IDs, owner defaults and independent shared storage', (t) => {
+test('TTS manual voices use explicit server IDs, owner defaults and device storage', (t) => {
   const f = fixture(t, { device: true }),
     schema = f.call('schema.get', { targetId: ttsList });
   assert.equal(schema.maxItems, undefined);
@@ -1667,6 +1675,7 @@ test('TTS manual voices use explicit server IDs, owner defaults and independent 
   });
   assert.equal(preview.completion, 'validated');
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
   assert.equal(f.writes(), 0);
   const request = f.request(ttsList, [operation]),
     saved = f.call('apply', request);
@@ -1675,7 +1684,10 @@ test('TTS manual voices use explicit server IDs, owner defaults and independent 
   assert.deepEqual(f.store.value.tts.connections[0].manualVoices, [preview.changes[0].values]);
   assert.equal(f.store.value.tts.connections[0].voicesSource, 'endpoint');
   assert.equal(f.store.value.tts.connections[0].defaultVoice, 'voice');
-  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  const expectedDevice = JSON.parse(device);
+  expectedDevice.generationAi.tts.connections[0].manualVoices = [preview.changes[0].values];
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)), expectedDevice);
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   assert(!fs.existsSync(f.ttsFile));
   assert.equal(f.decrypts(), 0);
 });
@@ -2740,7 +2752,7 @@ test('image preset settings never expose keys or change a credential-bound endpo
   assert.equal(f.decrypts(), 0);
 });
 
-test('MCP cannot grant generator permissions or retarget allowed presets and edits remain local', (t) => {
+test('MCP cannot grant generator permissions or retarget allowed presets and edits stay device-scoped', (t) => {
   const f = fixture(t, { device: true });
   const { newImageAiConnection } = require('../out/main/shared/image-ai');
   const next = structuredClone(f.store.value);
@@ -2753,7 +2765,8 @@ test('MCP cannot grant generator permissions or retarget allowed presets and edi
   };
   f.store.save(next, f.store.revision);
   const shared = fs.readFileSync(f.store.shared.file, 'utf8');
-  const device = fs.readFileSync(f.store.device.file, 'utf8');
+  const readDevice = () => JSON.parse(fs.readFileSync(f.store.device.file));
+  const { generationAi: _before, ...device } = readDevice();
   for (const kind of ['ai', 'tts', 'imageAi']) {
     const targetId = 'service.' + kind + '.connections';
     let row = f.call('items.list', { targetId }).items[0];
@@ -2783,11 +2796,9 @@ test('MCP cannot grant generator permissions or retarget allowed presets and edi
       f.request(targetId, [{ kind: 'update', itemRef: row.itemRef, changes: { name: 'Renamed' } }]),
     );
     assert.equal(f.store.value[kind].connections[0].mcpEnabled, true);
-    assert.equal(
-      JSON.parse(fs.readFileSync(f.store.local.file))[kind].connections[0].name,
-      'Renamed',
-    );
+    assert.equal(readDevice().generationAi[kind].connections[0].name, 'Renamed');
   }
   assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), shared);
-  assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), device);
+  const { generationAi: _after, ...otherDeviceSettings } = readDevice();
+  assert.deepEqual(otherDeviceSettings, device);
 });

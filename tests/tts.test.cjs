@@ -722,7 +722,7 @@ test('keys are encrypted, bound to endpoint, never fall back to plaintext and de
   const dir = fs.mkdtempSync(path.resolve('.artifacts/tts-implementation/secrets-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'tts-keys.json');
-  const keys = new TtsSecrets(file, {
+  const keys = new TtsSecrets(dir, 'tts-keys', {
     encrypt: (s) => 'encrypted:' + Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s.slice(10), 'base64').toString(),
   });
@@ -733,7 +733,7 @@ test('keys are encrypted, bound to endpoint, never fall back to plaintext and de
   assert.throws(() => keys.setKey({ id: 'one', baseUrl: 'http://host/v1' }, 'x\ny'));
   keys.setKey({ id: 'one', baseUrl: 'http://host/v1' }, '');
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).entries, {});
-  const denied = new TtsSecrets(file, {
+  const denied = new TtsSecrets(dir, 'tts-keys', {
     encrypt: () => {
       throw Error('unavailable');
     },
