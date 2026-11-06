@@ -101,7 +101,10 @@ settings.ribbon.groups = [
     children: ['button:deferred'],
   },
 ];
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const exe = source ? testHostPath(profile) : require('electron');
 if (source) copyHost(source, exe);
 const until = async (fn, label) => {
@@ -184,12 +187,13 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
     assert.equal(startup.images.filter((e) => e.width > 0).length, 1);
     assert.equal(startup.images.find((e) => e.ref.file === 'b-collapsed.png').width, 0);
     assert.equal(startup.images.find((e) => e.ref.file === 'zz-unused.webp').available, true);
-    assert.equal(
-      browser
-        .contexts()
-        .flatMap((c) => c.pages())
-        .some((p) => p.url().startsWith('data:')),
-      false,
+    await until(
+      () =>
+        !browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .some((p) => p.url().startsWith('data:')),
+      'visible image decoder released after idle',
     );
     result.checks.push(
       '103 files indexed; only the visible ribbon image decoded; closed group and unused WebP remain unloaded',
@@ -256,7 +260,7 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
     })`,
       );
     assert((await cacheState()).cached > 0);
-    await host.locator('.ad-gallery-card').first().locator('.ad-gallery-image').click();
+    await host.locator('.ad-gallery-card').first().locator('.ad-gallery-image').dblclick();
     await host.getByRole('dialog').waitFor();
     await until(async () => (await cacheState()).owners === 2, 'preview owner');
     await host.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
@@ -302,7 +306,7 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
         (await cacheState()).cached > 0 && (await cacheState()).owners === baselineOwners + 1,
       'picker cache',
     );
-    await picker.getByRole('button', { name: '拡大', exact: true }).first().click();
+    await picker.locator('.ad-gallery-card .ad-gallery-image').first().press('Enter');
     await until(
       async () => (await cacheState()).owners === baselineOwners + 2,
       'picker preview owner',

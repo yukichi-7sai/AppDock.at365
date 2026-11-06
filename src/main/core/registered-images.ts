@@ -5,7 +5,7 @@ import { imageFilename } from '../../shared/registered-images';
 import { RegisteredAssets, type AssetDecoder } from './registered-assets';
 export type { DecodedAsset as DecodedImage } from './registered-assets';
 export type ImageDecoder = AssetDecoder;
-const maxBytes = 5 * 1024 * 1024;
+const maxBytes = Number.MAX_SAFE_INTEGER;
 export function imageFormat(bytes: Buffer) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'png';
   if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'jpeg';
@@ -43,13 +43,7 @@ async function validateRegisteredImage(bytes: Buffer, name: string, decode: Imag
     }
   }
   const image = await decode(bytes);
-  if (
-    !image.width ||
-    !image.height ||
-    image.width > 8192 ||
-    image.height > 8192 ||
-    image.width * image.height > 16 * 1024 * 1024
-  )
+  if (image.width <= 0 || image.height <= 0 || !Number.isSafeInteger(image.width * image.height))
     throw Error(hostText('services.registeredImages.decodeFailed'));
   return image;
 }
@@ -69,6 +63,12 @@ export class RegisteredImages extends RegisteredAssets {
         maxBytes,
         format: imageFormat,
         validate: (bytes, name) => validateRegisteredImage(bytes, name, decode),
+        ...(decode.file
+          ? {
+              validateFile: (file: string, name: string, active?: () => boolean) =>
+                decode.file!(file, 64, name, active),
+            }
+          : {}),
       },
       changed,
       assistance,

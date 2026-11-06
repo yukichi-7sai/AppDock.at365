@@ -24,7 +24,7 @@ export interface AssetPolicy {
   allowEmpty?: boolean;
   format(bytes: Buffer): string;
   validate(bytes: Buffer, name: string): Promise<DecodedAsset>;
-  validateFile?(file: string, name: string): Promise<DecodedAsset>;
+  validateFile?(file: string, name: string, active?: () => boolean): Promise<DecodedAsset>;
 }
 export interface DecodedAsset {
   width: number;
@@ -36,7 +36,15 @@ export interface DecodedAsset {
   characters?: number;
   lines?: number;
 }
-export type AssetDecoder = (bytes: Buffer) => DecodedAsset | Promise<DecodedAsset>;
+export type AssetDecoder = ((bytes: Buffer) => DecodedAsset | Promise<DecodedAsset>) & {
+  file?(
+    file: string,
+    edge?: number,
+    name?: string,
+    active?: () => boolean,
+    hash?: string,
+  ): Promise<DecodedAsset>;
+};
 interface AssetRecord {
   entry: RegisteredImageEntry;
   modifiedAt?: number;
@@ -44,6 +52,12 @@ interface AssetRecord {
   hash: string;
   circle: string;
   decoded: boolean;
+  verified?: boolean;
+  filePending?: {
+    task: Promise<ReadAssetFile>;
+    cachePreview: boolean;
+    interests: Set<{ active(): boolean; cachePreview: boolean }>;
+  };
   pending?: {
     task: Promise<ReadAsset>;
     interests: Set<{ active(): boolean; cachePreview: boolean }>;
@@ -56,6 +70,7 @@ interface ReadAsset {
   generation: string;
   thumbnail: string;
 }
+type ReadAssetFile = Omit<ReadAsset, 'bytes'> & { file: string; bytes?: Buffer };
 /** A requesting view no longer needs the bytes. The file itself may still be current. */
 export class LibraryReadCancelled extends Error {}
 export class RegisteredAssets {
@@ -143,6 +158,7 @@ export class RegisteredAssets {
       record.entry.height !== image.height ||
       (cachePreview && !record.decoded);
     record.hash = hash;
+    record.verified = true;
     if (cachePreview) {
       record.circle = image.circle;
       record.entry.thumbnail = image.thumbnail;
@@ -324,62 +340,114 @@ export class RegisteredAssets {
     return bytes;
   }
   /** Validate file-backed media without materializing its complete contents. */
-  async readFile(ref: unknown, generation?: string, options: { active?(): boolean } = {}) {
+  async readFile(
+    ref: unknown,
+    generation?: string,
+    options: { active?(): boolean; cachePreview?: boolean } = {},
+  ): Promise<ReadAssetFile> {
     if (!this.policy.validateFile) {
       const saved = await this.read(ref, generation, options);
       return { ...saved, file: this.file(saved.ref.file) };
     }
     if (!this.reference(ref)) throw Error(this.text('services.registeredImages.invalidReference'));
-    const active = options.active ?? (() => true);
-    const check = () => {
-      if (!active()) throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
+    const interest = {
+      active: options.active ?? (() => true),
+      cachePreview: options.cachePreview !== false,
     };
-    check();
+    const checkInterest = () => {
+      if (!interest.active())
+        throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
+    };
+    checkInterest();
     await this.refresh(false, [ref.file]);
-    check();
+    checkInterest();
     const record = this.entries.get(imageKey(ref));
     if (!record || !this.current(record))
       throw Error(this.text('services.registeredImages.missing'));
     if (generation !== undefined && record.entry.generation !== generation)
       throw Error(this.text('services.registeredImages.changed'));
-    try {
-      const before = await this.fileSignature(ref.file);
-      const file = this.file(ref.file),
-        hash = await fileHash(file, active);
-      check();
-      if (
-        before.signature !== record.signature ||
-        (record.hash && record.hash !== hash) ||
-        (assignedImage(ref.file) && path.basename(ref.file, path.extname(ref.file)) !== hash)
-      )
-        throw Error(this.text('services.registeredImages.changed'));
-      const decoded = record.decoded
-        ? { ...record.entry, circle: record.circle }
-        : await this.policy.validateFile(file, ref.file);
-      check();
-      if (
-        !this.current(record) ||
-        (await this.fileSignature(ref.file)).signature !== before.signature
-      )
-        throw Error(this.text('services.registeredImages.changed'));
-      this.publish(record, decoded, hash);
-      return {
-        ref: { ...ref },
-        file,
-        hash,
-        generation: record.entry.generation!,
-        thumbnail: decoded.thumbnail,
-      };
-    } catch (error) {
-      check();
-      if (this.current(record)) {
-        record.entry.available = false;
-        record.entry.state = 'error';
-        record.signature = '';
-        this.notify();
-      }
-      throw error;
+    const reply = async (task: Promise<ReadAssetFile>) => {
+      const result = await task;
+      checkInterest();
+      return result;
+    };
+    if (
+      record.filePending &&
+      (record.filePending.cachePreview || !interest.cachePreview) &&
+      [...record.filePending.interests].some((value) => value.active())
+    ) {
+      record.filePending.interests.add(interest);
+      return reply(record.filePending.task);
     }
+    const interests = new Set([interest]);
+    const active = () => [...interests].some((value) => value.active());
+    const check = () => {
+      if (!active()) throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
+      if (!this.current(record)) throw Error(this.text('services.registeredImages.changed'));
+    };
+    const run = async (): Promise<ReadAssetFile> => {
+      check();
+      let decoding = false;
+      try {
+        const before = await this.fileSignature(ref.file);
+        const file = this.file(ref.file),
+          hash = await fileHash(file, active);
+        check();
+        if (
+          before.signature !== record.signature ||
+          (record.hash && record.hash !== hash) ||
+          (assignedImage(ref.file) && path.basename(ref.file, path.extname(ref.file)) !== hash)
+        )
+          throw Error(this.text('services.registeredImages.changed'));
+        const decoded =
+          record.decoded ||
+          (record.verified && ![...interests].some((value) => value.active() && value.cachePreview))
+            ? { ...record.entry, circle: record.circle }
+            : await (async () => {
+                decoding = true;
+                const value = await this.policy.validateFile!(file, ref.file, active);
+                decoding = false;
+                return value;
+              })();
+        check();
+        if (
+          !this.current(record) ||
+          (await this.fileSignature(ref.file)).signature !== before.signature
+        )
+          throw Error(this.text('services.registeredImages.changed'));
+        this.publish(
+          record,
+          decoded,
+          hash,
+          [...interests].some((value) => value.active() && value.cachePreview),
+        );
+        return {
+          ref: { ...ref },
+          file,
+          hash,
+          generation: record.entry.generation!,
+          thumbnail: decoded.thumbnail,
+        };
+      } catch (error) {
+        check();
+        if (this.current(record)) {
+          record.entry.available = false;
+          record.entry.state = 'error';
+          if (!decoding) record.signature = '';
+          this.notify();
+        }
+        throw error;
+      }
+    };
+    const task = this.reads.then(run, run).finally(() => {
+      if (record.filePending?.task === task) record.filePending = undefined;
+    });
+    record.filePending = { task, interests, cachePreview: interest.cachePreview };
+    this.reads = task.then(
+      () => {},
+      () => {},
+    );
+    return reply(task);
   }
   /** Copy to a private stage, validate it, then publish exclusively in the destination. */
   addFile(source: string, filename: string, writable: () => void = () => {}) {
@@ -428,7 +496,7 @@ export class RegisteredAssets {
           old?.signature === stat.signature
             ? old
             : this.replace(name, stat.signature, stat.bytes, old, stat.modifiedAt);
-        this.publish(record, decoded, original);
+        this.publish(record, decoded, original, this.policy.media !== 'image');
         return { ref: { file: name }, reused, generation: record.entry.generation! };
       } finally {
         await fs.unlink(temp).catch(() => {});
@@ -478,33 +546,54 @@ export class RegisteredAssets {
       if (!this.reference(ref))
         throw Error(this.text('services.registeredImages.invalidReference'));
       const expectedHash = this.entries.get(imageKey(ref))?.hash;
-      const original = await this.read(ref, generation);
+      const original = await this.readFile(ref, generation, { cachePreview: false });
       if (!generation || (expectedHash && expectedHash !== original.hash))
         throw Error(this.text('services.registeredImages.changed'));
       const commit = options.prepare();
       const file = this.file(original.ref.file);
-      let recycled = false;
+      const backup = this.policy.validateFile
+        ? path.join(this.directory, `.${randomUUID()}.recovery`)
+        : undefined;
+      let recycled = false,
+        keepBackup = false,
+        trashStarted = false;
       try {
+        if (backup) {
+          await fs.copyFile(file, backup, fs.constants.COPYFILE_EXCL);
+          if (
+            !(await sameFileHash(backup, original.hash)) ||
+            !(await sameFileHash(file, original.hash))
+          )
+            throw Error(this.text('services.registeredImages.changed'));
+        }
+        trashStarted = true;
         await options.trash(file);
         recycled = true;
         commit();
       } catch (error) {
+        if (!trashStarted) throw error;
         try {
           await this.root();
           try {
-            await fs.writeFile(file, original.bytes, { flag: 'wx' });
+            if (backup) {
+              if (!(await sameFileHash(backup, original.hash)))
+                throw Error('Recovery file changed');
+              await fs.copyFile(backup, file, fs.constants.COPYFILE_EXCL);
+            } else await fs.writeFile(file, original.bytes!, { flag: 'wx' });
           } catch (restoreError) {
             if (
               (restoreError as NodeJS.ErrnoException).code !== 'EEXIST' ||
-              !(await this.fileBytes(original.ref.file)).equals(original.bytes)
+              !(await sameFileHash(file, original.hash))
             )
               throw restoreError;
           }
         } catch {
+          keepBackup = true;
           throw Error(this.text('services.registeredImages.restoreFailed'));
         }
         throw recycled ? error : Error(this.text('services.registeredImages.trashFailed'));
       } finally {
+        if (backup && !keepBackup) await fs.unlink(backup).catch(() => {});
         if (this.refreshing) await this.refreshing;
         await this.refresh();
       }
@@ -661,7 +750,7 @@ export class RegisteredAssets {
       monochrome: /\.svg$/i.test(record.entry.ref.file),
       load: async () => {
         if (!this.current(record)) throw Error(this.text('services.registeredImages.changed'));
-        if (!record.decoded) await this.read(record.entry.ref, record.entry.generation);
+        if (!record.decoded) await this.readFile(record.entry.ref, record.entry.generation);
         if (!this.current(record)) throw Error(this.text('services.registeredImages.changed'));
         return this.icon(record.entry.ref, shape) || undefined;
       },

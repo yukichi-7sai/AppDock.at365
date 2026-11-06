@@ -73,6 +73,7 @@ import { ImageLibraryDialogs } from './core/image-library-dialogs';
 import { SoundGeneration } from './core/sound-generation';
 import { GalleryViewStateStore } from './core/gallery-view-state';
 import { GalleryImages } from './core/gallery-images';
+import { originalImageSources } from './core/image-file-source';
 import { NotificationCenterController } from './core/notification-center';
 import { publishUpdateResult } from './core/update-result-notification';
 import { LogPageSession } from './core/log-page';
@@ -474,7 +475,10 @@ let soundGalleryViewState: GalleryViewStateStore;
 const rendererSoundSessions = new Map<string, ReturnType<SoundGallery['session']>>();
 let galleryImages: GalleryImages;
 const rendererImageSessions = new Map<string, ReturnType<GalleryImages['session']>>();
+let legacyImageSession: ReturnType<GalleryImages['session']> | undefined;
 const releaseRendererImages = () => {
+  legacyImageSession?.dispose();
+  legacyImageSession = undefined;
   for (const session of rendererImageSessions.values()) session.dispose();
   rendererImageSessions.clear();
   for (const session of rendererSoundSessions.values()) session.dispose();
@@ -3791,14 +3795,7 @@ function registerIpc() {
   handle('dock:imageLibrary:preview', async (ref, original = false, sessionId) => {
     if (!imageReference(ref)) throw Error(hostText('services.index.imageReference'));
     if (sessionId !== undefined) return imageSession(sessionId).preview(ref, original === true);
-    if (original === true) {
-      const saved = await registeredImages.read(ref);
-      if (/\.svg$/i.test(saved.ref.file))
-        return (await decodeRegisteredImage(saved.bytes, 2048)).thumbnail;
-      const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
-      return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${saved.bytes.toString('base64')}`;
-    }
-    return (await registeredImages.preview(ref)) ?? null;
+    return (legacyImageSession ??= galleryImages.session()).preview(ref, original === true);
   });
   handle('dock:imageLibrary:pick', (current) => imageLibraryHost.pick(current));
   handle('dock:imagePick:pending', () => imageLibraryHost.pendingRequest());
@@ -4597,6 +4594,8 @@ async function initialize() {
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
+    if (url.host === 'host' && url.pathname.startsWith('/library-original/'))
+      return originalImageSources.response(request);
     if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
       const image = [...manager.items.values()]
         .flatMap((extension) => extension.panel?.images ?? [])

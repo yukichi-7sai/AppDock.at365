@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-11-06 大きな画像のファイル参照・縮小処理・容量制限撤去（0.163.1）
+
+- ファイルからの画像登録にある5MiB・各辺8192px・16Miピクセルの固定上限を撤去した。PNG/JPEG/WebP/SVGの静止画像、拡張子と内容の整合、正の表現可能な寸法、実decode、SVGの文書検証は維持する。Node/.NET共通の1MiB JSON-RPC行上限に由来するプログラム取り込みの512KiB制限は別に維持する。既存参照・原画像・設定用コピーの保存形式は変更しない。
+- 登録ラスター画像はヘッダーを部分読み込みし、非永続sessionの隔離rendererへ一時URLで渡す。必要な寸法を指定したImageBitmapから小型PNGを作り、原画像全体のBuffer/Base64をmainへ渡さない。原寸プレビューは開いたファイルハンドルを参照し、SVGは安全性検査後にPNG化する。hashは256KiB、配信は64KiB以下で読み込む。設定用保管・改名・削除復旧・Appletへの原画像コピーもファイル操作と分割hash照合へ変更した。
+- 永続サムネイルディスクキャッシュを追加せず、既存の64MiBギャラリーメモリーキャッシュと画面ごとの所有関係を維持した。最後の利用元の終了で縮小画像・一時URL・stream・待機要求を解放する。継続利用の小型アイコンと欠落時の直近表示は維持する。改名・削除の復旧用一時ファイルは成功または復旧成功後に削除し、復旧失敗時のみ保全する。実際のdecode可能範囲、codec内部の展開、原寸コピー/プレビュー、SVG文書検証のメモリーはElectronと端末資源に依存し、全操作のメモリー一定を保証するものではない。
+- 発行前レビューで実使用経路、URL権限、世代/hash・変更検出、同時要求と取消、元bytes保持、復旧・終了処理を確認した。公開画像APIの受理寸法拡張を含むため0.162.0→0.163.0とした。初回固定EXEの画面切替試験で、従来のbytes decoderのidle処理がfile decoderまで破棄する競合を検出したため、それぞれの自動回収を独立させ、閉じた要求は`LibraryReadCancelled`へ戻した。発行済み製品の内部修正として0.163.1へ更新して再発行した。1200ms遅延で重なりを作る試験は旧0.163.0で失敗し、最終版で成功する。未解決の阻害指摘なし。
+- 固定lockfile同期、型検査、ビルド、整形・差分検査が成功。関連回帰195/195件、失敗・取消・skip・todo各0。最終製品/依存/試験/ビルド入力1200ファイルのhashは検証前・発行後・最終試験後で一致した。途中のPNG末尾欠落検査とSVGのCORS描画を修正した。旧フォルダーselect・拡大ボタン・NativeImage専用の起動前提・選択状態を使っていたGUI試験は現行操作へ更新し、選択・取消・キャッシュ解放の契約を維持した。版更新直後の依存未同期による実行拒否もログを保持し、同期後に同じ試験を実行した。
+- 最終固定EXEで`image-files-ui-test`、`image-gallery-ui-test`、`image-folders-svg-ui-test`、`lazy-registered-images-ui-test`、`image-library-session-ui-test`、`library-navigation-ui-test`、`sound-library-ui-test`の7件がすべて終了0。25,151,572 bytes・10000×2400px PNGの登録、512×123px縮小、原寸ファイルURLの表示、透過alpha=180、縦10000px PNG、JPEGとEXIF付きJPEG、WebP、大寸法SVG、設定用コピーのhash、改名/削除失敗時の復旧を確認した。mainのラスター全量readFileと5MiB超Base64を拒否する検査も成功した。最終大画像profileは`image-files-ui-YLOFNQ`。実画面のPNGを目視し、元サイズと透過・プレビュー表示を確認した。SVG大量取り込み、設定用コピーの再起動保持、閉じた画面のキャッシュ/URL失効、画像/音各6回の早期離脱、古い要求の拒否、音の改名・移動・再生・保管コピーも確認した。
+- `publish.bat`終了0、`A:\40.ARTIFACT\AppDock.at365`へローカル発行。package/feed/manifest/PE FileVersionは0.163.1。build stage・発行先・共用runtime・更新ZIPの101ファイルがSHA256一致。EXE SHA256=`5907c39a69c1b06f2fd117e73fdada07307daa58e775920ca0f31e71c5040903`、更新ZIP SHA256=`57d3a875c85c6a08660c569d95e0a7a7d2157cbbe4a06325cdbe1722921d0fd4`。既存のViteチャンクサイズ警告は残る。
+- 最終証跡は`.artifacts/image-files-01631/`、途中の証跡は`.artifacts/image-files-work/`と`.artifacts/image-files-01630/`。Windows x64、Node 26.13.0/pnpm 12.15.0/Electron 45.1.0/.NET SDK 10.0.403。試験プロセス0、対象32profileの専用EXE/DLLコピー0を確認した。大画像source成功profileは新しい3件を保持して古い1件を整理し、結果JSONを最終証跡へ保管した。共用runtime・失敗証跡・成功判定が不明な過去profileは保持する。隔離fixtureでの自動検証と画面確認であり、利用者の手動確認、実NAS、実スピーカーやクリップボードの確認とは区別する。実装・試験・仕様・版・本記録を1つのローカルコミットへまとめ、push・GitHub Release・実利用先deployは行わない。
+
 ## 2026-11-06 音声形式追加・ファイルからの再生・容量制限撤去（0.162.0）
 
 - 音ライブラリー・保管コピー・通知音・Node Appletの音声再生に、WAVに加えてMP3/AAC（ADTS）/M4A/FLAC/OGG/OGA/OPUS/WEBMを接続した。拡張子とヘッダーに加え、圧縮音声は同梱Electronのデコーダーで検査する。既存WAV、登録名、絶対パス、`@library/@assigned`参照と`ui.pickFile('wav')`の引数は保持する。音の一覧と選択画面には実際の拡張子を表示する。

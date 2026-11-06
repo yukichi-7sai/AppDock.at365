@@ -2,6 +2,7 @@ import { svgSource, validateSvg } from '../../shared/svg-image';
 import { hostText } from '../../shared/i18n';
 import { BrowserWindow, nativeImage } from 'electron';
 import type { DecodedImage } from './registered-images';
+import { decodeRegisteredImageFile, disposeImageFileDecoder } from './image-file-decoder';
 
 let worker: BrowserWindow | undefined;
 let ready: Promise<void> | undefined;
@@ -11,10 +12,16 @@ let stopped = false;
 
 export function stopRegisteredImageDecoder() {
   stopped = true;
+  disposeImageFileDecoder(true);
   disposeRegisteredImageDecoder();
 }
 
 export function disposeRegisteredImageDecoder() {
+  disposeImageFileDecoder();
+  disposeByteImageDecoder();
+}
+
+function disposeByteImageDecoder() {
   clearTimeout(idle);
   const previous = worker;
   worker = undefined;
@@ -27,7 +34,7 @@ export function disposeRegisteredImageDecoder() {
 const browserDecode = `(async ({source,edge,svg}) => {
   const image = new Image(); image.src = source; await image.decode();
   const width = image.naturalWidth, height = image.naturalHeight;
-  if (!width || !height || width > 8192 || height > 8192 || width * height > 16777216)
+  if (!width || !height || !Number.isSafeInteger(width * height))
     throw new Error('Invalid dimensions');
   const preview = document.createElement('canvas');
   const scale = edge === 0 ? 1 : edge === 64 ? 64 / Math.max(width, height) : (svg ? edge / Math.max(width, height) : Math.min(1, edge / Math.max(width, height)));
@@ -78,7 +85,7 @@ function decodeWebP(bytes: Buffer, edge = 64, svg = false): Promise<DecodedImage
         })(),
         new Promise<never>((_, reject) => {
           timeout = setTimeout(() => {
-            disposeRegisteredImageDecoder();
+            disposeByteImageDecoder();
             reject(Error('Image decode timeout'));
           }, 15000);
         }),
@@ -87,7 +94,7 @@ function decodeWebP(bytes: Buffer, edge = 64, svg = false): Promise<DecodedImage
       throw Error(hostText('services.registeredImageDecoder.webpFailed'));
     } finally {
       clearTimeout(timeout);
-      idle = setTimeout(disposeRegisteredImageDecoder, 1000);
+      idle = setTimeout(disposeByteImageDecoder, 1000);
       idle.unref();
     }
   });
@@ -123,12 +130,7 @@ export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<D
     return decodeWebP(bytes, edge);
   const source = nativeImage.createFromBuffer(bytes),
     size = source.getSize();
-  if (
-    source.isEmpty() ||
-    size.width > 8192 ||
-    size.height > 8192 ||
-    size.width * size.height > 16 * 1024 * 1024
-  )
+  if (source.isEmpty() || !Number.isSafeInteger(size.width * size.height))
     throw Error(hostText('services.registeredImageDecoder.invalidDimensions'));
   const target = edge === 64 ? 64 : Math.min(edge, Math.max(size.width, size.height));
   const thumbnail = source
@@ -157,3 +159,5 @@ export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<D
     circle: nativeImage.createFromBitmap(bitmap, { width: 96, height: 96 }).toDataURL(),
   };
 }
+// File-backed library consumers use the isolated decoder; bounded RPC/icon inputs keep the byte API.
+Object.assign(decodeRegisteredImage, { file: decodeRegisteredImageFile });

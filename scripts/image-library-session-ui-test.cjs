@@ -294,8 +294,8 @@ const observations = [];
       'frame-independent dialog restores page',
     );
     await card('image-000.png')
-      .getByRole('button', { name: 'image-000.pngを拡大', exact: true })
-      .click();
+      .getByRole('button', { name: 'image-000.pngを選択', exact: true })
+      .dblclick();
     const framePreview = host.getByRole('dialog', { name: 'image-000.png', exact: true });
     for (const overlayBackground of ['transparent', 'blur']) {
       await host.evaluate(async (overlayBackground) => {
@@ -413,6 +413,8 @@ const observations = [];
       );
     }
     // A native modal can become active before the scroll handler's rAF reaches main.
+    await page.getByRole('button', { name: '選択を解除', exact: true }).click();
+    await until(async () => (await model()).content.selected === 0, 'clear preview selection');
     await page.evaluate(() => {
       const scroll = document.querySelector('.library-scroll');
       scroll.scrollTop = 500;
@@ -519,7 +521,7 @@ const observations = [];
         }
     });
     await card('image-000.png')
-      .getByRole('button', { name: 'image-000.pngを拡大', exact: true })
+      .getByRole('button', { name: 'image-000.pngを選択', exact: true })
       .dblclick({ delay: 75 });
     const preview = host.getByRole('dialog', { name: 'image-000.png', exact: true });
     await preview.waitFor();
@@ -553,8 +555,7 @@ const observations = [];
     );
     for (let i = 0; i < 6; i++) {
       await page
-        .locator('.library-sidebar > nav')
-        .first()
+        .getByRole('navigation', { name: 'グループ', exact: true })
         .getByRole('button')
         .nth(i % 2 ? 0 : 1)
         .click();

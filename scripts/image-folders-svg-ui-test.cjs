@@ -164,7 +164,10 @@ async function choose(cancel) {
     .click();
   await parent.getByRole('button', { name: /グループのアイコンの画像を(選択|変更)/ }).click();
   const picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
-  await picker.getByLabel('フォルダー', { exact: true }).selectOption('エクスプローラー');
+  await picker
+    .getByRole('navigation', { name: 'フォルダー', exact: true })
+    .getByRole('button', { name: 'エクスプローラー', exact: true })
+    .click();
   await card(picker, 'heart.svg').locator('.ad-gallery-image').click();
   await picker.getByRole('button', { name: '画像を使う', exact: true }).click();
   await picker.waitFor({ state: 'hidden' });

@@ -3,6 +3,8 @@ import type { RegisteredImages } from './registered-images';
 import { LibraryReadCancelled } from './registered-assets';
 import { imageKey, type RegisteredImageRef } from '../../shared/registered-images';
 import { decodeRegisteredImage } from './registered-image-decoder';
+import { decodeRegisteredImageFile } from './image-file-decoder';
+import { originalImageSources } from './image-file-source';
 
 export interface GalleryImageSession {
   get(ref: RegisteredImageRef, generation: string, edge: number): Promise<string>;
@@ -12,7 +14,7 @@ export interface GalleryImageSession {
 type Owner = {
   live: boolean;
   keys: Set<string>;
-  preview?: { key: string; task: Promise<string> };
+  preview?: { key: string; task: Promise<string>; close?(): Promise<void> };
 };
 type CachedImage = { source: string; cost: number; owners: Set<Owner> };
 type PendingImage = { task: Promise<string>; owners: Set<Owner> };
@@ -26,6 +28,7 @@ export class GalleryImages {
   constructor(
     private images: RegisteredImages,
     private decode = decodeRegisteredImage,
+    private decodeFile = decodeRegisteredImageFile,
   ) {}
   session(): GalleryImageSession {
     const owner: Owner = { live: true, keys: new Set() };
@@ -48,9 +51,43 @@ export class GalleryImages {
           throw Error(hostText('services.galleryImages.changed'));
         const key = `${imageKey(ref)}:${entry.generation}:${original}`;
         if (owner.preview?.key === key) return owner.preview.task;
-        const request = { key, task: undefined! as Promise<string> };
+        void owner.preview?.close?.().catch(() => {});
+        const request: NonNullable<Owner['preview']> = { key, task: undefined! as Promise<string> };
         owner.preview = request;
         request.task = (async () => {
+          const active = () => owner.live && owner.preview === request;
+          if (this.images.policy?.validateFile) {
+            const saved = await this.images.readFile(ref, entry.generation, {
+              cachePreview: false,
+              active,
+            });
+            check();
+            if (!active())
+              throw new LibraryReadCancelled(hostText('services.galleryImages.changed'));
+            if (!original || /\.svg$/i.test(saved.ref.file))
+              return (
+                await this.decodeFile(
+                  saved.file,
+                  original ? 2048 : 64,
+                  saved.ref.file,
+                  active,
+                  saved.hash,
+                )
+              ).thumbnail;
+            const extension = saved.ref.file.split('.').at(-1)!.toLowerCase();
+            const source = await originalImageSources.open(
+              saved.file,
+              `image/${extension === 'jpg' ? 'jpeg' : extension}`,
+              saved.hash,
+              active,
+            );
+            request.close = source.close;
+            if (!active()) {
+              await source.close();
+              throw new LibraryReadCancelled(hostText('services.galleryImages.changed'));
+            }
+            return source.url;
+          }
           const saved = await this.images.read(ref, entry.generation, {
             cachePreview: false,
             active: () => owner.live && owner.preview === request,
@@ -73,6 +110,7 @@ export class GalleryImages {
       },
       dispose: () => {
         owner.live = false;
+        void owner.preview?.close?.().catch(() => {});
         owner.preview = undefined;
         for (const key of owner.keys) {
           const cached = this.cache.get(key);
@@ -138,14 +176,15 @@ export class GalleryImages {
     const task = this.queue
       .then(async () => {
         check();
-        const {
-          bytes,
-          hash,
-          generation: currentGeneration,
-        } = await this.images.read(ref, generation, {
+        const saved = await (
+          this.images.policy?.validateFile
+            ? this.images.readFile.bind(this.images)
+            : this.images.read.bind(this.images)
+        )(ref, generation, {
           cachePreview: false,
           active,
         });
+        const { hash, generation: currentGeneration } = saved;
         check();
         if (currentGeneration !== generation)
           throw Error(hostText('services.galleryImages.changed'));
@@ -155,7 +194,10 @@ export class GalleryImages {
           this.retain(contentKey, existing, owners);
           return existing.source;
         }
-        const image = await this.decode(bytes, edge);
+        const image =
+          'file' in saved
+            ? await this.decodeFile(saved.file, edge, ref.file, active, hash)
+            : await this.decode(saved.bytes, edge);
         check();
         const current = this.images.entry(ref);
         if (!current?.available || current.generation !== generation)

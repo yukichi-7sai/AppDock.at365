@@ -57,7 +57,8 @@ type Card = {
   loading: boolean;
 };
 const safeImage = (source: string) =>
-  /^(data:image\/(?:png|jpeg|webp);base64,|blob:|appdock:\/\/page-images\/)/.test(source);
+  /^(data:image\/(?:png|jpeg|webp);base64,|blob:|appdock:\/\/page-images\/)/.test(source) ||
+  /^appdock:\/\/host\/library-original\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(source);
 /** Keyed DOM updates preserve focused controls, decoded images and the visible anchor. */
 export function mountImageGallery(container: HTMLElement, options: GalleryOptions) {
   container.classList.add('ad-gallery');

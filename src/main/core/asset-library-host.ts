@@ -23,6 +23,8 @@ import { imageDirectory } from './panel-images';
 import { ImageLibrarySettings } from './image-library-settings';
 
 import { decodeRegisteredImage, registeredImageClipboardPng } from './registered-image-decoder';
+import { decodeRegisteredImageFile } from './image-file-decoder';
+import { fileHash, sameFileHash } from './file-content';
 import { copyImageFiles } from './image-file-clipboard';
 import { renameImageFiles } from './image-file-rename';
 import type { ImageLibraryFileAction } from '../../shared/image-library-page';
@@ -350,9 +352,20 @@ export class AssetLibraryHost {
         }
       }
     } else {
-      const saved = await this.images.read(entries[0].ref, entries[0].generation ?? '');
-      const png = await registeredImageClipboardPng(saved.bytes);
-      await this.images.read(entries[0].ref, entries[0].generation ?? '');
+      const saved = await this.images.readFile(entries[0].ref, entries[0].generation ?? '', {
+        cachePreview: false,
+      });
+      const png = this.images.policy.validateFile
+        ? Buffer.from(
+            (
+              await decodeRegisteredImageFile(saved.file, 0, saved.ref.file, undefined, saved.hash)
+            ).thumbnail.split(',')[1],
+            'base64',
+          )
+        : await registeredImageClipboardPng(saved.bytes!);
+      await this.images.readFile(entries[0].ref, entries[0].generation ?? '', {
+        cachePreview: false,
+      });
       await clipboard.write([
         new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) }),
       ]);
@@ -518,29 +531,47 @@ export class AssetLibraryHost {
       !['original', 'thumbnail'].includes(String(variant))
     )
       throw Error(this.text('services.imageLibraryHost.ownImageOnly'));
-    const { bytes } = await this.images.read(ref);
+    const saved = await this.images.readFile(ref, undefined, { cachePreview: false });
     const directory = imageDirectory(dataRoot, manifest.id);
     if ((await fs.realpath(directory)).toLowerCase() !== path.resolve(directory).toLowerCase())
       throw Error(this.text('services.imageLibraryHost.redirectedCache'));
     const output =
       variant === 'thumbnail'
-        ? Buffer.from((await decodeRegisteredImage(bytes)).thumbnail.split(',')[1], 'base64')
-        : bytes;
+        ? Buffer.from(
+            (this.images.policy.validateFile
+              ? await decodeRegisteredImageFile(
+                  saved.file,
+                  64,
+                  saved.ref.file,
+                  undefined,
+                  saved.hash,
+                )
+              : await decodeRegisteredImage(saved.bytes!)
+            ).thumbnail.split(',')[1],
+            'base64',
+          )
+        : undefined;
+    const hash = output ? createHash('sha256').update(output).digest('hex') : saved.hash;
     const owner = `${manifest.id}:${generation}`;
     const prefix = createHash('sha256').update(owner).digest('hex').slice(0, 16);
     const file = path.join(
       directory,
-      `registered-${prefix}-${createHash('sha256').update(output).digest('hex')}${variant === 'thumbnail' ? '.png' : path.extname(ref.file)}`,
+      `registered-${prefix}-${hash}${variant === 'thumbnail' ? '.png' : path.extname(ref.file)}`,
     );
+    const temp = path.join(directory, `.${randomUUID()}.tmp`);
     try {
-      await fs.writeFile(file, output, { flag: 'wx' });
-    } catch (error) {
-      if (
-        (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
-        (await fs.lstat(file)).isSymbolicLink() ||
-        !(await fs.readFile(file)).equals(output)
-      )
-        throw error;
+      if (output) await fs.writeFile(temp, output, { flag: 'wx' });
+      else await fs.copyFile(saved.file, temp, fs.constants.COPYFILE_EXCL);
+      if ((await fileHash(temp)) !== hash || !(await sameFileHash(saved.file, saved.hash)))
+        throw Error(this.text('services.registeredImages.changed'));
+      try {
+        await fs.link(temp, file);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || !(await sameFileHash(file, hash)))
+          throw error;
+      }
+    } finally {
+      await fs.unlink(temp).catch(() => {});
     }
     const files = this.generated.get(owner) ?? new Set<string>();
     files.add(file);

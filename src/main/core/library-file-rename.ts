@@ -10,6 +10,7 @@ import {
 } from '../../shared/registered-images';
 import { safeDirectory } from './library-files';
 import type { RegisteredAssets } from './registered-assets';
+import { sameFileHash } from './file-content';
 
 /** Exclusive links support swaps and case-only renames without ever replacing a destination. */
 export async function renameLibraryFiles(
@@ -46,6 +47,10 @@ export async function renameLibraryFiles(
       target: images.file(ref.file),
       stage: path.join(safeDirectory(images.directory, parent), `.appdock-rename-${randomUUID()}`),
       bytes: Buffer.alloc(0) as Buffer,
+      hash: '',
+      backup: images.policy.validateFile
+        ? path.join(images.directory, `.appdock-recovery-${randomUUID()}`)
+        : undefined,
       staged: false,
       removed: false,
       created: false,
@@ -58,7 +63,11 @@ export async function renameLibraryFiles(
   const sources = new Set(changed.map((t) => imageKey(t.entry.ref)));
   for (const task of tasks) {
     if (!task.entry.generation) throw Error(text('services.registeredImages.changed'));
-    task.bytes = (await images.read(task.entry.ref, task.entry.generation)).bytes;
+    const saved = await images.readFile(task.entry.ref, task.entry.generation, {
+      cachePreview: false,
+    });
+    task.hash = saved.hash;
+    task.bytes = saved.bytes ?? Buffer.alloc(0);
     if (changed.includes(task) && !sources.has(imageKey(task.ref))) {
       const exists = await fs.lstat(task.target).then(
         () => true,
@@ -71,23 +80,23 @@ export async function renameLibraryFiles(
     }
   }
   const commit = prepare(mapping);
-  const same = async (file: string, bytes: Buffer) => {
-    const stat = await fs.lstat(file);
-    return stat.isFile() && !stat.isSymbolicLink() && (await fs.readFile(file)).equals(bytes);
-  };
+  const same = (file: string, task: (typeof tasks)[number]) => sameFileHash(file, task.hash);
   let completed = false;
+  let restored = true;
   try {
+    for (const task of changed)
+      if (task.backup) {
+        await fs.copyFile(task.source, task.backup, fs.constants.COPYFILE_EXCL);
+        if (!(await same(task.backup, task)))
+          throw Error(text('services.registeredImages.changed'));
+      }
     for (const task of changed) {
       await fs.link(task.source, task.stage);
       task.staged = true;
     }
     for (const task of changed) {
       const [source, stage] = await Promise.all([fs.lstat(task.source), fs.lstat(task.stage)]);
-      if (
-        source.ino !== stage.ino ||
-        source.dev !== stage.dev ||
-        !(await same(task.source, task.bytes))
-      )
+      if (source.ino !== stage.ino || source.dev !== stage.dev || !(await same(task.source, task)))
         throw Error(text('services.registeredImages.changed'));
       await fs.unlink(task.source);
       task.removed = true;
@@ -97,13 +106,11 @@ export async function renameLibraryFiles(
       task.created = true;
     }
     for (const task of changed)
-      if (!(await same(task.target, task.bytes)))
-        throw Error(text('services.registeredImages.changed'));
+      if (!(await same(task.target, task))) throw Error(text('services.registeredImages.changed'));
     commit();
     completed = true;
     return tasks.map((t) => t.ref);
   } catch (error) {
-    let restored = true;
     for (const task of [...changed].reverse()) {
       if (task.created) {
         try {
@@ -111,7 +118,7 @@ export async function renameLibraryFiles(
           if (
             current.ino !== stage.ino ||
             current.dev !== stage.dev ||
-            !(await same(task.target, task.bytes))
+            !(await same(task.target, task))
           )
             throw Error('changed');
           await fs.unlink(task.target);
@@ -123,9 +130,12 @@ export async function renameLibraryFiles(
     for (const task of changed) {
       if (task.removed) {
         try {
-          await fs.writeFile(task.source, task.bytes, { flag: 'wx' });
+          if (task.backup) {
+            if (!(await same(task.backup, task))) throw Error('Recovery file changed');
+            await fs.copyFile(task.backup, task.source, fs.constants.COPYFILE_EXCL);
+          } else await fs.writeFile(task.source, task.bytes, { flag: 'wx' });
         } catch {
-          if (!(await same(task.source, task.bytes).catch(() => false))) restored = false;
+          if (!(await same(task.source, task).catch(() => false))) restored = false;
         }
       }
     }
@@ -134,8 +144,9 @@ export async function renameLibraryFiles(
   } finally {
     // Stages are our exclusive recovery links; don't remove a link whose contents changed.
     for (const task of changed) {
-      if (task.staged && (completed || (await same(task.stage, task.bytes).catch(() => false))))
+      if (task.staged && (completed || (await same(task.stage, task).catch(() => false))))
         await fs.unlink(task.stage).catch(() => {});
+      if (task.backup && (completed || restored)) await fs.unlink(task.backup).catch(() => {});
     }
     await images.refresh(true);
   }

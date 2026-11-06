@@ -231,13 +231,16 @@ test('asynchronous decode failures leave registered originals intact and publish
   fail = false;
   assert.deepEqual((await images.read({ file: 'existing.png' })).bytes, bytes);
 });
-test('size, dimensions, extension mismatch, invalid bytes and RPC import limits are enforced', async () => {
+test('large images are accepted while extension, invalid data and RPC transport guards remain', async () => {
   const images = await fixture();
   await assert.rejects(images.add(bytes, 'a.jpg'), /形式/);
-  await assert.rejects(images.add(Buffer.alloc(5 * 1024 * 1024 + 1), 'a.png'), /5MiB/);
+  const large = Buffer.alloc(5 * 1024 * 1024 + 1);
+  bytes.copy(large);
+  await images.add(large, 'large.png');
   await assert.rejects(images.add(Buffer.from('invalid'), 'a.png'), /PNG/);
-  const huge = await fixture(() => ({ ...decoded(), width: 8193 }));
-  await assert.rejects(huge.add(bytes, 'a.png'), /サイズ/);
+  const huge = await fixture(() => ({ ...decoded(), width: 10000, height: 2400 }));
+  await huge.add(bytes, 'a.png');
+  assert.equal(huge.entry({ file: 'a.png' }).width, 10000);
   assert.throws(
     () => images.import({ base64: Buffer.alloc(512 * 1024 + 1).toString('base64') }),
     /512KiB/,
