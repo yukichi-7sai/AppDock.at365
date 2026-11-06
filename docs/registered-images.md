@@ -130,22 +130,19 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 ## Applet API
 
-基本APIは`minimumHostVersion: "0.69.0"`と`registered-images` capabilityを宣言する。SVG・相対フォルダー・保管コピーの動作を前提にするAppletは`minimumHostVersion: "0.115.0"`とする。参照の`file`は不透明な識別値としてそのまま保存・受け渡し、ファイル名やパスを組み立てない。Node/.NETの型・メソッド形状は従来と同じ。原画像の列挙と選択は信頼されたローカルUIだけが利用でき、リモートサイトへbridgeを渡さない。
+基本APIは`minimumHostVersion: "0.69.0"`と`registered-images` capabilityを宣言する。SVG・相対フォルダー・保管コピーの動作を前提にするAppletは`minimumHostVersion: "0.115.0"`とする。参照の`file`は不透明な識別値としてそのまま保存・受け渡し、ファイル名やパスを組み立てない。原画像の列挙と選択は信頼されたローカルUIだけが利用でき、リモートサイトへbridgeを渡さない。
 
 | 呼出元   | 操作                                                                  | 契約                                                                                          |
 | -------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Node     | `context.registeredImages.import({ filename?, base64 })`              | 元bytesを素材一覧へ登録し、設定用の保管コピーの参照を返す。512KiB以下。名前省略時は内容hash名 |
 | Node     | `context.registeredImages.copyToCache(image, variant?)`               | `original`（既定）または`thumbnail`を自己のPC専用imageDirectoryへコピーし、絶対パスを返す     |
-| .NET     | `context.RegisteredImages.ImportAsync(bytes, filename?, token)`       | Nodeと同じ。SDK 0.27.0                                                                        |
 | .NET     | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像                                                      |
 | local UI | `appletPage.call('registeredImages.snapshot')`                        | メタデータ・参照・グループ。サムネイル本体は別取得                                            |
 | local UI | `appletPage.call('registeredImages.preview', { image })`              | 縮小プレビューを返す                                                                          |
 | local UI | `appletPage.call('registeredImages.pick', { current })`               | `{cancelled:true}`または`{cancelled:false,image:ref                                           | null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
-| local UI | `appletPage.call('registeredImages.import', { filename?, base64 })`   | プログラム登録と同じ上限                                                                      |
 
 `copyToCache`は自己manifestのregistered-image設定、またはobject-list内の同型フィールドが現在参照している画像だけを受け付ける。登録しただけでは読取対象にならず、まず自己設定へ保存する。生成コピーはruntime世代別とし、停止・異常終了・世代変更で回収する。共有原画像は回収しない。古い処理の完了で新世代のコピーを消さない。ページで表示するときは既存の`pages.registerImages`へコピーを渡し、その画像IDの寿命も守る。
 
-登録データはbase64で送り、Node/.NET共通の1MiB JSON-RPC行上限内に収めるため、プログラムからの取り込みは512KiB以下に保つ。ネイティブファイル選択による本体の登録には容量の固定上限を設けない。大きい原画像は利用者が共通選択画面から登録する。APIに任意のホストファイルパスは渡さない。
+Appletから画像bytesを直接登録する公開APIは設けない。画像は利用者が本体の共通選択画面から登録・選択し、Appletは宣言した画像設定の参照を利用する。ネイティブファイル選択による本体の登録には容量の固定上限を設けず、APIに任意のホストファイルパスは渡さない。WebAppletの推奨設定で取得した画像は、本体の一覧編集が確定時に登録する専用の内部経路を使う。この内部経路の容量検査と取消時の非登録を維持する。
 
 ## 宣言型リボン
 
@@ -180,7 +177,7 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 
 `tests/image-folders-svg.test.cjs`、`tests/icon-set-import.test.cjs`は階層走査・監視・保管・静的SVG・取り込みの整合性/取消/失敗を確認する。`scripts/image-folders-svg-ui-test.cjs [固定EXE]`は実フォルダー操作、親編集の取消、SVG配色、公式Lucide全件取り込み、元画像削除と再起動を隔離profileで確認する。
 
-`tests/registered-images.test.cjs`は参照・保存・同名衝突・グループ競合・欠落回復・設定・汎用リボンを検査する。`scripts/image-library-ui-test.cjs [固定EXE]`は独立Profile/WebApplet、Node/.NET API、選択画面、原画像hash、表示、再起動を隔離profileで確認する。先に`tests/fixtures/dotnet/AppDock.RegisteredImages`をRelease publishする。必要な出力場所と実測は[VERIFICATION](../VERIFICATION.md)を参照する。
+`tests/registered-images.test.cjs`は参照・保存・同名衝突・グループ競合・欠落回復・設定・汎用リボンを検査する。`tests/registered-images-api.test.cjs`は公開取り込み要求の拒否と、残すローカルUI操作を確認する。`scripts/image-library-ui-test.cjs [固定EXE]`は独立Profile/WebApplet、Node/.NETでの取り込みAPIの不在・設定画像のコピー・未選択画像の拒否、選択画面、原画像hash、表示、再起動を隔離profileで確認する。先に`scripts/build-image-library-fixtures.cjs`で.NET fixtureとnative AppletをRelease buildする。必要な出力場所と実測は[VERIFICATION](../VERIFICATION.md)を参照する。
 
 `scripts/ribbon-customization-ui-test.cjs [固定EXE] --icons-only`は共通画像入力とリボンのモード切替、親・子ダイアログの取消、フォーカス復帰、キーボード、解除と適用、明暗テーマ・画面幅、原画像保持・実再起動後の選択状態を確認する。
 

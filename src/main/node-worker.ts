@@ -26,10 +26,6 @@ const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
   localization: AppletLocalizationApi;
   registeredImages: {
-    import(input: {
-      filename?: string;
-      base64: string;
-    }): Promise<import('../shared/registered-images').RegisteredImageRef>;
     copyToCache(
       image: import('../shared/registered-images').RegisteredImageRef,
       variant?: 'original' | 'thumbnail',
@@ -213,17 +209,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           }),
         ),
         registeredImages: {
-          import: (input) => {
-            if (
-              typeof input.base64 !== 'string' ||
-              input.base64.length > 700000 ||
-              Buffer.from(input.base64, 'base64').length > 512 * 1024
-            )
-              return Promise.reject(Error(hostText('services.nodeWorker.imageSizeLimit')));
-            return peer.request('host.registeredImages.import', input) as Promise<
-              import('../shared/registered-images').RegisteredImageRef
-            >;
-          },
           copyToCache: (image, variant = 'original') =>
             peer.request('host.registeredImages.copyToCache', {
               image,

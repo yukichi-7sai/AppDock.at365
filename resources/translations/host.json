@@ -1334,7 +1334,6 @@
   "services.mcpClient.waitCancelled": "待機を取り消しました。操作先で発生した効果は戻りません。",
   "services.nativeInput.cancelled": "入力操作は取り消されました。",
   "services.nativeInput.connectionFailed": "入力処理との接続に失敗しました。結果を確認してから再実行してください。",
-  "services.nodeWorker.imageSizeLimit": "画像は512KiB以下で指定してください。",
   "services.nodeWorker.pageActionUnsupported": "ページ操作は提供されていません。",
   "services.notificationCenter.activeOnly": "表示中のアクティブ通知だけを操作できます。",
   "services.notificationCenter.changed": "一覧が更新されました。再読み込みしてください。",

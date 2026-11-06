@@ -62,9 +62,17 @@ fs.writeFileSync(sample, png(160, 90));
 fs.writeFileSync(second, png(64, 128, 2));
 const sampleRef = { file: `@assigned/${hash(sample)}.png` },
   secondRef = { file: `@assigned/${hash(second)}.png` };
+const assets = path.join(profile, 'data/assets');
+fs.mkdirSync(path.join(assets, 'images'), { recursive: true });
+fs.mkdirSync(path.join(assets, 'assigned-images'), { recursive: true });
+fs.copyFileSync(sample, path.join(assets, 'images/unselected.png'));
+fs.copyFileSync(sample, path.join(assets, 'assigned-images', `${hash(sample)}.png`));
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
+settings.updates.checkHostOnStartup = false;
+settings.updates.checkHostOnAboutOpen = false;
+settings.updates.checkAppletsOnStartup = false;
 settings.globalShortcutCommands = [];
 settings.ribbon.order = ['group:photos', 'button:logs', 'settings'];
 settings.ribbon.bottom = ['theme', 'notifications'];
@@ -154,19 +162,18 @@ function probe(id, runtime, entry, type, source) {
       ...(type ? { type } : {}),
       capabilities: ['settings', 'registered-images'],
       settings: [
-        { key: 'source', title: 'Source', type: 'string' },
         { key: 'marker', title: 'Marker', type: 'string' },
         { key: 'image', title: 'Image', type: 'registered-image', default: null },
       ],
     }),
   );
-  settings.extensions[id] = { enabled: true, settings: { source: sample, marker } };
+  settings.extensions[id] = { enabled: true, settings: { image: sampleRef, marker } };
   return { directory, marker };
 }
 const node = probe('fixture.images-node', 'node', 'index.cjs');
 fs.writeFileSync(
   path.join(node.directory, 'index.cjs'),
-  `exports.activate=async c=>{const fs=require('node:fs'),crypto=require('node:crypto');const bytes=fs.readFileSync(c.settings.get('source',''));const image=await c.registeredImages.import({filename:'node-original.png',base64:bytes.toString('base64')});await c.registeredImages.import({filename:'unselected.png',base64:bytes.toString('base64')});await c.settings.set('image',image);const file=await c.registeredImages.copyToCache(image);let rejected=false;try{await c.registeredImages.copyToCache({file:'unselected.png'});}catch{rejected=true;}fs.writeFileSync(c.settings.get('marker',''),JSON.stringify({file,sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),rejected}));};`,
+  `exports.activate=async c=>{const fs=require('node:fs'),crypto=require('node:crypto');const importAvailable='import' in c.registeredImages;if(importAvailable)throw Error('Image import must not be exposed.');const image=c.settings.get('image',null);await c.settings.set('image',image);const file=await c.registeredImages.copyToCache(image);let rejected=false;try{await c.registeredImages.copyToCache({file:'unselected.png'});}catch{rejected=true;}fs.writeFileSync(c.settings.get('marker',''),JSON.stringify({file,sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),rejected,importAvailable}));};`,
 );
 const dotnet = probe(
   'fixture.images-dotnet',
@@ -185,6 +192,8 @@ for (const [name, id, values] of nativeApplets) {
     id,
     path.resolve(root, `../../40.ARTIFACT/Applet.${name}.at365/Applet.${name}.at365`),
   );
+  // Exercise current SDK builds in the isolated fixture without republishing unchanged Applets.
+  fs.cpSync(path.join(fixtureRoot, `native-${name}`), directory, { recursive: true });
   const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'extension.json')));
   delete manifest.defaultKeybindings;
   manifest.startupDelaySeconds = 0;
@@ -394,6 +403,7 @@ async function chooseInPicker(file) {
       const result = JSON.parse(fs.readFileSync(probe.marker));
       assert.equal(result.sha256.toLowerCase(), hash(sample));
       assert.equal(result.rejected, true);
+      assert.equal(result.importAvailable, false);
       assert(result.file.includes(path.join('cache', 'panel-images')));
     }
     for (const id of ['fixture.images-node', 'fixture.images-dotnet']) {
@@ -401,7 +411,7 @@ async function chooseInPicker(file) {
       await host.evaluate((id) => window.dock.toggleExtension(id, false), id);
       await until(() => !fs.existsSync(generated), 'stopped image cache released');
     }
-    checks.push('Node/.NET import, selected original copy and rejection of unselected images');
+    checks.push('Node/.NET omit import, copy selected originals and reject unselected images');
     const jpeg = path.join(profile, 'format-original.jpeg');
     const webp = path.join(profile, 'format-original.webp');
     const jpegBytes = await app.evaluate(

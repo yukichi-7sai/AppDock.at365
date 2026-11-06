@@ -173,7 +173,6 @@ export function createHostApi(
       case 'host.registeredImages.snapshot':
       case 'host.registeredImages.pick':
       case 'host.registeredImages.preview':
-      case 'host.registeredImages.import':
       case 'host.registeredImages.copyToCache': {
         requireCapability('registered-images');
         if (!imageLibrary) throw Error(hostText('services.hostApi.imageLibraryNotReady'));
@@ -205,11 +204,6 @@ export function createHostApi(
           if (e.state !== 'running' || generation !== e.runtimeSession)
             throw Error(hostText('services.hostApi.imageSelectionProviderStopped'));
           return result;
-        }
-        if (method === 'host.registeredImages.import') {
-          if (settings.writesBlocked)
-            throw Error(hostText('services.hostApi.settingsRecoveryRequired'));
-          return imageLibrary.import(p as { base64: string; filename?: string });
         }
         const generation = e.runtimeSession;
         const file = await imageLibrary.copyToCache(
@@ -536,7 +530,6 @@ export function createHostApi(
                 'registeredImages.snapshot',
                 'registeredImages.pick',
                 'registeredImages.preview',
-                'registeredImages.import',
                 'pages.openItem',
               ];
               if (

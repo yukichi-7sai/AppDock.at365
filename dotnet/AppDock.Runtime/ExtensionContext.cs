@@ -63,12 +63,6 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public IUiService Ui => this;
     public IPageService Pages => this;
     public IRegisteredImageService RegisteredImages => this;
-    public Task<RegisteredImageRef> ImportAsync(byte[] bytes, string? filename = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(bytes);
-        if (bytes.Length > 512 * 1024) throw new ArgumentException("Registered image import is limited to 512 KiB.");
-        return RequestAsync<RegisteredImageRef>("host.registeredImages.import", new { filename, base64 = Convert.ToBase64String(bytes) }, cancellationToken);
-    }
     public Task<string> CopyToCacheAsync(RegisteredImageRef image, bool thumbnail = false, CancellationToken cancellationToken = default)
         => RequestAsync<string>("host.registeredImages.copyToCache", new { image, variant = thumbnail ? "thumbnail" : "original" }, cancellationToken);
     public IBrowserService Browser => this;
