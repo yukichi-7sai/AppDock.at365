@@ -1,5 +1,6 @@
 import type { GalleryAnchor, GalleryItem } from './image-gallery';
 import { libraryGallerySize, validGalleryWidth } from './image-gallery';
+import { validLibraryView, type LibraryView } from './library-view';
 import type {
   ImageGroup,
   ImageLibraryEdit,
@@ -95,7 +96,7 @@ export type ImageLibraryFileAction =
   'copy-files' | 'copy-paths' | 'copy-image' | 'copy-text' | 'reveal';
 export interface ImageGalleryViewState {
   schemaVersion: 1;
-  library?: { cardWidth: number; layout?: ImageLibraryLayout };
+  library?: { cardWidth: number; layout?: ImageLibraryLayout; view?: LibraryView };
   picker?: { cardWidth: number; layout?: ImageLibraryLayout };
 }
 export function validImageGalleryViewState(value: unknown): value is ImageGalleryViewState {
@@ -111,8 +112,12 @@ export function validImageGalleryViewState(value: unknown): value is ImageGaller
         (!!item &&
           typeof item === 'object' &&
           !Array.isArray(item) &&
-          Object.keys(item).every((key) => key === 'cardWidth' || key === 'layout') &&
+          Object.keys(item).every(
+            (key) =>
+              key === 'cardWidth' || key === 'layout' || (surface === 'library' && key === 'view'),
+          ) &&
           validGalleryWidth(item.cardWidth, libraryGallerySize) &&
+          (!('view' in item) || item.view === undefined || validLibraryView(item.view)) &&
           (item.layout === undefined || validImageLibraryLayout(item.layout)))
       );
     })
@@ -144,6 +149,7 @@ export interface ImageLibraryPageModel {
     selected: number;
     cardWidth: number;
     layout: ImageLibraryLayout;
+    view: LibraryView;
     sizeError: string;
     error: string;
     message: string;
@@ -180,10 +186,12 @@ export type ImageLibraryPageAction = {
   | { command: 'file-action'; operation: ImageLibraryFileAction; imageId?: string }
   | { command: 'open-folder'; folder?: string }
   | { command: 'layout'; value: ImageLibraryLayout }
+  | { command: 'view'; value: LibraryView }
   | { command: 'select-range'; imageIds: string[]; additive: boolean }
   | { command: 'drag-start'; imageId: string }
   | { command: 'drop'; token: string; groupId: string }
   | { command: 'drop-folder'; token: string; folder: string }
+  | { command: 'remove-from-group'; token?: string }
   | { command: 'reorder'; token: string; imageId: string; after: boolean }
   | { command: 'select-all' | 'clear' | 'more' | 'reload' | 'add' | 'retry-membership' }
   | { command: 'width'; value: number; commit: boolean }

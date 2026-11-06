@@ -4,6 +4,9 @@
   gap: 20px;
   align-content: start;
 }
+.ad-gallery-list-text {
+  display: none;
+}
 .ad-gallery-preview {
   display: flex;
   flex-direction: column;

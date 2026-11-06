@@ -1,4 +1,5 @@
 import { libraryText } from '../../shared/library-text';
+import type { LibraryView } from '../../shared/library-view';
 import {
   LibraryMediaProvider,
   useLibraryMedia,
@@ -63,6 +64,11 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
   const [error, setError] = useState(''),
     [query, setQuery] = useState(initialModel.content.query);
   const [width, setWidth] = useState(initialModel.content.cardWidth);
+  const [view, setView] = useState(initialModel.content.view),
+    viewRef = useRef(view);
+  const requestedView = useRef<LibraryView | undefined>(undefined);
+  const [dragCount, setDragCount] = useState<number | undefined>(undefined);
+  const removeDrop = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState(initialModel.content.layout),
     layoutRef = useRef(layout);
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -171,6 +177,13 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     setLayout(value);
     run({ command: 'layout', value });
   };
+  const saveView = (value: LibraryView) => {
+    gallery.current?.cancelInteraction();
+    requestedView.current = value;
+    viewRef.current = value;
+    setView(value);
+    run({ command: 'view', value });
+  };
   const more = (retry = false) => {
     const c = latest.current.content,
       key = c.viewRevision + ':' + c.items.length;
@@ -262,6 +275,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     latest.current = initialModel;
     setModel(initialModel);
     setQuery(initialModel.content.query);
+    if (JSON.stringify(requestedView.current) === JSON.stringify(initialModel.content.view))
+      requestedView.current = undefined;
+    if (!requestedView.current) {
+      viewRef.current = initialModel.content.view;
+      setView(initialModel.content.view);
+    }
     if (requestedSize.current === initialModel.content.cardWidth) {
       requestedSize.current = undefined;
       sizeDirty.current = false;
@@ -295,13 +314,18 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         root: interactionRoot.current!,
         viewport,
         enabled: () => !openingDialog.current && !latest.current.content.busy,
-        canReorder: () => !['all', 'unfiled'].includes(latest.current.content.group),
+        canReorder: () =>
+          viewRef.current.sort === 'manual' &&
+          !['all', 'unfiled'].includes(latest.current.content.group),
+        dragging: setDragCount,
         beginDrag: async (imageId) =>
           (await act({ command: 'drag-start', imageId })) as { token: string; count: number },
         drop: (token, target) =>
-          target.startsWith('folder:')
-            ? run({ command: 'drop-folder', token, folder: target.slice(7) })
-            : run({ command: 'drop', token, groupId: target }),
+          target === 'remove-from-group'
+            ? run({ command: 'remove-from-group', token })
+            : target.startsWith('folder:')
+              ? run({ command: 'drop-folder', token, folder: target.slice(7) })
+              : run({ command: 'drop', token, groupId: target }),
         reorder: (token, imageId, after) => run({ command: 'reorder', token, imageId, after }),
         clear: () => run({ command: 'clear' }),
         selectRange: (imageIds, additive) => {
@@ -310,6 +334,22 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           run({ command: 'select-range', imageIds, additive });
         },
         targets: () => [
+          ...(removeDrop.current && !removeDrop.current.hidden
+            ? [
+                {
+                  element: removeDrop.current,
+                  id: 'remove-from-group',
+                  description: (count: number) =>
+                    libraryText(media, 'library.dragRemove', {
+                      count,
+                      group:
+                        latest.current.content.groups.find(
+                          (group) => group.id === latest.current.content.group,
+                        )?.title ?? '',
+                    }),
+                },
+              ]
+            : []),
           ...[
             ...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-group]') ?? []),
           ].map((element) => ({
@@ -423,6 +463,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     gallery.current?.setModel({
       items: c.items,
       cardWidth: width,
+      view: view.mode,
       fit: 'contain',
       selection: 'multiple',
       empty: c.query ? t('images.noMatches') : t('images.empty'),
@@ -440,7 +481,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     }
     const frame = requestAnimationFrame(maybeMore);
     return () => cancelAnimationFrame(frame);
-  }, [model, width, layout.sidebarWidth, dialogPending, morePending, language]);
+  }, [model, width, view.mode, layout.sidebarWidth, dialogPending, morePending, language]);
   useEffect(
     () => setMenu(null),
     [model.content.group, model.content.folder, model.content.query, model.id],
@@ -805,7 +846,77 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                 disabled={c.busy}
                 navigation={navigation}
                 navigationButton={navigationButton}
-                size={<div ref={size} />}
+                size={
+                  <div className="library-view-controls">
+                    <label className="library-sort">
+                      <span>{t('library.sort')}</span>
+                      <select
+                        aria-label={t('library.sort')}
+                        value={view.sort}
+                        disabled={c.busy}
+                        onChange={(e) =>
+                          saveView({
+                            ...viewRef.current,
+                            sort: e.target.value as LibraryView['sort'],
+                          })
+                        }
+                      >
+                        <option value="manual">
+                          {t(normalGroup ? 'library.sortManual' : 'library.sortDefault')}
+                        </option>
+                        <option value="name">{t('library.sortName')}</option>
+                        <option value="type">{t('library.sortType')}</option>
+                        <option value="modified">{t('library.sortModified')}</option>
+                        <option value="size">{t('library.sortSize')}</option>
+                      </select>
+                    </label>
+                    <SettingsButton
+                      icon
+                      disabled={c.busy || view.sort === 'manual'}
+                      aria-label={t(
+                        view.direction === 'ascending' ? 'library.ascending' : 'library.descending',
+                      )}
+                      title={t(
+                        view.direction === 'ascending' ? 'library.ascending' : 'library.descending',
+                      )}
+                      onClick={() =>
+                        saveView({
+                          ...viewRef.current,
+                          direction:
+                            viewRef.current.direction === 'ascending' ? 'descending' : 'ascending',
+                        })
+                      }
+                    >
+                      <Icon
+                        name={view.direction === 'ascending' ? 'sort-ascending' : 'sort-descending'}
+                        size={16}
+                      />
+                    </SettingsButton>
+                    <div
+                      className="library-view-toggle"
+                      role="group"
+                      aria-label={t('library.view')}
+                    >
+                      <SettingsButton
+                        disabled={c.busy}
+                        aria-pressed={view.mode === 'cards'}
+                        onClick={() => saveView({ ...viewRef.current, mode: 'cards' })}
+                      >
+                        <Icon name="grid" size={16} />
+                        {t('library.cards')}
+                      </SettingsButton>
+                      <SettingsButton
+                        disabled={c.busy}
+                        aria-pressed={view.mode === 'list'}
+                        onClick={() => saveView({ ...viewRef.current, mode: 'list' })}
+                      >
+                        <Icon name="list" size={16} />
+                        {t('library.list')}
+                      </SettingsButton>
+                    </div>
+                    <div ref={size} hidden={view.mode === 'list'} />
+                  </div>
+                }
                 locationActions={
                   <>
                     <SettingsButton
@@ -941,10 +1052,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                     </SettingsButton>
                     <SettingsButton
                       disabled={!c.selected || c.busy}
-                      onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
+                      onClick={() =>
+                        normalGroup ? run({ command: 'remove-from-group' }) : dialog('batch-remove')
+                      }
                     >
                       <Icon name="list-minus" size={15} />
-                      {t('images.removeFromGroup')}
+                      {t(normalGroup ? 'library.removeCurrent' : 'images.removeFromGroup')}
                     </SettingsButton>
                   </div>
                   <div className="library-action-group">
@@ -969,6 +1082,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                   <div className="library-action-group">
                     <SettingsButton
                       className="library-selection-delete"
+                      title={`${t('images.delete')} (Delete)`}
                       disabled={!c.selected || c.busy}
                       onClick={() => dialog('delete-image')}
                     >
@@ -1010,6 +1124,16 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             </div>
           </div>
           <div
+            ref={removeDrop}
+            className="library-remove-drop"
+            hidden={dragCount === undefined || !normalGroup}
+          >
+            <strong>
+              {t('library.dragRemove', { count: dragCount ?? 0, group: currentGroup?.title ?? '' })}
+            </strong>
+            <span>{t('library.removeKeepsAssets')}</span>
+          </div>
+          <div
             className="library-status"
             role="status"
             hidden={!c.busy && !toast && !c.sizeError && !c.error && !error}
@@ -1022,6 +1146,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                   onClick={() => {
                     saveSize(width);
                     saveLayout(layoutRef.current);
+                    saveView(viewRef.current);
                   }}
                 >
                   {t('images.retrySave')}

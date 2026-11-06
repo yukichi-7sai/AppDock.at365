@@ -436,13 +436,12 @@ async function selectedBorder(label) {
     const photoGroup = (await model()).content.groups.find((g) => g.title === '写真');
     await action('group', { groupId: photoGroup.id });
     await page.getByRole('button', { name: /すべて選択/ }).click();
-    await page.getByRole('button', { name: 'グループから外す', exact: true }).click();
+    await page.getByRole('button', { name: 'その他', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'グループから外す', exact: true }).click();
     d = host.getByRole('dialog', { name: 'グループから外す', exact: true });
     await d.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal((await imageSnapshot()).groups.find((g) => g.id === 'photos').images.length, 3);
-    await page.getByRole('button', { name: 'グループから外す', exact: true }).click();
-    d = host.getByRole('dialog', { name: 'グループから外す', exact: true });
-    await d.getByRole('button', { name: '外す', exact: true }).click();
+    await page.getByRole('button', { name: 'このグループから外す', exact: true }).click();
     await until(
       async () => !(await imageSnapshot()).groups.find((g) => g.id === 'photos').images.length,
       'batch remove',

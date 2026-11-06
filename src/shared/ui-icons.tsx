@@ -13,6 +13,10 @@ export type IconName =
   | 'copy'
   | 'select-all'
   | 'clear-selection'
+  | 'grid'
+  | 'list'
+  | 'sort-ascending'
+  | 'sort-descending'
   | 'list-plus'
   | 'list-minus'
   | 'folder-move'
@@ -58,6 +62,21 @@ export type IconName =
   | 'help';
 const playIcon = <path d="m7 4 13 8-13 8Z" />;
 const paths: Record<IconName, React.ReactNode> = {
+  grid: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+  ),
+  list: (
+    <>
+      <path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01" />
+    </>
+  ),
+  'sort-ascending': <path d="M6 20V4m-4 4 4-4 4 4M13 5h3m-3 7h5m-5 7h8" />,
+  'sort-descending': <path d="M6 4v16m-4-4 4 4 4-4M13 5h8m-8 7h5m-5 7h3" />,
   eye: (
     <>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />

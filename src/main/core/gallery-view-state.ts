@@ -2,6 +2,7 @@ import { libraryText } from '../../shared/library-text';
 import type { LibraryMedia } from '../../shared/library-assets';
 import { stateStorage, type StateStorage } from './state-storage';
 import { gallerySize, libraryGallerySize, validGalleryWidth } from '../../shared/image-gallery';
+import { defaultLibraryView, validLibraryView, type LibraryView } from '../../shared/library-view';
 import {
   defaultImageLibraryLayout,
   validImageLibraryLayout,
@@ -55,7 +56,26 @@ export class GalleryViewStateStore {
     if (this.blocked) throw Error(this.error);
     this.write({
       ...this.state,
-      [surface]: { cardWidth: this.get(surface), layout: structuredClone(layout) },
+      [surface]: {
+        ...this.state[surface],
+        cardWidth: this.get(surface),
+        layout: structuredClone(layout),
+      },
+    });
+  }
+  view(): LibraryView {
+    return structuredClone(this.state.library?.view ?? defaultLibraryView);
+  }
+  saveView(view: LibraryView) {
+    if (!validLibraryView(view)) throw Error(this.text('services.galleryViewState.invalidSize'));
+    if (this.blocked) throw Error(this.error);
+    this.write({
+      ...this.state,
+      library: {
+        ...this.state.library,
+        cardWidth: this.get('library'),
+        view: structuredClone(view),
+      },
     });
   }
   private write(next: State) {

@@ -23,6 +23,7 @@ export interface GalleryItem {
   /** Optional plain text preview; never interpreted as HTML or an image URL. */
   textPreview?: string;
   detail: string;
+  listDetail?: string;
   labels: string[];
   state: GalleryImageState;
   selected?: boolean;
@@ -32,6 +33,7 @@ export interface GalleryItem {
 export interface GalleryModel {
   items: GalleryItem[];
   cardWidth: number;
+  view?: 'cards' | 'list';
   fit: 'contain' | 'cover';
   selection: 'none' | 'single' | 'multiple';
   empty: string;

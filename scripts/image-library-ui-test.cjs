@@ -90,9 +90,19 @@ const pdir = path.join(profile, 'extensions', 'at365.profile');
 fs.mkdirSync(pdir, { recursive: true });
 for (const file of ['extension.json', 'index.cjs'])
   require('./copy-host.cjs').copyHost(path.join(profileSource, file), path.join(pdir, file));
-const profileRibbonTitle = JSON.parse(
-  fs.readFileSync(path.join(pdir, 'extension.json'), 'utf8'),
-).ribbonItems.find((item) => item.id === 'main').title;
+fs.cpSync(
+  path.join(profileSource, 'resources/translations'),
+  path.join(pdir, 'resources/translations'),
+  {
+    recursive: true,
+  },
+);
+const profileDictionary = JSON.parse(
+  fs.readFileSync(path.join(pdir, 'resources/translations/applet.json'), 'utf8'),
+);
+const profileRibbonTitle = JSON.parse(fs.readFileSync(path.join(pdir, 'extension.json'), 'utf8'))
+  .ribbonItems.find((item) => item.id === 'main')
+  .title.replace(/^%(.+)%$/, (_, key) => profileDictionary[key]);
 settings.extensions['at365.profile'] = { enabled: true, settings: { name: 'Profile fixture' } };
 install(
   'at365.web-applet',

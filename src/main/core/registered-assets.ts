@@ -37,6 +37,7 @@ export interface DecodedAsset {
 export type AssetDecoder = (bytes: Buffer) => DecodedAsset | Promise<DecodedAsset>;
 interface AssetRecord {
   entry: RegisteredImageEntry;
+  modifiedAt?: number;
   signature: string;
   hash: string;
   circle: string;
@@ -176,7 +177,11 @@ export class RegisteredAssets {
       (await fs.realpath(file)).toLowerCase() !== file.toLowerCase()
     )
       throw Error(this.text('services.registeredImages.unsafeFile'));
-    return { signature: `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`, bytes: stat.size };
+    return {
+      signature: `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
+      bytes: stat.size,
+      modifiedAt: stat.mtimeMs,
+    };
   }
   async read(
     ref: unknown,
@@ -434,7 +439,7 @@ export class RegisteredAssets {
         const record =
           old?.signature === before.signature
             ? old
-            : this.replace(name, before.signature, before.bytes, old);
+            : this.replace(name, before.signature, before.bytes, old, before.modifiedAt);
         this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'), false);
         return { ref, reused: true, generation: record.entry.generation! };
       };
@@ -459,7 +464,7 @@ export class RegisteredAssets {
       // A scan already in progress may have enumerated the directory before this addition.
       if (this.refreshing) await this.refreshing;
       const stat = await this.fileSignature(name);
-      const record = this.replace(name, stat.signature, stat.bytes);
+      const record = this.replace(name, stat.signature, stat.bytes, undefined, stat.modifiedAt);
       if (
         !record ||
         !(await this.fileBytes(name)).equals(bytes) ||
@@ -496,6 +501,11 @@ export class RegisteredAssets {
       .filter((v) => !assignedImage(v.entry.ref.file) && v.entry.state !== 'missing')
       .map((v) => structuredClone(v.entry))
       .sort((a, b) => a.ref.file.localeCompare(b.ref.file, 'ja'));
+  }
+  /** Host-only metadata; never reads bytes or changes the public library entry model. */
+  modified(ref: RegisteredImageRef) {
+    const record = this.entries.get(imageKey(ref));
+    return record?.entry.available ? record.modifiedAt : undefined;
   }
   /** Cached selection candidates only; never reads, decodes or returns image content. */
   availableReferences(): RegisteredImageRef[] {
@@ -544,8 +554,15 @@ export class RegisteredAssets {
       ? record.hash
       : undefined;
   }
-  private replace(name: string, signature: string, bytes: number, old?: AssetRecord) {
+  private replace(
+    name: string,
+    signature: string,
+    bytes: number,
+    old?: AssetRecord,
+    modifiedAt = old?.modifiedAt,
+  ) {
     const record: AssetRecord = {
+      modifiedAt,
       signature,
       hash: '',
       circle: old?.circle ?? '',
@@ -740,7 +757,7 @@ export class RegisteredAssets {
         seen.add(key);
         try {
           if (result.status === 'rejected') throw result.reason;
-          const { signature, bytes } = result.value;
+          const { signature, bytes, modifiedAt } = result.value;
           const old = this.entries.get(key);
           if (
             old?.signature === signature &&
@@ -748,7 +765,7 @@ export class RegisteredAssets {
             (old.entry.available || old.entry.state === 'error')
           )
             continue;
-          this.replace(f.name, signature, bytes, old);
+          this.replace(f.name, signature, bytes, old, modifiedAt);
           changed = true;
         } catch (error) {
           if (this.stopped) return;

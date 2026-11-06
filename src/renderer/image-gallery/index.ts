@@ -40,6 +40,7 @@ type Card = {
   checkArea: HTMLLabelElement;
   title: HTMLElement;
   detail: HTMLElement;
+  listText: HTMLElement;
   labels: HTMLElement;
   status: HTMLElement;
   actions: HTMLElement;
@@ -191,7 +192,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       detail = element('p', 'ad-gallery-detail');
     const labels = element('div', 'ad-gallery-labels'),
       actions = element('div', 'ad-gallery-actions');
-    body.append(title, detail, labels);
+    const listText = element('p', 'ad-gallery-list-text');
+    body.append(title, listText, detail, labels);
     node.append(button, checkArea, body, actions);
     const card: Card = {
       node,
@@ -203,6 +205,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       checkArea,
       title,
       detail,
+      listText,
       labels,
       actions,
       item,
@@ -219,6 +222,26 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           ? options.select(card.item.id, true)
           : options.activate(card.item.id);
     if (options.clickSelect) button.ondblclick = () => options.activate(card.item.id);
+    node.addEventListener('click', (event) => {
+      if (
+        model.view !== 'list' ||
+        !options.clickSelect ||
+        card.item.selectable === false ||
+        (event.target as Element).closest('button,input,label')
+      )
+        return;
+      button.focus({ preventScroll: true });
+      options.clickSelect(card.item.id, event);
+    });
+    node.addEventListener('dblclick', (event) => {
+      if (
+        model.view === 'list' &&
+        options.clickSelect &&
+        card.item.selectable !== false &&
+        !(event.target as Element).closest('button,input,label')
+      )
+        options.activate(card.item.id);
+    });
     if (options.context) {
       node.oncontextmenu = (event) => {
         event.preventDefault();
@@ -241,6 +264,10 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     cancelInteraction: () => interactions?.cancel(),
     setModel(next: GalleryModel) {
       if (disposed) return;
+      const focused =
+        document.activeElement instanceof HTMLElement && container.contains(document.activeElement)
+          ? document.activeElement
+          : undefined;
       const saved = anchor();
       const previousOrder = [...container.children]
         .map((child) => (child as HTMLElement).dataset.imageId)
@@ -251,8 +278,11 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         `${validGalleryWidth(next.cardWidth, options.size) ? next.cardWidth : gallerySize.initial}px`,
       );
       container.dataset.fit = next.fit;
-      container.dataset.compact = String(next.cardWidth < 180);
-      container.dataset.icons = String(!!options.clickSelect && next.cardWidth < 120);
+      container.dataset.view = next.view ?? 'cards';
+      container.dataset.compact = String(next.view !== 'list' && next.cardWidth < 180);
+      container.dataset.icons = String(
+        next.view !== 'list' && !!options.clickSelect && next.cardWidth < 120,
+      );
       const ids = new Set(next.items.map((i) => i.id));
       for (const [id, card] of cards)
         if (!ids.has(id)) {
@@ -300,10 +330,14 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.node.title = item.description ?? item.title;
         card.title.textContent = item.title;
         card.title.title = item.title;
-        card.detail.textContent = item.detail;
-        const tags = options.expandLabels ? item.labels : item.labels.slice(0, 2);
-        if (!options.expandLabels && item.labels.length > 2)
-          tags.push(hostText('gallery.moreLabels', { count: item.labels.length - 2 }));
+        card.listText.textContent = item.textPreview?.replace(/\s+/g, ' ') ?? '';
+        card.detail.textContent =
+          next.view === 'list' ? (item.listDetail ?? item.detail) : item.detail;
+        const limit = next.view === 'list' ? 1 : options.expandLabels ? item.labels.length : 2;
+        const tags = item.labels.slice(0, limit);
+        if (item.labels.length > limit)
+          tags.push(hostText('gallery.moreLabels', { count: item.labels.length - limit }));
+        card.labels.title = item.labels.join('\n');
         if (card.labels.dataset.signature !== JSON.stringify(tags)) {
           card.labels.replaceChildren(
             ...tags.map((v) => {
@@ -366,6 +400,12 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         if (replacement) saved.id = replacement;
       }
       restore(saved);
+      if (
+        focused?.isConnected &&
+        !focused.matches(':disabled') &&
+        document.activeElement !== focused
+      )
+        focused.focus({ preventScroll: true });
       interactions?.update();
       pump();
     },

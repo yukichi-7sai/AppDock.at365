@@ -108,6 +108,133 @@ test('import progress updates one modal, rejects edits, cancels once and closes 
   assert.equal(aborted, 2);
 });
 fs.mkdirSync(root, { recursive: true });
+test('library view restores per-media preferences and preserves sizes, picker and layout', () => {
+  for (const media of ['image', 'sound', 'text']) {
+    const file = path.join(root, `view-${media}.json`);
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ schemaVersion: 1, library: { cardWidth: 200 }, picker: { cardWidth: 120 } }),
+    );
+    const store = new GalleryViewStateStore(file, media);
+    assert.equal(store.view().mode, 'cards');
+    const view = { mode: 'list', sort: 'modified', direction: 'descending' };
+    store.saveView(view);
+    store.saveLayout({ sidebarWidth: 300, collapsedGroups: [], collapsedFolders: [] });
+    store.save('library', 40);
+    store.save('picker', 160);
+    const restored = new GalleryViewStateStore(file, media);
+    assert.deepEqual(restored.view(), view);
+    assert.equal(restored.get('library'), 40);
+    assert.equal(restored.get('picker'), 160);
+    assert.equal(restored.layout().sidebarWidth, 300);
+    const before = fs.readFileSync(file, 'utf8');
+    for (const value of [
+      { ...view, mode: 'table' },
+      { ...view, sort: 'random' },
+      { ...view, direction: 'backwards' },
+      { ...view, extra: true },
+    ])
+      assert.throws(() => store.saveView(value));
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+  }
+});
+
+test('display sorting uses natural names and metadata without changing selection or saved group order', async () => {
+  const f = fixture();
+  const entries = ['item10.svg', 'item2.png', 'item1.svg', 'missing.svg'].map((file, i) => ({
+    ...f.entries[i],
+    ref: { file },
+    bytes: [10, 30, 20, 0][i],
+    available: i !== 3,
+  }));
+  f.setEntries(entries);
+  f.value.groups[0].images = entries.map((e) => e.ref);
+  f.host.images.modified = (ref) =>
+    ({ 'item10.svg': 300, 'item2.png': 100, 'item1.svg': 200 })[ref.file];
+  const group = f.session
+    .snapshot()
+    .content.groups.find((g) => g.title === 'すべて' && g.id !== 'all');
+  await f.act('group', { groupId: group.id });
+  await f.act('select-all');
+  const before = structuredClone(f.value);
+  const sort = async (key, direction = 'ascending') => {
+    await f.act('view', { value: { mode: 'list', sort: key, direction } });
+    assert.equal(f.session.snapshot().content.selected, 4);
+    assert.deepEqual(f.value, before);
+    return f.session.snapshot().content.items.map((i) => i.title);
+  };
+  assert.deepEqual(await sort('name'), ['item1.svg', 'item2.png', 'item10.svg', 'missing.svg']);
+  assert.deepEqual(await sort('size'), ['item10.svg', 'item1.svg', 'item2.png', 'missing.svg']);
+  assert.deepEqual(await sort('modified', 'descending'), [
+    'item10.svg',
+    'item1.svg',
+    'item2.png',
+    'missing.svg',
+  ]);
+  assert.deepEqual(await sort('type'), ['item2.png', 'item1.svg', 'item10.svg', 'missing.svg']);
+  const items = f.session.snapshot().content.items;
+  const drag = await f.act('drag-start', { imageId: items[0].id });
+  await assert.rejects(f.act('reorder', { token: drag.token, imageId: items[1].id, after: true }));
+  assert.deepEqual(
+    await sort('manual'),
+    entries.map((e) => e.ref.file),
+  );
+  assert.deepEqual(new GalleryViewStateStore(f.file).view(), f.state.view);
+  await assert.rejects(
+    f.act('view', { value: { mode: 'list', sort: 'invalid', direction: 'ascending' } }),
+  );
+  f.session.dispose();
+});
+
+test('group removal includes unrendered selection while retaining files and other memberships', async () => {
+  const f = fixture();
+  f.value.groups[0].images = f.entries.map((e) => e.ref);
+  const group = f.session
+    .snapshot()
+    .content.groups.find((g) => g.title === 'すべて' && g.id !== 'all');
+  await f.act('group', { groupId: group.id });
+  await f.act('select-all');
+  const entries = structuredClone(f.entries),
+    other = structuredClone(f.value.groups[1]);
+  const drag = await f.act('drag-start', { imageId: f.session.snapshot().content.items[0].id });
+  assert.equal(drag.count, 130);
+  await f.act('remove-from-group', { token: drag.token });
+  assert.deepEqual(f.value.groups[0].images, []);
+  assert.deepEqual(f.value.groups[1], other);
+  assert.deepEqual(f.entries, entries);
+  assert.equal(f.session.snapshot().content.selected, 0);
+  await assert.rejects(f.act('remove-from-group', { token: drag.token }), /Stale/);
+  f.value.groups[0].images = [entries[0].ref];
+  await f.act('select-all');
+  await f.act('remove-from-group');
+  assert.deepEqual(f.value.groups[0].images, []);
+  await f.act('group', { groupId: 'all' });
+  await f.act('select-all');
+  await assert.rejects(f.act('remove-from-group'));
+  f.session.dispose();
+});
+
+test('group-removal drag rejects changed membership, content and navigation before modifying any item', async () => {
+  for (const change of ['membership', 'content', 'navigation', 'sort']) {
+    const f = fixture();
+    f.value.groups[0].images = f.entries.slice(0, 2).map((e) => e.ref);
+    const group = f.session
+      .snapshot()
+      .content.groups.find((g) => g.title === 'すべて' && g.id !== 'all');
+    await f.act('group', { groupId: group.id });
+    await f.act('select-all');
+    const drag = await f.act('drag-start', { imageId: f.session.snapshot().content.items[0].id });
+    if (change === 'membership') f.value.groups[1].images.push(f.entries[0].ref);
+    if (change === 'content') f.entries[0].generation = 'replaced';
+    if (change === 'navigation') await f.act('group', { groupId: 'unfiled' });
+    if (change === 'sort')
+      await f.act('view', { value: { mode: 'list', sort: 'name', direction: 'ascending' } });
+    const before = structuredClone(f.value);
+    await assert.rejects(f.act('remove-from-group', { token: drag.token }));
+    assert.deepEqual(f.value, before);
+    f.session.dispose();
+  }
+});
 let serial = 0;
 function fixture() {
   const file = path.join(root, `${++serial}.json`);
@@ -743,8 +870,8 @@ test('selection and view changes dismiss success feedback while retaining errors
   }
 });
 
-test('late drop and reorder results do not restore feedback after the selection context changes', async () => {
-  for (const command of ['drop', 'reorder']) {
+test('late membership and reorder results do not restore feedback after the selection context changes', async () => {
+  for (const command of ['drop', 'remove-from-group', 'reorder']) {
     const f = fixture();
     f.value.groups[1].images = f.entries.slice(0, 4).map((e) => e.ref);
     const group = f.session.snapshot().content.groups[3].id;

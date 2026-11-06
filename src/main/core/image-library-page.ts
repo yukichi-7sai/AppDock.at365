@@ -4,6 +4,11 @@ import type { LibrarySoundPreview } from './library-sound-preview';
 import type { TextLibraryService } from './text-library-service';
 import { snippetGroupId } from '../../shared/text-library';
 import { filterImageBrowser } from '../../shared/image-browser';
+import {
+  compareLibraryEntries,
+  validLibraryView,
+  type LibraryView,
+} from '../../shared/library-view';
 import { hostText } from '../../shared/i18n';
 import {
   iconSets,
@@ -33,6 +38,7 @@ import type { GalleryImages } from './gallery-images';
 import { LibraryReadCancelled } from './registered-assets';
 import type { GalleryViewStateStore } from './gallery-view-state';
 import type { ImageLibraryDialogs } from './image-library-dialogs';
+const fileSizeNumber = new Intl.NumberFormat('ja', { maximumFractionDigits: 1 });
 
 /** Window-owned state survives navigation and provider recovery. Import jobs also live here. */
 export class ImageLibraryPageState {
@@ -47,6 +53,7 @@ export class ImageLibraryPageState {
   viewRevision = 0;
   width: number;
   layout: ImageLibraryLayout;
+  view: LibraryView;
   sizeError: string;
   private errorValue = '';
   retryIconSet?: string;
@@ -75,6 +82,7 @@ export class ImageLibraryPageState {
   constructor(readonly store: GalleryViewStateStore) {
     this.width = store.get('library');
     this.layout = store.layout();
+    this.view = store.view();
     this.sizeError = store.error;
   }
   resetView() {
@@ -202,7 +210,13 @@ export class ImageLibraryPageSession implements HostPageController {
       this.options.groups(),
       this.options.state,
       this.options.texts ? (ref, query) => this.options.texts!.matches(ref, query) : undefined,
-    ).map((ref) => [imageKey(ref), this.items.get(imageKey(ref))!] as const);
+    )
+      .map((ref) => [imageKey(ref), this.items.get(imageKey(ref))!] as const)
+      .sort(([, a], [, b]) =>
+        compareLibraryEntries(a.entry, b.entry, this.options.state.view, (entry) =>
+          this.options.host.images.modified(entry.ref),
+        ),
+      );
   }
   passive(action: HostPageAction) {
     // Scrolling can report its last frame after a host dialog has blocked page input.
@@ -251,6 +265,10 @@ export class ImageLibraryPageSession implements HostPageController {
         assetId: this.options.texts ? '' : assetId,
         textPreview: this.options.texts ? e.textPreview || hostText('texts.emptyBody') : undefined,
         title: e.ref.file,
+        listDetail:
+          this.options.host.media === 'image'
+            ? `${e.ref.file.split('.').at(-1)!.toUpperCase()} · ${fileSizeNumber.format(e.bytes / 1024)} KB`
+            : undefined,
         detail: this.options.texts
           ? e.characters === undefined
             ? 'TXT'
@@ -277,6 +295,7 @@ export class ImageLibraryPageSession implements HostPageController {
       selected: s.selected.size,
       cardWidth: s.width,
       layout: s.layout,
+      view: s.view,
       sizeError: s.sizeError,
       error: s.error || this.options.preview?.error || this.options.host.images.error || '',
       message: s.message,
@@ -348,6 +367,7 @@ export class ImageLibraryPageSession implements HostPageController {
         'drag-start',
         'drop',
         'drop-folder',
+        'remove-from-group',
         'reorder',
       ].includes(action.command)
     )
@@ -412,6 +432,20 @@ export class ImageLibraryPageSession implements HostPageController {
           s.sizeError = (e as Error).message;
           this.options.failed(this.text('services.imageLibraryPage.sizeSaveFailed'));
         }
+      }
+    } else if (action.command === 'view') {
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
+      if (!validLibraryView(action.value)) throw Error('Invalid library view');
+      if (s.view.sort !== action.value.sort || s.view.direction !== action.value.direction)
+        s.resetView();
+      else if (s.view.mode !== action.value.mode) s.viewRevision++;
+      s.view = structuredClone(action.value);
+      try {
+        s.store.saveView(s.view);
+        s.sizeError = '';
+      } catch (e) {
+        s.sizeError = (e as Error).message;
+        this.options.failed(this.text('services.imageLibraryPage.sizeSaveFailed'));
       }
     } else if (action.command === 'layout') {
       if (!validImageLibraryLayout(action.value)) throw Error('Invalid gallery layout');
@@ -683,13 +717,77 @@ export class ImageLibraryPageSession implements HostPageController {
           this.options.changed();
           throw e;
         }
+      } else if (action.command === 'remove-from-group') {
+        const feedbackRevision = s.feedbackRevision;
+        const drag = this.drag;
+        this.drag = undefined;
+        const groups = this.options.groups();
+        const group = groups.find((g) => s.group === `group:${g.id}`);
+        if (!group) throw Error(this.text('services.imageLibraryPage.selectGroup'));
+        if (
+          action.token !== undefined &&
+          (!drag ||
+            drag.token !== action.token ||
+            drag.group?.id !== group.id ||
+            drag.group.name !== group.name)
+        )
+          throw Error('Stale gallery drag');
+        const entries = action.token !== undefined ? drag!.entries : targets();
+        if (!entries.length) throw Error(this.text('services.imageLibraryPage.selectImage'));
+        if (
+          entries.some((entry) => {
+            const current = this.items.get(imageKey(entry.ref))?.entry;
+            return !current || current.generation !== entry.generation;
+          })
+        )
+          throw Error(this.text('services.imageLibraryPage.imageChanged'));
+        const membership = new Map<string, string[]>();
+        if (action.token === undefined)
+          for (const current of groups)
+            for (const ref of current.images) {
+              const key = imageKey(ref);
+              membership.set(key, [...(membership.get(key) ?? []), current.id]);
+            }
+        const images =
+          action.token !== undefined
+            ? drag!.images
+            : entries.map((entry) => ({
+                image: entry.ref,
+                before: membership.get(imageKey(entry.ref)) ?? [],
+              }));
+        try {
+          await this.options.host.edit({
+            kind: 'membership-batch',
+            mode: 'remove',
+            groupId: group.id,
+            images,
+          });
+          this.catalogue();
+          s.error = '';
+          if (s.feedbackRevision === feedbackRevision)
+            s.message = this.text('library.removedFromGroup', {
+              count: images.length,
+              group: group.name,
+            });
+        } catch (e) {
+          s.error =
+            e instanceof Error ? e.message : this.text('services.imageLibraryPage.groupSaveFailed');
+          this.options.failed(this.text('services.imageLibraryPage.groupSaveFailed'));
+          this.options.changed();
+          throw e;
+        }
       } else if (action.command === 'reorder') {
         const feedbackRevision = s.feedbackRevision;
         const drag = this.drag;
         this.drag = undefined;
         if (!drag || drag.token !== action.token) throw Error('Stale gallery drag');
         const before = drag.group;
-        if (!before || s.group !== `group:${before.id}` || typeof action.after !== 'boolean')
+        if (
+          !before ||
+          s.group !== `group:${before.id}` ||
+          s.view.sort !== 'manual' ||
+          typeof action.after !== 'boolean'
+        )
           throw Error(this.text('services.imageLibraryPage.selectGroup'));
         const [target] = resolveImage(action.imageId);
         if (

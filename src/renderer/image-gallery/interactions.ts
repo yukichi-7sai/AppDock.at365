@@ -14,6 +14,7 @@ export interface GalleryInteractions {
   enabled(): boolean;
   canReorder(): boolean;
   beginDrag(imageId: string): Promise<{ token: string; count: number }>;
+  dragging?(count: number | undefined): void;
   drop(token: string, groupId: string): void;
   reorder(token: string, imageId: string, after: boolean): void;
   clear(): void;
@@ -68,6 +69,7 @@ export function mountGalleryInteractions(
   insertion.className = 'ad-gallery-insertion';
   insertion.dataset.testid = 'gallery-insertion';
   const resetVisuals = () => {
+    if (gesture?.imageId && gesture.active) options.dragging?.(undefined);
     rectangle.remove();
     badge.remove();
     insertion.remove();
@@ -131,12 +133,14 @@ export function mountGalleryInteractions(
         g.y <= viewport.bottom
       ) {
         const r = card.getBoundingClientRect();
-        const after = g.x >= r.left + r.width / 2;
+        const list = model().view === 'list';
+        const after = list ? g.y >= r.top + r.height / 2 : g.x >= r.left + r.width / 2;
         g.insertion = { imageId: item.id, after };
         Object.assign(insertion.style, {
-          left: `${(after ? r.right : r.left) - 2}px`,
-          top: `${Math.max(r.top, viewport.top)}px`,
-          height: `${Math.min(r.bottom, viewport.bottom) - Math.max(r.top, viewport.top)}px`,
+          left: `${list ? r.left : (after ? r.right : r.left) - 2}px`,
+          top: `${list ? (after ? r.bottom : r.top) - 2 : Math.max(r.top, viewport.top)}px`,
+          width: `${list ? r.width : 4}px`,
+          height: `${list ? 4 : Math.min(r.bottom, viewport.bottom) - Math.max(r.top, viewport.top)}px`,
         });
         document.body.append(insertion);
       }
@@ -274,6 +278,7 @@ export function mountGalleryInteractions(
           .then((result) => {
             if (gesture === g) {
               g.count = result.count;
+              options.dragging?.(result.count);
               badge.dataset.multiple = String(result.count > 1);
               draw();
             }
