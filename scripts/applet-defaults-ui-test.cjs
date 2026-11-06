@@ -21,21 +21,20 @@ settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 settings.extensions['fixture.off'] = { enabled: false, settings: { retained: 7 } };
 const row = {
-  id: 'web.11111111-1111-4111-8111-111111111111',
-  name: 'Unavailable account fixture',
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Registered site fixture',
   enabled: true,
   display: 'page',
   url: 'https://example.test/',
-  accountId: 'account.11111111-1111-4111-8111-111111111111',
   navigation: 'same-origin',
   allowedOrigins: [],
   icon: '',
 };
 settings.extensions['at365.web-applet'] = {
   enabled: true,
-  settings: { items: [row], shortcutDefaults: [] },
+  settings: { sites: [row], siteShortcutDefaults: [] },
 };
-settings.ribbon.order = [`page:${row.id}:main`, 'image-library', 'settings'];
+settings.ribbon.order = [`page:at365.web-applet.sites.${row.id}:main`, 'image-library', 'settings'];
 const referenceBefore = JSON.stringify(settings.extensions['at365.web-applet']);
 const profileSource = path.resolve(root, '../Applet.Profile.at365');
 const profileDirectory = path.join(profile, 'extensions', 'at365.profile');
@@ -70,13 +69,6 @@ for (const [id, delay] of [
     'exports.activate=async()=>{};exports.deactivate=async()=>{};',
   );
 }
-const originalAccounts = path.join(profile, 'data/web-applets/accounts.json');
-fs.mkdirSync(path.dirname(originalAccounts), { recursive: true });
-fs.writeFileSync(
-  originalAccounts,
-  JSON.stringify({ schemaVersion: 1, accounts: [{ id: row.accountId, name: 'Original fixture' }] }),
-);
-const originalHash = hash(originalAccounts);
 assert.equal(settings.migrations, undefined);
 assert.equal(settings.extensions['at365.profile'], undefined);
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
@@ -167,7 +159,6 @@ function assertReferences() {
   const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
   assert.equal(JSON.stringify(saved.extensions['at365.web-applet']), referenceBefore);
   assert.equal(saved.migrations, undefined);
-  assert.equal(hash(originalAccounts), originalHash);
 }
 (async () => {
   try {
@@ -220,9 +211,9 @@ function assertReferences() {
       'ribbon JSON saved',
     );
     assertReferences();
-    await host.screenshot({ path: path.join(profile, 'ribbon-with-missing-account.png') });
+    await host.screenshot({ path: path.join(profile, 'ribbon-with-registered-site.png') });
     checks.push(
-      'form and JSON ribbon saves succeed with missing account references; original rows, absent migration marker and old account bytes remain unchanged',
+      'form and JSON ribbon saves preserve the registered site',
     );
 
     await host.evaluate(() => window.dock.toggleExtension('at365.profile', false));

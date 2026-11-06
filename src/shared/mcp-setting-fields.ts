@@ -15,7 +15,7 @@ export const mcpSettingSupported = (field: SettingDefinition, nested = false) =>
     'registered-image',
     ...(nested ? ['string-list'] : []),
   ].includes(field.type) &&
-  (!nested || !field.dynamic || !!field.optionSource);
+  (!nested || !field.dynamic);
 /** Invalid stored image objects must not leave the owner, including change previews. */
 export const mcpSettingValue = (field: SettingDefinition, value: unknown) =>
   field.type === 'registered-image' && value !== null && !imageReference(value) ? undefined : value;

@@ -242,15 +242,13 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       'blur',
     );
     checks.push('host and Applet update sources defer both URL and path input until confirmation');
-    const account = await host.evaluate(() => window.dock.createWebAccount('URL fixture'));
     await host.evaluate(
-      async ({ account, base }) => {
+      async (base) => {
         const s = await window.dock.snapshot();
         s.settings.value.extensions['fixture.web-settings'].settings.items.push({
-          id: 'web.12345678-1234-1234-1234-123456789abc',
+          id: '12345678-1234-1234-1234-123456789abc',
           name: '新しいWebApplet',
           url: base + '/old',
-          accountId: account.id,
           enabled: false,
           display: 'page',
           navigation: 'same-origin',
@@ -259,7 +257,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
         });
         await window.dock.saveSettings(s.settings.value, s.settings.revision);
       },
-      { account, base },
+      base,
     );
     await select('新しいWebApplet');
     const web = page.getByLabel('WebAppletのURL', { exact: true });

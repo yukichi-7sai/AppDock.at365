@@ -18,7 +18,6 @@ export const hostSettingsPages = localizedMetadata(
       ['gestures', hostText('settings.settings-navigation.gestures')],
       ['touchpad-gestures', hostText('settings.settings-navigation.touchpad')],
       ['custom-commands', hostText('settings.settings-navigation.customCommands')],
-      ['web-accounts', hostText('settings.settings-navigation.webAccounts')],
       ['permissions', hostText('settings.settings-navigation.permissions')],
       ['tts', hostText('pages.tts.title')],
       ['ai', hostText('pages.ai.title')],

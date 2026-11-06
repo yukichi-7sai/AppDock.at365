@@ -328,21 +328,6 @@ export function parseSettings(value: unknown): Settings {
       : {}),
   };
   const parsed = structuredClone(next) as unknown as Settings;
-  // Saved identity/storage aliases remain readable; no legacy settings are imported.
-  if (value.migrations !== undefined) {
-    const marker = value.migrations as Settings['migrations'];
-    const web = marker?.webApplet;
-    if (
-      !web ||
-      web.version !== 1 ||
-      web.owner !== 'at365.web-applet' ||
-      !Array.isArray(web.ids) ||
-      web.ids.some((id) => typeof id !== 'string' || !/^web\.[a-f0-9-]{36}$/.test(id)) ||
-      new Set(web.ids).size !== web.ids.length
-    )
-      throw Error(hostText('settings.settings-schema.pageIdentity'));
-    parsed.migrations = structuredClone(marker);
-  }
   const result = keybindings ? withKeybindings(parsed, keybindings) : parsed;
   prepareSettingsLookups(result);
   return result;

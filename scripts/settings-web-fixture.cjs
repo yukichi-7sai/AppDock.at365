@@ -1,7 +1,7 @@
 const fs = require('node:fs'),
   path = require('node:path');
 /** Disabled remote collection: settings tests never open the external site. */
-function installWebSettings(profile, settings, items = [], accounts = []) {
+function installWebSettings(profile, settings, items = []) {
   const owner = 'fixture.web-settings';
   const fields = [
     { key: 'name', title: 'WebAppletの名前', type: 'string', default: '' },
@@ -35,16 +35,13 @@ function installWebSettings(profile, settings, items = [], accounts = []) {
       minimumHostVersion: '0.45.0',
       runtime: 'node',
       entry: 'index.cjs',
-      capabilities: ['pages', 'dynamic-pages', 'settings', 'web-profiles'],
+      capabilities: ['pages', 'dynamic-pages', 'settings'],
       settings: [{ key: 'items', title: '登録サイト', type: 'object-list', fields, default: [] }],
       pageCollections: [{ key: 'items', source: 'remote', fields }],
     }),
   );
   fs.writeFileSync(path.join(folder, 'index.cjs'), 'module.exports = {};');
   settings.extensions[owner] = { enabled: false, settings: { items } };
-  const accountFile = path.join(profile, 'data', 'web-profiles', owner, 'accounts.json');
-  fs.mkdirSync(path.dirname(accountFile), { recursive: true });
-  fs.writeFileSync(accountFile, JSON.stringify({ schemaVersion: 1, accounts }));
   return owner;
 }
 module.exports = { installWebSettings };

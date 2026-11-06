@@ -1,7 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { CommandText } from './CommandText';
 import { useEffect, useRef, useState } from 'react';
-import type { SettingDefinition, SettingOption } from '../../shared/contracts';
+import type { SettingDefinition } from '../../shared/contracts';
 import {
   normalizeObject,
   objectFieldValue,
@@ -29,7 +29,7 @@ export function ObjectListDialogSetting({
   testId,
   definition,
   value,
-  options = {},
+  deleteDetail,
   onCommit,
   onOpen,
   onDraftAction,
@@ -38,7 +38,7 @@ export function ObjectListDialogSetting({
   testId?: string;
   definition: SettingDefinition;
   value: unknown;
-  options?: Record<string, SettingOption[]>;
+  deleteDetail?: string;
   onCommit(value: Record<string, unknown>[], before: Record<string, unknown>[]): Promise<unknown>;
   onOpen?(entry: Record<string, unknown>): Promise<unknown>;
   onDraftAction?(input: string): Promise<SettingListDraftResult>;
@@ -123,10 +123,6 @@ export function ObjectListDialogSetting({
     fieldVersions.current = {};
     const draft = structuredClone(normalizeObject(index < 0 ? {} : entries[index], fields));
     if (index < 0 && view.idKey) draft[view.idKey] = crypto.randomUUID();
-    if (index < 0)
-      for (const field of fields)
-        if (field.optionSource && options[field.key]?.length)
-          setObjectField(draft, field, options[field.key][0].value);
     setCurrentDialog({
       kind,
       index,
@@ -208,7 +204,6 @@ export function ObjectListDialogSetting({
         actionsAlign="start"
         definition={definition}
         entries={entries}
-        options={options}
         busy={pending}
         extra={
           onOpen
@@ -256,11 +251,11 @@ export function ObjectListDialogSetting({
             id: String(index),
             title: view.showIndex
               ? `${definition.itemTitle ?? translate('settings.objectListDialogSetting.item')}${index + 1}`
-              : settingsListText(definition, entry, view.titleKey, options),
+              : settingsListText(definition, entry, view.titleKey),
             description: view.showIndex
-              ? settingsListText(definition, entry, view.titleKey, options)
+              ? settingsListText(definition, entry, view.titleKey)
               : view.descriptionKey
-                ? settingsListText(definition, entry, view.descriptionKey, options)
+                ? settingsListText(definition, entry, view.descriptionKey)
                 : undefined,
           }))}
           onClose={close}
@@ -287,7 +282,7 @@ export function ObjectListDialogSetting({
           )}
           onClose={close}
           valid={!fetching}
-          message={draftMessage}
+          message={dialog.kind === 'delete' ? deleteDetail : draftMessage}
           error={draftError}
           applyLabel={
             dialog.kind === 'delete' ? translate('settings.objectListDialogSetting.delete') : 'OK'
@@ -316,7 +311,7 @@ export function ObjectListDialogSetting({
               .filter((field) => field.key !== view.idKey)
               .map((field) => {
                 const current = objectFieldValue(dialog.draft, field),
-                  choices = options[field.key] ?? field.options ?? [];
+                  choices = field.options ?? [];
                 return (
                   <SettingsField
                     key={field.key}

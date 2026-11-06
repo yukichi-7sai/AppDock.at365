@@ -156,11 +156,16 @@ function readManifest(
     throw Error(hostText('services.extensions.notificationCenterVersion'));
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
+  if (m.capabilities?.includes('web-profiles')) {
+    // Retain the package in discovery so the updater can replace it.
+    delete m.pageCollections;
+    delete m.settings;
+    delete m.settingActions;
+    delete m.settingSections;
+  }
   m.pageCollections = parsePageCollections(m as unknown as ExtensionManifest);
   if (
-    (m.capabilities?.includes('dynamic-pages') ||
-      m.capabilities?.includes('web-profiles') ||
-      m.pageActions) &&
+    (m.capabilities?.includes('dynamic-pages') || m.pageActions) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.44.0') < 0)
   )
     throw Error(hostText('services.extensions.dynamicPageVersion'));
@@ -220,13 +225,6 @@ function readManifest(
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.45.0') < 0)
   )
     throw Error(hostText('services.extensions.listDialogVersion'));
-  if (
-    settingDefinitions?.some((s) =>
-      s.fields?.some((field) => field.optionSource === 'web-profiles'),
-    ) &&
-    !m.capabilities?.includes('web-profiles')
-  )
-    throw Error(hostText('services.extensions.profileCapability'));
   validateSettingCommandIds(m.id, settingDefinitions ?? [], commands ?? []);
   if (
     settingDefinitions?.some((s) => s.automation || s.generateCommands) &&
@@ -625,6 +623,8 @@ class ExtensionManager extends EventEmitter {
     e.scheduledDelay = undefined;
   }
   checkCompatibility(e: ExtensionInstance) {
+    if (e.manifest.capabilities?.includes('web-profiles'))
+      throw Error(hostText('services.extensions.sharedWebProfilesRetired'));
     const minimum = e.manifest.minimumHostVersion;
     if (minimum && compareVersions(this.hostVersion, minimum) < 0)
       throw new Error(

@@ -297,13 +297,6 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       hostText('settings.settings-catalog.gesturesNoActionKeywords'),
     ],
   ],
-  'web-accounts': [
-    [
-      'accounts',
-      hostText('settings.settings-catalog.webAccounts'),
-      hostText('settings.settings-catalog.webAccountsKeywords'),
-    ],
-  ],
   codex: [
     [
       'connectionScope',
@@ -510,7 +503,7 @@ export function settingsCatalog(
       id,
       title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
       kind: 'host' as const,
-      json: !['applets', 'web-accounts', 'permissions', 'codex', 'mcp-client'].includes(id),
+      json: !['applets', 'permissions', 'codex', 'mcp-client'].includes(id),
       items: [
         ...hostRows(id, current.host.language)
           .filter(([key]) => id !== 'tts' || ttsPageKeys.includes(key))

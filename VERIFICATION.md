@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-11-07 WebAppletのサイト別ログイン枠（0.170.0）
+
+- 発行前レビューで、旧画面・共用枠・手動API/MCP対象の削除、登録UUIDの分離、共有と端末専用の両参照、稼働中sessionとリンク先の回収ガードを確認した。旧manifestは更新情報を保持し、旧設定・ログイン枠は新方式へ移さない。
+- manifestの連携契約、設定項目、保存形式が変わるためマイナー更新。WebApplet 0.5.0の最低ホスト版は0.170.0。
+- 型検査と標準回帰は1,777件成功。初回の失敗は旧共用枠を検査していた試験、退役したShellへの参照、兄弟manifestおよび.NET試験ホストの不足に分けて対応した。兄弟manifestのハッシュと.NETの事前ビルドは証跡に保存した。
+- 発行済みEXEでWebApplet配布物、登録一覧、動的ページ、設定検索、Webアカウントグループ、MCP設定基盤を検証した。動的ページ試験は廃止したAPIの不存在を確認するよう改め、同じEXEで再実行した。
+- ローカルHTTP fixtureで同じURLのCookie分離と再起動後の保持、登録削除後の回収、未導入の状態での同期削除を確認した。Gmail用の保存領域の分離とサービス専用グループの維持は隔離fixtureで確認した。実サイトへのログインと実PC間の同期は検証対象外。
+- 配布物は `A:\40.ARTIFACT\AppDock.at365\worktrees\web-applet-site-accounts`。隔離先の103ファイルを発行元とSHA256照合した。EXEは `354e68385e1fef285404d0b7606def952ab98b81cf3ba4d402d179a2942dd624`。更新ZIPはfeedのハッシュと一致。
+- ログ、ツール版、試験入力tree、最終tree、配布物ハッシュは `.artifacts/commit-validation-web-applet-site-accounts/`。
+
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 
 - `5c26091`の設計に基づき、MCP接続と独立したMCPツールコマンドを`data/settings-<端末名>.json`へ固定保存した。Bearerとstdio環境変数の名前・値は配置別LocalAppDataの`mcp-client-secrets.json`へsafeStorageで暗号化する。旧名簿・旧秘密ファイル・旧カスタム種類を引き継がず、他の設定と割り当て参照は保持する。

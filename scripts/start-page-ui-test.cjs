@@ -57,7 +57,7 @@ function profile(name, overrides = {}) {
       version: '1.0.0',
       runtime: 'node',
       entry: 'worker.cjs',
-      capabilities: ['pages', 'dynamic-pages', 'settings', 'web-profiles', 'web-accounts'],
+      capabilities: ['pages', 'dynamic-pages', 'settings', 'web-accounts'],
       webAccounts: {
         url: 'https://fixture.invalid/',
         origins: ['https://fixture.invalid'],
@@ -110,13 +110,6 @@ function profile(name, overrides = {}) {
   );
   fs.writeFileSync(path.join(fixture, 'accounts.html'), '<!doctype html><h1>Accounts fixture</h1>');
   fs.writeFileSync(path.join(fixture, 'observer.js'), '({})');
-  const account = 'account.11111111-2222-3333-4444-555555555555';
-  const roster = path.join(folder, 'data', 'web-profiles', 'fixture.start');
-  fs.mkdirSync(roster, { recursive: true });
-  fs.writeFileSync(
-    path.join(roster, 'accounts.json'),
-    JSON.stringify({ schemaVersion: 1, accounts: [{ id: account, name: 'Fixture account' }] }),
-  );
   const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
   Object.assign(settings.host, {
     soundEnabled: false,
@@ -137,12 +130,11 @@ function profile(name, overrides = {}) {
       local: [{ id: 'local', name: 'Local collection', enabled: true, display: 'page' }],
       sites: [
         {
-          id: 'remote',
+          id: '11111111-2222-4333-8444-555555555555',
           name: 'Remote collection',
           enabled: true,
           display: 'page',
           url: remoteOrigin + '/remote',
-          accountId: account,
           navigation: 'same-origin',
           allowedOrigins: [],
         },
@@ -275,7 +267,7 @@ async function visibility() {
       'page:fixture.start:accounts',
       'page:fixture.start:dynamic',
       'page:fixture.start.local.local:main',
-      'page:fixture.start.sites.remote:main',
+      'page:fixture.start.sites.11111111-2222-4333-8444-555555555555:main',
     ]);
     await select.selectOption('page:fixture.start:dynamic');
     await until(
@@ -450,7 +442,7 @@ async function visibility() {
     await close();
     for (const [name, route, title] of [
       ['local', 'page:fixture.start.local.local:main', 'Start page fixture'],
-      ['remote', 'page:fixture.start.sites.remote:main', 'Remote collection fixture'],
+      ['remote', 'page:fixture.start.sites.11111111-2222-4333-8444-555555555555:main', 'Remote collection fixture'],
     ]) {
       await launch(profile('collection-' + name, { startPage: route }));
       await pageReady(route, title);

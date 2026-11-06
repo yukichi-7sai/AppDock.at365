@@ -402,10 +402,6 @@ export class SettingsViewClient {
       retryGlobalHotKeys: () => invoke('retryGlobalHotKeys'),
       openCommandPalette: (request) => this.invokePalette('open', request),
       cancelCommandPalette: (id) => this.invokePalette('cancel', id),
-      createWebAccount: (name) => invoke('createWebAccount', [name]),
-      renameWebAccount: (id, name) => invoke('renameWebAccount', [id, name]),
-      deleteWebAccount: (id, confirmed) => invoke('deleteWebAccount', [id, confirmed]),
-      clearWebAccount: (id, confirmed) => invoke('clearWebAccount', [id, confirmed]),
 
       chooseDirectory: () => invoke('chooseDirectory'),
       setAppletApiPermissions: (value) => invoke('setAppletApiPermissions', [value]),

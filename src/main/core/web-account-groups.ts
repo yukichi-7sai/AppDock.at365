@@ -4,7 +4,7 @@ import path from 'node:path';
 import { atomicWrite } from './settings';
 import { observeFile } from './file-observer';
 import type { WebAccountSound } from '../../shared/web-accounts';
-import { webAccountId } from '../../shared/web-accounts';
+import { webAccountGroupId, webAccountId } from '../../shared/web-accounts';
 import { WebAccountRoster, WebAccountRosterError } from './web-account-roster';
 
 export type AccountState = {
@@ -33,10 +33,7 @@ type Journal = { before: string | null; after: string; state: LocalState };
 type Listener = { changed(): void; removing(id: string): void; failed(): void };
 
 export const accountId = webAccountId;
-export const groupId = (id: unknown): id is string =>
-  typeof id === 'string' &&
-  /^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){1,4}$/.test(id) &&
-  !/^(con|prn|aux|nul|com[0-9]|lpt[0-9])\./i.test(id);
+export const groupId = webAccountGroupId;
 const ownerId = (id: unknown): id is string =>
   typeof id === 'string' &&
   /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(id) &&

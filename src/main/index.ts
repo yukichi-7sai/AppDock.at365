@@ -216,8 +216,6 @@ import {
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { hostShortcutPage, shortcutPageChoices } from '../shared/shortcut-pages';
 import { PageCollectionManager } from './core/page-collections';
-import { WebProfileStore } from './core/web-profiles';
-import type { WebProfile } from '../shared/web-content';
 import { contained } from './core/extensions';
 import { openLocalPage, pageHostShortcut } from './core/applet-pages';
 
@@ -718,12 +716,10 @@ const appletManagement = new AppletManagement({
 const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
-  settingOptions: (owner, field) =>
+  settingOptions: (_owner, field) =>
     field.type === 'registered-image'
       ? registeredImages.availableReferences().map(({ file }) => ({ value: file, label: file }))
-      : field.optionSource === 'web-profiles'
-        ? pageCollections.settingOptions(owner)
-        : [],
+      : [],
   save: (value, revision, reset) => {
     const rewrite = new Set<'shared' | 'device' | 'local'>();
     if (reset) {
@@ -1538,7 +1534,6 @@ const operationApi = new AppDockApi({
     ]),
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
-    ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
     ...webAccountSettingsTargets({
       applets: parentApplets(),
       localRoot: dataDirectory,
@@ -2382,7 +2377,6 @@ function snapshotCore(): HostSnapshot {
     settings: settings.snapshot(),
     extensions: allApplets(),
     webPages: pageCollections.states(),
-    webAccounts: pageCollections.accounts(),
     logs: log.entries,
     version: app.getVersion(),
     runtime: {
@@ -2405,6 +2399,7 @@ function applySettings() {
   try {
     refreshDisplayZoom();
     pageCollections?.reconcile();
+    pageCollections?.cleanupSiteAccounts();
     trayClicks?.cancel();
     nativeTheme.themeSource = settings.value.host.theme;
     refreshWindowTheme();
@@ -2545,7 +2540,7 @@ function prepareSettings(value: Settings) {
   value = restoreSettingsCollections(value, manager.snapshot());
   let next = parseSettings(value);
   validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
-  pageCollections.validate(next, settings.value);
+  pageCollections.validate(next);
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
@@ -2836,9 +2831,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
           startupDelaySeconds: a.startupDelaySeconds,
         },
       ],
-      accounts: a.capabilities?.includes('web-profiles')
-        ? pageCollections.profiles(a.id).accounts()
-        : [],
     };
   }
 
@@ -2940,17 +2932,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
       hostStartupTiming: hostStartupTiming.snapshot(),
     };
   }
-  if (id === 'web-accounts')
-    return {
-      accounts: pageCollections.accounts(),
-      accountReferences: {
-        saved: pageCollections.entries().map(({ id, item: { name, accountId } }) => ({
-          id,
-          name,
-          accountId: accountId ?? '',
-        })),
-      },
-    };
   if (id === 'tts')
     return {
       tts: {
@@ -3247,7 +3228,7 @@ function settingsPageActions(
           settings.value,
           notificationCatalog(allApplets()),
         );
-        pageCollections.validate(value, settings.value);
+        pageCollections.validate(value);
         validateAppletSettings(value, manager.snapshot());
       };
       if (isHostPageSettingsId(page.id))
@@ -3567,7 +3548,6 @@ function settingsPageActions(
       'mcp-client',
       'image-library',
       'applets',
-      'web-accounts',
     ].includes(page.id) ||
     page.json ||
     page.kind === 'applet'
@@ -3705,19 +3685,6 @@ function settingsPageActions(
         await shell.openExternal(`https://github.com/${repository}`);
       };
   }
-  if (page.id === 'web-accounts') {
-    actions.createWebAccount = async ([name]) => pageCollections.addAccount(name);
-    actions.renameWebAccount = async ([id, name]) =>
-      pageCollections.renameAccount(string(id), name);
-    actions.deleteWebAccount = async ([id, confirmed]) => {
-      const target = string(id);
-      if (pageCollections.entries().some((a) => a.item.accountId === target))
-        throw Error(hostText('settings.index.accountInUse'));
-      return pageCollections.deleteAccount(target, confirmed as WebProfile | undefined);
-    };
-    actions.clearWebAccount = async ([id, confirmed]) =>
-      pageCollections.clearAccount(string(id), confirmed as WebProfile | undefined);
-  }
   if (['permissions', 'codex'].includes(page.id)) {
     actions.automation = async ([action]) => {
       const value = action as AutomationAction;
@@ -3819,23 +3786,7 @@ function settingsPageActions(
       async (args: unknown[]) => {
         if (uiReady && !startupReady && !quitting) await startupCompleted;
         if (!startupReady || quitting) throw Error(hostText('settings.index.preparing'));
-        const result = await run(args);
-        const accountMessages: Record<string, string> = {
-          createWebAccount: hostText('settings.index.accountAdded'),
-          renameWebAccount: hostText('settings.index.accountRenamed'),
-          deleteWebAccount:
-            result === 'deferred'
-              ? hostText('settings.index.accountDeletionPending')
-              : hostText('settings.index.accountDeleted'),
-          clearWebAccount: hostText('settings.index.accountCleared'),
-        };
-        if (page.id === 'web-accounts' && accountMessages[key] && result !== false)
-          information.report(
-            'web-accounts',
-            hostText('settings.index.webAccounts'),
-            accountMessages[key],
-          );
-        return result;
+        return run(args);
       },
     ]),
   );
@@ -4129,16 +4080,6 @@ function registerIpc() {
   handle('dock:pageViewport', updatePageViewport);
 
   handle('dock:webNavigate', (id: string, action: string) => pageCollections.navigate(id, action));
-  handle('dock:clearWebAccount', (id: string, confirmed?: WebProfile) =>
-    pageCollections.clearAccount(id, confirmed),
-  );
-  handle('dock:createWebAccount', (name: unknown) => pageCollections.addAccount(name));
-  handle('dock:renameWebAccount', (id: string, name: unknown) =>
-    pageCollections.renameAccount(id, name),
-  );
-  handle('dock:deleteWebAccount', (id: string, confirmed?: WebProfile) =>
-    pageCollections.deleteAccount(id, confirmed),
-  );
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   ipcMain.handle('applet-page:call', (event, operation: unknown, input: unknown) => {
@@ -4503,14 +4444,13 @@ async function initialize() {
     settings: () => settings.value,
     parents: parentApplets,
     localRoot: dataDirectory,
-    sharedRoot: sharedDirectory,
-    assistance: fileWatchAssistance,
+    sources: () => settings.confirmedAppletSources(),
     windowState: (id) => settings.uiStateStorage('windows', `collection:${id}`),
     changed: () => {
       ribbonCatalog.invalidate();
       changed();
     },
-    failed: (error) => log.write('error', 'web-profiles', error.message),
+    failed: (error) => log.write('error', 'web-site-accounts', error.message),
     openLocal: async (page, presentation) => {
       const parent = manager.items.get(page.binding.owner);
       if (!parent || parent.state !== 'running')

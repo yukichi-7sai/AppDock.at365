@@ -22,7 +22,6 @@ const accentLayoutOnly = process.argv.includes('--accent-layout-only');
 const localizationOnly = process.argv.includes('--localization-only');
 const translationPacksOnly = process.argv.includes('--translation-packs-only');
 const serviceLocalizationOnly = process.argv.includes('--service-localization-only');
-const webAccountListOnly = process.argv.includes('--web-account-list-only');
 const listActionsOnly = process.argv.includes('--list-actions-only');
 const commandNavigationOnly = process.argv.includes('--command-navigation-only') || listActionsOnly;
 const listScrollbarOnly = process.argv.includes('--list-scrollbar-only');
@@ -691,8 +690,6 @@ async function checkSectionTitles() {
         ],
       };
     }
-    if (webAccountListOnly)
-      require('./settings-web-fixture.cjs').installWebSettings(profile, initial);
     require('../out/main/shared/settings-schema').parseSettings(initial);
     require('./test-settings.cjs').write(profile, initial, path.join(profile, 'local'));
     if (source) {
@@ -817,29 +814,6 @@ async function checkSectionTitles() {
       checks.push(
         'Partial pack discovery, live catalog and form switch, fallback, restart and removed pack',
       );
-      success = true;
-      return;
-    }
-    if (webAccountListOnly) {
-      await require('./web-account-list-checks.cjs')({
-        host,
-        select,
-        snapshot,
-        until,
-        inspect,
-        inspector,
-        electronExpression,
-        profile,
-        checks,
-        hints,
-      });
-      const accounts = (await snapshot()).webAccounts;
-      await stop();
-      await launch();
-      await select('Webアカウント');
-      assert.deepEqual((await snapshot()).webAccounts, accounts);
-      checks.push('Account IDs and names survive an actual process restart');
-      assert.deepEqual(errors, []);
       success = true;
       return;
     }
@@ -1567,7 +1541,6 @@ async function checkSectionTitles() {
       accentLayoutOnly,
       localizationOnly,
       serviceLocalizationOnly,
-      webAccountListOnly,
       commandNavigationOnly,
       listActionsOnly,
       listScrollbarOnly,

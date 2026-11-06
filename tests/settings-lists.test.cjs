@@ -376,65 +376,6 @@ test('list writes preserve device-local ownership and shared bytes, and reject u
   assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
   assert.equal(f.rows().length, 2);
 });
-test('dynamic root and list options come from live owner metadata and revalidate schema without writes', (t) => {
-  const f = fixture(t, {
-    id: false,
-    fields: [
-      { key: 'name', title: 'Name', type: 'string', default: 'New' },
-      {
-        key: 'account',
-        title: 'Account',
-        type: 'select',
-        optionSource: 'web-profiles',
-        options: [],
-      },
-    ],
-  });
-  f.owner.settings.push({
-    key: 'monitor',
-    title: 'Monitor',
-    type: 'select',
-    dynamic: true,
-    options: [],
-    default: 'one',
-  });
-  f.owner.settingOptions.monitor = [{ value: 'one', label: 'One' }];
-  const scalar = f
-    .call('targets.list', { ownerId: f.owner.id })
-    .items.find((target) => target.kind === 'fields');
-  assert.deepEqual(f.call('options.list', { targetId: scalar.targetId, key: 'monitor' }).items, [
-    { value: 'one', label: 'One' },
-  ]);
-  assert.deepEqual(
-    f.call('options.list', {
-      targetId: f.target(),
-      key: 'account',
-      itemRef: f.items().items[0].itemRef,
-      draftValues: { name: 'Draft' },
-    }).items,
-    f.choices,
-  );
-  const request = f.request([
-    { kind: 'update', itemRef: f.items().items[0].itemRef, changes: { account: 'account.one' } },
-  ]);
-  f.choices.splice(0, 1, { value: 'account.two', label: 'Account Two' });
-  assert.throws(() => f.call('apply', request), { code: 'SCHEMA_CONFLICT' });
-  assert.throws(
-    () =>
-      f.call(
-        'apply',
-        f.request([
-          {
-            kind: 'update',
-            itemRef: f.items().items[0].itemRef,
-            changes: { account: 'account.one' },
-          },
-        ]),
-      ),
-    { code: 'INVALID_ARGUMENT' },
-  );
-  assert.equal(f.writes(), 0);
-});
 test('list pagination respects response limits and oversized change previews fail before persistence', (t) => {
   const rows = Array.from({ length: 27 }, (_, index) => ({ name: 'x'.repeat(10000), index }));
   const f = fixture(t, {

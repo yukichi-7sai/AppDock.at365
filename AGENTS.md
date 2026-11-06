@@ -83,9 +83,9 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 ## WebとApplet
 
 - [WebApplet](docs/web-applets.md)と[WebアカウントAPI](docs/web-accounts.md)の保存領域・認証・表示寿命を区別する。リモートページへpreload/Node/ホストIPCを渡さない。提供JSONは検証した初期値だけを取り込み、手動変更・権限を上書きしない。
-- アカウントグループの共有名簿・PC専用session・Applet別設定は[グループ設計](docs/web-accounts.md)に従う。グループ未宣言の専用枠とWebApplet枠は分離を継続し、同一グループを宣言したAppletだけが共用する。
-- WebAppletの追加/削除/初期ショートカットは独立したApplet.WebApplet.at365の管理画面と本体の宣言型一覧設定から操作する。一覧は共通部品を使い、追加/編集はダイアログで確定する。個別サイトは汎用pageCollectionsとしてID・設定・リボンを保持し、親Appletだけをruntimeと更新対象にする。公開設定・コマンドは提供元の宣言に従う。
-- Webアカウントは別ファイルへ即時保存する。名前のblur/Enter確定・Escape取消・IME/重複送信防止、削除/クリアの警告と参照中ガードを維持する。削除待ちsessionは検証済み専用root内で次回起動時に回収し、Gmail・別枠・外部リンク先を削除しない。
+- アカウントグループの共有名簿・PC専用session・Applet別設定は[グループ設計](docs/web-accounts.md)に従う。同一グループを宣言したサービスだけがその名簿を共有する。登録サイトの枠は本体が提供元・一覧・登録IDごとに管理する。
+- WebAppletの追加/削除/初期ショートカットは本体のWebApplet用の宣言型一覧設定から操作する。一覧は共通部品を使い、追加/編集はダイアログで確定する。個別サイトは汎用pageCollectionsとしてID・設定・リボンを保持し、親Appletだけをruntimeと更新対象にする。公開設定・コマンドは提供元の宣言に従う。
+- サービス専用のWebアカウントは名簿へ即時保存する。サイト別の枠は共有とPC専用の両方の確定済み一覧を参照し、未使用のセッションを専用root内で回収する。表示停止やApplet未導入は登録削除と区別する。
 - 表示先切替でWebContents/session/入力を再生成しない。非選択/非表示でも背景描画を維持する。rAF・visibilityState・observer.readyやPlaywrightのfocus emulationだけで実受信成功と扱わず、通常起動の描画/取得を確認する。
 - keepActiveの遷移/破棄時解除、native focusの優先、Debugger接続の冪等回収を維持する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
 - 無効Appletは実リボンから除外し、設定カタログと保存配置は保持する。再開時の元の配置と、有効Appletの開始待ち/エラー/再試行を維持する。

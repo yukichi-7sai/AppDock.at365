@@ -57,8 +57,8 @@ fs.writeFileSync(
   `exports.activate=async c=>{let calls=[];c.commands.register('test.keys.open','Open',()=>c.pages.open('main'));for(const x of ['a','b','c','d'])c.commands.register('test.keys.'+x,'Record '+x,async()=>{calls.push(x);await c.storage.set('calls'+String(calls.length).padStart(5,'0'),x);});};`,
 );
 fs.writeFileSync(path.join(fixture, 'index.html'), '<h1>Keys</h1><input aria-label="Text">');
-const webId = 'fixture.web-settings.items.site',
-  accountId = 'account.' + randomUUID();
+const siteId = randomUUID();
+const webId = 'fixture.web-settings.items.' + siteId;
 let webItem;
 const make = (id, command, scope, appletIds = [], key = 'Ctrl+F12') => ({
   id,
@@ -192,10 +192,9 @@ const expectCalls = async (before, expected) => {
   try {
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     webItem = {
-      id: 'site',
+      id: siteId,
       name: 'Webキー検証',
       url: `http://127.0.0.1:${server.address().port}/`,
-      accountId,
       enabled: true,
       display: 'page',
       navigation: 'none',
@@ -206,7 +205,6 @@ const expectCalls = async (before, expected) => {
       profile,
       settings,
       [webItem],
-      [{ id: accountId, name: 'Test' }],
     );
     settings.extensions[webOwner].enabled = true;
     fs.writeFileSync(
@@ -357,14 +355,14 @@ const expectCalls = async (before, expected) => {
     assert.equal(await remote.locator('#text').inputValue(), '入力保持'); // sendInputEvent keyDown is not a char event
     await remote.locator('#text').press('b');
     assert.equal(await remote.locator('#text').inputValue(), '入力保持b');
-    await dock.evaluate(async (id) => {
+    await dock.evaluate(async ({ siteId, webId }) => {
       const s = await window.dock.snapshot();
       s.settings.value.extensions['fixture.web-settings'].settings.items.find(
-        (i) => i.id === 'site',
+        (i) => i.id === siteId,
       ).display = 'window';
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
-      await window.dock.executeCommand(id + '.open');
-    }, webId);
+      await window.dock.executeCommand(webId + '.open');
+    }, { siteId, webId });
     before = calls().length;
     await send(webItem.url);
     await expectCalls(before, ['a', 'b', 'c', 'a']);

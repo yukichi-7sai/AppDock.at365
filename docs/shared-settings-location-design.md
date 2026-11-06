@@ -34,7 +34,7 @@
 - 現在の複数ファイルの回復記録は共有／端末というscopeを現在のパスへ解決する。参照先が変わった後に別ファイルへ復旧しないため、記録を共有参照先の識別子に結び付ける。
 - GPU設定はapp.ready前に使用する。ネットワークからの設定読み込みを、この早期処理の必須条件にしない。
 - `data-paths.ts`と`index.ts`からHost API・ページコレクションへ共有ルートを渡す。共通画像も注入されたassets rootを使う。共有場所切替ではRegisteredImagesを参照先別に作り直し、正常表示と生成キャッシュを別の共有先へ使い回さない。
-- `web-profiles.ts`、`web-account-groups.ts`には共有名簿の同期I/Oと独自の回復処理がある。素材一覧・登録・音声読取も含め、共有設定だけを非同期化してNAS対応済みとは扱わない。
+- `web-account-groups.ts`には共有名簿の同期I/Oと独自の回復処理がある。素材一覧・登録・音声読取も含め、共有設定だけを非同期化してNAS対応済みとは扱わない。
 
 ## 保存領域の分離
 
@@ -62,9 +62,7 @@ D:/Apps/AppDock/
   data/                       同じ共有先の登録素材・共有名簿
     assets/images/
     assets/applets/<Applet ID>/
-    web-profiles/<Applet ID>/accounts.json
     web-account-groups/<group-id>/accounts.json
-    web-applets/accounts.json
   settings.json.appdock-lock  対応版AppDockが保存時に使う恒久的な排他用ファイル
 
 %LOCALAPPDATA%/at365/AppDock/profiles/<従来の配置ID>/
@@ -85,7 +83,7 @@ D:/Apps/AppDock/
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
 | data/assets/images                               | 共通原画像。共有設定のimageLibrary.groupsと同じ参照先へ切替。元bytesと同名衝突の契約は[共通画像](registered-images.md) |
 | data/assets/applets/<Applet ID>                  | 宣言済みの登録原素材。通知音は16MB以下のWAV・512件上限・同名別内容拒否を維持                                           |
-| data/web-profiles、data/web-appletsの共有名簿    | 共有のUUID・表示名を参照。Cookie・session・削除待ち記録はPC専用のまま                                                  |
+| data/web-account-groupsの共有名簿    | 共有のUUID・表示名を参照。Cookie・session・削除待ち記録はPC専用のまま                                                  |
 | data/web-account-groups/<group-id>/accounts.json | 共通名簿だけを共有。選択・監視・音の好み・旧session参照はPC専用のまま                                                  |
 | 旧PC専用データ、未知のディレクトリー             | 共有対象として走査・変更せず、残存チェックや自動整理を追加しない                                                       |
 
@@ -315,7 +313,7 @@ publish・deploy・自己更新・スターターの処理対象は従来のEXE�
 | `src/main/core/settings.ts`、`file-observer.ts`                                                        | 非同期I/O接続、参照先別backup、世代・結果不明の管理。既存のschema検証と競合判定を維持                                                 |
 | 新しい`SharedStorageIo`と`dotnet/AppDock.SharedStorageHost`                                            | 設定・素材・名簿の非同期要求、Windows/SMBのハンドル排他、置換、再照合、親子の終了処理、単一EXEへの同梱                                |
 | `src/main/core/data-paths.ts`、`registered-images.ts`、`image-library-host.ts`、`registered-sounds.ts` | 共有assetsの解決、原画像・グループと音声の保護、非同期一覧・登録、参照先別の取得状態                                                  |
-| `web-profiles.ts`、`web-account-groups.ts`、`web-accounts.ts`、`page-collections.ts`、`host-api.ts`    | 共有名簿I/O、共通排他、参照先別の取得状態・pending、既存データの保護、PC専用session維持                                               |
+| `web-account-groups.ts`、`web-accounts.ts`、`page-collections.ts`、`host-api.ts`    | 共有名簿I/O、共通排他、参照先別の取得状態・pending、既存データの保護、PC専用session維持                                               |
 | `src/main/index.ts`、`settings-recovery.ts`                                                            | 早期端末読込と非同期共有読込の分離、起動前の場所変更、起動・再起動・更新との調停                                                      |
 | `settings-health.ts`、`settings-health-notifications.ts`                                               | 場所変更による再起動理由、参照先別の障害、結果不明状態                                                                                |
 | `settings-page.ts`、`settings-page-host.ts`、`settings-catalog.ts`、`src/shared/settings-page.ts`      | ローカルUI用の投影・アクション・検索。共有Settingsへパスを出さない                                                                    |
@@ -354,7 +352,7 @@ publish・deploy・自己更新・スターターの処理対象は従来のEXE�
 | Windows起動      | 端末のGPU要求、通常／管理者起動でのUNCアクセス差、サインイン時のNAS遅延、UAC取消、タスク・launch journal・再起動経路の維持                                     |
 | 配布             | 固定単一EXEへの補助プロセス収録、更新・再起動後の保持、別配置の分離、NASの設定・data/・lockとローカルの端末設定・旧data/を配布が変更しない                     |
 
-最初に関連するsettings-sync/settings-editing/device-settings/settings-recovery/settings-page/settings-commands/windows-launch、registered-sounds、web-profiles/web-account-groups、Node/.NET Webアカウントと更新・素材の回帰を選ぶ。純粋関数、故障注入付きの実ファイル、2プロセスの排他、固定EXEの隔離GUI、実際の2台＋SMB共有を区別する。NASを使わないfixtureの成功から、特定NAS・実ネットワーク切断・実サインイン・実UAC承認の成功を推定しない。
+最初に関連するsettings-sync/settings-editing/device-settings/settings-recovery/settings-page/settings-commands/windows-launch、registered-sounds、web-site-accounts/web-account-groups、Node/.NET Webアカウントと更新・素材の回帰を選ぶ。純粋関数、故障注入付きの実ファイル、2プロセスの排他、固定EXEの隔離GUI、実際の2台＋SMB共有を区別する。NASを使わないfixtureの成功から、特定NAS・実ネットワーク切断・実サインイン・実UAC承認の成功を推定しない。
 
 実装前に製品回帰を実行して、この新機能の成功とは記録しない。実装・レビュー・publish時の実行結果と未確認事項は[検証記録](../VERIFICATION.md)へ残す。
 

@@ -8,65 +8,43 @@ const { SettingsStore, defaults } = require('../out/main/main/core/settings');
 const { SettingsCommands } = require('../out/main/main/core/settings-commands');
 const { RibbonCommands } = require('../out/main/main/core/ribbon-commands');
 const row = {
-  id: 'site.one',
+  id: '11111111-2222-3333-4444-555555555555',
   name: 'Site',
   enabled: true,
   display: 'page',
   url: 'https://example.test/',
   navigation: 'same-origin',
   allowedOrigins: [],
-  accountId: 'account.11111111-1111-4111-8111-111111111111',
 };
 const owner = {
   id: 'fixture.web',
-  capabilities: ['pages', 'dynamic-pages', 'web-profiles'],
+  capabilities: ['pages', 'dynamic-pages'],
   pageCollections: [{ key: 'items', source: 'remote', fields: [] }],
 };
 function fixture() {
   const before = defaults();
   before.extensions[owner.id] = { enabled: true, settings: { items: [structuredClone(row)] } };
-  const calls = [];
   const manager = new PageCollectionManager({
     settings: () => before,
     parents: () => [owner],
     localRoot: 'unused',
-    sharedRoot: 'unused',
+    sources: () => { throw Error('Unexpected read'); },
     changed: () => {},
     failed: () => {},
     openLocal: async () => {
       throw Error('No page opening');
     },
   });
-  manager.readProfiles = () => ({
-    get: (id) => {
-      calls.push(id);
-      throw Error('Account missing');
-    },
-  });
-  return { before, manager, calls };
+  return { before, manager };
 }
-test('unrelated settings retain missing Web references; new and edited page rows still validate accounts', () => {
-  const { before, manager, calls } = fixture(),
-    next = structuredClone(before);
-  next.ribbon.hidden = ['home'];
-  assert.doesNotThrow(() => manager.validate(next, before));
-  assert.equal(calls.length, 0);
-  assert.throws(() => manager.validate(next), /Account missing/);
-  const edit = structuredClone(before);
-  edit.extensions[owner.id].settings.items[0].name = 'Changed';
-  assert.throws(() => manager.validate(edit, before), /Account missing/);
-  const add = structuredClone(before);
-  add.extensions[owner.id].settings.items.push({ ...row, id: 'site.two' });
-  assert.throws(() => manager.validate(add, before), /Account missing/);
-  const remove = structuredClone(before);
-  remove.extensions[owner.id].settings.items = [];
-  assert.doesNotThrow(() => manager.validate(remove, before));
-  const invalidBefore = structuredClone(before);
-  invalidBefore.extensions[owner.id].settings.items[0].name = '';
-  manager.readProfiles = () => ({ get: () => {} });
-  assert.doesNotThrow(() => manager.validate(before, invalidBefore));
+test('site registration, validation and listing do not open an account session', () => {
+  const { before, manager } = fixture();
+  manager.remote = () => { throw Error('Unexpected WebContents'); };
+  assert.doesNotThrow(() => manager.validate(before));
+  assert.equal(manager.snapshot()[0].collection.itemId, row.id);
+  assert.equal(fs.existsSync('unused'), false);
 });
-test('ribbon saving succeeds with an unchanged missing Web account and never repairs or removes reference data', (t) => {
+test('ribbon saving preserves site registration and does not access session data', (t) => {
   const { before, manager } = fixture(),
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-ribbon-reference-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -76,7 +54,7 @@ test('ribbon saving succeeds with an unchanged missing Web account and never rep
   store.save(before, store.revision);
   const oldRows = JSON.stringify(store.value.extensions[owner.id]);
   const save = (next, revision) => {
-    manager.validate(next, store.value);
+    manager.validate(next);
     return store.save(next, revision);
   };
   const settingsCommands = new SettingsCommands({ settings: store, applets: () => [owner], save });

@@ -39,7 +39,6 @@ export function AppletSettingsForm({
   onListOpen,
   onListDraftAction,
   onListDraftImage,
-  accounts = [],
   commonFields,
 }: {
   applet: ExtensionSnapshot;
@@ -59,7 +58,6 @@ export function AppletSettingsForm({
     value: Record<string, unknown>[],
     before: Record<string, unknown>[],
   ): Promise<unknown>;
-  accounts?: { id: string; name: string }[];
   commonFields?: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
@@ -164,25 +162,19 @@ export function AppletSettingsForm({
     );
     const inline = attached.filter((action) => action.placement !== 'below');
     const below = attached.filter((action) => action.placement === 'below');
+    const collection = applet.pageCollections?.find((entry) => entry.key === item.key);
     const control =
       item.type === 'object-list' && item.list && onListCommit ? (
         <ObjectListDialogSetting
           testId={`setting:${settingsItemId(pageId, `setting:${item.key}`)}`}
           definition={item}
           value={value}
-          onOpen={
-            applet.pageCollections?.some((c) => c.key === item.key) && onListOpen
-              ? (entry) => onListOpen(item.key, entry.id)
+          onOpen={collection && onListOpen ? (entry) => onListOpen(item.key, entry.id) : undefined}
+          deleteDetail={
+            collection?.source === 'remote'
+              ? translate('settings.objectListDialogSetting.deleteSiteLogin')
               : undefined
           }
-          options={Object.fromEntries(
-            (item.fields ?? [])
-              .filter((field) => field.optionSource === 'web-profiles')
-              .map((field) => [
-                field.key,
-                accounts.map((account) => ({ value: account.id, label: account.name })),
-              ]),
-          )}
           onCommit={(next, before) => onListCommit(item.key, next, before)}
           onDraftAction={
             item.list.draftAction && onListDraftAction

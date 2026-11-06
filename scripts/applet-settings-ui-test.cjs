@@ -72,14 +72,12 @@ fs.writeFileSync(
   "exports.activate=async c=>{c.commands.register('fixture.sections.run','試験操作',async()=>{await new Promise(r=>setTimeout(r,500));});};exports.deactivate=async()=>{};",
 );
 initial.extensions['fixture.sections'] = { enabled: true, settings: { privateValue: 'keep' } };
-const webId = 'web.12121212-1212-4212-8212-121212121212';
-initial.webApplets = {};
-initial.webApplets.items = [
+const webId = '12121212-1212-4212-8212-121212121212';
+const sites = [
   {
     id: webId,
     name: 'Web settings fixture',
     url: 'https://example.com/',
-    accountId: 'account.34343434-3434-4434-8434-343434343434',
     enabled: false,
     display: 'page',
     navigation: 'same-origin',
@@ -87,17 +85,7 @@ initial.webApplets.items = [
     icon: '',
   },
 ];
-require('../out/main/shared/settings-schema').parseSettings(initial);
-initial.webApplets.accounts = [
-  { id: initial.webApplets.items[0].accountId, name: 'Fixture account' },
-];
-require('./settings-web-fixture.cjs').installWebSettings(
-  profile,
-  initial,
-  initial.webApplets.items,
-  initial.webApplets.accounts,
-);
-delete initial.webApplets;
+require('./settings-web-fixture.cjs').installWebSettings(profile, initial, sites);
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const checks = [],
   errors = [];

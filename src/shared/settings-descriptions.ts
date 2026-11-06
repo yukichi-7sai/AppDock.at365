@@ -16,7 +16,6 @@ const descriptions: Record<string, HostTextKey> = {
   ai: 'settings.settingsPageLayout.ai',
   'image-ai': 'imageAi.description',
   'mcp-client': 'settings.settingsPageLayout.mcpClient',
-  'web-accounts': 'settings.settingsPageLayout.webAccounts',
   permissions: 'settings.settingsPageLayout.permissions',
   codex: 'settings.settingsPageLayout.codex',
   about: 'settings.settingsPageLayout.about',

@@ -15,17 +15,16 @@ test('WebApplet public settings share revision, validation and caller permission
   const store = new SettingsStore(path.join(dir, 'settings.json'));
   store.load();
   t.after(() => store.close());
-  const id = 'web.11111111-2222-3333-4444-555555555555';
+  const itemId = '11111111-2222-3333-4444-555555555555';
+  const id = 'at365.web-applet.sites.' + itemId;
   const next = structuredClone(store.value);
-  next.extensions['at365.web-applet'] = { enabled: true, settings: { items: [] } };
-  next.migrations = { webApplet: { version: 1, owner: 'at365.web-applet', ids: [id] } };
-  next.extensions['at365.web-applet'].settings.items.push({
-    id,
+  next.extensions['at365.web-applet'] = { enabled: true, settings: { sites: [] } };
+  next.extensions['at365.web-applet'].settings.sites.push({
+    id: itemId,
     name: 'Before',
     display: 'page',
     enabled: true,
     url: 'https://example.test/?PRIVATE_QUERY#PRIVATE_FRAGMENT',
-    accountId: 'account.11111111-2222-3333-4444-555555555555',
     navigation: 'same-origin',
     allowedOrigins: [],
     icon: '',
@@ -33,11 +32,12 @@ test('WebApplet public settings share revision, validation and caller permission
   });
   store.save(next, store.revision);
   const applets = () =>
-    store.value.extensions['at365.web-applet'].settings.items.map((a) => ({
+    store.value.extensions['at365.web-applet'].settings.sites.map((a) => ({
       ...a,
+      id: 'at365.web-applet.sites.' + a.id,
       displayName: a.name,
       runtime: 'node',
-      collection: { owner: 'at365.web-applet', key: 'items', itemId: a.id },
+      collection: { owner: 'at365.web-applet', key: 'sites', itemId: a.id },
       state: a.enabled ? 'running' : 'stopped',
       settings: webAppletSettingDefinitions,
     }));
@@ -103,10 +103,10 @@ test('WebApplet public settings share revision, validation and caller permission
   assert.deepEqual(saved.changed, ['name', 'display']);
   assert.equal(store.value.extensions[id], undefined);
   assert.equal(
-    store.value.extensions['at365.web-applet'].settings.items[0].url,
-    next.extensions['at365.web-applet'].settings.items[0].url,
+    store.value.extensions['at365.web-applet'].settings.sites[0].url,
+    next.extensions['at365.web-applet'].settings.sites[0].url,
   );
-  assert.deepEqual(store.value.extensions['at365.web-applet'].settings.items[0].imported, {
+  assert.deepEqual(store.value.extensions['at365.web-applet'].settings.sites[0].imported, {
     name: 'Original',
   });
   await assert.rejects(run({ name: 'Stale' }, { expectedRevision: revision }), {
@@ -115,12 +115,12 @@ test('WebApplet public settings share revision, validation and caller permission
   const noOp = await run({ name: ' After ' });
   assert.deepEqual(noOp.changed, []);
   const disabled = structuredClone(store.value);
-  disabled.extensions['at365.web-applet'].settings.items[0].enabled = false;
+  disabled.extensions['at365.web-applet'].settings.sites[0].enabled = false;
   store.save(disabled, store.revision);
   await assert.rejects(run({ name: 'Disabled' }), { code: 'UNAVAILABLE' });
   assert.deepEqual(read().values, { name: 'After', display: 'window' });
   const removed = structuredClone(store.value);
-  removed.extensions['at365.web-applet'].settings.items = [];
+  removed.extensions['at365.web-applet'].settings.sites = [];
   store.save(removed, store.revision);
   assert.throws(read, { code: 'NOT_FOUND' });
 });

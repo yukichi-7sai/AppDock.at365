@@ -119,31 +119,21 @@ install(
 settings.extensions['at365.web-applet'] = {
   enabled: true,
   settings: {
-    items: [
+    sites: [
       {
-        id: 'site.fixture',
+        id: '11111111-2222-4333-8444-555555555555',
         name: 'Fixture site',
         url: 'https://example.com/',
         enabled: true,
         display: 'page',
         navigation: 'same-origin',
         allowedOrigins: [],
-        accountId: 'account.11111111-1111-4111-8111-111111111111',
         icon: 'data:image/png;base64,' + png(32, 32).toString('base64'),
       },
     ],
-    shortcutDefaults: [],
+    siteShortcutDefaults: [],
   },
 };
-const accounts = path.join(profile, 'data/web-profiles/at365.web-applet');
-fs.mkdirSync(accounts, { recursive: true });
-fs.writeFileSync(
-  path.join(accounts, 'accounts.json'),
-  JSON.stringify({
-    schemaVersion: 1,
-    accounts: [{ id: 'account.11111111-1111-4111-8111-111111111111', name: 'Fixture' }],
-  }),
-);
 function probe(id, runtime, entry, type, source) {
   const directory = path.join(profile, 'extensions', id);
   fs.mkdirSync(directory, { recursive: true });
@@ -710,24 +700,24 @@ async function chooseInPicker(file) {
     const web = await settingsPage(host);
     await web.getByTestId('settings-nav:applet:at365.web-applet').click();
     const webField = (part) =>
-      web.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Aitems:${part}`);
-    await webField('list:edit:site.fixture').click();
+      web.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Asites:${part}`);
+    await webField('list:edit:11111111-2222-4333-8444-555555555555').click();
     await web
-      .getByTestId('setting:applet%3Aat365.web-applet/setting%3Aitems/image:image:choose')
+      .getByTestId('setting:applet%3Aat365.web-applet/setting%3Asites/image:image:choose')
       .click();
     await host.getByRole('dialog', { name: '画像を選択', exact: true }).waitFor();
     await chooseInPicker('sample.png');
     await web.getByTestId('settings-dialog-confirm').click();
     await until(
       async () =>
-        (await snapshot()).settings.value.extensions['at365.web-applet'].settings.items[0].image
+        (await snapshot()).settings.value.extensions['at365.web-applet'].settings.sites[0].image
           ?.file === sampleRef.file,
       'Web image saved',
     );
-    const row = (await snapshot()).settings.value.extensions['at365.web-applet'].settings.items[0];
+    const row = (await snapshot()).settings.value.extensions['at365.web-applet'].settings.sites[0];
     assert(row.icon.startsWith('data:image/png;base64,'));
     const child = (await snapshot()).extensions.find(
-      (e) => e.collection?.itemId === 'site.fixture',
+      (e) => e.collection?.itemId === '11111111-2222-4333-8444-555555555555',
     );
     await rail.locator(`[data-ribbon-id="page:${child.id}:main"] img`).waitFor();
     checks.push('WebApplet settings use the shared image picker and preserve legacy icon');
