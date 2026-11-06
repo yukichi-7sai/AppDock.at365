@@ -123,7 +123,7 @@ export function SettingsPageLayout({
                           {t('settings.form')}
                         </button>
                       )}
-                      {page.json && (
+                      {page.json && !['ai', 'tts', 'image-ai'].includes(page.id) && (
                         <button
                           type="button"
                           className={mode === 'json' ? 'selected' : ''}
