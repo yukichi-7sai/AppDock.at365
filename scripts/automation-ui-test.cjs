@@ -102,10 +102,8 @@ exports.activate=async(context)=>{
 `,
 );
 settings.extensions[fixtureId] = { enabled: true, settings: {} };
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(settings),
-);
+settings.operationPermissions = { applet: { read: true, execute: true, write: true } };
+require('./test-settings.cjs').write(profile, settings);
 const local = path.join(profile, 'local'),
   configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
@@ -215,31 +213,23 @@ const webServer = http.createServer((_req, res) => {
       '</p>',
   );
 });
-const webId = 'web.11111111-2222-3333-4444-555555555555';
+const webOwner = 'at365.web-applet';
+const siteId = '11111111-2222-4333-8444-555555555555';
+const webId = webOwner + '.sites.' + siteId;
+const webRoot = path.join(profile, 'extensions', webOwner);
+fs.mkdirSync(webRoot, { recursive: true });
+fs.copyFileSync(path.resolve(root, '../Applet.WebApplet.at365/extension.json'), path.join(webRoot, 'extension.json'));
+fs.writeFileSync(path.join(webRoot, 'index.cjs'), 'exports.activate = async () => {};');
 (async () => {
   try {
     await new Promise((r) => webServer.listen(0, '127.0.0.1', r));
-    let s = await start(),
-      page = s.page;
-    const account = await page.evaluate(() => window.dock.createWebAccount('Automation fixture'));
-    await page.evaluate(
-      async ({ webId, account, port }) => {
-        const snap = await window.dock.snapshot();
-        snap.settings.value.webApplets.items.push({
-          id: webId,
-          name: 'Automation Web fixture',
-          url: `http://127.0.0.1:${port}/`,
-          accountId: account.id,
-          enabled: true,
-          display: 'page',
-          navigation: 'same-origin',
-          allowedOrigins: [],
-          icon: '',
-        });
-        await window.dock.saveSettings(snap.settings.value, snap.settings.revision);
-      },
-      { webId, account, port: webServer.address().port },
-    );
+    settings.extensions[webOwner] = { enabled: true, settings: { sites: [{
+      id: siteId, name: 'Automation Web fixture',
+      url: 'http://127.0.0.1:' + webServer.address().port + '/',
+      enabled: true, display: 'page', navigation: 'same-origin', allowedOrigins: [],
+    }] } };
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    let s = await start(), page = s.page;
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const section = page.getByRole('region', { name: 'Codex連携', exact: true });
@@ -528,12 +518,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'management restored',
     );
     await manage(webId, 'disable');
-    assert.equal(
-      JSON.parse(
-        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
-      ).webApplets.items.find((a) => a.id === webId).enabled,
-      false,
-    );
+    assert.equal((await page.evaluate(() => window.dock.snapshot())).extensions.find((a) => a.id === webId).enabled, false);
     assert.equal(
       (
         await client.callTool({

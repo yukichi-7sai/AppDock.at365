@@ -27,6 +27,18 @@ export interface CodexIntegrationState extends ReceiverState {
   registrationError?: string;
 }
 
+export const mcpPermissionKeys = [
+  'allowWrite',
+  'allowExecute',
+  'allowUseTts',
+  'allowUseAi',
+  'allowUseMcp',
+  'allowSendInput',
+  'allowRunProcesses',
+] as const;
+export type McpPermission = (typeof mcpPermissionKeys)[number];
+export type McpPermissions = Partial<Record<McpPermission, boolean>>;
+
 export const retiredMcpPermissionKeys = [
   'allowManageApplets',
   'allowEditShortcuts',

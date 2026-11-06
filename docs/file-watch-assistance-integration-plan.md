@@ -23,15 +23,13 @@
 | [file-observer.ts](../src/main/core/file-observer.ts)                                                            | 各observerが60秒タイマーを持ち、5分ごとに内容も照合。安定待ちを別タイマーへ渡すため`check()`のPromiseだけでは確認全体の完了にならない | 独立した定期タイマーを削除。補助登録と解除、内容照合、安定確認の完了を待てる入口を接続          |
 | [settings.ts](../src/main/core/settings.ts)                                                                      | SettingsStoreがobserverを所有し、保存/再読込/復旧時に世代を更新                                                                       | 共通基盤を`watch`へ渡す。既存の`invalidate`・health・revisionを維持し、`close`で登録も解放      |
 | [device-settings-store.ts](../src/main/core/device-settings-store.ts)                                            | shared/deviceそれぞれにwatchを接続                                                                                                    | 同じ基盤を両storeへ渡す。合成storeを3件目の監視として重複登録しない                             |
-| [web-profiles.ts](../src/main/core/web-profiles.ts)                                                              | WebProfileStoreが名簿observerを所有                                                                                                   | watch生成時に登録し、closeで解除。設定参照やsession整理を補助確認へ混ぜない                     |
-| [page-collections.ts](../src/main/core/page-collections.ts)、[remote-pages.ts](../src/main/core/remote-pages.ts) | ページ提供元ごとにRemotePageServiceとWebProfileStoreを生成                                                                            | 所有者の依存として同じ基盤を渡す。監視のためだけに停止中AppletやViewを起動しない                |
 | [web-account-groups.ts](../src/main/core/web-account-groups.ts)                                                  | グループの最初の購読でobserverを生成し、最後の解除で閉じる                                                                            | グループに基盤を渡し、既存の1監視を登録。購読者ごとの重複を防止                                 |
 | [host-api.ts](../src/main/core/host-api.ts)、[web-accounts.ts](../src/main/core/web-accounts.ts)                 | Host APIからWebアカウントcontrollerと共有グループを生成                                                                               | グループ名簿への内部依存だけを渡す。既存SDKの要求形式を維持。後続のつなぎ対応で通知音も同じ依存へ登録    |
 | [registered-images.ts](../src/main/core/registered-images.ts)                                                    | 2秒タイマーから全一覧を確認。watch登録が`this.timer`に依存し、watch通知も全走査へ直結                                                 | タイマーを撤去して補助登録へ置換。通常watchと初期走査を独立させ、通知の集約と走査中の変更を保持 |
 | 旧残存チェック機構                                                                                               | 起動時/定期検査・状態・操作・文言・専用試験を廃止                                                                                     | 共通WarningReporterは維持、実ファイルは削除しない                                               |
 | [index.ts](../src/main/index.ts)                                                                                 | 各サービスの生成・設定反映・起動順序・終了を所有                                                                                      | 基盤を1個生成・注入し、実効設定を反映。初期化後に開始を許可し、終了時は新規巡回を先に止める     |
 
-`observeFile`の直接利用箇所は、確認基準ではSettingsStore、WebProfileStore、WebAccountGroupの3系統。共有/自端末設定や各名簿の実ファイルごとに登録される。実装前に再検索し、追加された呼び出し元を漏らさない。
+`observeFile`の直接利用箇所は、確認基準ではSettingsStore、WebAccountGroup。共有/自端末設定や各名簿の実ファイルごとに登録される。実装前に再検索し、追加された呼び出し元を漏らさない。
 
 ### 設定と画面の接続
 
@@ -70,7 +68,7 @@
 3. watch/初期照合/補助確認は同じ対象の実行管理と世代を共用する。watchの新しい要求を、補助確認中だからという理由で破棄しない。後から届く無関係な要求まで無期限に同じPromiseへ含めない。
 4. 60秒の定期statと固定5分の周期を廃止する。補助ONの各巡回で内容まで照合し、通知とメタデータの両方を取り逃した編集を検出する。
 5. 監視読取ワーカー、原子的保存、直接reload、revision照合、復旧、`invalidate`と古い失敗の拒否を維持する。
-6. SettingsStoreのshared/device、ページ提供元の名簿、共有アカウントグループへ接続する。グループの最終購読解除・ページサービス破棄・store.closeで登録を解放する。
+6. SettingsStoreのshared/device、共有アカウントグループへ接続する。グループの最終購読解除・store.closeで登録を解放する。
 7. watchの失敗を自動ONや短周期の再登録ループで補わない。既存の障害表示、初期照合、通知/明示操作に伴う再登録、ONの場合の次回補助確認へ接続する。
 
 ### B3. 登録画像の通常監視と補助確認を分離
@@ -119,7 +117,7 @@
 | `tests/settings-observer-race.test.cjs`                                                                                                            | 保存/reload/revision照合/復旧と古い読取・古い失敗の競合を維持。補助確認経由も同じ世代検査へ接続                                                                        |
 | `tests/file-reader.test.cjs`、`tests/file-reader-lifecycle.test.cjs`                                                                               | ワーカー内のハンドル解放、停止/失敗後の再作成、メインの同期保存との境界を維持                                                                                          |
 | `tests/settings-sync.test.cjs`                                                                                                                     | 受信順・破損/一時欠落/部分ファイルと最後の正常値、補助OFFでも通常通知で更新、ON時の通知欠落回復                                                                        |
-| `tests/web-profiles.test.cjs`、`tests/web-account-groups.test.cjs`、`tests/settings-web-profiles.test.cjs`、`tests/settings-web-accounts.test.cjs` | 名簿/購読の寿命、グループ1登録、未到着名簿の非生成、停止中の設定取得と非起動、認証/sessionの不変                                                                       |
+| `tests/web-account-groups.test.cjs`、`tests/settings-web-accounts.test.cjs` | 名簿/購読の寿命、グループ1登録、未到着名簿の非生成、停止中の設定取得と非起動、認証/sessionの不変                                                                       |
 | `tests/registered-images.test.cjs`、`tests/image-library-delete.test.cjs`                                                                          | OFF中の通常watch、root後着、通知集約、走査中の変更、遅延decode・置換/削除時の世代、原画像と参照の保持                                                                  |
 | `tests/legacy-local-data.test.cjs`、`tests/warning-reporter.test.cjs`                                                                              | 前者は機構削除と一緒に削除。後者で共通警告の寿命・抑止を維持する                                                                                                       |
 | `tests/host-default-settings.test.cjs`、`tests/host-page-settings.test.cjs`、`tests/settings-defaults-reset.test.cjs`                              | OFF/300秒の既定、最小値2と小数、差分保存、一般の共有/PC専用切替、reset、無関係設定の保持                                                                               |

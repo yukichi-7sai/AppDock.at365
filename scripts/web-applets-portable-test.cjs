@@ -14,7 +14,9 @@ const root = path.resolve(__dirname, '..'),
 const development = process.argv.includes('--development');
 const source = development
   ? require('electron')
-  : path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'));
+  : path.resolve(
+      process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
+    );
 const executable = development ? source : testHostPath(profile);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(profile, { recursive: true });
@@ -74,7 +76,7 @@ let browser, child, dock, port;
 const checks = [];
 const pages = () => browser.contexts().flatMap((context) => context.pages());
 const snapshot = () => dock.evaluate(() => window.dock.snapshot());
-async function start() {
+async function start(appletInstalled = true) {
   const debugPort = await freePort(),
     env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -99,10 +101,12 @@ async function start() {
   await until(
     async () =>
       (await snapshot()).startupReady &&
-      (await snapshot()).extensions.some(
-        (item) => item.id === 'at365.web-applet' && item.state === 'running',
-      ),
-    'Applet running',
+      (appletInstalled
+        ? (await snapshot()).extensions.some(
+            (item) => item.id === 'at365.web-applet' && item.state === 'running',
+          )
+        : !(await snapshot()).extensions.some((item) => item.id === 'at365.web-applet')),
+    appletInstalled ? 'Applet running' : 'host without WebApplet',
   );
 }
 async function stop() {
@@ -125,7 +129,10 @@ async function stop() {
     settings.gestures.enabled = false;
     const owner = 'at365.web-applet';
     settings.extensions[owner] = { enabled: true, settings: {} };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(settings),
+    );
     await start();
     assert.equal((await snapshot()).version, require('../package.json').version);
     assert.deepEqual(
@@ -137,9 +144,10 @@ async function stop() {
         .find((item) => item.id === owner)
         .commands.some((command) => command.id === owner + '.manage'),
     );
-    await dock.evaluate(() => window.dock.createWebAccount('個人用'));
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     let ui = await settingsPage(dock);
+    assert.equal(await ui.getByTestId('settings-nav:web-accounts').count(), 0);
+    assert.equal(await dock.evaluate(() => typeof window.dock.createWebAccount), 'undefined');
     const field = (key, part, control) =>
       ui.getByTestId(
         'setting:applet%3A' +
@@ -155,49 +163,50 @@ async function stop() {
     const imageCount = (await images()).images.length;
     const fetchDone = () =>
       until(
-        async () => !(await field('items', 'draft-action').getAttribute('aria-busy')),
+        async () => !(await field('sites', 'draft-action').getAttribute('aria-busy')),
         'metadata finished',
       );
     const cancel = () => ui.getByTestId('settings-dialog-cancel').click();
     const base = 'http://127.0.0.1:' + port;
     await ui.getByTestId('settings-nav:applet:' + owner).click();
-    await field('items', 'add').click();
-    await field('items', 'url', 'input').fill(base + '/');
-    await field('items', 'draft-action').click();
+    await field('sites', 'add').click();
+    assert.equal(await ui.getByLabel('Webアカウント', { exact: true }).count(), 0);
+    await field('sites', 'url', 'input').fill(base + '/');
+    await field('sites', 'draft-action').click();
     await until(
-      async () => (await field('items', 'name', 'input').inputValue()) === '配布物のWeb',
+      async () => (await field('sites', 'name', 'input').inputValue()) === '配布物のWeb',
       'metadata in settings dialog',
     );
     await fetchDone();
-    assert.equal((await own()).items?.length ?? 0, 0);
+    assert.equal((await own()).sites?.length ?? 0, 0);
     assert.equal((await images()).images.length, imageCount);
     await cancel();
-    assert.equal((await own()).items?.length ?? 0, 0);
+    assert.equal((await own()).sites?.length ?? 0, 0);
     assert.equal((await images()).images.length, imageCount);
     checks.push('settings-only management; suggestions and image remain unsaved on cancellation');
-    await field('items', 'add').click();
-    await field('items', 'url', 'input').fill(base + '/');
-    await field('items', 'name', 'input').fill('手動名');
-    await field('items', 'draft-action').click();
+    await field('sites', 'add').click();
+    await field('sites', 'url', 'input').fill(base + '/');
+    await field('sites', 'name', 'input').fill('手動名');
+    await field('sites', 'draft-action').click();
     await fetchDone();
-    assert.equal(await field('items', 'name', 'input').inputValue(), '手動名');
-    assert.equal(await field('items', 'url', 'input').inputValue(), base + '/start');
+    assert.equal(await field('sites', 'name', 'input').inputValue(), '手動名');
+    assert.equal(await field('sites', 'url', 'input').inputValue(), base + '/start');
     assert.equal((await images()).images.length, imageCount);
     await ui.getByTestId('settings-dialog-confirm').click();
-    await until(async () => (await own()).items?.length === 1, 'suggestions saved on OK');
-    assert((await own()).items[0].image?.file);
+    await until(async () => (await own()).sites?.length === 1, 'suggestions saved on OK');
+    assert((await own()).sites[0].image?.file);
     assert.equal((await images()).images.length, imageCount + 1);
     checks.push('metadata preserves manual name and imports suggested image only on OK');
-    const storedImage = structuredClone((await own()).items[0].image);
-    await field('items', 'list:edit:' + (await own()).items[0].id).click();
-    await field('items', 'draft-action').click();
+    const storedImage = structuredClone((await own()).sites[0].image);
+    await field('sites', 'list:edit:' + (await own()).sites[0].id).click();
+    await field('sites', 'draft-action').click();
     await fetchDone();
     await ui.getByTestId('settings-dialog-confirm').click();
     await until(
       async () => !(await ui.getByTestId('settings-dialog').count()),
       'edited suggestions saved',
     );
-    assert.deepEqual((await own()).items[0].image, storedImage);
+    assert.deepEqual((await own()).sites[0].image, storedImage);
     assert.equal((await images()).images.length, imageCount + 1);
     checks.push('an already selected library image is retained when fetching suggestions');
     const legacyIcon =
@@ -205,7 +214,7 @@ async function stop() {
       fs.readFileSync(path.join(root, 'assets/icon.png')).toString('base64');
     await dock.evaluate(async (icon) => {
       const state = await window.dock.snapshot();
-      const row = state.settings.value.extensions['at365.web-applet'].settings.items[0];
+      const row = state.settings.value.extensions['at365.web-applet'].settings.sites[0];
       row.image = null;
       row.icon = icon;
       await window.dock.saveSettings(state.settings.value, state.settings.revision);
@@ -215,32 +224,32 @@ async function stop() {
     await ui.getByTestId('settings-page:general').waitFor();
     await ui.getByTestId('settings-nav:applet:' + owner).click();
     await ui.getByTestId('settings-page:applet:' + owner).waitFor();
-    await field('items', 'list:edit:' + (await own()).items[0].id).click();
-    await field('items', 'draft-action').click();
+    await field('sites', 'list:edit:' + (await own()).sites[0].id).click();
+    await field('sites', 'draft-action').click();
     await fetchDone();
     await ui.getByTestId('settings-dialog-confirm').click();
     await until(
       async () => !(await ui.getByTestId('settings-dialog').count()),
       'legacy image retained',
     );
-    assert.equal((await own()).items[0].icon, legacyIcon);
-    assert.equal((await own()).items[0].image, null);
+    assert.equal((await own()).sites[0].icon, legacyIcon);
+    assert.equal((await own()).sites[0].image, null);
     assert.equal((await images()).images.length, imageCount + 1);
     checks.push('legacy icon data is retained without replacing it with a fetched image');
     for (const edit of ['name', 'url']) {
-      await field('items', 'add').click();
-      await field('items', 'url', 'input').fill(base + '/');
+      await field('sites', 'add').click();
+      await field('sites', 'url', 'input').fill(base + '/');
       holdMetadata = true;
-      await field('items', 'draft-action').click();
+      await field('sites', 'draft-action').click();
       await until(() => waitingMetadata.length === 1, 'held metadata');
       const next = edit === 'name' ? '取得中の手入力' : base + '/changed';
-      await field('items', edit, 'input').fill(next);
+      await field('sites', edit, 'input').fill(next);
       holdMetadata = false;
       metadata(waitingMetadata.shift());
       await fetchDone();
-      assert.equal(await field('items', edit, 'input').inputValue(), next);
+      assert.equal(await field('sites', edit, 'input').inputValue(), next);
       await cancel();
-      assert.equal((await own()).items.length, 1);
+      assert.equal((await own()).sites.length, 1);
     }
     checks.push('unconfirmed text during fetch is retained; changed URL rejects stale suggestions');
     const item = (await snapshot()).extensions.find((item) => item.displayName === '手動名');
@@ -257,13 +266,35 @@ async function stop() {
     );
     await dock.evaluate(async (id) => {
       const state = await window.dock.snapshot();
-      state.settings.value.extensions['at365.web-applet'].settings.items.find(
+      state.settings.value.extensions['at365.web-applet'].settings.sites.find(
         (row) => row.id === id,
       ).display = 'window';
       await window.dock.saveSettings(state.settings.value, state.settings.revision);
     }, item.collection.itemId);
     assert.equal(await remote.getByLabel('保持する入力').inputValue(), '保持');
     checks.push('page/window preserves View; remote has no bridge');
+    await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    ui = await settingsPage(dock);
+    await ui.getByTestId('settings-nav:applet:' + owner).click();
+    await field('sites', 'add').click();
+    await field('sites', 'name', 'input').fill('同じURLの別サイト');
+    await field('sites', 'url', 'input').fill(base + '/start');
+    await ui.getByTestId('settings-dialog-confirm').click();
+    await until(async () => (await own()).sites.length === 2, 'second site saved');
+    const second = (await snapshot()).extensions.find(
+      (entry) => entry.displayName === '同じURLの別サイト',
+    );
+    await dock.evaluate((id) => window.dock.openAppletPage(id, 'main'), second.id);
+    const another = await until(
+      () => pages().find((page) => page !== remote && page.url().startsWith(base)),
+      'second site',
+    );
+    assert.equal(await another.evaluate(() => document.cookie), '');
+    await another.evaluate(() => {
+      document.cookie = 'portable_login=second; Max-Age=3600';
+    });
+    assert.equal(await remote.evaluate(() => document.cookie), 'portable_login=retained');
+    checks.push('same-URL sites use independent real Cookies');
     await stop();
     await start();
     await dock.evaluate((id) => window.dock.openAppletPage(id, 'main'), item.id);
@@ -273,12 +304,72 @@ async function stop() {
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     ui = await settingsPage(dock);
     await ui.getByTestId('settings-nav:applet:' + owner).click();
-    await field('items', 'list:edit:' + item.collection.itemId).click();
-    assert.equal(await field('items', 'name', 'input').inputValue(), '手動名');
+    await field('sites', 'list:edit:' + item.collection.itemId).click();
+    assert.equal(await field('sites', 'name', 'input').inputValue(), '手動名');
     await cancel();
+    const sessionDirectory = (entry) =>
+      path.join(
+        profile,
+        'local',
+        'web-account-groups',
+        owner,
+        'site-sessions',
+        'sites',
+        entry.collection.itemId,
+      );
+    const googleDirectory = path.join(
+      profile,
+      'local',
+      'web-account-groups',
+      'at365.google',
+      'sessions',
+      item.collection.itemId,
+    );
+    fs.mkdirSync(googleDirectory, { recursive: true });
+    fs.writeFileSync(path.join(googleDirectory, 'fixture'), 'Gmail');
+    await field('sites', 'list:delete:' + item.collection.itemId).click();
+    await ui.getByText(/保存したログイン情報も削除/).waitFor();
+    await cancel();
+    assert.equal((await own()).sites.length, 2);
+    await field('sites', 'list:delete:' + item.collection.itemId).click();
+    await ui.getByTestId('settings-dialog-confirm').click();
+    await until(async () => (await own()).sites.length === 1, 'site deleted');
+    await until(() => !pages().includes(remote), 'deleted site closed');
+    await dock.evaluate((id) => window.dock.openAppletPage(id, 'main'), second.id);
+    const remaining = await until(
+      () => pages().find((page) => page.url().startsWith(base)),
+      'remaining site',
+    );
+    assert.equal(await remaining.evaluate(() => document.cookie), 'portable_login=second');
+    checks.push(
+      'site deletion confirms login removal, closes its page, and retains the other login',
+    );
     await dock.evaluate(() => window.dock.toggleExtension('at365.web-applet', false));
     await until(() => !pages().some((page) => page.url().startsWith(base)), 'stop cleanup');
-    checks.push('settings reopen and parent stop cleanup without a manager page');
+    assert(fs.existsSync(sessionDirectory(second)));
+    checks.push('stopping the parent retains saved logins');
+    await stop();
+    const installation = path.join(profile, 'extensions', owner);
+    const removedApplet = path.join(profile, 'uninstalled-web-applet');
+    const appletVersion = JSON.parse(
+      fs.readFileSync(path.join(installation, 'extension.json')),
+    ).version;
+    fs.renameSync(installation, removedApplet);
+    await start(false);
+    await until(() => !fs.existsSync(sessionDirectory(item)), 'orphan collected without Applet');
+    assert(fs.existsSync(sessionDirectory(second)));
+    assert.equal(fs.readFileSync(path.join(googleDirectory, 'fixture'), 'utf8'), 'Gmail');
+    const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
+    const saved = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    saved.extensions[owner].settings.sites = [];
+    const incoming = settingsFile + '.incoming';
+    fs.writeFileSync(incoming, JSON.stringify(saved));
+    fs.renameSync(incoming, settingsFile);
+    await until(() => !fs.existsSync(sessionDirectory(second)), 'final orphan collected');
+    assert.equal(fs.readFileSync(path.join(googleDirectory, 'fixture'), 'utf8'), 'Gmail');
+    checks.push(
+      'uninstalled Applet cleanup handles restart and synced deletion, leaving Gmail isolated',
+    );
     await stop();
     assert.equal(hash(executable), sha256);
     assert.equal(hash(source), sha256);
@@ -288,9 +379,7 @@ async function stop() {
       mode: development ? 'source' : 'fixed',
       sha256,
       checks,
-      appletVersion: JSON.parse(
-        fs.readFileSync(path.join(profile, 'extensions/at365.web-applet/extension.json')),
-      ).version,
+      appletVersion,
     };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));

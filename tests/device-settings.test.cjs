@@ -37,6 +37,62 @@ function fixture(t, name = 'PC-A', collections = []) {
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+test('operation grants use only the device file and preserve concurrent changes and other settings', (t) => {
+  const { store, file } = fixture(t);
+  const deviceFile = store.device.file;
+  const injected = { applet: { read: true }, mcp: { allowWrite: true } };
+  const shared = { ...disk(file), operationPermissions: injected };
+  fs.writeFileSync(file, JSON.stringify(shared));
+  store.shared.reload();
+  assert.deepEqual(store.operationPermissions(), {});
+  assert.equal(store.value.operationPermissions, undefined);
+  assert.equal(store.storedValue().operationPermissions, undefined);
+
+  store.saveOperationPermissions({ applet: { read: true } });
+  store.saveOperationPermissions({ mcp: { allowWrite: true } });
+  assert.deepEqual(disk(deviceFile).operationPermissions, injected);
+  assert.deepEqual(disk(file), shared);
+  const next = disk(deviceFile);
+  next.operationPermissions.applet.read = false;
+  next.extensions['example.wallpaper'].enabled = false;
+  fs.writeFileSync(deviceFile, JSON.stringify(next));
+  assert.throws(() => store.saveOperationPermissions({ mcp: { allowExecute: true } }));
+  assert.deepEqual(disk(deviceFile), next);
+  assert.deepEqual(store.operationPermissions(), next.operationPermissions);
+
+  const normalSettings = structuredClone(store.value);
+  normalSettings.operationPermissions = injected;
+  normalSettings.host.soundEnabled = !normalSettings.host.soundEnabled;
+  normalSettings.touchpadGestures.enabled = true;
+  store.save(normalSettings, store.revision);
+  assert.equal(disk(file).operationPermissions, undefined);
+  assert.deepEqual(disk(deviceFile).operationPermissions, next.operationPermissions);
+  assert.equal(disk(deviceFile).extensions['example.wallpaper'].enabled, false);
+
+  for (const invalid of [
+    { mcp: { read: true } },
+    { mcp: { allowWrite: 'true' } },
+    { mcp: { allowManageApplets: true } },
+    { applet: { read: 1 } },
+    { mcp: null },
+  ]) {
+    const before = fs.readFileSync(deviceFile);
+    assert.throws(() => store.saveOperationPermissions(invalid));
+    assert.deepEqual(fs.readFileSync(deviceFile), before);
+  }
+
+  const valid = fs.readFileSync(deviceFile);
+  fs.writeFileSync(deviceFile, '{broken');
+  assert.throws(() => store.device.reload());
+  assert.ok(store.operationPermissionsError);
+  assert.deepEqual(store.operationPermissions(), {});
+  assert.throws(() => store.saveOperationPermissions({ mcp: { allowExecute: true } }));
+  fs.writeFileSync(deviceFile, valid);
+  store.device.reload();
+  assert.equal(store.operationPermissionsError, undefined);
+  assert.deepEqual(store.operationPermissions(), next.operationPermissions);
+});
+
 test('gallery compact size and navigation layout use the device store and survive restart without shared writes', (t) => {
   const { store, base, file } = fixture(t);
   const { GalleryViewStateStore } = require('../out/main/main/core/gallery-view-state');

@@ -10,7 +10,7 @@
 - 生成設定: モデルID、画像サイズ、枚数、PNG/JPEG/WebP、品質、背景、圧縮品質、待ち時間。モデルIDは利用する画像生成モデルを入力する。モデルの自動列挙は行わない。
 - プロンプト: 「いつも加えるプロンプト」と「指定がないときのプロンプト」。alwaysPrompt、今回のadditionalPrompt（省略時はdefaultPrompt）、入力データinputの順で、空白だけの部分を除いて改行で結合し、送信先のpromptへ渡す。明示した空文字のadditionalPromptは既定プロンプトを抑制する。合成結果が空なら送信しない。
 
-通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。PC専用rootのgeneration-ai.jsonへ保存する。各ダイアログのMCP利用許可も同じファイルで管理する。現在のMCP API公開範囲は変更しない。[生成AIのPC専用設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
+通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。ダイアログのMCP利用許可とともに`data/settings-<端末名>.json`の`generationAi.imageAi`へ保存する。[生成AIの端末別設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
 
 設定ページの「画像生成の試験」は選択したサーバー登録のモデルで生成し、生成画像を表示する。空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
 
@@ -24,7 +24,7 @@ Applet向けには `ai.image.connections.list` を提供する。`appdock-api` c
 
 `ai.image.generate`と、256KiBずつ生成画像を取得する`ai.image.results.read`はAppletへ公開しない。Node/.NETの汎用Callでも実行できず、公開操作の一覧にも含めない。MCPには接続一覧・ジョブ操作を含む画像生成操作をまだ公開しない。生成・接続一覧・状態取得・取消・一時結果取得の内部機能は維持し、本体の設定試験で使用する。
 
-「操作の許可」の画像生成AI（`useImageAi`）は項目と保存値を維持する。現在の接続一覧と、後続の「生成してライブラリーに登録するAPI」で使い、公開終了を理由に廃止・移行しない。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は従来どおり許可する。MCP列は引き続き未対応と表示する。許可がONでも非公開の操作は呼び出せない。
+「操作の許可」の画像生成AI（`useImageAi`）は、現在の接続一覧と後続の「生成してライブラリーに登録するAPI」で使う。Applet列は[端末別の操作許可](settings-sync.md#端末別の操作許可)に保存し、既定OFF。MCP列は未対応と表示する。許可がONでも非公開の操作は呼び出せない。
 
 本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, additionalPrompt?, input?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。モデルは登録の設定から確定する。`model`引数や空欄のモデル設定はINVALID_ARGUMENT。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
 

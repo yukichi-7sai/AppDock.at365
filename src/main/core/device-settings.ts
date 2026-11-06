@@ -1,9 +1,18 @@
 import { hostText } from '../../shared/i18n';
+import { appletApiPermissionLabels, type AppletApiPermissions } from '../../shared/appdock-api';
+import { mcpPermissionKeys, type McpPermissions } from '../../shared/automation';
 import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
 import { parseMcpRoster } from '../../shared/mcp-client';
 import type { McpServerSettings } from '../../shared/automation';
 import { parseMcpServerSettings } from './automation-network';
 import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
+import {
+  generationSettings,
+  parseGenerationSettings,
+  withGenerationSettings,
+  withoutGenerationSettings,
+  type GenerationSettings,
+} from './generation-settings';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import {
   appletCommonKeys,
@@ -49,11 +58,17 @@ export interface DeviceHostPage {
   useLocalSettings: boolean;
   configuration?: HostPageConfiguration;
 }
+export interface OperationPermissions {
+  applet?: AppletApiPermissions;
+  mcp?: McpPermissions;
+}
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
   mcpClient?: McpDeviceSettings;
   mcpServer?: McpServerSettings;
+  generationAi?: GenerationSettings;
+  operationPermissions?: OperationPermissions;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
   hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
@@ -138,7 +153,24 @@ export function initialDeviceSettings(
   }
   return value;
 }
+function validateOperationPermissions(value: unknown) {
+  const valid = (permissions: unknown, keys: readonly string[]) =>
+    object(permissions) &&
+    Object.entries(permissions).every(
+      ([key, allowed]) => keys.includes(key) && typeof allowed === 'boolean',
+    );
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => key !== 'applet' && key !== 'mcp') ||
+    (Object.hasOwn(value, 'applet') &&
+      !valid(value.applet, Object.keys(appletApiPermissionLabels))) ||
+    (Object.hasOwn(value, 'mcp') && !valid(value.mcp, mcpPermissionKeys))
+  )
+    throw Error(hostText('services.operationPermissions.invalid'));
+}
+
 export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings {
+  raw = withoutGenerationSettings(raw);
   if (object(raw) && raw.schemaVersion === 1 && typeof raw.machineName === 'string')
     raw = fillSettingDefaults(raw, initialDeviceSettings(name));
   if (
@@ -167,11 +199,15 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'mcpClient',
           'mcpServer',
           'mcpServers',
+          'generationAi',
+          'operationPermissions',
         ].includes(key),
     )
   )
     throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
+  if (raw.operationPermissions !== undefined)
+    validateOperationPermissions(raw.operationPermissions);
   if (raw.mcpServers !== undefined) parseMcpRoster(raw.mcpServers);
   if (raw.uiState !== undefined) parseDeviceUiState(raw.uiState);
   if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))
@@ -248,6 +284,9 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
     ...structuredClone(current),
     ...(raw.mcpClient === undefined ? {} : { mcpClient: parseMcpDeviceSettings(raw.mcpClient) }),
     ...(raw.mcpServer === undefined ? {} : { mcpServer: parseMcpServerSettings(raw.mcpServer) }),
+    ...(raw.generationAi === undefined
+      ? {}
+      : { generationAi: parseGenerationSettings(raw.generationAi) }),
     hostPages,
     host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;
@@ -302,6 +341,7 @@ export function readDeviceManifests(roots: string[]): ExtensionManifest[] {
         if (fs.statSync(file).size > 1024 * 1024) continue;
         const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as ExtensionManifest;
         if (!id(manifest.id) || result.some((item) => item.id === manifest.id)) continue;
+        if (manifest.capabilities?.includes('web-profiles')) continue;
         validateAppletCommonValues(manifest as unknown as Record<string, unknown>, true);
         manifest.settings = parseSettingDefinitions(manifest.settings);
         manifest.pages = parseAppletPages(manifest);
@@ -360,7 +400,7 @@ export function combineSettings(
         row.enabled =
           device.collectionEnabled[owner]?.[definition.key]?.[row.id] ?? defaultAppletEnabled;
   }
-  return parseSettings(result);
+  return parseSettings(withGenerationSettings(result, device.generationAi));
 }
 /** Selectable pages start shared; fixed local pages never inherit shared configuration. */
 export function initializeHostPageSettings(
@@ -415,6 +455,10 @@ export function splitSettings(
   delete shared.mcpClient;
   if (!equal(before.mcpClient, next.mcpClient))
     device.mcpClient = parseMcpDeviceSettings(next.mcpClient);
+  const generation = generationSettings(next);
+  if (!equal(generationSettings(before), generation)) device.generationAi = generation;
+  next = withoutGenerationSettings(next);
+  before = withoutGenerationSettings(before);
   const copyChanges = (
     target: Record<string, any>,
     previous: Record<string, any>,

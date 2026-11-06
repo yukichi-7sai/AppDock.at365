@@ -28,7 +28,6 @@ fs.writeFileSync(
     minimumHostVersion: '0.44.0',
     runtime: 'node',
     entry: 'index.js',
-    capabilities: ['web-profiles'],
     commands: [
       { id: 'fixture.accounts.run', title: 'Run fixture' },
       { id: 'fixture.accounts.fail', title: 'Fail fixture' },
@@ -468,14 +467,6 @@ async function main() {
   checks.push('failed test uses common error notification and safe matching result');
   await dismissAll();
   await checkUpdateNotifications();
-  await ui.getByRole('button', { name: 'Webアカウント', exact: true }).click();
-  await ui.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
-  await until(
-    async () => (await info()).some((i) => i.body === 'アカウント枠を追加しました。'),
-    'account saved',
-  );
-  assert.equal(await ui.getByText('アカウント枠を追加しました。', { exact: true }).count(), 0);
-  checks.push('settings Shell operation reports account creation once without inline duplicate');
   await dismissAll();
   await ui.getByRole('button', { name: '音声生成AI', exact: true }).click();
   await ui.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();

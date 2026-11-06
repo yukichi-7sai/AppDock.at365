@@ -18,7 +18,7 @@ const { parseCommandStack } = require('../out/main/shared/command-stacks');
 const { readObjectList } = require('../out/main/shared/object-list');
 const { validateSettingValue } = require('../out/main/shared/setting-definitions');
 const { parseImageLibrary } = require('../out/main/shared/registered-images');
-const { parseWebProfiles } = require('../out/main/shared/web-content');
+const { validateCollectionRecords } = require('../out/main/shared/page-collections');
 const {
   parseMcpRoster,
   parseMcpConnection,
@@ -208,9 +208,10 @@ test('settings collections accept former boundaries while rejecting malformed id
   );
   assert.equal(parseTrayMenu(ids.map((id) => ({ id, type: 'separator' }))).length, 2001);
   assert.equal(
-    parseWebProfiles(
-      Array.from({ length: 65 }, () => ({ id: `account.${randomUUID()}`, name: 'Account' })),
-    ).length,
+    validateCollectionRecords({ source: 'remote' }, Array.from({ length: 65 }, () => ({
+      id: randomUUID(), name: 'Site', enabled: true, display: 'page',
+      url: 'https://example.test/', navigation: 'same-origin', allowedOrigins: [],
+    }))).length,
     65,
   );
   assert.equal(

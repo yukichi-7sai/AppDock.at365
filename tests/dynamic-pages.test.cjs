@@ -42,33 +42,45 @@ test('dynamic pages validate capabilities, collisions, limits and copy context a
     assert.throws(() => parseDynamicPages(owner, rows));
   assert.throws(() => parseDynamicPages({ ...owner, capabilities: ['pages'] }, [page]));
 });
-test('legacy sites retain identities, commands and private data; repeated parse is stable', () => {
+test('legacy site records and identity aliases do not create registered pages', () => {
   const settings = createDefaultSettings();
   const id = 'web.11111111-2222-3333-4444-555555555555';
-  const item = {
-    id,
-    name: 'Original',
-    enabled: true,
-    display: 'window',
-    url: 'https://example.test/?private',
-    accountId: 'account.11111111-2222-3333-4444-555555555555',
-    navigation: 'same-origin',
-    allowedOrigins: [],
-    icon: '',
-  };
-  settings.extensions[manifest.id] = { enabled: true, settings: { items: [item] } };
+  settings.extensions[manifest.id] = { enabled: true, settings: { items: [{ id }] } };
   settings.migrations = { webApplet: { version: 1, owner: manifest.id, ids: [id] } };
-  settings.pinnedCommands = [id + '.open'];
-  const migrated = parseSettings(settings);
-  assert.deepEqual(migrated.extensions[manifest.id].settings.items, [item]);
-  assert.equal(migrated.webApplets, undefined);
-  assert.deepEqual(parseSettings(migrated), migrated);
-  assert.deepEqual(migrated.pinnedCommands, [id + '.open']);
-  const pages = collectionPages(migrated, [manifest]);
-  assert.equal(pages[0].id, id);
-  assert.deepEqual(
-    parseSettings({ ...migrated, webApplets: { items: [] } }).extensions,
-    migrated.extensions,
+  const parsed = parseSettings(settings);
+  assert.equal(parsed.migrations, undefined);
+  assert.deepEqual(collectionPages(parsed, [manifest]), []);
+  assert.deepEqual(parseSettings(parsed), parsed);
+});
+test('retired shared-profile Applets retain update metadata without exposing their site settings', (t) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const { ExtensionManager, readManifest } = require('../out/main/main/core/extensions');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-retired-web-profiles-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, manifest.entry), 'module.exports = {};');
+  fs.writeFileSync(
+    path.join(dir, 'extension.json'),
+    JSON.stringify({
+      ...manifest,
+      version: '0.4.2',
+      minimumHostVersion: '0.86.5',
+      capabilities: [...manifest.capabilities, 'web-profiles'],
+    }),
+  );
+  const loaded = readManifest(dir);
+  assert.equal(loaded.updateRepository, manifest.updateRepository);
+  assert.equal(loaded.version, '0.4.2');
+  assert.deepEqual(loaded.pageCollections, []);
+  assert.equal(loaded.settings, undefined);
+  assert.throws(
+    () =>
+      ExtensionManager.prototype.checkCompatibility.call(
+        { hostVersion: manifest.minimumHostVersion },
+        { manifest: loaded },
+      ),
+    /Appletを更新/,
   );
 });
 test('collection declarations validate ownership and templates; new rows receive defaults once', () => {
@@ -89,14 +101,13 @@ test('collection declarations validate ownership and templates; new rows receive
   next.extensions[owner.id] = {
     enabled: true,
     settings: {
-      items: [
+      sites: [
         {
-          id: 'site.one',
+          id: '11111111-2222-3333-4444-555555555555',
           name: 'One',
           enabled: true,
           display: 'page',
           url: 'https://example.test/',
-          accountId: 'account.11111111-2222-3333-4444-555555555555',
           navigation: 'same-origin',
           allowedOrigins: [],
         },
@@ -105,7 +116,9 @@ test('collection declarations validate ownership and templates; new rows receive
   };
   const result = initializeCollectionDefaults(next, previous, [owner]);
   assert.equal(
-    result.keybindings.filter((b) => b.command.startsWith(owner.id + '.items.site.one.')).length,
+    result.keybindings.filter((b) =>
+      b.command.startsWith(owner.id + '.sites.11111111-2222-3333-4444-555555555555.'),
+    ).length,
     3,
   );
   assert.deepEqual(initializeCollectionDefaults(result, result, [owner]), result);
@@ -128,22 +141,21 @@ test('collection settings projection exposes declared fields and writes only the
   } = require('../out/main/shared/settings-catalog');
   const value = createDefaultSettings();
   const item = {
-    id: 'site.one',
+    id: '11111111-2222-3333-4444-555555555555',
     name: 'One',
     enabled: true,
     display: 'page',
     url: 'https://private.test/secret',
-    accountId: 'account.11111111-2222-3333-4444-555555555555',
     navigation: 'same-origin',
     allowedOrigins: [],
   };
-  value.extensions[manifest.id] = { enabled: true, settings: { items: [item] } };
-  const id = manifest.id + '.items.site.one';
+  value.extensions[manifest.id] = { enabled: true, settings: { sites: [item] } };
+  const id = manifest.id + '.sites.11111111-2222-3333-4444-555555555555';
   const applet = {
     id,
     displayName: 'One',
     runtime: 'node',
-    collection: { owner: manifest.id, key: 'items', itemId: item.id },
+    collection: { owner: manifest.id, key: 'sites', itemId: item.id },
     settings: manifest.pageCollections[0].fields,
   };
   const page = settingsCatalog([applet], value).find((p) => p.owner === id);
@@ -151,9 +163,9 @@ test('collection settings projection exposes declared fields and writes only the
   assert.ok(!JSON.stringify(projection).includes('private.test'));
   projection.extensions[id].settings.name = 'Changed';
   const saved = applySettingsJson(value, page, [applet], JSON.stringify(projection));
-  assert.equal(saved.extensions[manifest.id].settings.items[0].name, 'Changed');
+  assert.equal(saved.extensions[manifest.id].settings.sites[0].name, 'Changed');
   assert.equal(saved.extensions[id], undefined);
-  assert.equal(saved.extensions[manifest.id].settings.items[0].url, item.url);
+  assert.equal(saved.extensions[manifest.id].settings.sites[0].url, item.url);
   projection.extensions[id].settings.url = 'https://other.test/';
   assert.throws(() => applySettingsJson(value, page, [applet], JSON.stringify(projection)));
 });

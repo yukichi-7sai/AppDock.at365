@@ -1,6 +1,6 @@
 # AppDock.at365 開発ガイド
 
-[生成AIのPC専用設定とプリセット別MCP許可](docs/generation-settings.md)
+[生成AIの端末別設定とプリセット別MCP許可](docs/generation-settings.md)
 
 [MCP接続・ツールコマンドの端末別保存と認証復旧](docs/mcp-device-settings-design.md)
 

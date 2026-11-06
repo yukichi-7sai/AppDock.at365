@@ -13,6 +13,7 @@ const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationService } = require('../out/main/main/core/automation');
 const { mcpReceiverSettings } = require('./fixtures/mcp-receiver-settings.cjs');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const root = path.join(__dirname, '../.artifacts/ai-unit');
 fs.mkdirSync(root, { recursive: true });
 const temp = () => fs.mkdtempSync(path.join(root, 'case-'));
@@ -646,30 +647,29 @@ test('model refresh replaces an aborted request without losing the new in-flight
 });
 test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   const dir = temp(),
-    store = new AiSecrets(path.join(dir, 'keys.json'), {
+    store = new AiSecrets(dir, 'ai-keys', {
       encrypt: (v) => Buffer.from(v).toString('base64'),
       decrypt: (v) => Buffer.from(v, 'base64').toString(),
     });
   const c = { ...newAiConnection('local'), baseUrl: 'http://server/v1' };
   store.setKey(c, 'fake-secret');
   assert.equal(store.key(c), 'fake-secret');
-  assert(!fs.readFileSync(path.join(dir, 'keys.json'), 'utf8').includes('fake-secret'));
+  assert(!fs.readFileSync(path.join(dir, 'ai-keys.json'), 'utf8').includes('fake-secret'));
   assert.equal(store.key({ ...c, baseUrl: 'http://other/v1' }), undefined);
   assert.throws(() => store.setKey(c, 'secret\nheader'));
   store.setKey(c, '');
   assert.equal(store.key(c), undefined);
-  fs.writeFileSync(path.join(dir, 'keys.json'), '{broken');
+  fs.writeFileSync(path.join(dir, 'ai-keys.json'), '{broken');
   assert(store.status(c).error);
 });
-test('Applet AI defaults ON and existing grants retain their explicit permissions', () => {
-  const dir = temp(),
-    file = path.join(dir, 'access.json');
-  assert.equal(new AppletApiAccess(file).get().useAi, true);
-  fs.writeFileSync(
-    file,
-    JSON.stringify({ version: 2, permissions: { read: true, execute: true, useTts: true } }),
-  );
-  assert.equal(new AppletApiAccess(file).get().useAi, undefined);
+test('Applet AI requires a separate device grant and defaults OFF', (t) => {
+  const dir = temp();
+  const access = new AppletApiAccess(openOperationPermissions(t, dir));
+  assert.equal(access.get().useAi, undefined);
+  access.set({ read: true, execute: true, useTts: true });
+  assert.equal(access.get().useAi, undefined);
+  access.set({ read: true, execute: true, useAi: true });
+  assert.equal(new AppletApiAccess(openOperationPermissions(t, dir)).get().useAi, true);
   assert.deepEqual(appDockOperations['ai.text.generate'].callers, ['mcp', 'applet']);
   assert.deepEqual(appDockOperations['ai.text.generate'].permissions, ['read', 'execute', 'useAi']);
 });
@@ -726,11 +726,12 @@ test('shared dispatcher enforces independent Applet/MCP grants and the same AI s
     (e) => e.code === 'INVALID_ARGUMENT',
   );
 });
-test('MCP AI permission is stored independently and absent legacy values remain OFF', async (t) => {
+test('MCP AI permission is stored independently and defaults OFF on another device', async (t) => {
   const dir = temp(),
     s = new AutomationService({
       localDirectory: dir,
       baseDirectory: dir,
+      settings: openOperationPermissions(t, dir),
       version: 'test',
       encrypt: (v) => v,
       decrypt: (v) => v,
@@ -743,12 +744,11 @@ test('MCP AI permission is stored independently and absent legacy values remain 
   await s.action({ kind: 'setAi', allowed: true });
   assert.equal(s.state().allowUseAi, true);
   assert.equal(s.state().allowUseTts, false);
-  const config = JSON.parse(fs.readFileSync(path.join(dir, 'automation.json'), 'utf8'));
-  delete config.allowUseAi;
-  fs.writeFileSync(path.join(dir, 'automation.json'), JSON.stringify(config));
-  const legacy = new AutomationService({
+  assert.equal(fs.existsSync(path.join(dir, 'automation.json')), false);
+  const other = new AutomationService({
     localDirectory: dir,
     baseDirectory: dir,
+    settings: openOperationPermissions(t, dir, 'OtherDevice'),
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,
@@ -756,8 +756,8 @@ test('MCP AI permission is stored independently and absent legacy values remain 
     mcpServer: mcpReceiverSettings(),
     createApi: () => ({ auditTarget: () => undefined, call: () => ({}) }),
   });
-  t.after(() => legacy.close());
-  assert.equal(legacy.state().allowUseAi, false);
+  t.after(() => other.close());
+  assert.equal(other.state().allowUseAi, false);
 });
 test('MCP authorization changes invalidate jobs synchronously before action completion', async (t) => {
   const dir = temp();
@@ -765,6 +765,7 @@ test('MCP authorization changes invalidate jobs synchronously before action comp
   const service = new AutomationService({
     localDirectory: dir,
     baseDirectory: dir,
+    settings: openOperationPermissions(t, dir),
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,

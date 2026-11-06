@@ -33,6 +33,7 @@ const rows = localizedMetadata<
     key: 'write',
     description: hostSettingItem('permissions', 'write').description,
     mcp: 'allowWrite',
+    action: 'setWrite',
     label: hostText('settings.apiPermissionsSettings.settings'),
   },
   {
@@ -96,7 +97,7 @@ function needs(key: AppletApiPermission, permissions: AppletApiPermissions, appl
 export function ApiPermissionsSettings({
   grants,
   state,
-  error: appletError,
+  error: permissionError,
   busy: hostBusy,
 }: {
   grants: AppletApiPermissions;
@@ -144,7 +145,7 @@ export function ApiPermissionsSettings({
   }
   useSettingsFeedback({
     busy,
-    error: error || appletError,
+    error: error || permissionError || state?.error || state?.codex.error || '',
   });
   return (
     <section
@@ -187,10 +188,13 @@ export function ApiPermissionsSettings({
                   <Toggle
                     label={`Applet：${appletApiPermissionLabels[row.key]}`}
                     checked={appletOn}
-                    disabled={hostBusy || busy || !!appletError}
+                    disabled={hostBusy || busy || !!permissionError}
                     onChange={(value) =>
                       void save(() =>
-                        settingsControls.setAppletApiPermissions({ ...grants, [row.key]: value }),
+                        settingsControls.setAppletApiPermissions(
+                          { ...grants, [row.key]: value },
+                          grants,
+                        ),
                       )
                     }
                   />
@@ -222,16 +226,20 @@ export function ApiPermissionsSettings({
                           })}
                           checked={!!mcpOn}
                           disabled={
-                            hostBusy || busy || !state || state.starting || state.codex.starting
+                            hostBusy ||
+                            busy ||
+                            !!permissionError ||
+                            !state ||
+                            state.starting ||
+                            state.codex.starting
                           }
                           onChange={(allowed) =>
-                            void save(async () => {
-                              const action =
-                                row.key === 'write'
-                                  ? ({ kind: 'setWrite', allowed } as const)
-                                  : ({ kind: row.action, allowed } as AutomationAction);
-                              await settingsControls.automation(action);
-                            })
+                            void save(() =>
+                              settingsControls.automation({
+                                kind: row.action,
+                                allowed,
+                              } as AutomationAction),
+                            )
                           }
                         />
                         {row.mcpWarning && (

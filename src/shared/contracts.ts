@@ -46,7 +46,6 @@ export interface ExtensionSettings extends Partial<
 export interface Settings {
   mcpClient?: import('./mcp-device-settings').McpDeviceSettings;
   customCommands?: import('./custom-commands').CustomCommandBlock;
-  migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
   tts?: import('./tts').TtsConfiguration;
   ai?: import('./ai').AiSettings;
   imageAi?: import('./image-ai').ImageAiSettings;
@@ -159,7 +158,6 @@ export interface SettingDefinition {
   };
   /** Nested storage path for an object-list field; never a JavaScript expression. */
   propertyPath?: string[];
-  optionSource?: 'web-profiles';
 }
 export interface SettingOption {
   label: string;
@@ -283,7 +281,6 @@ export interface HostSnapshot {
     error?: string;
   };
   launch: LaunchState;
-  webAccounts: import('./web-content').WebProfile[];
   webPages: Record<string, import('./web-content').WebPageState>;
   startupReady: boolean;
   uiReady: boolean;
@@ -333,7 +330,10 @@ export interface DockApi {
   overlayViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
-  setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
+  setAppletApiPermissions(
+    permissions: import('./appdock-api').AppletApiPermissions,
+    before?: import('./appdock-api').AppletApiPermissions,
+  ): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,
   ): Promise<import('./automation').AutomationReply>;
@@ -345,13 +345,6 @@ export interface DockApi {
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
 
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
-  clearWebAccount(id: string, confirmed?: import('./web-content').WebProfile): Promise<boolean>;
-  createWebAccount(name: string): Promise<import('./web-content').WebProfile>;
-  renameWebAccount(id: string, name: string): Promise<void>;
-  deleteWebAccount(
-    id: string,
-    confirmed?: import('./web-content').WebProfile,
-  ): Promise<false | 'deleted' | 'deferred'>;
   cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'all' | 'host' | 'applets' | string): Promise<UpdateState>;

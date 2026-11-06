@@ -31,7 +31,6 @@ import { AiSettingsForm } from './AiSettings';
 import { ImageAiSettingsForm } from './ImageAiSettings';
 import { CustomCommandsSettings } from './CustomCommandsSettings';
 import { TriggerStackSettings } from './TriggerStackSettings';
-import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { McpReceiverSettings } from './McpReceiverSettings';
 import { NotificationSettings } from './NotificationSettings';
@@ -95,7 +94,6 @@ export function SettingsForm({
           applet={extensions.find((a) => a.id === page.owner)!}
           settings={settings}
           onChange={edit}
-          accounts={aux.accounts}
           commonFields={
             !page.collection && (
               <AppletUpdateSource
@@ -216,13 +214,6 @@ export function SettingsForm({
         state={aux.automation}
         error={aux.permissions?.error}
         busy={busy}
-      />
-    );
-  if (category === 'web-accounts')
-    return (
-      <WebAccountSettings
-        accounts={aux.accounts ?? []}
-        savedItems={aux.accountReferences?.saved ?? []}
       />
     );
   return (

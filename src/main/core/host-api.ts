@@ -155,21 +155,6 @@ export function createHostApi(
         if (!item) throw Error(hostText('services.hostApi.ownBadgePage'));
         return ribbonBadges.set(id, e.runtimeSession, item, p.badge);
       }
-      case 'host.webProfiles.list':
-      case 'host.webProfiles.add':
-      case 'host.webProfiles.rename':
-      case 'host.webProfiles.clear':
-      case 'host.webProfiles.delete': {
-        requireCapability('web-profiles');
-        if (!collectionHost) throw Error(hostText('services.hostApi.webProfilesNotReady'));
-        const profiles = collectionHost().profiles(id);
-        if (method === 'host.webProfiles.list') return profiles.accounts();
-        if (method === 'host.webProfiles.add') return profiles.addAccount(p.name);
-        if (typeof p.id !== 'string') throw Error(hostText('services.hostApi.accountId'));
-        if (method === 'host.webProfiles.rename') return profiles.renameAccount(p.id, p.name);
-        if (method === 'host.webProfiles.clear') return profiles.clearAccount(p.id);
-        return profiles.deleteAccount(p.id);
-      }
       case 'host.registeredImages.snapshot':
       case 'host.registeredImages.pick':
       case 'host.registeredImages.preview':
@@ -521,11 +506,6 @@ export function createHostApi(
                 'storage.get',
                 'storage.set',
                 'settings.update',
-                'webProfiles.list',
-                'webProfiles.add',
-                'webProfiles.rename',
-                'webProfiles.clear',
-                'webProfiles.delete',
                 'images.normalize',
                 'registeredImages.snapshot',
                 'registeredImages.pick',

@@ -99,7 +99,12 @@ module.exports = async function ({
   assert.equal(web.url(), url, 'same document survives display change');
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.equal(saved.extensions[webId], undefined);
-  assert.equal(saved.webApplets.items.find((a) => a.id === webId).url, url);
+  assert.equal(
+    saved.extensions['at365.web-applet'].settings.sites.find(
+      (a) => 'at365.web-applet.sites.' + a.id === webId,
+    ).url,
+    url,
+  );
   await togglePermission('MCPからの設定変更を許可する');
   const blocked = await client.callTool({
     name: 'appdock_execute_command',
@@ -116,7 +121,7 @@ module.exports = async function ({
   assert.equal(
     back.value.completion,
     'settingsSaved',
-    'default Applet permission independent from MCP',
+    'explicit Applet permission independent from MCP',
   );
   assert.deepEqual((await read()).values, original.values);
   const grants = (await page.evaluate(() => window.dock.snapshot())).appletApi.permissions;

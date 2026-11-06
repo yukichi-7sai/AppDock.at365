@@ -9,10 +9,13 @@ import type {
   AutomationReceiver,
   AutomationReply,
   AutomationState,
+  McpPermission,
+  McpPermissions,
   McpServerSettings,
   ReceiverSettings,
 } from '../../shared/automation';
 import { retiredMcpPermissionKeys, retiredPermissionActions } from '../../shared/automation';
+import type { DeviceSettingsStore } from './device-settings-store';
 import type { AutomationApi } from './automation-api';
 import { AutomationMcp } from './automation-mcp';
 import { McpEvents } from './mcp-events';
@@ -27,7 +30,6 @@ import {
   defaultAutomationConfig,
   parseAutomationConfig,
   type AutomationConfig,
-  type McpPermission,
 } from './automation-config';
 import {
   changeRegistration,
@@ -68,6 +70,7 @@ export class AutomationService {
   readonly id: string;
   private readonly file: string;
   private config = defaultAutomationConfig();
+  private appliedPermissions: McpPermissions;
   private legacy?: McpServerSettings;
   private deviceConfig?: McpServerSettings;
   private readonly credentials: Partial<Record<AutomationReceiver, Credential>> = {};
@@ -94,6 +97,7 @@ export class AutomationService {
     private options: {
       localDirectory: string;
       baseDirectory: string;
+      settings: Pick<DeviceSettingsStore, 'operationPermissions' | 'saveOperationPermissions'>;
       version: string;
       encrypt(value: string): string;
       decrypt(value: string): string;
@@ -163,6 +167,7 @@ export class AutomationService {
     });
     this.listeners = { mcp: createListener('mcp'), codex: createListener('codex') };
     this.readDevice();
+    this.appliedPermissions = this.options.settings.operationPermissions().mcp ?? {};
   }
 
   private get mcpSettings() {
@@ -288,10 +293,11 @@ export class AutomationService {
     const effectiveKey = (retiredMcpPermissionKeys as readonly string[]).includes(key)
       ? 'allowWrite'
       : (key as McpPermission);
+    const { mcp } = this.options.settings.operationPermissions();
     return (
       this.authorized() &&
-      this.config[effectiveKey] &&
-      ((key !== 'allowSendInput' && key !== 'allowRunProcesses') || this.config.allowExecute)
+      mcp?.[effectiveKey] === true &&
+      ((key !== 'allowSendInput' && key !== 'allowRunProcesses') || mcp.allowExecute === true)
     );
   }
 
@@ -326,7 +332,16 @@ export class AutomationService {
   }
 
   state(): AutomationState {
-    const { codex, ...local } = this.config;
+    const { codex } = this.config;
+    const {
+      allowWrite = false,
+      allowExecute = false,
+      allowUseTts = false,
+      allowUseAi = false,
+      allowUseMcp = false,
+      allowSendInput = false,
+      allowRunProcesses = false,
+    } = this.options.settings.operationPermissions().mcp ?? {};
     const listener = this.listeners.mcp;
     const { connectionScope, networkHostnames } = this.mcpSettings;
     return {
@@ -343,21 +358,21 @@ export class AutomationService {
       canCopyToken: !this.loadError && !!this.credentials.mcp,
       lastLocalClientAt: listener.lastLocalClientAt,
       lastNetworkClientAt: listener.lastNetworkClientAt,
-      allowWrite: local.allowWrite,
-      allowExecute: local.allowExecute,
-      allowManageApplets: local.allowWrite,
-      allowEditShortcuts: local.allowWrite,
-      allowEditGestures: local.allowWrite,
-      allowEditTouchpadGestures: local.allowWrite,
-      allowEditRibbon: local.allowWrite,
-      allowUseTts: local.allowUseTts,
-      allowUseAi: local.allowUseAi,
-      allowUseMcp: local.allowUseMcp,
-      allowSendInput: local.allowSendInput,
-      allowRunProcesses: local.allowRunProcesses,
-      allowManageMcpServers: local.allowWrite,
-      allowEditTray: local.allowWrite,
-      allowManageCustomCommands: local.allowWrite,
+      allowWrite,
+      allowExecute,
+      allowManageApplets: allowWrite,
+      allowEditShortcuts: allowWrite,
+      allowEditGestures: allowWrite,
+      allowEditTouchpadGestures: allowWrite,
+      allowEditRibbon: allowWrite,
+      allowUseTts,
+      allowUseAi,
+      allowUseMcp,
+      allowSendInput,
+      allowRunProcesses,
+      allowManageMcpServers: allowWrite,
+      allowEditTray: allowWrite,
+      allowManageCustomCommands: allowWrite,
       codex: {
         ...this.receiverState('codex'),
         serverId: codex.serverName,
@@ -708,7 +723,6 @@ export class AutomationService {
           action.allowed,
           'services.automation.invalidExecutionPermission',
           'services.automation.executionPermissionSaved',
-          true,
         );
       case 'setMcpClient':
         return this.setPermission(
@@ -716,7 +730,6 @@ export class AutomationService {
           action.allowed,
           'services.automation.invalidMcpPermission',
           'services.automation.mcpPermissionSaved',
-          true,
         );
       case 'setAi':
         return this.setPermission(
@@ -724,7 +737,6 @@ export class AutomationService {
           action.allowed,
           'services.automation.invalidAiPermission',
           'services.automation.aiPermissionSaved',
-          !action.allowed,
         );
       case 'setExecution':
         return this.setPermission(
@@ -778,12 +790,26 @@ export class AutomationService {
     allowed: boolean,
     invalidKey: Parameters<typeof hostText>[0],
     savedKey: Parameters<typeof hostText>[0],
-    invalidate = false,
   ) {
     if (typeof allowed !== 'boolean') throw Error(hostText(invalidKey));
-    this.saveLocal({ ...this.config, [key]: allowed });
-    if (invalidate) this.options.authorizationChanged?.();
+    this.options.settings.saveOperationPermissions({
+      mcp: { ...this.options.settings.operationPermissions().mcp, [key]: allowed },
+    });
+    this.reconcilePermissions();
     return hostText(savedKey);
+  }
+
+  reconcilePermissions() {
+    const before = this.appliedPermissions;
+    const after = this.options.settings.operationPermissions().mcp ?? {};
+    this.appliedPermissions = after;
+    if (
+      (before.allowUseAi && !after.allowUseAi) ||
+      (['allowUseMcp', 'allowSendInput', 'allowRunProcesses'] as const).some(
+        (key) => (before[key] === true) !== (after[key] === true),
+      )
+    )
+      this.options.authorizationChanged?.();
   }
 
   private changeRegistration(

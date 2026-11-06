@@ -241,8 +241,8 @@ const api: DockApi = {
   },
   navigate: (route, restore) => ipcRenderer.invoke('dock:navigate', route, restore),
   ribbonViewport: (bounds) => ipcRenderer.invoke('dock:ribbonViewport', bounds),
-  setAppletApiPermissions: (permissions) =>
-    ipcRenderer.invoke('dock:appletApiPermissions', permissions),
+  setAppletApiPermissions: (permissions, before) =>
+    ipcRenderer.invoke('dock:appletApiPermissions', permissions, before),
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
   refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
   restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),
@@ -254,10 +254,6 @@ const api: DockApi = {
   },
 
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
-  clearWebAccount: (id, confirmed) => ipcRenderer.invoke('dock:clearWebAccount', id, confirmed),
-  createWebAccount: (name) => ipcRenderer.invoke('dock:createWebAccount', name),
-  renameWebAccount: (id, name) => ipcRenderer.invoke('dock:renameWebAccount', id, name),
-  deleteWebAccount: (id, confirmed) => ipcRenderer.invoke('dock:deleteWebAccount', id, confirmed),
   cancelUpdates: () => ipcRenderer.invoke('dock:cancelUpdates'),
   onAppletPage: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, key: string | null) => callback(key);

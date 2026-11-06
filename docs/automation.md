@@ -193,7 +193,7 @@ Appletの有効・無効はread + write、再起動はread + executeで判定し
 
 コマンド一覧の任意の`category`は提供元が指定した分類名です。AppDock 0.130.0から返し、未指定のコマンドでは省略します。カテゴリの入力規則は[Applet API](extensions.md#動的コマンドとキー送信の一覧設定)を参照してください。
 
-設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableで編集可否、executableで独立した動作の実行可否を確認します。接尾辞・表示名・aliasから許可を推測しません。
+設定変更とは独立したallowExecuteを端末別の操作許可に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableで編集可否、executableで独立した動作の実行可否を確認します。接尾辞・表示名・aliasから許可を推測しません。
 
 - 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
@@ -265,11 +265,13 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 各入口は初期無効で、MCPの操作許可は共通です。2つの `AutomationMcp` で同じ `/mcp` を受け、`AppDockApi`、公開ツール、設定のrevision、同時8要求の上限を共有します。書込・実行などの許可は呼出し時と必要な保存直前に検査します。設定画面の有効化・停止・ポート変更・接続テストは選択した入口に適用します。
 
+「操作の許可」のMCP列は[端末別の操作許可](settings-sync.md#端末別の操作許可)に保存します。切り替え可能な項目は未保存ならOFFです。以前の許可をLocalAppDataにだけ保存していた端末では、この画面で必要な項目を有効にします。
+
 入口ごとの32バイト乱数のBearerトークンは、AppDock側ではElectron safeStorageで暗号化して `automation.json` に保存します。一般向けは `token`、Codex向けは `codex.token` です。同じ入口の同じトークンを使うクライアントは同一の認証主体として扱います。トークンの再発行・停止ではその入口の購読やジョブ管理の認可を失効させます。設定APIのrequestIdの重複判定は認証主体ごとです。
 
 ### 旧設定からの引き継ぎ
 
-バージョン1の `automation.json` がある場合、旧設定の有効状態、ポート、公開範囲、追加ホスト名を、端末別の `mcpServer` が未保存のときだけ初期値として書き込みます。一般向けトークンの暗号文、MCPの操作許可、Codexの登録名・設定ファイル・所有情報を引き継ぎます。Codex側は旧設定の有効状態を引き継ぎ、独自のトークンとポートを割り当てます。端末別の保存が済んでからPC専用ファイルをバージョン2へ原子的に更新します。途中で失敗した場合はバージョン1から再試行でき、保存済みの端末別設定を上書きしません。
+バージョン1の `automation.json` がある場合、旧設定の有効状態、ポート、公開範囲、追加ホスト名を、端末別の `mcpServer` が未保存のときだけ初期値として書き込みます。一般向けトークンの暗号文と、Codexの登録名・設定ファイル・所有情報を引き継ぎます。Codex側は旧設定の有効状態を引き継ぎ、独自のトークンとポートを割り当てます。端末別の保存が済んでからPC専用ファイルをバージョン2へ原子的に更新します。途中で失敗した場合はバージョン1から再試行でき、保存済みの端末別設定を上書きしません。
 
 旧URLと旧トークンは一般向けの入口で使えます。「Codex連携」の「登録を修復」を実行してCodexを再読み込みすると、同じ登録名で専用ポートへ切り替わります。初回起動時の移行はCodexのTOMLを変更しません。
 

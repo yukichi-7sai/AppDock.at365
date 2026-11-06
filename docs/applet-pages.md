@@ -254,11 +254,11 @@ await context.pages.open('document.1');
 
 pageCollectionsの各宣言は`key/source/fields`を持つ。keyは自身のobject-list設定、sourceはlocalまたはremote。localはuiを必須とする。任意のmanagementCommandは自身のmanifestコマンド、shortcutDefaultsKeyは自身のobject-list設定を参照する。automationは公開するopen/back/forward/reload/homeの限定リストで、localではopenだけ。
 
-共通レコードは`{id,name,enabled,display}`。remoteはさらに`url/accountId/navigation/allowedOrigins/icon?`を持ち、web-profiles capabilityを必須にする。追加のApplet固有データはそのレコードに保持できる。fieldsは個別設定画面へ投影する定義で、automation指定のフィールドだけが外部APIへ公開される。
+共通レコードは`{id,name,enabled,display}`。remoteはさらに`url/navigation/allowedOrigins/icon?`を持ち、idはUUID、提供元IDは[WebアカウントのグループID](web-accounts.md)の形式とする。本体が提供元・一覧キー・登録IDから専用のログイン枠を解決する。fieldsは個別設定画面へ投影する定義で、automation指定のフィールドだけを外部APIへ公開する。
 
 管理項目IDは通常`<owner>.<collectionKey>.<itemId>`、ページキーは`page:<管理項目ID>:main`。local画面はsnapshot.page.contextから自身のレコードを取得する。remoteのページ操作は管理項目の宣言済みコマンドとして提供する。無効・親停止中の表示操作は拒否する。
 
-保存時はレコード全体を検証し、新規項目にだけ初期ショートカットを適用する。同期で不正な一覧が届いた場合は最後に検証したカタログを保持し、プロフィールの破壊操作と自動回収を保留する。不正データを自動修復・上書きしない。
+保存時はレコード全体を検証し、新規項目にだけ初期ショートカットを適用する。同期で不正な一覧が届いた場合は最後に検証したカタログを保持する。ログイン枠の[自動回収](web-applets.md#保存と回収)には、確認済みの保存設定を用いる。
 
 ## ローカルUIの限定bridge
 
@@ -267,7 +267,6 @@ pageCollectionsの各宣言は`key/source/fields`を持つ。keyは自身のobje
 | 操作                                     | 境界                                                                                        |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
 | settings.update                          | key/value/expectedRevision。自身の設定のみ、settings capability                             |
-| webProfiles.list/add/rename/clear/delete | 自身の名前空間のみ、web-profiles capability                                                 |
 | images.normalize                         | PNG/JPEG/WebPの検証と32px PNG化、images capability                                          |
 | pages.openItem                           | 自身の設定由来項目のみ                                                                      |
 | actions.invoke                           | manifest.pageActionsのidと宣言されたstring/number/boolean引数だけ。NodeのonPageActionへ渡す |

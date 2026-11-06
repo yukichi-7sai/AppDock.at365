@@ -165,7 +165,7 @@ async function configure(patch) {
           `exports.activate=async c=>c.commands.register('fixture.tts-node.speak','TTS probe',async()=>{let r;try{await c.appdock.call('tts.connections.list');const j=await c.appdock.call('tts.speak',{text:'SDK音声テスト。',connectionId:'default',instructions:'Nodeのニュアンス',requestId:require('node:crypto').randomUUID()});r={ok:true,...await c.appdock.call('tts.jobs.get',{jobId:j.jobId})};}catch(e){r={code:e.code};}await c.log.info('tts-probe:'+JSON.stringify(r));});`,
         );
     }
-    require('./test-settings.cjs').write(profile, settings, local);
+    require('./test-settings.cjs').write(profile, settings);
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
     const port = probe.address().port;

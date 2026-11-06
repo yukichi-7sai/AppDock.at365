@@ -422,13 +422,13 @@ test('new collection pages copy current template without changing existing bindi
   const initializeWebAppletDefaults = (value, prior) =>
     initializeCollectionDefaults(value, prior, [parent]);
   const previous = createDefaultSettings();
-  const oldId = 'web.00000000-0000-0000-0000-000000000001';
-  const newId = 'web.00000000-0000-0000-0000-000000000002';
+  const oldId = '00000000-0000-0000-0000-000000000001';
+  const newId = '00000000-0000-0000-0000-000000000002';
+  const prefix = parent.id + '.sites.';
   const makeItem = (id) => ({
     id,
     name: 'Test',
     url: 'https://example.com/',
-    accountId: 'account.00000000-0000-0000-0000-000000000001',
     enabled: true,
     display: 'page',
     navigation: 'same-origin',
@@ -436,41 +436,40 @@ test('new collection pages copy current template without changing existing bindi
     icon: '',
   });
   const previousItems = [makeItem(oldId)];
-  previous.migrations = { webApplet: { version: 1, owner: parent.id, ids: [oldId, newId] } };
   previous.extensions[parent.id] = {
     enabled: true,
     settings: {
-      items: previousItems,
-      shortcutDefaults: structuredClone(
-        parent.settings.find((f) => f.key === 'shortcutDefaults').default,
+      sites: previousItems,
+      siteShortcutDefaults: structuredClone(
+        parent.settings.find((f) => f.key === 'siteShortcutDefaults').default,
       ),
     },
   };
   const changed = structuredClone(previous);
-  changed.extensions[parent.id].settings.items.push(makeItem(newId));
-  changed.extensions[parent.id].settings.shortcutDefaults[0].key = 'Ctrl+F5';
-  changed.extensions[parent.id].settings.shortcutDefaults[1].enabled = false;
-  changed.extensions[parent.id].settings.shortcutDefaults[2].when = {
+  changed.extensions[parent.id].settings.sites.push(makeItem(newId));
+  changed.extensions[parent.id].settings.siteShortcutDefaults[0].key = 'Ctrl+F5';
+  changed.extensions[parent.id].settings.siteShortcutDefaults[1].enabled = false;
+  changed.extensions[parent.id].settings.siteShortcutDefaults[2].when = {
     scope: 'applets',
     appletIds: ['test.defaults'],
   };
   const result = initializeWebAppletDefaults(changed, previous);
   assert.equal(
-    getKeybindings(result).some((r) => r.command.startsWith(oldId + '.')),
+    getKeybindings(result).some((r) => r.command.startsWith(prefix + oldId + '.')),
     false,
   );
   assert.deepEqual(
     getKeybindings(result)
-      .filter((r) => r.command.startsWith(newId + '.'))
+      .filter((r) => r.command.startsWith(prefix + newId + '.'))
       .map((r) => [r.command, r.key, r.enabled, r.when.scope]),
     [
-      [`${newId}.reload`, 'Ctrl+F5', true, 'owner'],
-      [`${newId}.back`, 'Alt+Left', false, 'owner'],
-      [`${newId}.forward`, 'Alt+Right', true, 'applets'],
+      [`${prefix}${newId}.reload`, 'Ctrl+F5', true, 'owner'],
+      [`${prefix}${newId}.back`, 'Alt+Left', false, 'owner'],
+      [`${prefix}${newId}.forward`, 'Alt+Right', true, 'applets'],
     ],
   );
   assert.deepEqual(
-    getKeybindings(result).find((row) => row.command === `${newId}.forward`).when.appletIds,
+    getKeybindings(result).find((row) => row.command === `${prefix}${newId}.forward`).when.appletIds,
     ['test.defaults'],
   );
   assert.deepEqual(initializeWebAppletDefaults(result, result), result);

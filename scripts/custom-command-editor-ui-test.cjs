@@ -143,7 +143,7 @@ const diskDefinitions = () =>
       })),
     };
     settings.customCommands = { version: 2, items: [] };
-    require('./test-settings.cjs').write(profile, settings, local);
+    require('./test-settings.cjs').write(profile, settings);
     let exe = require('electron');
     if (portable) {
       exe = testHostPath(profile);

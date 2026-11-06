@@ -307,8 +307,8 @@ test('all JSON pages round-trip only selected ranges; unknown owners, leaves and
 test('web partial arrays preserve other rows and immutable fields', () => {
   const v = createDefaultSettings(),
     id = 'web.11111111-1111-1111-1111-111111111111';
-  v.extensions['at365.web-applet'] = { enabled: true, settings: { items: [] } };
-  v.extensions['at365.web-applet'].settings.items = [
+  v.extensions['at365.web-applet'] = { enabled: true, settings: { sites: [] } };
+  v.extensions['at365.web-applet'].settings.sites = [
     {
       id,
       name: 'Site',
@@ -318,7 +318,6 @@ test('web partial arrays preserve other rows and immutable fields', () => {
       display: 'page',
       navigation: 'none',
       allowedOrigins: [],
-      accountId: 'account.11111111-1111-1111-1111-111111111111',
       imported: { name: 'Original' },
     },
   ];
@@ -327,7 +326,7 @@ test('web partial arrays preserve other rows and immutable fields', () => {
         id,
         displayName: 'Site',
         runtime: 'node',
-        collection: { owner: 'at365.web-applet', key: 'items', itemId: id },
+        collection: { owner: 'at365.web-applet', key: 'sites', itemId: id },
         settings: siblingManifest('Applet.WebApplet.at365').pageCollections[0].fields,
       },
     ],
@@ -335,8 +334,8 @@ test('web partial arrays preserve other rows and immutable fields', () => {
   const json = settingsProjection(v, p, a);
   json.extensions[id].settings.name = 'Changed';
   const next = applySettingsJson(v, p, a, JSON.stringify(json));
-  assert.equal(next.extensions['at365.web-applet'].settings.items[0].enabled, false);
-  assert.deepEqual(next.extensions['at365.web-applet'].settings.items[0].imported, {
+  assert.equal(next.extensions['at365.web-applet'].settings.sites[0].enabled, false);
+  assert.deepEqual(next.extensions['at365.web-applet'].settings.sites[0].imported, {
     name: 'Original',
   });
   json.extensions[id].settings.id = 'changed';

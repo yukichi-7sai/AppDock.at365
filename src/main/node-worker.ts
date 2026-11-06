@@ -68,13 +68,6 @@ export interface NodeExtensionContext {
       expectedRevision: number,
     ): Promise<{ revision: number }>;
   };
-  webProfiles: {
-    list(): Promise<import('../shared/web-content').WebProfile[]>;
-    add(name: string): Promise<unknown>;
-    rename(id: string, name: string): Promise<unknown>;
-    clear(id: string): Promise<unknown>;
-    delete(id: string): Promise<unknown>;
-  };
   images: { normalize(bytes: number[]): Promise<string> };
   webAccounts: {
     start(): Promise<unknown>;
@@ -240,16 +233,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             peer.request('host.pages.replace', { pages, expectedRevision }) as Promise<{
               revision: number;
             }>,
-        },
-        webProfiles: {
-          list: () =>
-            peer.request('host.webProfiles.list', {}) as Promise<
-              import('../shared/web-content').WebProfile[]
-            >,
-          add: (name) => peer.request('host.webProfiles.add', { name }),
-          rename: (id, name) => peer.request('host.webProfiles.rename', { id, name }),
-          clear: (id) => peer.request('host.webProfiles.clear', { id }),
-          delete: (id) => peer.request('host.webProfiles.delete', { id }),
         },
         images: {
           normalize: (bytes) => peer.request('host.images.normalize', { bytes }) as Promise<string>,

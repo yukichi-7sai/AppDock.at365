@@ -1,4 +1,5 @@
 const { _electron: electron } = require('playwright');
+const { prepareTestHost } = require('./copy-host.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,7 +24,7 @@ fs.writeFileSync(
     minimumHostVersion: '0.44.0',
     runtime: 'node',
     entry: 'index.cjs',
-    capabilities: ['pages', 'dynamic-pages', 'storage', 'web-profiles'],
+    capabilities: ['pages', 'dynamic-pages', 'storage'],
     commands: [
       { id: 'test.dynamic.open', title: 'Open' },
       { id: 'test.dynamic.update', title: 'Update' },
@@ -45,8 +46,8 @@ c.commands.register('test.dynamic.hide','Hide',()=>c.pages.hide('one'));
 c.commands.register('test.dynamic.dispose','Dispose',()=>c.pages.dispose('one'));
 c.commands.register('test.dynamic.remove','Remove',async()=>c.pages.replace([], (await c.pages.list()).revision));
 c.commands.register('test.dynamic.stale','Stale',async()=>{let rejected=false;try{await c.pages.replace([],0);}catch{rejected=true;} if(!rejected)throw Error('Stale revision accepted');
-if((await c.webProfiles.list()).length)throw Error('Foreign profiles exposed');
-for(const action of [()=>c.pages.open('manage'),()=>c.pages.openItem('web.11111111-2222-3333-4444-555555555555'),async()=>c.pages.replace([{id:'escape',title:'Escape',source:'local',ui:'../at365.web-applet/extension.json'}],(await c.pages.list()).revision)]){let blocked=false;try{await action();}catch{blocked=true;}if(!blocked)throw Error('Ownership boundary failed');}
+if(c.webProfiles!==undefined)throw Error('Retired shared profiles API exposed');
+for(const action of [()=>c.pages.open('manage'),()=>c.pages.openItem('at365.web-applet.sites.11111111-2222-4333-8444-555555555555'),async()=>c.pages.replace([{id:'escape',title:'Escape',source:'local',ui:'../at365.web-applet/extension.json'}],(await c.pages.list()).revision)]){let blocked=false;try{await action();}catch{blocked=true;}if(!blocked)throw Error('Ownership boundary failed');}
 });
 };`,
 );
@@ -63,16 +64,13 @@ settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 settings.keybindings = [];
 settings.gestures.enabled = false;
-const legacy = 'web.11111111-2222-3333-4444-555555555555';
-const account = 'account.11111111-2222-3333-4444-555555555555';
+const site = '11111111-2222-4333-8444-555555555555';
 settings.extensions['at365.web-applet'] = { enabled: true, settings: {} };
-settings.migrations = { webApplet: { version: 1, owner: 'at365.web-applet', ids: [legacy] } };
-settings.extensions['at365.web-applet'].settings.items = [
+settings.extensions['at365.web-applet'].settings.sites = [
   {
-    id: legacy,
-    name: '移行サイト',
+    id: site,
+    name: '登録済みサイト',
     url: 'https://example.test/',
-    accountId: account,
     enabled: true,
     display: 'page',
     navigation: 'same-origin',
@@ -80,11 +78,6 @@ settings.extensions['at365.web-applet'].settings.items = [
     icon: '',
   },
 ];
-fs.mkdirSync(path.join(profile, 'data/web-applets'), { recursive: true });
-fs.writeFileSync(
-  path.join(profile, 'data/web-applets/accounts.json'),
-  JSON.stringify({ schemaVersion: 1, accounts: [{ id: account, name: '移行アカウント' }] }),
-);
 settings.extensions['test.dynamic'] = { enabled: true, settings: {} };
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 let app, dock;
@@ -115,8 +108,11 @@ const ui = (suffix) =>
   try {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
+    const executablePath = process.argv[2]
+      ? prepareTestHost(path.resolve(process.argv[2]), profile)
+      : require('electron');
     app = await electron.launch({
-      executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+      executablePath,
       args: [...(process.argv[2] ? [] : [root]), '--test-profile=' + profile],
       env,
     });
@@ -127,14 +123,13 @@ const ui = (suffix) =>
         s.extensions.some((e) => e.id === id && e.state === 'running'),
       );
     }, 'providers running');
-    const migrated = await snapshot();
+    const registered = await snapshot();
     assert.ok(
-      migrated.extensions.some(
-        (e) => e.id === legacy && e.collection?.owner === 'at365.web-applet',
+      registered.extensions.some(
+        (e) => e.id === 'at365.web-applet.sites.' + site && e.collection?.owner === 'at365.web-applet',
       ),
     );
-    assert.equal(migrated.webAccounts.find((a) => a.id === account).name, '移行アカウント');
-    checks.push('saved site ID and roster aliases remain readable');
+    checks.push('registered site appears with its stable identity');
     await command('test.dynamic.open');
     let local = await ui('/test.dynamic/index.html');
     await local.getByLabel('Document text').fill('保持するテキスト');
@@ -169,8 +164,8 @@ const ui = (suffix) =>
     const manage = await settingsPage(dock);
     await manage.getByTestId('settings-nav:applet:at365.web-applet').click();
     const siteField = (field) =>
-      manage.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Aitems/${field}:input`);
-    await manage.getByTestId('setting:applet%3Aat365.web-applet/setting%3Aitems:add').click();
+      manage.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Asites/${field}:input`);
+    await manage.getByTestId('setting:applet%3Aat365.web-applet/setting%3Asites:add').click();
     await siteField('name').fill('追加サイト');
     await siteField('url').fill('https://second.test/');
     await manage.getByTestId('settings-dialog-confirm').click();
@@ -220,7 +215,7 @@ const ui = (suffix) =>
       'remote closed',
     );
     const stopped = await snapshot();
-    assert.equal(stopped.settings.value.extensions['at365.web-applet'].settings.items.length, 2);
+    assert.equal(stopped.settings.value.extensions['at365.web-applet'].settings.sites.length, 2);
     assert.equal(stopped.extensions.find((e) => e.id === added.id).state, 'stopped');
     await command('test.dynamic.remove');
     assert.equal(

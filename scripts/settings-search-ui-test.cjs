@@ -333,11 +333,10 @@ async function until(fn, label) {
     checks.push(
       'IME Enter/Escape guard, Escape clears index, disclosure expansion and last-result movement',
     );
-    const webId = 'web.11111111-1111-1111-1111-111111111111';
+    const webId = '11111111-1111-1111-1111-111111111111';
     await search().fill('New search site');
     await shell.getByText('0件の設定', { exact: true }).waitFor();
     await host.evaluate(async (id) => {
-      const account = await window.dock.createWebAccount('Search account');
       const s = await window.dock.snapshot();
       s.settings.value.extensions['fixture.web-settings'].settings.items.push({
         id,
@@ -348,7 +347,6 @@ async function until(fn, label) {
         display: 'page',
         navigation: 'none',
         allowedOrigins: [],
-        accountId: account.id,
       });
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, webId);

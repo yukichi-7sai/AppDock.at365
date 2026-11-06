@@ -117,7 +117,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { SettingsConflictError } from './core/settings';
+import {
+  SettingsConflictError,
+  settingsCredentialFiles,
+  type SettingsScope,
+} from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
 import { readDeviceCollections, readDeviceManifests } from './core/device-settings';
 import { isHostPageSettingsId, canSwitchHostPageSettings } from '../shared/host-page-settings';
@@ -217,8 +221,6 @@ import {
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { hostShortcutPage, shortcutPageChoices } from '../shared/shortcut-pages';
 import { PageCollectionManager } from './core/page-collections';
-import { WebProfileStore } from './core/web-profiles';
-import type { WebProfile } from '../shared/web-content';
 import { contained } from './core/extensions';
 import { openLocalPage, pageHostShortcut } from './core/applet-pages';
 
@@ -719,14 +721,12 @@ const appletManagement = new AppletManagement({
 const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
-  settingOptions: (owner, field) =>
+  settingOptions: (_owner, field) =>
     field.type === 'registered-image'
       ? registeredImages.availableReferences().map(({ file }) => ({ value: file, label: file }))
-      : field.optionSource === 'web-profiles'
-        ? pageCollections.settingOptions(owner)
-        : [],
+      : [],
   save: (value, revision, reset) => {
-    const rewrite = new Set<'shared' | 'device' | 'local'>();
+    const rewrite = new Set<SettingsScope>();
     if (reset) {
       const owner = reset.collection?.owner ?? reset.ownerId;
       if (owner === 'appdock')
@@ -947,7 +947,7 @@ let inputPalette: InputPaletteHost | undefined;
 let textLibraryPageState: ImageLibraryPageState | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
-const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
+const appletApiAccess = new AppletApiAccess(settings);
 const mcpAuthorized = (lease?: string) => !quitting && (automation?.authorized(lease) ?? false);
 const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
   !quitting && (automation?.allowed(key) ?? false);
@@ -986,7 +986,7 @@ const sendInput =
     if (!id || !nativeInput) throw Error(hostText('services.index.inputNotReady'));
     return nativeInput.send(method, params, id, context);
   };
-const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-keys.json'), {
+const ttsSecrets = new TtsSecrets(dataDirectory, 'tts-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.keyEncryptionUnavailable'));
@@ -1035,7 +1035,7 @@ const ttsSettings = new TtsSettingsController(settings, ttsSecrets, (keyChanged 
   tts.reconcile(keyChanged);
   changed();
 });
-const aiSecrets = new AiSecrets(path.join(dataDirectory, 'ai-keys.json'), {
+const aiSecrets = new AiSecrets(dataDirectory, 'ai-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.credentialProtectionUnavailable'));
@@ -1047,7 +1047,7 @@ const aiSettings = new AiSettingsController(settings, aiSecrets, (id) => {
   ai.reconcile(id ?? false);
   changed();
 });
-const imageAiSecrets = new AiSecrets(path.join(dataDirectory, 'image-ai-keys.json'), {
+const imageAiSecrets = new AiSecrets(dataDirectory, 'image-ai-keys', {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
       throw Error(hostText('services.index.credentialProtectionUnavailable'));
@@ -1237,7 +1237,7 @@ function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
 }
 const mcpSettings = new McpClientSettings(
   settings,
-  path.join(dataDirectory, 'mcp-client-secrets.json'),
+  path.join(dataDirectory, settingsCredentialFiles['mcp-secrets']),
   {
     encrypt: (v) => {
       if (!safeStorage.isEncryptionAvailable())
@@ -1542,7 +1542,6 @@ const operationApi = new AppDockApi({
     ]),
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
-    ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
     ...webAccountSettingsTargets({
       applets: parentApplets(),
       localRoot: dataDirectory,
@@ -2386,7 +2385,6 @@ function snapshotCore(): HostSnapshot {
     settings: settings.snapshot(),
     extensions: allApplets(),
     webPages: pageCollections.states(),
-    webAccounts: pageCollections.accounts(),
     logs: log.entries,
     version: app.getVersion(),
     runtime: {
@@ -2409,6 +2407,7 @@ function applySettings() {
   try {
     refreshDisplayZoom();
     pageCollections?.reconcile();
+    pageCollections?.cleanupSiteAccounts();
     trayClicks?.cancel();
     nativeTheme.themeSource = settings.value.host.theme;
     refreshWindowTheme();
@@ -2471,18 +2470,10 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
       await dialog.showMessageBox({
         type: 'warning',
         message: hostText(
-          plan.scope === 'local'
-            ? 'recovery.confirmLocal'
-            : plan.scope === 'device'
-              ? 'recovery.confirmDevice'
-              : 'recovery.confirmShared',
+          plan.scope === 'device' ? 'recovery.confirmDevice' : 'recovery.confirmShared',
         ),
         detail: hostText(
-          plan.scope === 'local'
-            ? 'recovery.detailLocal'
-            : plan.scope === 'device'
-              ? 'recovery.detailDevice'
-              : 'recovery.detailShared',
+          plan.scope === 'device' ? 'recovery.detailDevice' : 'recovery.detailShared',
           { modifiedAt: new Date(plan.modifiedAt).toLocaleString() },
         ),
         buttons: [hostText('recovery.cancel'), hostText('recovery.restore')],
@@ -2524,7 +2515,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     return (['restore', 'open', 'reload', 'quit'] as const)[result.response] ?? 'quit';
   },
 };
-async function restoreSettingsBackup(scope?: 'shared' | 'device' | 'local') {
+async function restoreSettingsBackup(scope?: SettingsScope) {
   if (settingsOperationBusy() || quitting) throw Error(hostText('services.index.settingsBusy'));
   settingsRecoveryBusy = true;
   settings.writesBlocked = true;
@@ -2549,7 +2540,7 @@ function prepareSettings(value: Settings) {
   value = restoreSettingsCollections(value, manager.snapshot());
   let next = parseSettings(value);
   validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
-  pageCollections.validate(next, settings.value);
+  pageCollections.validate(next);
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
@@ -2557,7 +2548,7 @@ function commitSettings(
   value: Settings,
   revision: number,
   resetPage?: SettingsPageDefinition,
-  rewrite: ('shared' | 'device' | 'local')[] = [],
+  rewrite: SettingsScope[] = [],
   resetScope: SettingsResetScope = 'page',
 ) {
   assertSettingsWritable();
@@ -2606,7 +2597,9 @@ function commitSettings(
     revision,
     undefined,
     resetPage
-      ? settingsPageStorage(resetPage, resetScope).files.map((file) => file.scope)
+      ? settingsPageStorage(resetPage, resetScope).files.flatMap(({ scope }) =>
+          scope === 'local' ? [] : [scope],
+        )
       : rewrite,
   );
 }
@@ -2618,10 +2611,10 @@ function settingsPageStorage(
   const local =
     page.kind === 'applet'
       ? settings.localSettings(owner!)
-      : page.id === 'mcp-client' ||
+      : ['mcp-client', 'tts', 'ai', 'image-ai'].includes(page.id) ||
         (isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id));
-  const scopes = new Set<'shared' | 'device' | 'local'>();
-  if (page.id === 'notifications') scopes.add('local');
+  const scopes = new Set<SettingsScope>();
+  if (page.id === 'notifications') scopes.add('device');
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
   for (const p of settingsResetPaths(page, allApplets(), resetScope)) {
     scopes.add(
@@ -2642,6 +2635,11 @@ function settingsPageStorage(
         ?.settings?.some((field) => field.key === 'enabled'))
   )
     scopes.add('device');
+  const files: NonNullable<SettingsPageAuxiliary['storage']>['files'] = [...scopes].map(
+    (scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }),
+  );
+  if (page.id === 'mcp-client' && resetScope !== 'mcp-commands')
+    files.push({ scope: 'local', name: settingsCredentialFiles['mcp-secrets'] });
   return {
     canSwitch: (page.kind === 'applet' && !page.collection) || canSwitchHostPageSettings(page.id),
     local,
@@ -2656,13 +2654,7 @@ function settingsPageStorage(
           : ''
     }`,
     revision: settings.revision,
-    files: [...scopes]
-      .map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }))
-      .concat(
-        page.id === 'mcp-client' && resetScope !== 'mcp-commands'
-          ? [{ scope: 'local', name: 'mcp-client-secrets.json' }]
-          : [],
-      ),
+    files,
   };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
@@ -2858,9 +2850,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
           startupDelaySeconds: a.startupDelaySeconds,
         },
       ],
-      accounts: a.capabilities?.includes('web-profiles')
-        ? pageCollections.profiles(a.id).accounts()
-        : [],
     };
   }
 
@@ -2962,17 +2951,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
       hostStartupTiming: hostStartupTiming.snapshot(),
     };
   }
-  if (id === 'web-accounts')
-    return {
-      accounts: pageCollections.accounts(),
-      accountReferences: {
-        saved: pageCollections.entries().map(({ id, item: { name, accountId } }) => ({
-          id,
-          name,
-          accountId: accountId ?? '',
-        })),
-      },
-    };
   if (id === 'tts')
     return {
       tts: {
@@ -3269,7 +3247,7 @@ function settingsPageActions(
           settings.value,
           notificationCatalog(allApplets()),
         );
-        pageCollections.validate(value, settings.value);
+        pageCollections.validate(value);
         validateAppletSettings(value, manager.snapshot());
       };
       if (isHostPageSettingsId(page.id))
@@ -3337,9 +3315,12 @@ function settingsPageActions(
     actions['open-settings'] = async ([scope, revision]) => {
       if (typeof revision !== 'number') throw Error(hostText('settings.index.refreshStorage'));
       settings.assertRevision(revision);
-      if (!settingsPageStorage(page).files.some((file) => file.scope === scope))
-        throw Error(hostText('settings.index.wrongStorage'));
-      const file = settings.targetFile(scope as 'shared' | 'device' | 'local');
+      const target = settingsPageStorage(page).files.find((file) => file.scope === scope);
+      if (!target) throw Error(hostText('settings.index.wrongStorage'));
+      const file =
+        target.scope === 'local'
+          ? path.join(dataDirectory, target.name)
+          : settings.targetFile(target.scope);
       if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
@@ -3539,7 +3520,7 @@ function settingsPageActions(
   }
   if (page.id === 'about') {
     actions.restoreScopedSettings = async ([scope]) => {
-      if (scope !== 'shared' && scope !== 'device' && scope !== 'local')
+      if (scope !== 'shared' && scope !== 'device')
         throw Error(hostText('settings.index.invalidRecovery'));
       await restoreSettingsBackup(scope);
       return null;
@@ -3589,7 +3570,6 @@ function settingsPageActions(
       'mcp-client',
       'image-library',
       'applets',
-      'web-accounts',
     ].includes(page.id) ||
     page.json ||
     page.kind === 'applet'
@@ -3727,19 +3707,6 @@ function settingsPageActions(
         await shell.openExternal(`https://github.com/${repository}`);
       };
   }
-  if (page.id === 'web-accounts') {
-    actions.createWebAccount = async ([name]) => pageCollections.addAccount(name);
-    actions.renameWebAccount = async ([id, name]) =>
-      pageCollections.renameAccount(string(id), name);
-    actions.deleteWebAccount = async ([id, confirmed]) => {
-      const target = string(id);
-      if (pageCollections.entries().some((a) => a.item.accountId === target))
-        throw Error(hostText('settings.index.accountInUse'));
-      return pageCollections.deleteAccount(target, confirmed as WebProfile | undefined);
-    };
-    actions.clearWebAccount = async ([id, confirmed]) =>
-      pageCollections.clearAccount(string(id), confirmed as WebProfile | undefined);
-  }
   if (['permissions', 'codex', 'mcp-server'].includes(page.id)) {
     actions.automation = async ([action]) => {
       const value = action as AutomationAction;
@@ -3787,15 +3754,8 @@ function settingsPageActions(
       return reply;
     };
     if (page.id === 'permissions')
-      actions.setAppletApiPermissions = async ([value]) => {
-        appletApiAccess.set(value);
-        customCommands.reconcile();
-        mcpClient.reconcile();
-        ai.reconcile();
-        imageAi.reconcile();
-        tts.reconcile();
-        for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
-        changed();
+      actions.setAppletApiPermissions = async ([value, before]) => {
+        appletApiAccess.set(value, before);
         information.report(
           'permissions',
           hostText('settings.index.permissions'),
@@ -3839,23 +3799,7 @@ function settingsPageActions(
       async (args: unknown[]) => {
         if (uiReady && !startupReady && !quitting) await startupCompleted;
         if (!startupReady || quitting) throw Error(hostText('settings.index.preparing'));
-        const result = await run(args);
-        const accountMessages: Record<string, string> = {
-          createWebAccount: hostText('settings.index.accountAdded'),
-          renameWebAccount: hostText('settings.index.accountRenamed'),
-          deleteWebAccount:
-            result === 'deferred'
-              ? hostText('settings.index.accountDeletionPending')
-              : hostText('settings.index.accountDeleted'),
-          clearWebAccount: hostText('settings.index.accountCleared'),
-        };
-        if (page.id === 'web-accounts' && accountMessages[key] && result !== false)
-          information.report(
-            'web-accounts',
-            hostText('settings.index.webAccounts'),
-            accountMessages[key],
-          );
-        return result;
+        return run(args);
       },
     ]),
   );
@@ -4080,16 +4024,10 @@ function registerIpc() {
   handle('dock:pages:get', (id) => hostPages!.get(id));
   handle('dock:pages:act', (action) => hostPages!.act(action));
   handle('dock:pages:close', (id) => hostPages?.close(id));
-  handle('dock:appletApiPermissions', (permissions: unknown) => {
+  handle('dock:appletApiPermissions', (permissions: unknown, before?: unknown) => {
     if (!startupReady || quitting) throw Error(hostText('services.index.notReady'));
-    appletApiAccess.set(permissions);
-    customCommands.reconcile();
-    ai.reconcile();
-    imageAi.reconcile();
-    tts.reconcile();
-    for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
-    log.audit('info', 'host', '[Applet API] shared permissions updated');
-    changed();
+    appletApiAccess.set(permissions, before);
+    log.audit('info', 'host', '[Applet API] operation permissions updated');
   });
   handle('dock:automation', async (action: AutomationAction) => {
     if (!automation || quitting) throw Error(hostText('services.index.automationNotReady'));
@@ -4149,16 +4087,6 @@ function registerIpc() {
   handle('dock:pageViewport', updatePageViewport);
 
   handle('dock:webNavigate', (id: string, action: string) => pageCollections.navigate(id, action));
-  handle('dock:clearWebAccount', (id: string, confirmed?: WebProfile) =>
-    pageCollections.clearAccount(id, confirmed),
-  );
-  handle('dock:createWebAccount', (name: unknown) => pageCollections.addAccount(name));
-  handle('dock:renameWebAccount', (id: string, name: unknown) =>
-    pageCollections.renameAccount(id, name),
-  );
-  handle('dock:deleteWebAccount', (id: string, confirmed?: WebProfile) =>
-    pageCollections.deleteAccount(id, confirmed),
-  );
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   ipcMain.handle('applet-page:call', (event, operation: unknown, input: unknown) => {
@@ -4523,14 +4451,13 @@ async function initialize() {
     settings: () => settings.value,
     parents: parentApplets,
     localRoot: dataDirectory,
-    sharedRoot: sharedDirectory,
-    assistance: fileWatchAssistance,
+    sources: () => settings.confirmedAppletSources(),
     windowState: (id) => settings.uiStateStorage('windows', `collection:${id}`),
     changed: () => {
       ribbonCatalog.invalidate();
       changed();
     },
-    failed: (error) => log.write('error', 'web-profiles', error.message),
+    failed: (error) => log.write('error', 'web-site-accounts', error.message),
     openLocal: async (page, presentation) => {
       const parent = manager.items.get(page.binding.owner);
       if (!parent || parent.state !== 'running')
@@ -4724,10 +4651,22 @@ async function initialize() {
     void syncHotKeys();
     changed();
   });
+  let appliedPermissions = settings.operationPermissions();
+  const reconcilePermissionChanges = () => {
+    const previous = appliedPermissions;
+    const current = settings.operationPermissions();
+    if (isDeepStrictEqual(previous, current)) return false;
+    appliedPermissions = current;
+    if (!isDeepStrictEqual(previous.applet ?? {}, current.applet ?? {}))
+      for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
+    automation?.reconcilePermissions();
+    return true;
+  };
   settings.on('changed', () => {
     touchpad?.settingsChanged();
     try {
       applyFileWatchAssistanceSettings();
+      reconcilePermissionChanges();
       customCommands.reconcile();
       mcpClient.reconcile();
       applyAudioPlaybackSettings();
@@ -4749,6 +4688,20 @@ async function initialize() {
     settingsHealthNotifications?.refresh();
   });
   settings.on('statusChanged', () => {
+    // A read error can change authorization without changing the last-good JSON.
+    queueMicrotask(() => {
+      if (quitting) return;
+      try {
+        if (!reconcilePermissionChanges()) return;
+        customCommands.reconcile();
+        mcpClient.reconcile();
+        ai.reconcile();
+        imageAi.reconcile();
+        tts.reconcile();
+      } catch {
+        settings.health.set('apply-services', 'apply-failed', settings.revision);
+      }
+    });
     settingsHealthNotifications?.refresh();
     changed();
   });
@@ -5733,6 +5686,7 @@ async function initialize() {
   automation = new AutomationService({
     localDirectory: dataDirectory,
     baseDirectory,
+    settings,
     version: app.getVersion(),
     createApi: () => operationApi,
     mcpServer: {

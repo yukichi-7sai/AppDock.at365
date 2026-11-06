@@ -63,7 +63,9 @@ settings.tts = {
   ],
 };
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
-require('./test-settings.cjs').write(profile, settings, local);
+const settingsFixture = require('./test-settings.cjs');
+const sharedSettingsFile = settingsFixture.file(profile);
+fs.writeFileSync(sharedSettingsFile, JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -148,10 +150,10 @@ fs.writeFileSync(
 require('./settings-applet-common-gateway-checks.cjs').install(profile);
 require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
-require('./settings-web-profile-gateway-checks.cjs').install(profile);
 require('./settings-web-account-gateway-checks.cjs').install(profile, local);
 require('./settings-shortcut-list-gateway-checks.cjs').install(profile);
 require('./settings-image-group-gateway-checks.cjs').install(profile);
+settingsFixture.write(profile, JSON.parse(fs.readFileSync(sharedSettingsFile)));
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;
@@ -254,9 +256,13 @@ async function main() {
   assert.equal(await page.getByTestId('permission-row-useImageAi').count(), 1);
   await toggle('write', 'MCP', true);
   await toggle('execute', 'MCP', false);
+  await toggle('write', 'Applet', true);
   await toggle('write', 'Applet', false);
-  const grants = JSON.parse(fs.readFileSync(path.join(local, 'applet-api.json'))).permissions;
-  assert.equal(grants.write, false);
+  const deviceFile = require('./test-settings.cjs').deviceFile(profile);
+  const grants = JSON.parse(fs.readFileSync(deviceFile)).operationPermissions;
+  assert.equal(grants.applet.write, false);
+  assert.equal(grants.mcp.allowWrite, true);
+  assert.equal(fs.existsSync(path.join(local, 'applet-api.json')), false);
   let state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.equal(state.allowWrite, true);
   assert.equal(state.allowExecute, false);
@@ -525,16 +531,9 @@ async function main() {
     fixtureId,
   });
   await require('./settings-stack-mcp-lock-checks.cjs').check({ page, profile, checks });
-  await require('./settings-web-profile-gateway-checks.cjs').check({
-    page,
-    profile,
-    local,
-    client,
-    checks,
-    tool,
-    value,
-    until,
-  });
+  const targets = await value('appdock_settings_list_targets');
+  assert(!targets.items.some((target) => target.targetId.startsWith('service.web-profiles.')));
+  checks.push('retired shared Web profile settings are absent from MCP discovery');
   await require('./settings-web-account-gateway-checks.cjs').check({
     page,
     profile,
@@ -581,6 +580,32 @@ async function main() {
   assert.equal(JSON.stringify((await client.listTools()).tools), toolsBefore);
   checks.push(
     'write revocation immediate; read remains available; MCP tool definitions unchanged by permission/value changes',
+  );
+  const synced = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+  synced.operationPermissions.mcp.allowWrite = true;
+  fs.writeFileSync(deviceFile, JSON.stringify(synced));
+  const writeSwitch = page
+    .getByTestId('permission-row-write')
+    .locator('[data-caller="MCP"]')
+    .getByRole('switch');
+  await until(() => writeSwitch.isChecked(), 'externally received MCP grant');
+  assert.equal((await value('appdock_get_info')).writable, true);
+  fs.writeFileSync(deviceFile, '{broken');
+  await until(
+    async () => !(await writeSwitch.isChecked()) && (await writeSwitch.isDisabled()),
+    'invalid device file fails closed',
+  );
+  assert.equal((await value('appdock_get_info')).writable, false);
+  assert.equal(
+    (await tool('appdock_settings_apply', gatewayReplay)).structuredContent.code,
+    'WRITE_DISABLED',
+  );
+  synced.operationPermissions.mcp.allowWrite = false;
+  fs.writeFileSync(deviceFile, JSON.stringify(synced));
+  await until(() => writeSwitch.isEnabled(), 'repaired device file accepted');
+  assert.equal(await writeSwitch.isChecked(), false);
+  checks.push(
+    'device file updates change live MCP authorization; corruption closes grants until recovery',
   );
   fs.writeFileSync(
     path.join(profile, 'result.json'),

@@ -241,6 +241,7 @@ async function checkPermissions() {
     Object.fromEntries(permissionKeys.map((key) => [key, value[key]]));
   const saved = await state();
   const applet = await host.evaluate(async () => (await window.dock.snapshot()).appletApi);
+  const appletReadWasAllowed = applet.permissions.read === true;
   await mcp('execute').getByRole('switch').uncheck();
   await until(async () => (await state()).allowExecute === false, 'saved MCP permission');
   assert.deepEqual(permissionValues(await state()), {
@@ -257,21 +258,21 @@ async function checkPermissions() {
     .getByTestId('permission-row-read')
     .locator('[data-caller="Applet"]')
     .getByRole('switch');
-  await appletRead.setChecked(!applet.permissions.read);
+  await appletRead.setChecked(!appletReadWasAllowed);
   await until(
     async () =>
       (await host.evaluate(
         async () => (await window.dock.snapshot()).appletApi.permissions.read,
-      )) === !applet.permissions.read,
+      )) === !appletReadWasAllowed,
     'saved Applet permission',
   );
   assert.deepEqual(permissionValues(await state()), permissionValues(saved));
-  await appletRead.setChecked(applet.permissions.read);
+  await appletRead.setChecked(appletReadWasAllowed);
   await until(
     async () =>
       (await host.evaluate(
         async () => (await window.dock.snapshot()).appletApi.permissions.read,
-      )) === applet.permissions.read,
+      )) === appletReadWasAllowed,
     'restored Applet permission',
   );
   checks.push(
@@ -281,10 +282,10 @@ async function checkPermissions() {
   await launch(true, '操作の許可');
   await waitPermissionsRunning();
   assert.deepEqual(permissionValues(await state()), permissionValues(saved));
-  assert.deepEqual(
-    await host.evaluate(async () => (await window.dock.snapshot()).appletApi),
-    applet,
-  );
+  assert.deepEqual(await host.evaluate(async () => (await window.dock.snapshot()).appletApi), {
+    ...applet,
+    permissions: { ...applet.permissions, read: appletReadWasAllowed },
+  });
   await host.screenshot({ path: path.join(profile, 'permissions-restored.png') });
   checks.push('process restart restores the permissions page with live status and saved grants');
   await stop();

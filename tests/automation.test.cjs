@@ -7,6 +7,7 @@ const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationApi } = require('../out/main/main/core/automation-api');
 const { AutomationService } = require('../out/main/main/core/automation');
 const { mcpReceiverSettings } = require('./fixtures/mcp-receiver-settings.cjs');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const {
   automationApplets,
   automationCommands,
@@ -341,6 +342,7 @@ test('registration recovery confirmation is private, single use and bound to act
   const options = {
     localDirectory: path.join(f.base, 'local'),
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -533,6 +535,7 @@ test('corrupt local credentials remain untouched and expose a readable disabled 
   const service = new AutomationService({
     localDirectory,
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -697,6 +700,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   const options = {
     localDirectory: path.join(f.base, 'local'),
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -984,6 +988,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     localDirectory: path.join(f.base, 'other-local'),
     baseDirectory: path.join(f.base, 'other'),
     mcpServer: mcpReceiverSettings(),
+    settings: openOperationPermissions(t, path.join(f.base, 'other')),
   });
   t.after(() => conflict.close());
   await conflict.action({ kind: 'configure', receiver: 'codex', enabled: true, port: s.port });

@@ -194,16 +194,12 @@ const result = { ok: false, source, profile, sha256: hash(source), checks: [] };
     assert.equal(fresh.settings.value.gestures.wheelDelayMs, 20);
     assert.equal(fresh.settings.value.gestures.indicatorOpacity, 0.9);
     assert.deepEqual(fresh.settings.value.ribbon.bottom, ['theme', 'logs', 'notifications']);
-    assert.equal(
-      Object.keys(fresh.appletApi.permissions).length,
-      Object.keys(appletApiPermissionLabels).length,
-    );
-    assert(Object.values(fresh.appletApi.permissions).every((value) => value === true));
-    assert.equal(
-      (await host.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
-      false,
-    );
-    result.checks.push('fresh host defaults and all Applet permissions ON; MCP server remains OFF');
+    assert.deepEqual(fresh.appletApi.permissions, {});
+    const { state: mcp } = await host.evaluate(() => window.dock.automation({ kind: 'status' }));
+    assert.equal(mcp.enabled, false);
+    const { mcpPermissionKeys } = require('../out/main/shared/automation');
+    for (const key of mcpPermissionKeys) assert.equal(mcp[key], false, key);
+    result.checks.push('fresh host defaults: both caller columns and MCP server default OFF');
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     const surface = await settingsPage(host);
     await surface.getByRole('button', { name: 'AppDockについて', exact: true }).click();
@@ -226,10 +222,14 @@ const result = { ok: false, source, profile, sha256: hash(source), checks: [] };
         await panel
           .getByRole('switch', { name: `Applet：${title}`, exact: true })
           .getAttribute('aria-checked'),
-        'true',
+        'false',
       );
     await host.screenshot({ path: path.join(profile, 'fresh-permissions.png') });
-    result.checks.push('permission UI shows every Applet switch ON');
+    const mcpControls = panel.locator('td[data-caller="MCP"]').getByRole('switch');
+    assert.equal(await mcpControls.count(), mcpPermissionKeys.length + 1);
+    for (const control of await mcpControls.all())
+      assert.equal(await control.isChecked(), await control.isDisabled());
+    result.checks.push('permission UI shows configurable switches OFF and fixed MCP read ON');
     await main.evaluate('globalThis.__hostDefaultsProbe.manual=true; true');
     await host.evaluate(() => window.dock.executeCommand('appdock.updates.check'));
     await until(async () => {

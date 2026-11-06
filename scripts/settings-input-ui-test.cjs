@@ -34,8 +34,8 @@ const saved = async () => (await snapshot()).settings.value;
 const disk = () =>
   JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
 const generationDisk = () => {
-  const file = path.join(profile, 'local', 'generation-ai.json');
-  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
+  const file = require('./test-settings.cjs').deviceFile(profile);
+  return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file)).generationAi ?? {}) : {};
 };
 (async () => {
   try {

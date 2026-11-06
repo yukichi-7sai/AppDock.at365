@@ -76,7 +76,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       ],
       defaultConnectionId: 'default',
     };
-    require('./test-settings.cjs').write(profile, initial, path.join(profile, 'local'));
+    require('./test-settings.cjs').write(profile, initial);
     const config = path.join(profile, 'codex', 'config.toml');
     fs.mkdirSync(path.dirname(config));
     fs.writeFileSync(config, '# fixture\n');

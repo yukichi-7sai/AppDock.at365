@@ -5,6 +5,7 @@ import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { observeFile } from './file-observer';
 import type { FileWatchAssistance } from './file-watch-assistance';
 import { SettingsHealth, settingsIssueMessages } from './settings-health';
@@ -32,10 +33,18 @@ export function storedSettingRecord(
   );
 }
 export class SettingsConflictError extends Error {}
+export type SettingsScope = 'shared' | 'device';
+export const settingsCredentialFiles = {
+  'mcp-secrets': 'mcp-client-secrets.json',
+  'ai-keys': 'ai-keys.json',
+  'tts-keys': 'tts-keys.json',
+  'image-ai-keys': 'image-ai-keys.json',
+} as const;
+export type SettingsCredentialScope = keyof typeof settingsCredentialFiles;
 export interface SettingsAsset {
   commit(): void;
   rollback(): void;
-  recovery?: { scope: 'mcp-secrets'; before: string | null; after: string };
+  recovery?: { scope: SettingsCredentialScope; before: string | null; after: string };
 }
 class SettingsReadError extends Error {
   constructor(readonly kind: 'read-invalid' | 'read-unavailable') {
@@ -43,7 +52,7 @@ class SettingsReadError extends Error {
   }
 }
 export interface SettingsRecoveryPlan {
-  readonly scope?: 'shared' | 'device' | 'local';
+  readonly scope?: SettingsScope;
   readonly candidate: string;
   readonly candidateHash: string;
   readonly modifiedAt: number;
@@ -165,7 +174,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   appletConfigurationScope(_owner: string): 'shared' | 'device' {
     return 'shared';
   }
-  settingScope(_path: readonly string[]): 'shared' | 'device' | 'local' {
+  settingScope(_path: readonly string[]): SettingsScope {
     return 'shared';
   }
   storedAppletConfiguration(owner: string): Record<string, unknown> {
@@ -208,6 +217,14 @@ class SettingsStore<T = Settings> extends EventEmitter {
   private readDisk() {
     this.observer?.invalidate();
     return this.parse(this.readBytes(this.file));
+  }
+  confirmedValue() {
+    if (this.recovered) return;
+    try {
+      if (isDeepStrictEqual(this.parse(this.readBytes(this.file)), this.value)) return this.value;
+    } catch {
+      // Unavailable or invalid data cannot confirm that a reference was removed.
+    }
   }
   private readFailure(error: unknown, immediate = true) {
     this.recovered = true;

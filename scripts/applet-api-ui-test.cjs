@@ -22,6 +22,13 @@ const profile = path.join(
   ),
   local = path.join(profile, 'local');
 fs.mkdirSync(profile, { recursive: true });
+fs.mkdirSync(local, { recursive: true });
+const legacyPermissionFile = path.join(local, 'applet-api.json');
+const legacyPermissions = JSON.stringify({
+  version: 2,
+  permissions: { read: true, execute: true, write: true },
+});
+fs.writeFileSync(legacyPermissionFile, legacyPermissions);
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
@@ -196,8 +203,11 @@ async function probe(id, action, mcp = false) {
     return entries.length > before && JSON.parse(entries.at(-1).message.slice(prefix.length));
   }, 'probe ' + action);
 }
-async function grant(permissions) {
-  await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), permissions);
+async function grant(id, permissions) {
+  await page.evaluate(({ id, permissions }) => window.dock.setAppletApiPermissions(permissions), {
+    id,
+    permissions,
+  });
 }
 (async () => {
   try {
@@ -218,25 +228,15 @@ async function grant(permissions) {
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
       false,
     );
+    assert.deepEqual((await snapshot()).appletApi.permissions, {});
     for (const id of ids) {
       assert.equal((await snapshot()).settings.value.extensions[id].settings.privateFlag, true);
-      assert.equal((await probe(id, 'read')).ok, true);
+      assert.equal((await probe(id, 'read')).code, 'API_DISABLED');
       assert.equal((await probe(id, 'legacy')).ok, true);
     }
     checks.push(
-      'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
+      'old Applet grants ignored; default denial on both SDKs; legacy self-setting remains available',
     );
-    assert.deepEqual((await snapshot()).appletApi.permissions, {
-      read: true,
-      write: true,
-      execute: true,
-      sendInput: true,
-      runProcesses: true,
-      useMcp: true,
-      useAi: true,
-      useImageAi: true,
-      useTts: true,
-    });
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Applet：/ }).count(), 0);
@@ -258,12 +258,6 @@ async function grant(permissions) {
     ]);
     assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
     assert.equal(await panel.getByRole('switch', { name: /^MCPからの/ }).count(), 8);
-    assert.equal(
-      await panel
-        .locator('[data-testid="permission-row-useImageAi"] [data-caller="MCP"]')
-        .innerText(),
-      '未対応',
-    );
     const fixedRead = panel.getByRole('switch', {
       name: 'MCPからの情報取得を許可する（MCP連携中は常に許可）',
       exact: true,
@@ -293,21 +287,13 @@ async function grant(permissions) {
       'requested row labels/order, fixed-ON disabled MCP read, six MCP-only warnings while OFF and keyboard tooltips',
     );
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
-      assert.equal(await control.isChecked(), true);
+      assert.equal(await control.isChecked(), false);
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
     assert.ok(
       Object.entries(mcpDefaults)
         .filter(([key]) => key.startsWith('allow'))
         .every(([, v]) => v === false),
-    );
-    await grant({});
-    await until(
-      async () =>
-        await panel
-          .getByRole('switch', { name: /^Applet：/ })
-          .evaluateAll((nodes) => nodes.every((n) => n.getAttribute('aria-checked') === 'false')),
-      'all grants revoked',
     );
     assert.equal(await panel.getByText('直接公開なし', { exact: true }).count(), 0);
     assert.equal(await fixedRead.isChecked(), true);
@@ -353,10 +339,7 @@ async function grant(permissions) {
       exact: true,
     });
     await childGrant.click();
-    await panel
-      .locator('[data-testid="permission-row-runProcesses"]')
-      .getByText('未有効：情報の取得・コマンドの実行の許可が必要です', { exact: true })
-      .waitFor();
+    await panel.getByText(/未有効：情報の取得・コマンドの実行/).waitFor();
     assert.equal((await snapshot()).appletApi.permissions.read, undefined);
     await until(() => childGrant.isEnabled(), 'save child grant');
     await childGrant.click();
@@ -389,7 +372,6 @@ async function grant(permissions) {
         'permission save',
       );
     }
-    await grant({ read: true, execute: true, write: true });
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'read')).ok, true);
     for (const id of ids) {
@@ -441,10 +423,10 @@ async function grant(permissions) {
       });
       assert.deepEqual(read.structuredContent.values, { flag: true });
     }
-    await grant({ read: true, execute: true });
+    await grant(ids[0], { read: true, execute: true });
     assert.equal((await probe(ids[0], 'write', true)).code, 'WRITE_DISABLED');
     assert.equal((await probe(ids[1], 'write', true)).code, 'WRITE_DISABLED');
-    await grant({});
+    await grant(ids[0], {});
     assert.equal((await probe(ids[0], 'read')).code, 'API_DISABLED');
     assert.ok(
       (await snapshot()).logs.some(
@@ -457,7 +439,7 @@ async function grant(permissions) {
     checks.push(
       'MCP -> Node/.NET -> shared API reentry, shared Applet grants/revocation, public-only readback and audit',
     );
-    await grant({ read: true, execute: true, write: true });
+    await grant(ids[0], { read: true, execute: true, write: true });
     for (const theme of ['light', 'dark']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -535,6 +517,11 @@ async function grant(permissions) {
     s = await start();
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'write')).completion, 'settingsSaved');
+    assert.equal(fs.readFileSync(legacyPermissionFile, 'utf8'), legacyPermissions);
+    const deviceFile = require('./test-settings.cjs').deviceFile(profile);
+    const { operationPermissions } = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+    assert.deepEqual(operationPermissions.applet, { read: true, execute: true, write: true });
+    assert.equal(operationPermissions.mcp.allowWrite, true);
     assert.equal(
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex.running,
       false,

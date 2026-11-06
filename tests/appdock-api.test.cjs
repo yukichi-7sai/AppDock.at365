@@ -6,8 +6,12 @@ const { AppDockApi, automationMethods } = require('../out/main/main/core/appdock
 const { AppletApiAccess, callAppletApi } = require('../out/main/main/core/applet-api-access');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { SettingsCommands } = require('../out/main/main/core/settings-commands');
-const { createAppDockClient } = require('../out/main/shared/appdock-api');
+const {
+  appletApiPermissionLabels,
+  createAppDockClient,
+} = require('../out/main/shared/appdock-api');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 function setup(t) {
   const base = path.resolve('.artifacts/shared-api-unit');
   fs.mkdirSync(base, { recursive: true });
@@ -15,7 +19,8 @@ function setup(t) {
   const store = new SettingsStore(path.join(dir, 'settings.json'));
   store.load();
   t.after(() => store.close());
-  const access = new AppletApiAccess(path.join(dir, 'applet-api.json'));
+  const permissions = openOperationPermissions(t, dir);
+  const access = new AppletApiAccess(permissions);
   const manifest = {
     id: 'test.caller',
     folder: dir,
@@ -55,6 +60,7 @@ function setup(t) {
   return {
     dir,
     store,
+    permissions,
     access,
     manifest,
     e,
@@ -68,6 +74,7 @@ function setup(t) {
 }
 test('image generation stays private even with every Applet grant and a registered handler', async (t) => {
   const f = setup(t);
+  f.grant(Object.fromEntries(Object.keys(appletApiPermissionLabels).map((key) => [key, true])));
   const methods = ['ai.image.generate', 'ai.image.results.read'];
   let invoked = false;
   f.options.handlers = Object.fromEntries(
@@ -107,7 +114,7 @@ test('image generation stays private even with every Applet grant and a register
   await assert.rejects(async () => f.api.call('ai.image.connections.list'), { code: 'NOT_FOUND' });
   for (const useImageAi of [false, true]) {
     f.grant({ read: true, execute: true, useImageAi });
-    const reloaded = new AppletApiAccess(path.join(f.dir, 'applet-api.json'));
+    const reloaded = new AppletApiAccess(openOperationPermissions(t, f.dir));
     assert.equal(reloaded.error, undefined);
     assert.equal(reloaded.get().useImageAi, useImageAi);
     const listed = await f.call('ai.image.connections.list');
@@ -127,6 +134,7 @@ test('image generation stays private even with every Applet grant and a register
 
 test('internal publication IDs share the external catalog without granting execution', async (t) => {
   const f = setup(t);
+  f.grant({ read: true });
   f.options.commands = () => [
     {
       id: 'test.public',
@@ -159,22 +167,9 @@ test('internal publication IDs share the external catalog without granting execu
   );
 });
 
-test('Applet grants are default-on, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
+test('Applet grants default OFF, persist per device for all Applets, and are revoked immediately', async (t) => {
   const f = setup(t);
-  assert.equal((await f.call('system.getInfo')).ok, true);
-  assert.equal(f.access.get().useTts, true);
-  assert.equal(f.access.get().useAi, true);
-  assert.equal(f.access.get().useMcp, true);
-  assert.equal(f.access.get().manageCustomCommands, undefined);
-  assert.equal(f.access.get().manageMcpServers, undefined);
-  assert.equal(f.access.get().runProcesses, true);
-  assert.ok(Object.values(f.access.get()).every((value) => value === true));
-  assert.equal(
-    Object.keys(f.access.get()).length,
-    Object.keys(require('../out/main/shared/appdock-api').appletApiPermissionLabels).length,
-  );
-  f.grant({});
-  assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
+  assert.deepEqual(f.access.get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
   for (const method of require('../out/main/shared/appdock-api')
@@ -194,11 +189,15 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
     ))
     assert.equal((await f.call(method)).ok, true, method);
   assert.equal(f.api.call('system.getInfo').executable, false);
-  assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(f.manifest), {
+  assert.deepEqual(new AppletApiAccess(openOperationPermissions(t, f.dir)).get(f.manifest), {
     read: true,
     execute: true,
     write: true,
   });
+  assert.deepEqual(
+    new AppletApiAccess(openOperationPermissions(t, f.dir, 'OtherDevice')).get(f.manifest),
+    {},
+  );
   assert.deepEqual(
     f.access.get({ ...f.manifest, id: 'other', folder: path.join(f.dir, 'other') }),
     { read: true, execute: true, write: true },
@@ -353,6 +352,7 @@ test('MCP -> Applet can call settings and another command while cycles and self 
 test('host stack children retain publication, caller authority and cycle guards without refusing other calls', async (t) => {
   const f = setup(t),
     calls = [];
+  f.grant({ read: true, execute: true });
   f.options.commands = () =>
     ['stack', 'leaf', 'test.caller.self'].map((id) => ({
       id,
@@ -431,27 +431,28 @@ test('Legacy self-setting uses shared validation and revision while keeping priv
     undeclared: { legacy: true },
   });
 });
-test('Malformed grants fail closed; invalid edits never change stored permissions', (t) => {
+test('Malformed and unavailable device files fail closed even with a last-good grant', (t) => {
   const f = setup(t);
-  f.grant({ read: true });
-  const file = path.join(f.dir, 'applet-api.json'),
+  f.grant({ read: true, write: true });
+  const file = f.permissions.device.file,
     before = fs.readFileSync(file, 'utf8');
   assert.throws(() => f.grant({ read: 'true' }));
   assert.throws(() => f.grant({ admin: true }));
+  assert.throws(() => f.access.set({ read: false }, { read: true }));
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   fs.writeFileSync(file, '{}');
-  const bad = new AppletApiAccess(file);
+  const bad = new AppletApiAccess(openOperationPermissions(t, f.dir));
   assert.ok(bad.error);
   assert.deepEqual(bad.get(f.manifest), {});
   assert.throws(() => bad.set({ read: true }));
-  // An access error must not be mistaken for a missing file by existsSync.
-  const deniedFile = path.join(f.dir, 'denied.json');
-  const statSync = fs.statSync;
-  t.mock.method(fs, 'statSync', (name, ...args) => {
-    if (name === deniedFile) throw Object.assign(new Error('denied'), { code: 'EACCES' });
-    return statSync(name, ...args);
+  assert.equal(fs.readFileSync(file, 'utf8'), '{}');
+  fs.writeFileSync(file, before);
+  const readFileSync = fs.readFileSync;
+  t.mock.method(fs, 'readFileSync', (name, ...args) => {
+    if (name === file) throw Object.assign(new Error('denied'), { code: 'EACCES' });
+    return readFileSync(name, ...args);
   });
-  const inaccessible = new AppletApiAccess(deniedFile);
+  const inaccessible = new AppletApiAccess(openOperationPermissions(t, f.dir));
   assert.ok(inaccessible.error);
   assert.deepEqual(inaccessible.get(f.manifest), {});
 });
@@ -501,18 +502,27 @@ test('Applet-only operations require only their declared grant and cannot be cal
   assert.equal((await f.call('input.sendKeys', { keys: 'A' })).error.code, 'API_DISABLED');
 });
 
-test('old per-Applet grants never become a global grant automatically', (t) => {
+test('old per-Applet and global grants are ignored and never written back', (t) => {
   const f = setup(t),
-    file = path.join(f.dir, 'applet-api.json');
-  fs.writeFileSync(
-    file,
-    JSON.stringify({ version: 1, grants: { a: { folder: f.dir, permissions: { read: true } } } }),
-  );
-  const access = new AppletApiAccess(file);
-  assert.equal(access.error, undefined);
-  assert.deepEqual(access.get(), {});
-  access.set({ sendInput: true });
-  assert.equal(JSON.parse(fs.readFileSync(file)).version, 2);
+    file = path.join(f.dir, 'local', 'applet-api.json');
+  for (const old of [
+    { version: 1, grants: { a: { folder: f.dir, permissions: { read: true } } } },
+    { version: 2, permissions: { read: true, write: true, editTray: true } },
+  ]) {
+    const saved = JSON.stringify(old);
+    fs.writeFileSync(file, saved);
+    const access = new AppletApiAccess(openOperationPermissions(t, f.dir));
+    assert.equal(access.error, undefined);
+    assert.deepEqual(access.get(), {});
+    assert.throws(() => access.set({ editTray: true }));
+    access.set({ sendInput: true });
+    assert.equal(fs.readFileSync(file, 'utf8'), saved);
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(f.permissions.device.file)).operationPermissions.applet,
+      { sendInput: true },
+    );
+    access.set({});
+  }
 });
 
 test('host execution context isolates identities, expires on return, and cancels the matching gesture', async () => {
@@ -541,109 +551,54 @@ test('MCP effective permission reporting retains execution and write prerequisit
   const f = setup(t);
   const config = {
     version: 2,
-    enabled: true,
-    allowWrite: false,
-    allowExecute: false,
-    allowManageApplets: true,
-    allowEditShortcuts: true,
-    allowEditGestures: true,
-    allowEditRibbon: true,
-    allowEditTray: true,
-    port: 0,
-    token: 'a'.repeat(64),
-    configFile: path.join(f.dir, 'config.toml'),
-    serverName: 'Test',
-    owned: {},
+    token: '',
+    codex: {
+      enabled: true,
+      port: 0,
+      token: '',
+      configFile: path.join(f.dir, 'config.toml'),
+      owned: {},
+    },
   };
   const service = () => {
-    const { enabled, port, configFile, serverName, owned, ...permissions } = config;
-    fs.writeFileSync(
-      path.join(f.dir, 'automation.json'),
-      JSON.stringify({
-        ...permissions,
-        codex: { enabled, port, configFile, serverName, owned, token: '' },
-      }),
-    );
+    fs.writeFileSync(path.join(f.dir, 'automation.json'), JSON.stringify(config));
     return new AutomationService({
       localDirectory: f.dir,
       baseDirectory: f.dir,
+      settings: f.permissions,
+      mcpServer: require('./fixtures/mcp-receiver-settings.cjs').mcpReceiverSettings(),
       version: 'test',
       encrypt: (v) => v,
       decrypt: (v) => v,
       changed: () => {},
-      mcpServer: require('./fixtures/mcp-receiver-settings.cjs').mcpReceiverSettings(),
       createApi: () => f.api,
     });
   };
   let s = service();
+  const enabled = s;
+  t.after(() => enabled.close());
   assert.equal(s.allowed('allowManageApplets'), false);
   assert.equal(s.allowed('allowEditTray'), false);
-  config.allowExecute = true;
-  s = service();
+  f.permissions.saveOperationPermissions({ mcp: { allowExecute: true } });
   assert.equal(s.allowed('allowManageApplets'), false);
   assert.equal(s.allowed('allowEditTray'), false);
-  config.allowWrite = true;
-  s = service();
+  f.permissions.saveOperationPermissions({ mcp: { allowExecute: true, allowWrite: true } });
   assert.equal(s.allowed('allowEditTray'), true);
-  config.enabled = false;
+  config.codex.enabled = false;
   s = service();
+  t.after(() => s.close());
   assert.equal(s.allowed('allowWrite'), false);
   assert.equal(s.allowed('allowEditTray'), false);
 });
 
-test('legacy Applet grants load without writeback, never enable write, and compact only on explicit save', (t) => {
-  const f = setup(t),
-    file = path.join(f.dir, 'applet-api.json');
-  for (const write of [false, true]) {
-    const saved = JSON.stringify({
-      version: 2,
-      permissions: {
-        read: true,
-        write,
-        execute: false,
-        editShortcuts: !write,
-        manageApplets: true,
-        manageMcpServers: !write,
-        editTray: false,
-      },
-    });
-    fs.writeFileSync(file, saved);
-    const access = new AppletApiAccess(file);
-    assert.deepEqual(access.get(), { read: true, write, execute: false });
-    assert.equal(!!access.get().useImageAi, false);
-    assert.equal(fs.readFileSync(file, 'utf8'), saved);
-    assert.throws(() => access.set({ write, editTray: false }));
-    assert.equal(fs.readFileSync(file, 'utf8'), saved);
-    access.set(access.get());
-    assert.deepEqual(JSON.parse(fs.readFileSync(file)).permissions, {
-      read: true,
-      write,
-      execute: false,
-    });
-  }
-  for (const permissions of [
-    { read: true, unknown: true },
-    { read: true, editTray: 'false' },
-  ]) {
-    fs.writeFileSync(file, JSON.stringify({ version: 2, permissions }));
-    assert(new AppletApiAccess(file).error);
-  }
-  assert(
-    Object.hasOwn(
-      require('../out/main/shared/appdock-api').appletApiPermissionLabels,
-      'useImageAi',
-    ),
-  );
-});
-
-test('legacy MCP flags cannot broaden write and are removed when the legacy configuration is migrated', async (t) => {
+test('MCP ignores old grants and saves new grants independently of its connection', async (t) => {
   const f = setup(t),
     file = path.join(f.dir, 'automation.json');
   const saved = JSON.stringify({
     version: 1,
     enabled: true,
-    allowWrite: false,
-    allowExecute: false,
+    allowWrite: true,
+    allowExecute: true,
     allowEditTray: true,
     allowManageMcpServers: true,
     port: 0,
@@ -656,21 +611,35 @@ test('legacy MCP flags cannot broaden write and are removed when the legacy conf
   const service = new AutomationService({
     localDirectory: f.dir,
     baseDirectory: f.dir,
+    settings: f.permissions,
+    mcpServer: {
+      read: () => f.permissions.readMcpServer(),
+      save: (next, previous) => f.permissions.saveMcpServer(next, previous),
+    },
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,
     changed: () => {},
-    mcpServer: require('./fixtures/mcp-receiver-settings.cjs').mcpReceiverSettings(),
     createApi: () => f.api,
   });
   t.after(() => service.close());
   assert.equal(service.allowed('allowEditTray'), false);
+  assert.equal(service.allowed('allowExecute'), false);
   assert.equal(fs.readFileSync(file, 'utf8'), saved);
   await assert.rejects(service.action({ kind: 'setTrayEditing', allowed: true }), /個別/);
   assert.equal(fs.readFileSync(file, 'utf8'), saved);
+  await service.initialize();
+  const migrated = fs.readFileSync(file, 'utf8');
   await service.action({ kind: 'setExecution', allowed: true });
-  const compact = JSON.parse(fs.readFileSync(file));
-  assert.equal(compact.allowWrite, false);
+  assert.equal(fs.readFileSync(file, 'utf8'), migrated);
+  assert.deepEqual(f.permissions.operationPermissions(), { mcp: { allowExecute: true } });
+  assert.equal(service.state().allowWrite, false);
+  const compact = JSON.parse(migrated);
+  assert.equal(f.permissions.readMcpServer().enabled, true);
+  assert.equal(compact.codex.enabled, true);
+  assert.equal(compact.token, 'a'.repeat(64));
+  assert.equal(Object.hasOwn(compact, 'allowWrite'), false);
+  assert.equal(Object.hasOwn(compact, 'allowExecute'), false);
   assert.equal(Object.hasOwn(compact, 'allowEditTray'), false);
   assert.equal(Object.hasOwn(compact, 'allowManageMcpServers'), false);
 });

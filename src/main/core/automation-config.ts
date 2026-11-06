@@ -2,20 +2,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { hostText } from '../../shared/i18n';
 import type { McpServerSettings, ReceiverSettings } from '../../shared/automation';
-import { retiredMcpPermissionKeys } from '../../shared/automation';
 import { parseMcpServerSettings } from './automation-network';
 import { codexConfigPath, codexServerName } from './codex-registration';
-
-const defaultPermissions = {
-  allowWrite: false,
-  allowExecute: false,
-  allowUseTts: false,
-  allowUseAi: false,
-  allowUseMcp: false,
-  allowSendInput: false,
-  allowRunProcesses: false,
-};
-export type McpPermission = keyof typeof defaultPermissions;
 
 interface CodexConfig extends ReceiverSettings {
   token: string;
@@ -24,7 +12,7 @@ interface CodexConfig extends ReceiverSettings {
   owned: Record<string, string>;
 }
 
-export interface AutomationConfig extends Record<McpPermission, boolean> {
+export interface AutomationConfig {
   version: 2;
   token: string;
   codex: CodexConfig;
@@ -33,7 +21,6 @@ export interface AutomationConfig extends Record<McpPermission, boolean> {
 export function defaultAutomationConfig(): AutomationConfig {
   return {
     version: 2,
-    ...defaultPermissions,
     token: '',
     codex: {
       enabled: false,
@@ -89,33 +76,19 @@ export function parseAutomationConfig(value: unknown): {
   if (
     !object(value) ||
     (value.version !== 1 && value.version !== 2) ||
-    typeof value.allowWrite !== 'boolean' ||
     typeof value.token !== 'string'
   )
     invalid();
-  const permissions = { ...defaultPermissions };
-  for (const key of Object.keys(permissions) as McpPermission[]) {
-    if (value[key] === undefined) continue;
-    if (typeof value[key] !== 'boolean') invalid();
-    permissions[key] = value[key];
-  }
   if (value.version === 2)
     return {
       config: {
         version: 2,
-        ...permissions,
         token: value.token,
         codex: parseCodexConfig(value.codex),
       },
     };
 
-  if (
-    !value.token ||
-    retiredMcpPermissionKeys.some(
-      (key) => value[key] !== undefined && typeof value[key] !== 'boolean',
-    )
-  )
-    invalid();
+  if (!value.token) invalid();
   const legacy = parseMcpServerSettings({
     enabled: value.enabled,
     port: value.port,
@@ -123,5 +96,5 @@ export function parseAutomationConfig(value: unknown): {
     networkHostnames: value.networkHostnames === undefined ? [] : value.networkHostnames,
   });
   const codex = parseCodexConfig({ ...value, port: 0, token: '' });
-  return { config: { version: 2, ...permissions, token: value.token, codex }, legacy };
+  return { config: { version: 2, token: value.token, codex }, legacy };
 }
