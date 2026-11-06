@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { withoutDeviceMcp } from '../../shared/mcp-device-settings';
 import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
 import { AssignedImages } from './assigned-images';
@@ -11,6 +12,7 @@ import {
   SettingsConflictError,
   atomicWrite,
   type SettingsRecoveryPlan,
+  type SettingsAsset,
   storedSettingRecord,
 } from './settings';
 import type { Settings, ExtensionManifest, ExtensionSnapshot } from '../../shared/contracts';
@@ -59,7 +61,7 @@ interface Journal {
   version: 1;
   machineName: string;
   committed: boolean;
-  files: { scope: Scope; before: string; after: string }[];
+  files: { scope: Scope | 'mcp-secrets'; before: string | null; after: string }[];
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const read = (file: string) => {
@@ -126,6 +128,7 @@ export class DeviceSettingsStore extends SettingsStore {
     );
   }
   override settingScope(path: readonly string[]): Scope {
+    if (path[0] === 'mcpClient') return 'device';
     if (
       ['ai', 'tts', 'imageAi'].includes(path[0]) ||
       (path[0] === 'notificationPreferences' && path[1] === 'speech' && path[2] === 'connectionId')
@@ -141,6 +144,8 @@ export class DeviceSettingsStore extends SettingsStore {
     const shared = this.shared.storedValue(),
       device = this.device.storedValue();
     const result = structuredClone(shared);
+    delete result.mcpServers;
+    result.mcpClient = structuredClone(this.device.value.mcpClient);
     result.host ??= {};
     for (const key of deviceHostKeys) {
       const pageId = hostPageForPath(['host', key]);
@@ -199,8 +204,12 @@ export class DeviceSettingsStore extends SettingsStore {
     this.shared = new SettingsStore(file, backups, {
       defaults: () => this.value,
       parse: (raw) =>
-        restoreSettingsCollections(parseSettings(withoutGenerationSettings(raw)), this.applets()),
-      serialize: (value) => withoutGenerationSettings(settingsStorageValue(value, this.applets())),
+        restoreSettingsCollections(
+          parseSettings(withoutDeviceMcp(withoutGenerationSettings(raw))),
+          this.applets(),
+        ),
+      serialize: (value) =>
+        withoutDeviceMcp(withoutGenerationSettings(settingsStorageValue(value, this.applets()))),
     });
     this.device = new SettingsStore(
       path.join(path.dirname(file), `settings-${machineName}.json`),
@@ -349,7 +358,8 @@ export class DeviceSettingsStore extends SettingsStore {
     if (revision !== this.revision)
       throw new SettingsConflictError(hostText('services.deviceSettingsStore.revisionConflict'));
   }
-  private fileFor(scope: Scope) {
+  private fileFor(scope: Scope | 'mcp-secrets') {
+    if (scope === 'mcp-secrets') return path.join(this.localRoot, 'mcp-client-secrets.json');
     return this.storeFor(scope).file;
   }
   private storeFor(scope: Scope) {
@@ -364,25 +374,38 @@ export class DeviceSettingsStore extends SettingsStore {
         journal.machineName.toLowerCase() !== this.machineName.toLowerCase() ||
         typeof journal.committed !== 'boolean' ||
         !Array.isArray(journal.files) ||
-        journal.files.length > 3 ||
+        journal.files.length > 4 ||
         new Set(journal.files.map((item) => item.scope)).size !== journal.files.length
       )
         throw Error('journal schema');
       for (const item of journal.files) {
         if (
-          !['shared', 'device', 'local'].includes(item.scope) ||
-          typeof item.before !== 'string' ||
+          !['shared', 'device', 'local', 'mcp-secrets'].includes(item.scope) ||
+          (typeof item.before !== 'string' &&
+            !(item.scope === 'mcp-secrets' && item.before === null)) ||
           typeof item.after !== 'string' ||
-          !/^[A-Za-z0-9+/=]*$/.test(item.before + item.after)
+          !/^[A-Za-z0-9+/=]*$/.test((item.before ?? '') + item.after)
         )
           throw Error('journal entry');
-        for (const text of [item.before, item.after]) {
+        // An explicitly reset secret document may contain invalid original bytes.
+        for (const text of item.scope === 'mcp-secrets'
+          ? [item.after]
+          : [item.before!, item.after]) {
           const value = JSON.parse(
             Buffer.from(text, 'base64')
               .toString('utf8')
               .replace(/^\uFEFF/, ''),
           );
-          if (item.scope === 'local') parseGenerationSettings(value);
+          if (item.scope === 'mcp-secrets') {
+            if (
+              !value ||
+              value.version !== 1 ||
+              !value.entries ||
+              typeof value.entries !== 'object' ||
+              Array.isArray(value.entries)
+            )
+              throw Error('secret journal schema');
+          } else if (item.scope === 'local') parseGenerationSettings(value);
           else if (item.scope === 'shared') parseSettings(withoutGenerationSettings(value));
           else parseDeviceSettings(withoutGenerationSettings(value), this.machineName);
         }
@@ -390,15 +413,18 @@ export class DeviceSettingsStore extends SettingsStore {
       if (!journal.committed) {
         // Check every target before restoring any file; never overwrite an external writer.
         for (const item of journal.files) {
-          const current = read(this.fileFor(item.scope)).toString('base64');
+          const file = this.fileFor(item.scope);
+          const current = fs.existsSync(file) ? read(file).toString('base64') : null;
           if (current !== item.before && current !== item.after)
             throw Error('external settings change');
         }
         for (const item of [...journal.files].reverse()) {
           const file = this.fileFor(item.scope),
-            current = read(file);
-          if (current.toString('base64') === item.after)
-            atomicWrite(file, Buffer.from(item.before, 'base64'), { previous: current });
+            current = fs.existsSync(file) ? read(file) : undefined;
+          if (current?.toString('base64') === item.after) {
+            if (item.before === null) fs.unlinkSync(file);
+            else atomicWrite(file, Buffer.from(item.before, 'base64'), { previous: current });
+          }
         }
       }
       fs.unlinkSync(this.journal);
@@ -412,11 +438,11 @@ export class DeviceSettingsStore extends SettingsStore {
     shared: Settings,
     device: DeviceSettings,
     revision: number,
-    asset?: { commit(): void; rollback(): void },
+    asset?: SettingsAsset,
     rewrite: Scope[] = [],
     local = this.local.value,
   ) {
-    shared = parseSettings(withoutGenerationSettings(shared));
+    shared = parseSettings(withoutDeviceMcp(withoutGenerationSettings(shared)));
     device = parseDeviceSettings(withoutGenerationSettings(device), this.machineName);
     if (this.writesBlocked) throw Error(hostText('services.deviceSettingsStore.restoring'));
     this.assertRevision(revision);
@@ -440,8 +466,9 @@ export class DeviceSettingsStore extends SettingsStore {
         after: Buffer.from(this.local.serialize(local)).toString('base64'),
       });
     for (const item of files)
-      if (this.storeFor(item.scope).recovered)
+      if (item.scope !== 'mcp-secrets' && this.storeFor(item.scope).recovered)
         throw Error(hostText('services.deviceSettingsStore.targetRecoveryRequired'));
+    if (asset?.recovery) files.unshift(asset.recovery);
     if (!files.length && !asset) return this.snapshot();
     this.mutating = true;
     const journal: Journal = { version: 1, machineName: this.machineName, committed: false, files };
@@ -449,6 +476,7 @@ export class DeviceSettingsStore extends SettingsStore {
       atomicWrite(this.journal, JSON.stringify(journal), { previous: undefined });
       asset?.commit();
       for (const item of files) {
+        if (item.scope === 'mcp-secrets') continue; // Written by the guarded asset transaction.
         if (item.scope === 'local') this.local.save(local, this.local.revision);
         else if (item.scope === 'shared') this.shared.save(shared, this.shared.revision);
         else this.device.save(device, this.device.revision);
@@ -484,12 +512,7 @@ export class DeviceSettingsStore extends SettingsStore {
     this.refreshCombined(true);
     return this.snapshot();
   }
-  override save(
-    value: unknown,
-    revision: number,
-    asset?: { commit(): void; rollback(): void },
-    rewrite: Scope[] = [],
-  ) {
+  override save(value: unknown, revision: number, asset?: SettingsAsset, rewrite: Scope[] = []) {
     this.assertRevision(revision);
     const next = restoreSettingsCollections(parseSettings(value), this.applets());
     new AssignedImages(path.join(path.dirname(this.file), 'assets', 'images')).prepare(

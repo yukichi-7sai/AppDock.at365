@@ -96,7 +96,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   const toolsBefore = JSON.stringify((await client.listTools()).tools);
   const assets = path.join(profile, 'data/assets/images');
   const assetHashes = filenames.map((file) => hash(path.join(assets, file)));
-  const credentials = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
+  const credentials = ['ai-keys.json', 'tts-keys.json', 'mcp-client-secrets.json']
     .map((name) => path.join(local, name))
     .filter((file) => fs.existsSync(file))
     .map((file) => ({ file, sha256: hash(file) }));

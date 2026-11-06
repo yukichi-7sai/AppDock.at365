@@ -14,6 +14,7 @@ export function McpCommandFields({
   invoke,
   advancedOptions,
   refreshKey = 0,
+  approvedBinding,
 }: {
   config: Record<string, unknown>;
   onChange(config: Record<string, unknown>): void;
@@ -21,6 +22,7 @@ export function McpCommandFields({
   invoke(name: string, args?: unknown[]): Promise<any>;
   advancedOptions?: ReactNode;
   refreshKey?: number;
+  approvedBinding?: import('../../shared/mcp-device-settings').McpToolBinding | null;
 }) {
   const { t: translate } = useHostTranslation();
   const [servers, setServers] = useState<McpServerEntry[]>([]);
@@ -42,14 +44,19 @@ export function McpCommandFields({
   useEffect(() => {
     let active = true;
     setServersError('');
-    void current.current
-      .invoke('mcpServers')
-      .then((reply) => {
-        if (active) setServers(reply.items);
-      })
-      .catch((reason) => {
-        if (active) setServersError(String(reason));
-      });
+    void (async () => {
+      const items: McpServerEntry[] = [];
+      let cursor: string | undefined;
+      do {
+        const reply = await current.current.invoke('mcpServers', [cursor]);
+        if (!active) return;
+        items.push(...reply.items);
+        cursor = reply.nextCursor;
+      } while (cursor);
+      setServers(items);
+    })().catch((reason) => {
+      if (active) setServersError(String(reason));
+    });
     return () => {
       active = false;
     };
@@ -67,7 +74,7 @@ export function McpCommandFields({
           const items: Partial<McpToolDescriptor>[] = [];
           let cursor: string | undefined;
           do {
-            const reply = await current.current.invoke('mcpTools', [serverId, cursor]);
+            const reply = await current.current.invoke('mcpCommandTools', [serverId, cursor]);
             if (epoch !== generation.current) return;
             items.push(...reply.items);
             cursor = reply.nextCursor;
@@ -75,10 +82,19 @@ export function McpCommandFields({
           setTools(items);
           const savedName = String(current.current.config.toolName ?? '');
           if (savedName) {
-            const reply = await current.current.invoke('mcpTool', [serverId, savedName]);
+            const reply = await current.current.invoke('mcpCommandTool', [serverId, savedName]);
             if (epoch !== generation.current) return;
             // Opening an existing command never adopts a different tool revision.
             setTool(reply.tool);
+            if (
+              reply.tool &&
+              approvedBinding &&
+              JSON.stringify(reply.tool.toolBinding) === JSON.stringify(approvedBinding)
+            )
+              current.current.onChange({
+                ...current.current.config,
+                toolRevision: reply.tool.toolRevision,
+              });
           }
         } catch (reason) {
           if (epoch === generation.current)
@@ -103,7 +119,7 @@ export function McpCommandFields({
     }
     setPending(true);
     try {
-      const reply = await current.current.invoke('mcpTool', [serverId, nextName]);
+      const reply = await current.current.invoke('mcpCommandTool', [serverId, nextName]);
       if (epoch !== generation.current) return;
       setTool(reply.tool);
       // Retain argument and timeout edits made while discovery was in progress.
@@ -120,7 +136,7 @@ export function McpCommandFields({
     }
   };
   useEffect(() => {
-    current.current.onValidity(!argsError && !pending && !needsReview);
+    current.current.onValidity(!argsError && !pending);
   }, [argsError, pending, needsReview]);
   useSettingsFeedback({
     busy: pending,
@@ -130,7 +146,7 @@ export function McpCommandFields({
   });
   return (
     <>
-      <SettingsField title={translate('settings.mcpCommandFields.server')}>
+      <SettingsField settingKey="serverId" title={translate('settings.mcpCommandFields.server')}>
         <select
           data-testid="custom-command-mcp-server"
           aria-label={translate('settings.mcpCommandFields.server')}
@@ -157,7 +173,7 @@ export function McpCommandFields({
           ))}
         </select>
       </SettingsField>
-      <SettingsField title={translate('settings.mcpCommandFields.tool')}>
+      <SettingsField settingKey="toolName" title={translate('settings.mcpCommandFields.tool')}>
         <select
           data-testid="custom-command-mcp-tool"
           aria-label={translate('settings.mcpCommandFields.tool')}
@@ -206,7 +222,11 @@ export function McpCommandFields({
           </button>
         </div>
       )}
-      <SettingsField error={argsError} title={translate('settings.mcpCommandFields.args')}>
+      <SettingsField
+        settingKey="arguments"
+        error={argsError}
+        title={translate('settings.mcpCommandFields.args')}
+      >
         <SettingsTextarea
           data-testid="custom-command-mcp-arguments"
           aria-label={translate('settings.mcpCommandFields.args')}
@@ -226,7 +246,10 @@ export function McpCommandFields({
         />
       </SettingsField>
       <CustomCommandOptions>
-        <SettingsField title={translate('settings.mcpCommandFields.timeout')}>
+        <SettingsField
+          settingKey="timeoutMs"
+          title={translate('settings.mcpCommandFields.timeout')}
+        >
           <SettingsInput
             aria-label={translate('settings.mcpCommandFields.timeout')}
             type="number"

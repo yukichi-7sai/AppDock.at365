@@ -21,7 +21,7 @@ const root = path.resolve(__dirname, '..'),
     `mcp-settings-${portable ? 'portable' : 'source'}-${Date.now()}`,
   ),
   local = path.join(profile, 'local'),
-  localFile = path.join(local, 'mcp-client.json'),
+  localFile = path.join(local, 'mcp-client-secrets.json'),
   checks = [],
   sessions = new Map();
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -36,8 +36,14 @@ let application,
   child,
   host,
   requests = 0;
+const remoteState = { count: 0, changed: false };
 const server = http.createServer(async (req, res) => {
   requests++;
+  if (req.url === '/auth' && req.headers.authorization !== 'Bearer fixture-private-token') {
+    res.writeHead(401);
+    res.end();
+    return;
+  }
   if (req.url === '/offline') {
     res.writeHead(503);
     res.end();
@@ -46,7 +52,7 @@ const server = http.createServer(async (req, res) => {
   try {
     let session = sessions.get(req.headers['mcp-session-id']);
     if (!session) {
-      const sdk = fixtureServer({ count: 0, changed: false }),
+      const sdk = fixtureServer(remoteState),
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: randomUUID,
           enableJsonResponse: true,
@@ -165,245 +171,264 @@ async function noInlineError() {
 }
 async function main() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${server.address().port}`,
-    ids = Object.fromEntries(
-      ['shared', 'broken', 'good', 'offline', 'auth'].map((key) => [key, randomUUID()]),
-    ),
-    settings = createDefaultSettings();
-  settings.host.closeToTray = false;
-  settings.host.soundEnabled = false;
+  const url = 'http://127.0.0.1:' + server.address().port,
+    authId = randomUUID(),
+    offlineId = randomUUID();
+  const settings = createDefaultSettings();
+  Object.assign(settings.host, {
+    closeToTray: false,
+    soundEnabled: false,
+    hardwareAcceleration: false,
+  });
   settings.gestures.enabled = false;
   settings.keybindings = [];
   settings.updates.checkHostOnStartup = false;
   settings.updates.checkAppletsOnStartup = false;
-  settings.notificationPreferences = {
-    overrides: [
+  settings.mcpClient = {
+    version: 1,
+    commands: [],
+    servers: [
       {
-        ownerKind: 'host',
-        ownerId: 'warnings',
-        typeId: 'attention-required',
-        targets: ['banner'],
-        speak: false,
+        id: authId,
+        name: 'Restored server',
+        description: '',
+        requiresEnvironment: false,
+        connection: {
+          ...defaultMcpConnection(),
+          url: url + '/auth',
+          authentication: 'bearer',
+          enabled: true,
+        },
+      },
+      {
+        id: offlineId,
+        name: 'Offline',
+        description: '',
+        requiresEnvironment: false,
+        connection: { ...defaultMcpConnection(), url: url + '/offline' },
       },
     ],
   };
-  settings.mcpServers = {
-    version: 1,
-    items: Object.entries(ids).map(([key, id]) => ({ id, name: key, description: '' })),
-  };
-  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-  const broken = {
-      connection: { enabled: false, url: 'invalid' },
-      secret: 'preserve-broken-value',
-    },
-    auth = {
-      connection: { ...defaultMcpConnection(), url: url + '/mcp', authentication: 'bearer' },
-      secret: 'unreadable-ciphertext',
-    };
-  fs.writeFileSync(
-    localFile,
-    JSON.stringify({
-      version: 1,
-      entries: {
-        [ids.broken]: broken,
-        [ids.good]: { connection: { ...defaultMcpConnection(), url: url + '/mcp' } },
-        [ids.offline]: { connection: { ...defaultMcpConnection(), url: url + '/offline' } },
-        [ids.auth]: auth,
-      },
-    }),
-  );
+  require('./test-settings.cjs').write(profile, settings, local);
+  const sharedFile = require('./test-settings.cjs').file(profile),
+    deviceFile = require('./test-settings.cjs').file(
+      profile,
+      'settings-' + require('node:os').hostname() + '.json',
+    );
+  fs.writeFileSync(path.join(local, 'mcp-client.json'), 'legacy-not-imported');
+  const sharedBefore = fs.readFileSync(sharedFile);
   await start();
-  assert.equal((await notices()).length, 0);
   assert.equal(requests, 0);
-  assert.equal(await row('shared').getByRole('switch').isDisabled(), true);
-  assert.equal(await row('broken').getByRole('switch').isDisabled(), true);
-  assert.equal(await row('good').getByRole('switch').isEnabled(), true);
-  checks.push(
-    'shared-only and OFF damaged entries produce no startup notice; unconfigured switches disabled',
+  assert.equal(await host.getByRole('button', { name: 'JSON', exact: true }).count(), 0);
+  assert.match(await row('Restored server').innerText(), /認証情報を再設定/);
+  assert.equal(
+    JSON.parse(fs.readFileSync(deviceFile)).mcpClient.servers[0].connection.enabled,
+    true,
   );
-  const sharedFile = require('./test-settings.cjs').file(profile, 'settings.json');
-  const beforeAdd = [fs.readFileSync(sharedFile, 'utf8'), fs.readFileSync(localFile, 'utf8')];
   await host.getByRole('button', { name: '接続先を追加', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: '名前', exact: true })
-    .fill('dialog-added');
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('alert')
-    .filter({ hasText: 'MCPのURLを入力してください' })
-    .waitFor();
+  let dialog = host.getByRole('dialog');
+  await dialog.getByRole('textbox', { name: '名前', exact: true }).fill('Invalid draft');
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.getByRole('alert').filter({ hasText: 'MCPのURLを入力してください' }).waitFor();
   assert.equal(
-    await host.getByRole('dialog').getByRole('textbox', { name: '名前', exact: true }).inputValue(),
-    'dialog-added',
+    await dialog.getByRole('textbox', { name: '名前', exact: true }).inputValue(),
+    'Invalid draft',
   );
-  await noInlineError();
-  assert.deepEqual(
-    [fs.readFileSync(sharedFile, 'utf8'), fs.readFileSync(localFile, 'utf8')],
-    beforeAdd,
-  );
-  await host.screenshot({ path: path.join(profile, 'add-validation-error.png') });
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: 'MCPのURL', exact: true })
-    .fill(url + '/mcp');
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
-  await until(() => row('dialog-added').count(), 'valid add after dialog error');
-  const addedId = JSON.parse(fs.readFileSync(sharedFile)).mcpServers.items.find(
-    (i) => i.name === 'dialog-added',
-  ).id;
-  await noInlineError();
-  checks.push(
-    'add validation appears only in the dialog, keeps drafts and files intact, and retries successfully',
-  );
-  await row('good').getByRole('button', { name: 'goodを編集', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: '名前', exact: true })
-    .fill('healthy');
-  const beforeEdit = [fs.readFileSync(sharedFile, 'utf8'), fs.readFileSync(localFile, 'utf8')];
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: 'MCPのURL', exact: true })
-    .fill('bad-url');
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('alert')
-    .filter({ hasText: 'MCPのURLを入力してください' })
-    .waitFor();
-  assert.equal(
-    await host.getByRole('dialog').getByRole('textbox', { name: '名前', exact: true }).inputValue(),
-    'healthy',
-  );
-  assert.equal(
-    await host
-      .getByRole('dialog')
-      .getByRole('textbox', { name: 'MCPのURL', exact: true })
-      .inputValue(),
-    'bad-url',
-  );
-  await noInlineError();
-  assert.deepEqual(
-    [fs.readFileSync(sharedFile, 'utf8'), fs.readFileSync(localFile, 'utf8')],
-    beforeEdit,
-  );
-  await host.screenshot({ path: path.join(profile, 'edit-validation-error.png') });
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: 'MCPのURL', exact: true })
-    .fill(url + '/mcp');
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
-  await until(() => row('healthy').count(), 'healthy rename');
-  assert.deepEqual(JSON.parse(fs.readFileSync(localFile)).entries[ids.broken], broken);
-  assert.deepEqual(JSON.parse(fs.readFileSync(localFile)).entries[ids.auth], auth);
-  checks.push('healthy row editing preserves both malformed entry and encrypted secret');
-  checks.push(
-    'edit validation stays inside the dialog and preserves name, URL, and persisted settings until corrected',
-  );
-  await row('healthy').getByRole('switch').click();
-  await until(
-    async () => (await row('healthy').innerText()).includes('接続済み'),
-    'connected after ON',
-  );
-  assert.equal(await row('healthy').getByRole('switch').getAttribute('aria-checked'), 'true');
-  assert(requests > 0);
-  await row('healthy').getByRole('switch').click();
-  await until(
-    async () => (await row('healthy').getByRole('switch').getAttribute('aria-checked')) === 'false',
-    'OFF',
-  );
-  checks.push(
-    'configured disconnected connection activates with real MCP handshake and can be disabled',
-  );
-  for (const name of ['offline', 'auth']) {
-    const beforeWarnings = await host.evaluate(
-      async () =>
-        (await window.dock.snapshot()).logs.filter(
-          (entry) => entry.source === 'mcp-client' && entry.message.includes('[WARNING]'),
-        ).length,
-    );
-    await row(name).getByRole('switch').click();
-    await until(
-      async () => (await notices()).some((n) => n.ownerId === 'warnings'),
-      'warning banner',
-    );
-    await until(
-      async () =>
-        (await row(name).getByRole('switch').getAttribute('aria-checked')) === 'false' &&
-        (await row(name).getByRole('switch').isEnabled()),
-      'failed activation OFF',
-    );
+  await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  const repair = async () => {
+    await row('Restored server')
+      .getByRole('button', { name: '認証情報を再設定', exact: true })
+      .click();
+    dialog = host.getByRole('dialog');
+    assert.equal(await dialog.getByLabel('ID', { exact: true }).inputValue(), authId);
+    await dialog.getByLabel('Bearer token', { exact: true }).fill('fixture-private-token');
+    const before = requests;
+    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    assert.equal(requests, before, 'credential save never connects or executes');
     assert.equal(
-      JSON.parse(fs.readFileSync(localFile)).entries[ids[name]].connection.enabled,
-      false,
+      JSON.parse(fs.readFileSync(deviceFile)).mcpClient.servers[0].connection.enabled,
+      true,
     );
-    await noInlineError();
-    assert((await notices()).every((n) => n.level === 'warning'));
-    const afterWarnings = await host.evaluate(
-      async () =>
-        (await window.dock.snapshot()).logs.filter(
-          (entry) => entry.source === 'mcp-client' && entry.message.includes('[WARNING]'),
-        ).length,
-    );
-    assert.equal(afterWarnings - beforeWarnings, 1, 'one warning per failed activation');
-  }
-  checks.push(
-    'network and credential activation failures persist OFF and publish only warning banners without inline error or reload',
-  );
-  await row('offline').getByRole('button', { name: 'offlineを編集', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('checkbox', { name: 'このPCで接続を許可する', exact: true })
-    .check();
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
+  };
+  await repair();
+  await row('Restored server').getByRole('button', { name: '接続確認', exact: true }).click();
   await until(
-    async () => (await host.getByRole('dialog').count()) === 0,
-    'failed ON save closes normally',
+    async () => (await row('Restored server').innerText()).includes('接続済み'),
+    'connection checked',
   );
+  assert.equal(remoteState.count, 0);
+  await row('Offline').getByRole('switch').click();
+  await until(
+    () => !JSON.parse(fs.readFileSync(deviceFile)).mcpClient.servers[1].connection.enabled,
+    'failed activation returns OFF',
+  );
+  checks.push(
+    'device-only definitions, restored ON retained, local key re-entry without connection, explicit connection check and failed OFF-to-ON rollback',
+  );
+  await host.getByRole('tab', { name: 'ツール確認', exact: true }).click();
+  await host.getByLabel('確認するMCP接続先', { exact: true }).selectOption(authId);
+  await until(() => host.getByLabel('MCPツール', { exact: true }).isEnabled(), 'tools discovered');
+  await host.getByLabel('MCPツール', { exact: true }).selectOption('echo');
+  await host.getByLabel('MCPツールの引数', { exact: true }).fill('{"message":"saved"}');
+  await host.getByRole('button', { name: 'コマンドとして追加', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');
+  await dialog.getByLabel('有効', { exact: true }).check();
+  await until(
+    () => dialog.getByRole('button', { name: 'OK', exact: true }).isEnabled(),
+    'command draft ready',
+  );
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  const saved = JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0],
+    commandId = 'appdock.mcp.tool.' + saved.id;
+  assert(saved.toolBinding);
+  assert.equal(saved.enabled, true);
+  assert.equal(remoteState.count, 0);
+  assert(!fs.readFileSync(deviceFile, 'utf8').includes('fixture-private-token'));
+  assert(!fs.readFileSync(localFile, 'utf8').includes('fixture-private-token'));
+  await host.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+  await host.getByRole('button', { name: 'Saved MCPを編集', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByLabel('固定引数（JSON）', { exact: true }).fill('{bad');
+  await until(
+    async () => !(await dialog.getByRole('button', { name: 'OK', exact: true }).isEnabled()),
+    'bad JSON remains invalid',
+  );
+  await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  assert.deepEqual(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0], saved);
+  await host.evaluate(async (command) => {
+    const state = await window.dock.snapshot();
+    state.settings.value.keybindings = [
+      {
+        id: 'mcp-ui',
+        command,
+        key: 'Ctrl+Alt+F7',
+        enabled: true,
+        when: { scope: 'app', appletIds: [] },
+      },
+    ];
+    await window.dock.saveSettings(state.settings.value, state.settings.revision);
+  }, commandId);
   assert.equal(
-    JSON.parse(fs.readFileSync(localFile)).entries[ids.offline].connection.enabled,
-    false,
+    (await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+Alt+F7'))).executed,
+    1,
   );
-  await noInlineError();
-  checks.push(
-    'dialog save with ON persists the connection OFF after failure and closes without an inline error',
-  );
-  await host.getByRole('combobox', { name: '確認するMCP接続先' }).selectOption(ids.offline);
-  await until(
-    async () => await host.getByRole('combobox', { name: '確認するMCP接続先' }).isEnabled(),
-    'inspection finished',
-  );
-  await noInlineError();
-  checks.push(
-    'selection-triggered tool inspection failure also leaves settings editable without reload',
-  );
-  await row('broken').getByRole('button', { name: 'brokenを編集', exact: true }).click();
-  await host
-    .getByRole('dialog')
-    .getByRole('textbox', { name: 'MCPのURL', exact: true })
-    .fill(url + '/mcp');
-  await host.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click();
-  await until(() => row('broken').getByRole('switch').isEnabled(), 'explicit repair');
-  assert.deepEqual(JSON.parse(fs.readFileSync(localFile)).entries[ids.auth], auth);
-  checks.push('explicit repair restores the affected row without replacing another credential');
-  await host.screenshot({ path: path.join(profile, 'settings-light.png') });
-  await noInlineError();
-  const shared = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
-  assert.deepEqual(
-    shared.mcpServers.items.map((i) => i.id),
-    [...Object.values(ids), addedId],
-  );
-  assert(!JSON.stringify(shared).includes(url));
-  assert(!JSON.stringify(shared).includes('unreadable-ciphertext'));
+  await until(() => remoteState.count === 1, 'saved command executes');
+  const binding = JSON.stringify(saved.toolBinding);
   await stop();
+  fs.unlinkSync(localFile);
   await start();
-  assert.equal((await notices()).length, 0);
-  assert.equal(await row('shared').getByRole('switch').isDisabled(), true);
-  await noInlineError();
-  checks.push('restart retains shared IDs and local OFF states without startup warning');
-  await host.screenshot({ path: path.join(profile, 'settings-restarted.png') });
+  assert.equal(
+    JSON.stringify(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0].toolBinding),
+    binding,
+  );
+  await row('Restored server')
+    .getByRole('button', { name: 'Restored serverを編集', exact: true })
+    .click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByLabel('説明', { exact: true }).fill('Metadata without credentials');
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(
+    fs.existsSync(localFile),
+    false,
+    'metadata edit does not initialize or replace secrets',
+  );
+  await repair();
+  assert.equal(
+    (await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+Alt+F7'))).executed,
+    1,
+  );
+  await until(() => remoteState.count === 2, 'restored command executes without rebinding');
+  checks.push(
+    'tool-to-command dialog, invalid JSON retention, stable shortcut ID, restart and lost credentials recovered without changing tool approval',
+  );
+  remoteState.changed = true;
+  await assert.rejects(host.evaluate((id) => window.dock.executeCommand(id), commandId));
+  assert.equal(remoteState.count, 2);
+  await host.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+  await host.getByRole('button', { name: 'Saved MCPを編集', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByTestId('custom-command-tool-review').waitFor();
+  await dialog.getByTestId('custom-command-accept-tool').click();
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.notEqual(
+    JSON.stringify(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0].toolBinding),
+    binding,
+  );
+  await host.getByRole('button', { name: 'Saved MCPを編集', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await host.screenshot({ path: path.join(profile, 'command-light.png') });
+  await host.evaluate(async () => {
+    const state = await window.dock.snapshot();
+    state.settings.value.host.theme = 'dark';
+    await window.dock.saveSettings(state.settings.value, state.settings.revision);
+  });
+  await host.setViewportSize({ width: 740, height: 760 });
+  await host.screenshot({ path: path.join(profile, 'command-dark-narrow.png') });
+  const bounds = await dialog.evaluate((el) => ({
+    width: el.scrollWidth,
+    client: el.clientWidth,
+    bottom: el.querySelector('footer').getBoundingClientRect().bottom,
+    height: innerHeight,
+  }));
+  assert(bounds.width <= bounds.client + 1 && bounds.bottom <= bounds.height);
+  await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await host.getByRole('tab', { name: '接続先', exact: true }).click();
+  await row('Restored server')
+    .getByRole('button', { name: 'Restored serverを削除', exact: true })
+    .click();
+  dialog = host.getByRole('dialog');
+  assert.match(await dialog.innerText(), /1件/);
+  await dialog.getByRole('button', { name: '削除', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0].id, saved.id);
+  checks.push(
+    'changed tool rejected until explicit adoption; light and narrow dark dialogs; deleting server preserves command and bindings',
+  );
+  fs.writeFileSync(localFile, 'corrupt original secret document');
+  await host.getByRole('button', { name: '認証情報を初期化', exact: true }).waitFor();
+  await row('Offline').getByRole('button', { name: 'Offlineを編集', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByLabel('説明', { exact: true }).fill('Metadata with corrupt file');
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(fs.readFileSync(localFile, 'utf8'), 'corrupt original secret document');
+  await host.getByRole('button', { name: '認証情報を初期化', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0].id, saved.id);
+  await host.getByRole('button', { name: 'このページを既定値に戻す', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByRole('button', { name: '既定値に戻す', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(deviceFile)).mcpClient, {
+    version: 1,
+    servers: [],
+    commands: [],
+  });
+  assert.equal(
+    (await host.evaluate(() => window.dock.snapshot())).settings.value.keybindings[0].command,
+    commandId,
+  );
+  checks.push(
+    'metadata retains absent and corrupt secrets; explicit credential reset preserves definitions; page reset preserves shortcut references',
+  );
+  assert.equal(fs.readFileSync(path.join(local, 'mcp-client.json'), 'utf8'), 'legacy-not-imported');
+  const shared = JSON.parse(fs.readFileSync(sharedFile));
+  assert.equal(shared.mcpClient, undefined);
+  assert.equal(shared.mcpServers, undefined);
+  await host.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+  await host.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
+  assert.equal(
+    await host.getByRole('dialog').locator('option[value="appdock.mcp.call"]').count(),
+    0,
+  );
+  await host.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
   const version = await host.evaluate(async () => (await window.dock.snapshot()).version);
   assert.equal(version, require('../package.json').version);
   const result = {
@@ -417,6 +442,7 @@ async function main() {
   fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 }
+
 main()
   .catch(async (error) => {
     console.error(error);

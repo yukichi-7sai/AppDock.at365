@@ -1,5 +1,6 @@
 import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
+import { emptyMcpDeviceSettings } from './mcp-device-settings';
 import { commandTextPlain, type CommandReference } from './command-text';
 import { pageReferences } from './page-links';
 import { hostSettingDefinitions } from './host-settings';
@@ -89,6 +90,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
     ],
   ],
   'mcp-client': [
+    ['commands', hostText('settings.mcpCommands.title')],
     [
       'connections',
       hostText('settings.settings-catalog.mcpClient'),
@@ -508,7 +510,7 @@ export function settingsCatalog(
       id,
       title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
       kind: 'host' as const,
-      json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
+      json: !['applets', 'web-accounts', 'permissions', 'codex', 'mcp-client'].includes(id),
       items: [
         ...hostRows(id, current.host.language)
           .filter(([key]) => id !== 'tts' || ttsPageKeys.includes(key))
@@ -655,6 +657,7 @@ export function settingsPaths(
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
 ): SettingsPath[] {
+  if (page.id === 'mcp-client') return [['mcpClient']];
   if (!page.json) return [];
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner);
@@ -678,8 +681,6 @@ export function settingsPaths(
       ...(page.id === 'about' ? deviceOnlyHostKeys.map((key) => ['host', key]) : []),
     ];
   switch (page.id) {
-    case 'mcp-client':
-      return [['mcpServers']];
     case 'custom-commands':
       return [['customCommands']];
     case 'tts':
@@ -778,6 +779,7 @@ export function resetSettingsPage(
   scope: SettingsResetScope = 'page',
 ): Settings {
   const paths = settingsResetPaths(page, applets, scope);
+  if (page.id === 'mcp-client') return { ...current, mcpClient: emptyMcpDeviceSettings() };
   if (scope === 'page') return applySettingsJson(current, page, applets, '{}');
   const defaults = settingsPageDefaults(page, applets);
   const next = structuredClone(current);
@@ -812,7 +814,8 @@ export function settingsProjection(
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
 ): Record<string, unknown> {
-  if (!page.json) throw Error(hostText('settings.settings-catalog.jsonUnsupported'));
+  if (!page.json && page.id !== 'mcp-client')
+    throw Error(hostText('settings.settings-catalog.jsonUnsupported'));
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);
     const fields = applet?.settings ?? [];

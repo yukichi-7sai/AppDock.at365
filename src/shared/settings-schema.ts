@@ -4,7 +4,7 @@ import { validateSettingValue } from './setting-definitions';
 import { defaultHostLanguage, validHostLanguageCode } from './host-language';
 import { hostText } from './i18n';
 import { prepareSettingsLookups } from './settings-lookups';
-import { parseMcpRoster } from './mcp-client';
+import { parseMcpDeviceSettings } from './mcp-device-settings';
 import { minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsConfiguration, parseTtsConfiguration } from './tts';
@@ -95,7 +95,6 @@ export function parseSettings(value: unknown): Settings {
       ...(raw.notificationPreferences === undefined
         ? {}
         : { notificationPreferences: { overrides: [] } }),
-      ...(raw.mcpServers === undefined ? {} : { mcpServers: { version: 1, items: [] } }),
       ...(raw.imageLibrary === undefined ? {} : { imageLibrary: { groups: [] } }),
       ...(raw.soundLibrary === undefined ? {} : { soundLibrary: { groups: [] } }),
       ...(raw.textLibrary === undefined ? {} : { textLibrary: { groups: [] } }),
@@ -277,7 +276,9 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error(hostText('settings.settings-schema.updateDelay'));
   const next = {
-    ...(value.mcpServers === undefined ? {} : { mcpServers: parseMcpRoster(value.mcpServers) }),
+    ...(value.mcpClient === undefined
+      ? {}
+      : { mcpClient: parseMcpDeviceSettings(value.mcpClient) }),
     ...(value.customCommands === undefined
       ? {}
       : { customCommands: parseCustomCommands(value.customCommands) }),

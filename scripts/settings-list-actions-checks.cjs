@@ -1,8 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { settleSettings } = require('./settings-immediate-helper.cjs');
-const { normalizeShortcut } = require('../out/main/shared/commands');
 
 module.exports = async ({
   host,
@@ -24,11 +22,10 @@ module.exports = async ({
     ],
     ['リボン', '.ribbon-row-controls .settings-list-icon'],
     ['タスクトレイ', '.tray-row-controls .settings-list-icon'],
-    ['ショートカットキー', '.command-binding-table .settings-list-icon'],
-    ['マウスジェスチャー', '.command-binding-table .settings-list-icon'],
     ['カスタムコマンド', '.settings-list tbody .settings-list-icon'],
     ['文章生成AI', '.ai-connection-table .settings-list-icon'],
-    ['MCPクライアント', '.settings-list tbody .settings-list-icon'],
+    ['MCPクライアント', '.settings-list tbody .settings-list-icon:visible'],
+    ['MCPツールコマンド', '.settings-list tbody .settings-list-icon:visible'],
   ];
   const change = (patch) =>
     host.evaluate(async (patch) => {
@@ -38,19 +35,24 @@ module.exports = async ({
         s.settings.revision,
       );
     }, patch);
-  const binding = (id) => host.locator(`[data-binding-id="${id}"]`);
   for (const theme of ['light', 'dark']) {
     await change({ theme });
     for (const width of [1280, 760]) {
       await inspect(
         inspector,
         `(${(e, width) => {
-          const window = e.BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+          const window = e.BrowserWindow.getAllWindows().find(
+            (w) =>
+              !w.isDestroyed() && w.webContents.getURL().startsWith('appdock://host/index.html'),
+          );
           window.setMinimumSize(600, 600);
           window.setSize(width, 900);
         }})(${electronExpression},${width})`,
       );
-      assert.equal(await host.evaluate(() => innerWidth), width);
+      await until(
+        async () => (await host.evaluate(() => innerWidth)) === width,
+        'resized native window',
+      );
       await until(
         () =>
           host.evaluate(async () => {
@@ -64,7 +66,11 @@ module.exports = async ({
       );
       let reference;
       for (const [title, selector] of pages) {
-        await select(title);
+        await select(title === 'MCPツールコマンド' ? 'MCPクライアント' : title);
+        if (title.startsWith('MCP'))
+          await host
+            .getByRole('tab', { name: title === 'MCPクライアント' ? '接続先' : title, exact: true })
+            .click();
         if (['Applet管理', '文章生成AI', 'MCPクライアント'].includes(title)) {
           const order = host.getByRole('button', { name: /並べ替え/ });
           assert.equal(await order.count(), 1, title + ' has one order action');
@@ -212,183 +218,24 @@ module.exports = async ({
           });
           await button.evaluate((e) => e.blur());
         }
-        if (title === 'ショートカットキー' || title === 'マウスジェスチャー') {
-          const s = (await snapshot()).settings.value;
-          const gestures = title === 'マウスジェスチャー';
-          const rows = gestures ? s.gestures.bindings : s.keybindings;
-          const key = (row) => (gestures ? row.gesture : normalizeShortcut(row.key));
-          const groups = new Map();
-          for (const row of rows) {
-            if (!groups.has(key(row))) groups.set(key(row), new Set());
-            groups.get(key(row)).add(row.command);
-          }
-          assert.deepEqual(await host.locator('.command-binding-table th').allTextContents(), [
-            'コマンド',
-            '割り当て',
-            '操作',
-            '移動',
-          ]);
-          assert.equal(await host.locator('.gesture-menu-trigger').count(), 0);
-          for (const row of rows) {
-            const multiple = groups.get(key(row)).size >= 2;
-            const actions = binding(row.id).locator('.binding-row-actions');
-            assert.deepEqual(
-              await actions.locator('button').evaluateAll((buttons) => buttons.map((b) => b.title)),
-              [
-                '編集',
-                `この${gestures ? 'ジェスチャー' : 'キー'}の実行順${multiple ? '（複数のコマンド）' : ''}`,
-                '削除',
-              ],
-            );
-            assert.equal(
-              await actions.locator('.binding-order').getAttribute('data-multiple-commands'),
-              String(multiple),
-            );
-            assert.equal(await actions.locator('.accent-action').count(), multiple ? 1 : 0);
-            const alignment = await binding(row.id).evaluate((tr) => {
-              const a = tr.querySelector('.applet-shortcut-value').getBoundingClientRect();
-              const b = tr.querySelector('.binding-row-actions').getBoundingClientRect();
-              return {
-                delta: Math.abs(a.top + a.height / 2 - b.top - b.height / 2),
-                value: a.toJSON(),
-                actions: b.toJSON(),
-                rowHeight: tr.getBoundingClientRect().height,
-                badgeColor: getComputedStyle(tr.querySelector('kbd')).color,
-                textColor: getComputedStyle(tr).color,
-                orderColor: getComputedStyle(tr.querySelector('.binding-order')).color,
-                lastAssignment: tr === tr.parentElement.lastElementChild,
-                lastCommand: tr.parentElement === tr.closest('table').lastElementChild,
-                padding: [...tr.querySelectorAll('.binding-value-cell, .binding-actions-cell')].map(
-                  (cell) => ({
-                    top: getComputedStyle(cell).paddingTop,
-                    bottom: getComputedStyle(cell).paddingBottom,
-                    border: getComputedStyle(cell).borderBottomWidth,
-                  }),
-                ),
-              };
-            });
-            assert(alignment.delta < 1, JSON.stringify(alignment));
-            assert.equal(
-              alignment.badgeColor,
-              multiple ? alignment.orderColor : alignment.textColor,
-              'input badge uses accent only for multiple commands',
-            );
-            (samples.at(-1).bindings ??= []).push({ id: row.id, ...alignment });
-          }
-          const filter = host.getByLabel(
-            gestures ? 'ジェスチャーのコマンドを検索' : 'ショートカットキーのコマンドを検索',
-          );
-          await filter.fill('fixture.hints.run');
-          await host.locator('.binding-row-actions').first().scrollIntoViewIfNeeded();
-          await host.screenshot({
-            path: path.join(
-              profile,
-              `actions-${gestures ? 'gestures' : 'keys'}-${theme}-${width}.png`,
-            ),
-          });
-          await filter.fill('');
-        }
       }
       checks.push(
-        `${theme}/${width}: eight lists share 32px transparent icons, hover/keyboard focus surfaces, four binding columns and per-input assignment indicators`,
+        `${theme}/${width}: seven current lists share 32px transparent icons and hover/keyboard focus surfaces`,
       );
     }
   }
-  await require('./binding-input-filter-checks.cjs')({
-    host,
-    select,
-    snapshot,
-    until,
-    profile,
-    checks,
-  });
-  for (const [page, id, editor] of [
-    ['ショートカットキー', 'nav.owner', '.applet-shortcut-dialog'],
-    ['マウスジェスチャー', 'actions.gesture', '.gesture-binding-dialog'],
-  ]) {
-    await select(page);
-    const before = structuredClone((await snapshot()).settings.value);
-    const filter = host.getByLabel(
-      page === 'ショートカットキー'
-        ? 'ショートカットキーのコマンドを検索'
-        : 'ジェスチャーのコマンドを検索',
-    );
-    await filter.fill('fixture.hints.run');
-    assert.equal(
-      await binding(id).locator('.binding-order.accent-action').count(),
-      1,
-      'other commands outside filter still count',
-    );
-    await binding(id).locator('.applet-shortcut-edit').focus();
-    await host.keyboard.press('Enter');
-    await host.locator(editor).waitFor();
-    await host.locator(editor).press('Escape');
-    assert(
-      await binding(id)
-        .locator('.applet-shortcut-edit')
-        .evaluate((e) => e === document.activeElement),
-    );
-    await binding(id).locator('.binding-order').click();
-    const order = host.locator('.shortcut-order-dialog');
-    await order.waitFor();
-    assert((await order.locator('[data-order-id]').count()) >= 2);
-    await order.press('Escape');
-    assert(
-      await binding(id)
-        .locator('.binding-order')
-        .evaluate((e) => e === document.activeElement),
-    );
-    assert.deepEqual((await snapshot()).settings.value, before, 'cancel preserves saved settings');
-    await binding(id).locator('.binding-delete').click();
-    await settleSettings(host);
-    assert.equal(await host.getByRole('alertdialog').count(), 0);
-    assert.equal(await binding(id).count(), 0);
-    const after = (await snapshot()).settings.value;
-    await filter.fill('');
-    const affected =
-      page === 'ショートカットキー'
-        ? after.keybindings.filter(
-            (row) =>
-              normalizeShortcut(row.key) ===
-              normalizeShortcut(before.keybindings.find((row) => row.id === id).key),
-          )
-        : after.gestures.bindings.filter(
-            (row) => row.gesture === before.gestures.bindings.find((row) => row.id === id).gesture,
-          );
-    assert(affected.length > 0);
-    for (const row of affected) {
-      assert.equal(
-        await binding(row.id).locator('.binding-order').getAttribute('data-multiple-commands'),
-        'false',
-        'deletion refreshes the remaining order indicator',
-      );
-    }
-    if (page === 'ショートカットキー') {
-      assert.deepEqual(
-        after.keybindings,
-        before.keybindings.filter((row) => row.id !== id),
-      );
-      assert.deepEqual(after.gestures, before.gestures);
-    } else {
-      assert.deepEqual(
-        after.gestures.bindings,
-        before.gestures.bindings.filter((row) => row.id !== id),
-      );
-      assert.deepEqual(after.keybindings, before.keybindings);
-    }
-    checks.push(
-      `${page}: filtered direct edit/order keyboard focus, cancel, immediate delete and unrelated bindings preserved`,
-    );
-  }
-  await select('ショートカットキー');
-  await host.getByLabel('ショートカットキーのコマンドを検索').fill('');
+  // Trigger stack actions, filtering and cancellation are covered by command-stacks-ui-test
+  // and command-triggers-ui-test --usability-only/--dialog-actions-only.
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.showHints.off'));
   await until(async () => (await snapshot()).settings.value.host.showHints === false, 'hints off');
-  assert.equal(
-    await binding('actions.duplicate.one').locator('.binding-row-actions button').count(),
-    3,
+  const actions = host.locator('.settings-list tbody .settings-list-icon:visible');
+  assert((await actions.count()) > 0);
+  assert(
+    await actions.evaluateAll((buttons) =>
+      buttons.every((button) => !!button.getAttribute('aria-label')),
+    ),
   );
-  checks.push('direct action labels remain available with hints OFF');
+  checks.push('MCP command row actions retain accessible labels with hints OFF');
   fs.writeFileSync(path.join(profile, 'list-actions.json'), JSON.stringify(samples, null, 2));
   fs.writeFileSync(
     path.join(profile, 'list-icon-states.json'),

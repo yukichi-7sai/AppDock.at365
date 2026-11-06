@@ -52,7 +52,7 @@ exports.install = (profile) => {
 
 exports.check = async ({ page, profile, local, client, checks, tool, value, until }) => {
   const toolsBefore = JSON.stringify((await client.listTools()).tools);
-  const credentials = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
+  const credentials = ['ai-keys.json', 'tts-keys.json', 'mcp-client-secrets.json']
     .map((file) => path.join(local, file))
     .filter((file) => fs.existsSync(file))
     .map((file) => ({ file, sha256: hash(file) }));

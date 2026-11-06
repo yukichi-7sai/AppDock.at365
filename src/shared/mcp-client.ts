@@ -26,6 +26,7 @@ export interface McpLocalStatus {
   connection?: McpConnection;
   tokenConfigured: boolean;
   environmentNames: string[];
+  requiresEnvironment?: boolean;
   state: string;
   error?: string;
 }
@@ -37,6 +38,7 @@ export interface McpToolDescriptor {
   outputSchema?: JsonObject;
   annotations?: JsonObject;
   toolRevision: string;
+  toolBinding: import('./mcp-device-settings').McpToolBinding;
   unsupportedReason?: string;
 }
 export interface McpResult {

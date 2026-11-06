@@ -131,7 +131,7 @@ import {
 import { SettingsCommands } from './core/settings-commands';
 import { SettingsInputSession } from './core/settings-input-session';
 import { CustomCommandService, CustomCommandError } from './core/custom-commands';
-import { mcpCommandType } from '../shared/mcp-command';
+import { McpToolCommandService } from './core/mcp-tool-commands';
 import type { InputInvocation } from './core/command-contexts';
 import { commandStackType, parseCommandStack, validateStackGraph } from '../shared/command-stacks';
 import { customItems } from '../shared/custom-commands';
@@ -1056,6 +1056,7 @@ const serviceSettings = new SettingsServiceTargets({
   applets: allApplets,
   appletManagement,
   mcpSettings: () => mcpSettings,
+  mcpToolCommands: () => mcpToolCommands,
   launch,
   assertWritable: assertSettingsWritable,
 });
@@ -1235,7 +1236,7 @@ function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
 }
 const mcpSettings = new McpClientSettings(
   settings,
-  path.join(dataDirectory, 'mcp-client.json'),
+  path.join(dataDirectory, 'mcp-client-secrets.json'),
   {
     encrypt: (v) => {
       if (!safeStorage.isEncryptionAvailable())
@@ -1441,42 +1442,18 @@ customCommands.registerHost(
     stateVersion: () => 0,
   },
 );
-customCommands.registerHost(
-  () => mcpCommandType,
-  async (config, context) => {
+const mcpToolCommands = new McpToolCommandService({
+  settings: mcpSettings,
+  client: mcpClient,
+  actor: (context) => {
     const caller = context.apiCaller ?? context.origin;
-    const actor =
-      caller?.kind === 'applet'
-        ? mcpActor(caller.appletId, context)
-        : caller?.kind === 'mcp'
-          ? mcpActor(undefined, context)
-          : mcpHostActor;
-    try {
-      const job = await mcpClient.start(
-        actor,
-        {
-          serverId: config.serverId,
-          name: config.toolName,
-          toolRevision: config.toolRevision,
-          arguments: config.arguments,
-          timeoutMs: config.timeoutMs ?? 60000,
-          requestId: randomUUID(),
-        },
-        context.signal,
-        true,
-      );
-      return { completion: 'accepted', jobId: job.jobId, state: job.state };
-    } catch (error) {
-      if (error instanceof AutomationError) throw new CustomCommandError(error.code, error.message);
-      throw error;
-    }
+    return caller?.kind === 'applet'
+      ? { ...mcpActor(caller.appletId, context), external: true }
+      : caller?.kind === 'mcp'
+        ? mcpActor(undefined, context)
+        : mcpHostActor;
   },
-  {
-    validateConfig: (config) => mcpClient.commandValidation(config),
-    unavailableReason: (config) => mcpClient.commandUnavailable(config),
-    stateVersion: () => mcpClient.commandStateVersion(),
-  },
-);
+});
 customCommands.registerHost(
   commandStackType,
   async (_config, context, definition) => {
@@ -1693,6 +1670,7 @@ const operationApi = new AppDockApi({
   settingsCommands,
   appletManagement,
   customCommands,
+  mcpToolCommands,
   mcpClientAllowed: () => mcpAllowed('allowUseMcp'),
   inputAllowed: () => mcpAllowed('allowSendInput'),
   processesAllowed: () => mcpAllowed('allowRunProcesses'),
@@ -1845,7 +1823,11 @@ function trayMenu() {
   const applets = allApplets();
   const entries = resolveTrayMenu(
     getTrayMenu(settings.value, applets),
-    trayCommandCatalog(applets, customCommands.uiCommands(), navigation.history.availability),
+    trayCommandCatalog(
+      applets,
+      [...customCommands.uiCommands(), ...mcpToolCommands.uiCommands()],
+      navigation.history.availability,
+    ),
   );
   const template = (items: ResolvedTrayItem[]): Electron.MenuItemConstructorOptions[] =>
     items.map((item) =>
@@ -1940,6 +1922,7 @@ function commandReferenceCatalog() {
   const key = JSON.stringify([
     settings.value.host.language,
     navigation.history.availability,
+    mcpToolCommands.uiCommands(),
     applets.map((applet) => [
       applet.id,
       applet.displayName,
@@ -1962,6 +1945,7 @@ function uiCommands(applets = allApplets()): import('../shared/commands').UiComm
       extensionId: null,
     })),
     ...customCommands.uiCommands(),
+    ...mcpToolCommands.uiCommands(),
     ...appletManagementCommands(applets),
     ...applets.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
@@ -1979,7 +1963,13 @@ function settingsUiCommands() {
     ...commands,
     ...[...knownSettingsCommands.values()]
       .filter((c) => !ids.has(c.id))
-      .map((c) => ({ ...c, available: false, missing: true, customDefinitionId: undefined })),
+      .map((c) => ({
+        ...c,
+        available: false,
+        missing: true,
+        customDefinitionId: undefined,
+        mcpToolCommandId: undefined,
+      })),
   ].map((command) => ({ ...command, automation: published.has(command.id) }));
 }
 function settingsCommandAssignments() {
@@ -2140,6 +2130,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
     if (!startupReady || !updater) throw Error(hostText('services.index.notReady'));
     return update.scope === 'check' ? updater.check() : updater.install(update.scope);
   }
+  if (mcpToolCommands.has(id)) return mcpToolCommands.execute(id, invocation);
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
     const context = invocation?.triggerContext ?? (await captureCommandContext());
@@ -2256,7 +2247,8 @@ const commandDispatcher = new CommandDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
   () => quitting,
-  (id) => customCommands.isAvailable(id),
+  (id) =>
+    mcpToolCommands.has(id) ? mcpToolCommands.isAvailable(id) : customCommands.isAvailable(id),
 );
 async function captureCommandContext(): Promise<
   import('../shared/command-conditions').TriggerContext
@@ -2295,6 +2287,7 @@ function availableShortcutCommands(
         extensionId: null,
       })),
     ...customCommands.uiCommands().filter((c) => c.available),
+    ...mcpToolCommands.uiCommands().filter((c) => c.available),
     ...appletManagementCommands(applets).filter((c) => c.available),
     ...applets.flatMap((e) =>
       e.commands
@@ -2565,6 +2558,10 @@ function commitSettings(
 ) {
   assertSettingsWritable();
   settings.assertRevision(revision);
+  if (resetPage?.id === 'mcp-client') {
+    mcpSettings.reset(mcpSettings.revision());
+    return settings.snapshot();
+  }
   customCommands.validateReplacement(value);
   if (
     JSON.stringify([value.customCommands, triggerStacks(value)]) !==
@@ -2601,7 +2598,8 @@ function settingsPageStorage(
   const local =
     page.kind === 'applet'
       ? settings.localSettings(owner!)
-      : isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id);
+      : page.id === 'mcp-client' ||
+        (isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id));
   const scopes = new Set<'shared' | 'device' | 'local'>();
   if (page.id === 'notifications') scopes.add('local');
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
@@ -2633,10 +2631,16 @@ function settingsPageStorage(
           createHash('sha256')
             .update(JSON.stringify(customCommands.descriptors().map((t) => t.typeRevision)))
             .digest('hex')
-        : ''
+        : page.id === 'mcp-client'
+          ? ':' + mcpSettings.revision()
+          : ''
     }`,
     revision: settings.revision,
-    files: [...scopes].map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) })),
+    files: [...scopes]
+      .map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }))
+      .concat(
+        page.id === 'mcp-client' ? [{ scope: 'local', name: 'mcp-client-secrets.json' }] : [],
+      ),
   };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
@@ -2706,10 +2710,12 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
   if (id === 'codex') return { automation: automation?.state() };
   if (id === 'mcp-client')
     return {
+      commandAssignments: settingsCommandAssignments(),
       mcpClient: {
         ...mcpSettings.health(),
         connections: mcpClient.statuses(),
         jobs: mcpClient.summaries(),
+        commands: mcpToolCommands.summaries(),
       },
     };
   const summary = (a: ExtensionSnapshot): ExtensionSnapshot => ({
@@ -3172,11 +3178,12 @@ function settingsPageActions(
       changed();
     };
   }
-  if (page.id === 'mcp-client' || page.id === 'custom-commands') {
-    actions.mcpServers = async () => mcpClient.servers(mcpHostActor, { limit: 50 });
-    actions.mcpTools = async ([serverId, cursor]) =>
+  if (page.id === 'mcp-client') {
+    actions.mcpServers = async ([cursor]) => mcpClient.servers(mcpHostActor, { limit: 50, cursor });
+    actions.mcpCommandTools = async ([serverId, cursor]) =>
       mcpClient.tools(mcpHostActor, { serverId, cursor, refresh: !cursor, limit: 50 });
-    actions.mcpTool = async ([serverId, name]) => mcpClient.tool(mcpHostActor, { serverId, name });
+    actions.mcpCommandTool = async ([serverId, name]) =>
+      mcpClient.tool(mcpHostActor, { serverId, name });
   }
   if (page.id === 'mcp-client') {
     actions.mcpTools = async ([serverId, cursor]) => {
@@ -3193,6 +3200,14 @@ function settingsPageActions(
       const attempt = await mcpClient.inspectForSettings(mcpHostActor, { serverId, name });
       if (attempt.warning) mcpConnectionWarning(attempt.warning);
       return attempt.result ?? {};
+    };
+    actions.updateMcpToolCommands = async ([args]) => {
+      assertSettingsWritable();
+      return mcpToolCommands.update(args);
+    };
+    actions.resetMcpSecrets = async ([revision]) => {
+      assertSettingsWritable();
+      return mcpSettings.resetSecrets(String(revision));
     };
     actions.updateMcpConnection = async ([args]) => {
       assertSettingsWritable();
@@ -4717,6 +4732,7 @@ async function initialize() {
     settingsHealthNotifications?.refresh();
     changed();
   });
+  mcpSettings.watch(fileWatchAssistance);
   settings.watch(() => {
     /* The health source reports stable failures through ErrorReporter. */
   }, fileWatchAssistance);
@@ -6043,6 +6059,7 @@ app.on('before-quit', (event) => {
       }
     }
   })().finally(() => {
+    mcpSettings.close();
     settings.close();
     registeredImages.stop();
     soundLibrary.close();

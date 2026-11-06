@@ -6,13 +6,17 @@ import type { UiCommand } from '../../shared/commands';
 import { Icon, type IconName } from '../../shared/ui-icons';
 import { CommandProviderFilter } from './CommandProviderFilter';
 
-export const commandSettingsPages = localizedMetadata(() => [
-  {
-    id: 'command-triggers',
-    title: hostText('settings.commandTriggers.title'),
-    icon: 'bolt',
-  },
-] as const satisfies { id: string; title: string; icon: IconName }[]);
+export const commandSettingsPages = localizedMetadata(
+  () =>
+    [
+      {
+        id: 'command-triggers',
+        title: hostText('settings.commandTriggers.title'),
+        icon: 'bolt',
+      },
+      { id: 'mcp-client', title: hostText('settings.mcpCommands.edit'), icon: 'settings' },
+    ] as const satisfies { id: string; title: string; icon: IconName }[],
+);
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
 export type CommandSettingsTarget = {
   page: CommandSettingsPage;
@@ -47,7 +51,7 @@ export function CommandTargetFilter() {
 export function CommandSettingsLinks({
   command,
 }: {
-  command: Pick<UiCommand, 'id' | 'title' | 'customDefinitionId'>;
+  command: Pick<UiCommand, 'id' | 'title' | 'customDefinitionId' | 'mcpToolCommandId'>;
 }) {
   const { t: translate } = useHostTranslation();
   const navigation = useContext(CommandSettingsNavigation);
@@ -59,7 +63,10 @@ export function CommandSettingsLinks({
       aria-label={translate('settings.commandSettingsNavigation.target', { title: command.title })}
     >
       {commandSettingsPages
-        .filter((page) => page.id !== navigation.page)
+        .filter(
+          (page) =>
+            page.id !== navigation.page && (page.id !== 'mcp-client' || !!command.mcpToolCommandId),
+        )
         .map((page) => {
           const assigned = Object.values(navigation.assignments).some((ids) => ids.has(command.id));
           return (

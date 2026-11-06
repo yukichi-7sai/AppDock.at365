@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
+import { parseMcpRoster } from '../../shared/mcp-client';
 import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import {
@@ -48,6 +50,7 @@ export interface DeviceHostPage {
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
+  mcpClient?: McpDeviceSettings;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
   hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
@@ -158,11 +161,14 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'collectionEnabled',
           'touchpadGestures',
           'uiState',
+          'mcpClient',
+          'mcpServers',
         ].includes(key),
     )
   )
     throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
+  if (raw.mcpServers !== undefined) parseMcpRoster(raw.mcpServers);
   if (raw.uiState !== undefined) parseDeviceUiState(raw.uiState);
   if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))
     throw Error(hostText('services.deviceSettings.invalidHost'));
@@ -233,8 +239,10 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           throw Error(hostText('services.deviceSettings.invalidEnabled'));
     }
   }
+  const { mcpServers: _legacyMcpServers, ...current } = raw;
   return {
-    ...structuredClone(raw),
+    ...structuredClone(current),
+    ...(raw.mcpClient === undefined ? {} : { mcpClient: parseMcpDeviceSettings(raw.mcpClient) }),
     hostPages,
     host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;
@@ -312,6 +320,7 @@ export function combineSettings(
   collections: DeviceCollection[],
 ): Settings {
   const result = structuredClone(shared);
+  result.mcpClient = parseMcpDeviceSettings(device.mcpClient);
   for (const key of deviceOnlyHostKeys) result.host[key] = device.host[key];
   for (const pageId of hostPageSettingsIds) {
     const entry = device.hostPages?.[pageId];
@@ -398,6 +407,9 @@ export function splitSettings(
 ) {
   const shared = structuredClone(originalShared),
     device = structuredClone(initializeHostPageSettings(originalDevice, originalShared));
+  delete shared.mcpClient;
+  if (!equal(before.mcpClient, next.mcpClient))
+    device.mcpClient = parseMcpDeviceSettings(next.mcpClient);
   const copyChanges = (
     target: Record<string, any>,
     previous: Record<string, any>,
@@ -411,6 +423,7 @@ export function splitSettings(
       }
   };
   copyChanges(shared, before, next, [
+    'mcpClient',
     'host',
     'extensions',
     'touchpadGestures',

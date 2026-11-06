@@ -186,7 +186,7 @@ export function SettingsPageLayout({
                         hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
                       />
                     </label>
-                  ) : page.id === 'about' ? (
+                  ) : page.id === 'about' || page.id === 'mcp-client' ? (
                     <span
                       className="settings-storage-toggle"
                       data-testid="settings-storage-device-only"
@@ -197,7 +197,7 @@ export function SettingsPageLayout({
                   <span className="sr-only" role="status">
                     {pending ? t('settings.saving') : ''}
                   </span>
-                  {page.json && !page.unavailableReason && (
+                  {(page.json || page.id === 'mcp-client') && !page.unavailableReason && (
                     <button
                       type="button"
                       className="settings-page-reset"

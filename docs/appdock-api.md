@@ -6,8 +6,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 `customCommands.types.list/get`と`customCommands.list/get`、`commands.execute`経由の`appdock.customCommands.update`を使用できます。[カスタムコマンド契約](custom-commands-design.md)に保存形式・Schema・上限・CRUD例をまとめています。定義の読取りはread、変更はread + write、保存済みコマンドの実行はread + executeです。Appletは自身の定義だけを管理でき、外部公開を追加できません。実行の元callerはハンドラー内の共通APIにも引き継ぎ、MCPとAppletの必要許可の積を検査します。
 
-本体提供種類`appdock.mcp.call`は接続先ID・ツール名・toolRevision・固定argumentsを保存します。実行は`handlerReturned`内の`result.completion:'accepted'`とjobIdを返し、完了を待ちません。[保存型MCPコマンド](custom-commands-design.md)を参照してください。
-
+MCPツールコマンドは`appdock.mcp.tool.<UUID>`として独立した所有サービスへ接続します。実行結果の`completion: accepted`と`jobId`はジョブ受付を示し、完了を待ちません。管理は固定の共通設定API対象を使用します。[保存・復旧・公開条件](mcp-device-settings-design.md)を参照してください。
 ## MCPクライアントとハブ
 
 `mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要です。新規環境のuseMcpはApplet側がON、MCP側がOFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-design.md)を参照してください。

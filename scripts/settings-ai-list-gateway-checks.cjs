@@ -150,7 +150,10 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await until(async () => (await added.count()) === 0, 'AI UI received list removal');
   const current = await value('appdock_settings_get_values', { targetId: 'service.ai' });
   assert.equal(current.fields.find((field) => field.key === 'defaultConnectionId').hasValue, false);
-  assert.equal(JSON.parse(fs.readFileSync(shared)).ai.defaultConnectionId, undefined);
+  assert.equal(
+    require('./test-settings.cjs').read(profile, local).ai.defaultConnectionId,
+    undefined,
+  );
   assert.deepEqual(fs.readFileSync(keyFile), cipher);
   checks.push(
     'AI list reorder updates UI with stable IDs and removing a default clears it without choosing another',

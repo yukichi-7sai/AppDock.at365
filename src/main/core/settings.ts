@@ -32,6 +32,11 @@ export function storedSettingRecord(
   );
 }
 export class SettingsConflictError extends Error {}
+export interface SettingsAsset {
+  commit(): void;
+  rollback(): void;
+  recovery?: { scope: 'mcp-secrets'; before: string | null; after: string };
+}
 class SettingsReadError extends Error {
   constructor(readonly kind: 'read-invalid' | 'read-unavailable') {
     super(settingsIssueMessages[kind]);
@@ -345,7 +350,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     if (revision !== this.revision)
       throw new SettingsConflictError(hostText('services.settings.changedBeforeSave'));
   }
-  save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
+  save(value: unknown, revision: number, asset?: SettingsAsset) {
     if (this.writesBlocked) throw Error(hostText('services.settings.restoring'));
     this.assertRevision(revision);
     const parsed = this.codec ? this.codec.parse(value) : (validate(value) as T);

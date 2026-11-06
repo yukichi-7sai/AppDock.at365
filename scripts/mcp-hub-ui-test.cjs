@@ -22,7 +22,13 @@ const profile = path.join(
   ),
   local = path.join(profile, 'local');
 fs.mkdirSync(profile, { recursive: true });
-const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const hash = (file) =>
+  fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+const deviceFile = () =>
+  require('./test-settings.cjs').file(
+    profile,
+    'settings-' + require('node:os').hostname() + '.json',
+  );
 const checks = [],
   states = [];
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -119,13 +125,15 @@ delete watchManifest.defaultKeybindings;
 delete watchManifest.defaultGestures;
 fs.writeFileSync(path.join(watchFolder, 'extension.json'), JSON.stringify(watchManifest));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
 const portableHash = portable ? hash(portable) : undefined;
-if (portable)
-  require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
+if (portable) require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
 function fixtureHashes(folder) {
   return Object.fromEntries(
     fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
@@ -361,8 +369,9 @@ async function assertMcpWriteDenied() {
       false,
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).customCommands
-        .version,
+      JSON.parse(
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+      ).customCommands.version,
       1,
     );
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
@@ -398,8 +407,8 @@ async function assertMcpWriteDenied() {
       .fill(JSON.stringify([path.join(root, 'tests/fixtures/mcp-server.cjs')]));
     await connectionDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await connectionDialog.waitFor({ state: 'hidden' });
-    const mcpServerId = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'))
-      .mcpServers.items[0].id;
+    const mcpServerId = JSON.parse(fs.readFileSync(deviceFile(), 'utf8')).mcpClient.servers[0].id;
+    await page.getByRole('tab', { name: 'ツール確認', exact: true }).click();
     await page.getByLabel('確認するMCP接続先').selectOption(mcpServerId);
     await until(
       () => page.getByLabel('MCPツール', { exact: true }).isEnabled(),
@@ -473,7 +482,8 @@ async function assertMcpWriteDenied() {
     };
     const beforePreview = [
       hash(require('./test-settings.cjs').file(profile, 'settings.json')),
-      hash(path.join(local, 'mcp-client.json')),
+      hash(deviceFile()),
+      hash(path.join(local, 'mcp-client-secrets.json')),
     ];
     const secretWrite = await client.callTool({
       name: 'appdock_mcp_update_server_settings',
@@ -486,11 +496,16 @@ async function assertMcpWriteDenied() {
     assert.equal(secretWrite.structuredContent.code, 'INVALID_ARGUMENT');
     assert.equal((await managedUpdate({ ...request, dryRun: true })).saved, false);
     assert.deepEqual(
-      [hash(require('./test-settings.cjs').file(profile, 'settings.json')), hash(path.join(local, 'mcp-client.json'))],
+      [
+        hash(require('./test-settings.cjs').file(profile, 'settings.json')),
+        hash(deviceFile()),
+        hash(path.join(local, 'mcp-client-secrets.json')),
+      ],
       beforePreview,
     );
     await managedUpdate(request);
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
+    await page.getByRole('tab', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: managedItem.name + 'を編集', exact: true }).click();
     const secretDialog = page.getByRole('dialog');
     await secretDialog.getByLabel('環境変数を入力・置換する', { exact: true }).check();
@@ -499,9 +514,8 @@ async function assertMcpWriteDenied() {
       .fill(JSON.stringify({ MCP_FIXTURE_SECRET: 'fixture-management-secret' }));
     await secretDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await secretDialog.waitFor({ state: 'hidden' });
-    const secretFile = path.join(local, 'mcp-client.json');
-    const secretBytes = () =>
-      JSON.parse(fs.readFileSync(secretFile, 'utf8')).entries[managedId].secret;
+    const secretFile = path.join(local, 'mcp-client-secrets.json');
+    const secretBytes = () => JSON.parse(fs.readFileSync(secretFile, 'utf8')).entries[managedId];
     const retainedSecret = secretBytes();
     assert.equal(typeof retainedSecret, 'string');
     let managedDetails = await call('appdock_mcp_get_server_settings', { serverId: managedId });
@@ -593,6 +607,7 @@ async function assertMcpWriteDenied() {
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     assert.equal((await call('appdock_mcp_list_servers')).items.length, 0);
+    await page.getByRole('tab', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     let relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).check();
@@ -654,13 +669,14 @@ async function assertMcpWriteDenied() {
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await page.setViewportSize({ width: 740, height: 760 });
+    await page.getByRole('tab', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     await checkDialogLayout(page.getByRole('dialog'));
     await page.screenshot({ path: path.join(profile, 'mcp-client-dialog-dark-narrow.png') });
     await page.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
     await page.setViewportSize({ width: 1280, height: 900 });
     const allTypes = (await call('appdock_list_custom_command_types')).items;
-    assert(allTypes.some((t) => t.id === 'appdock.mcp.call' && t.owner.kind === 'host'));
+    assert(!allTypes.some((t) => t.id === 'appdock.mcp.call'));
     const types = allTypes.filter((t) => t.owner.kind === 'applet');
     assert.equal(types.length, 3);
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
@@ -1047,9 +1063,9 @@ async function assertMcpWriteDenied() {
       'native Watch display/save',
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).extensions[
-        'at365.watch'
-      ].settings.showSeconds,
+      JSON.parse(
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+      ).extensions['at365.watch'].settings.showSeconds,
       false,
     );
     const watchPid = watchState().processId;
@@ -1100,10 +1116,11 @@ async function assertMcpWriteDenied() {
     checks.push(
       'stable ID retained after rename; existing shortcut dispatcher executes custom command',
     );
-    await page.getByRole('button', { name: 'Renamed Nodeを編集', exact: true }).waitFor();
-    await page.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
+    await page.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPツールコマンドを追加', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('種類', { exact: true }).selectOption('appdock.mcp.call');
+    await dialog.getByLabel('有効', { exact: true }).check();
     await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');
     await dialog.getByLabel('説明', { exact: true }).fill('MCPツールを実行する試験');
     await dialog.getByLabel('MCP接続先', { exact: true }).selectOption(mcpServerId);
@@ -1131,43 +1148,47 @@ async function assertMcpWriteDenied() {
     await page.screenshot({ path: path.join(profile, 'mcp-command-dialog.png') });
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.waitFor({ state: 'hidden' });
-    const savedMcp = (await call('appdock_list_custom_commands')).items.find(
-      (i) => i.title === 'Saved MCP',
-    );
-    assert(savedMcp);
+    const mcpRows = () =>
+      call('appdock_settings_list_items', { targetId: 'service.mcp.toolCommands' });
+    const mcpUpdate = async (operations, dryRun = false) => {
+      const state = await mcpRows();
+      return call('appdock_settings_apply', {
+        targetId: 'service.mcp.toolCommands',
+        expectedRevision: state.revision,
+        expectedSchemaRevision: state.schemaRevision,
+        requestId: randomUUID(),
+        operations,
+        dryRun,
+      });
+    };
+    const savedRow = (await mcpRows()).items.find((row) => row.values.title === 'Saved MCP');
+    assert(savedRow);
+    const savedMcp = { ...savedRow.values, commandId: 'appdock.mcp.tool.' + savedRow.values.id };
     assert.equal(savedMcp.description, 'MCPツールを実行する試験');
-    assert.equal(
-      (await call('appdock_get_custom_command', { id: savedMcp.id })).item.config.timeoutMs,
-      120000,
-    );
+    assert.equal(savedMcp.timeoutMs, 120000);
     const savedJob = async () => {
       const accepted = await call('appdock_execute_command', { id: savedMcp.commandId });
-      assert.equal(accepted.completion, 'handlerReturned');
-      assert.equal(accepted.result.completion, 'accepted');
+      assert.equal(accepted.completion, 'accepted');
       return until(async () => {
-        const j = await call('appdock_mcp_get_job', { jobId: accepted.result.jobId });
+        const j = await call('appdock_mcp_get_job', { jobId: accepted.jobId });
         return j.state !== 'running' && j;
       }, 'saved MCP job');
     };
     assert.equal((await savedJob()).result.structuredContent.scheduledSeconds, 600);
-    const mcpType = (await call('appdock_get_custom_command_type', { typeId: 'appdock.mcp.call' }))
-      .type;
-    const mcpDefinition = (await call('appdock_get_custom_command', { id: savedMcp.id })).item;
-    const apiItem = { ...mcpDefinition, id: randomUUID(), title: 'API MCP' };
-    delete apiItem.owner;
-    const beforeDryRun = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
-    await call('appdock_mcp_get_tool', { serverId: mcpServerId, name: 'schedule_off' });
-    await call('appdock_execute_command', {
-      id: 'appdock.customCommands.update',
-      args: {
-        expectedRevision: (await call('appdock_list_custom_commands')).revision,
-        dryRun: true,
-        operations: [{ op: 'add', item: apiItem, expectedTypeRevision: mcpType.typeRevision }],
-      },
+    const observed = await call('appdock_mcp_get_tool', {
+      serverId: mcpServerId,
+      name: 'schedule_off',
     });
-    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), beforeDryRun);
-    await update([{ op: 'add', item: apiItem, expectedTypeRevision: mcpType.typeRevision }]);
-    await update([{ op: 'remove', id: apiItem.id }]);
+    const { id: _id, available: _available, unavailableReason: _reason, ...apiValues } = savedMcp;
+    delete apiValues.commandId;
+    apiValues.title = 'API MCP';
+    apiValues.toolRevision = observed.tool.toolRevision;
+    const beforeDryRun = fs.readFileSync(deviceFile(), 'utf8');
+    await mcpUpdate([{ kind: 'add', values: apiValues }], true);
+    assert.equal(fs.readFileSync(deviceFile(), 'utf8'), beforeDryRun);
+    await mcpUpdate([{ kind: 'add', values: apiValues }]);
+    const apiRow = (await mcpRows()).items.find((row) => row.values.title === 'API MCP');
+    await mcpUpdate([{ kind: 'remove', itemRef: apiRow.itemRef }]);
     const shortcuts = await call('appdock_get_shortcuts');
     await call('appdock_execute_command', {
       id: 'appdock.shortcuts.update',
@@ -1187,12 +1208,19 @@ async function assertMcpWriteDenied() {
         ],
       },
     });
-    await update([{ op: 'update', id: savedMcp.id, changes: { title: 'Renamed MCP' } }]);
+    await mcpUpdate([
+      {
+        kind: 'update',
+        itemRef: (await mcpRows()).items.find((row) => row.values.id === savedMcp.id).itemRef,
+        changes: { title: 'Renamed MCP' },
+      },
+    ]);
     assert.equal(
       (await page.evaluate(() => window.dock.dispatchShortcut('Ctrl+Alt+F7'))).executed,
       1,
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
+    await page.getByRole('tab', { name: 'ツール確認', exact: true }).click();
     await until(async () => {
       const buttons = page.getByRole('button', { name: '結果を表示', exact: true });
       if (!(await buttons.count())) return false;
@@ -1200,6 +1228,7 @@ async function assertMcpWriteDenied() {
       const content = await page.getByLabel('MCP実行結果', { exact: true }).innerText();
       return content.includes('scheduledSeconds') && content.includes('600');
     }, 'shortcut MCP job result');
+    await page.getByRole('tab', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).uncheck();
@@ -1214,6 +1243,7 @@ async function assertMcpWriteDenied() {
       ).isError,
       true,
     );
+    await page.getByRole('tab', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).check();
@@ -1298,7 +1328,11 @@ async function assertMcpWriteDenied() {
     const restoredOn = await mcpPermissionControl(page);
     assert.equal(await restoredOn.control.isChecked(), true);
     await connect(state);
-    assert.equal((await call('appdock_list_custom_commands')).items.length, 4);
+    assert.equal((await call('appdock_list_custom_commands')).items.length, 3);
+    assert.equal(
+      (await mcpRows()).items.find((row) => row.values.id === savedMcp.id).values.title,
+      'Renamed MCP',
+    );
     assert.equal(await (await mcpPermissionControl(page, true)).control.isChecked(), true);
     assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
     assert.equal((await savedJob()).result.structuredContent.scheduledSeconds, 600);

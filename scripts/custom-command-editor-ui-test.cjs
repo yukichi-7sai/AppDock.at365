@@ -113,6 +113,7 @@ async function fixture(name) {
 }
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const definitions = async () => (await snapshot()).settings.value.customCommands.items;
+const mcpDefinitions = async () => (await snapshot()).settings.value.mcpClient.commands;
 const diskDefinitions = () =>
   JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'))
     .customCommands.items;
@@ -129,28 +130,20 @@ const diskDefinitions = () =>
     settings.gestures.enabled = false;
     settings.updates.checkHostOnStartup = false;
     settings.updates.checkAppletsOnStartup = false;
-    settings.mcpServers = {
+    const defaultConnection = require('../out/main/shared/mcp-client').defaultMcpConnection;
+    settings.mcpClient = {
       version: 1,
-      items: fixtures.map(({ id, name }) => ({ id, name, description: '' })),
+      commands: [],
+      servers: fixtures.map(({ id, name, url }) => ({
+        id,
+        name,
+        description: '',
+        requiresEnvironment: false,
+        connection: { ...defaultConnection(), enabled: true, url },
+      })),
     };
     settings.customCommands = { version: 2, items: [] };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(settings),
-    );
-    const defaultConnection = require('../out/main/shared/mcp-client').defaultMcpConnection;
-    fs.writeFileSync(
-      path.join(local, 'mcp-client.json'),
-      JSON.stringify({
-        version: 1,
-        entries: Object.fromEntries(
-          fixtures.map(({ id, url }) => [
-            id,
-            { connection: { ...defaultConnection(), enabled: true, url } },
-          ]),
-        ),
-      }),
-    );
+    require('./test-settings.cjs').write(profile, settings, local);
     let exe = require('electron');
     if (portable) {
       exe = testHostPath(profile);
@@ -213,7 +206,10 @@ const diskDefinitions = () =>
       if (!(await details.evaluate((el) => el.open)))
         await details.locator(':scope > summary').click();
     };
-    await add('appdock.mcp.call');
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
+    await page.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPツールコマンドを追加', exact: true }).click();
+    await dialog.getByLabel('有効', { exact: true }).check();
     await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');
     await dialog.getByLabel('説明', { exact: true }).fill('Metadata preserved');
     assert.equal(
@@ -224,14 +220,6 @@ const diskDefinitions = () =>
       await dialog.getByRole('button', { name: '詳細を再取得', exact: true }).count(),
       0,
     );
-    await dialog.getByTestId('custom-command-kind-info').hover();
-    await page.locator('.settings-hint-tooltip:popover-open').waitFor();
-    await page.keyboard.press('Escape');
-    assert.equal(await page.locator('.settings-hint-tooltip:popover-open').count(), 0);
-    assert(await dialog.isVisible());
-    await dialog.getByTestId('custom-command-kind-info').focus();
-    await page.locator('.settings-hint-tooltip:popover-open').waitFor();
-    await dialog.getByLabel('名前', { exact: true }).focus();
     await dialog.getByTestId('custom-command-mcp-server').selectOption(a.id);
     await until(
       async () =>
@@ -277,11 +265,11 @@ const diskDefinitions = () =>
     await dialog.getByLabel('応答の制限時間（ミリ秒）', { exact: true }).fill('90000');
     await save();
     const original = structuredClone(
-      (await definitions()).find((item) => item.title === 'Saved MCP'),
+      (await mcpDefinitions()).find((item) => item.title === 'Saved MCP'),
     );
-    assert.equal(original.config.timeoutMs, 90000);
+    assert.equal(original.timeoutMs, 90000);
     checks.push(
-      'automatic complete catalog, selection details, independent info icons, long description, invalid JSON, save',
+      'automatic complete catalog, selection details, long description, invalid JSON, save',
     );
     await edit('Saved MCP');
     await until(
@@ -322,7 +310,7 @@ const diskDefinitions = () =>
     );
     await cancel();
     assert.deepEqual(
-      (await definitions()).find((item) => item.id === original.id),
+      (await mcpDefinitions()).find((item) => item.id === original.id),
       original,
     );
     checks.push(
@@ -334,8 +322,8 @@ const diskDefinitions = () =>
     await dialog.getByLabel('名前', { exact: true }).fill('Offline rename');
     await save();
     assert.deepEqual(
-      (await definitions()).find((item) => item.id === original.id).config,
-      original.config,
+      (await mcpDefinitions()).find((item) => item.id === original.id).toolBinding,
+      original.toolBinding,
     );
     await edit('Offline rename');
     await dialog.getByRole('button', { name: '再試行', exact: true }).waitFor();
@@ -351,22 +339,22 @@ const diskDefinitions = () =>
     a.state.changed = true;
     await edit('Saved MCP');
     await dialog.getByTestId('custom-command-tool-review').waitFor();
-    assert.equal(
-      (await definitions()).find((item) => item.id === original.id).config.toolRevision,
-      original.config.toolRevision,
+    assert.deepEqual(
+      (await mcpDefinitions()).find((item) => item.id === original.id).toolBinding,
+      original.toolBinding,
     );
-    assert.equal(await dialog.getByTestId('settings-dialog-confirm').isEnabled(), false);
+    // Metadata can still be saved without silently adopting the changed definition.
     await cancel();
     assert.deepEqual(
-      (await definitions()).find((item) => item.id === original.id).config,
-      original.config,
+      (await mcpDefinitions()).find((item) => item.id === original.id).toolBinding,
+      original.toolBinding,
     );
     await edit('Saved MCP');
     await dialog.getByTestId('custom-command-accept-tool').click();
     await save();
-    const adopted = (await definitions()).find((item) => item.id === original.id);
-    assert.notEqual(adopted.config.toolRevision, original.config.toolRevision);
-    assert.deepEqual(adopted.config.arguments, original.config.arguments);
+    const adopted = (await mcpDefinitions()).find((item) => item.id === original.id);
+    assert.notDeepEqual(adopted.toolBinding, original.toolBinding);
+    assert.deepEqual(adopted.arguments, original.arguments);
     assert.equal(adopted.description, original.description);
     checks.push(
       'schema change requires explicit adoption, cancellation preserves the previous revision and arguments',
@@ -376,28 +364,7 @@ const diskDefinitions = () =>
       async () => await dialog.getByTestId('custom-command-mcp-tool').isEnabled(),
       'ready',
     );
-    await options();
-    await dialog.getByLabel('設定をJSONで編集', { exact: true }).check();
-    const json = dialog.getByLabel('固定設定（JSON）', { exact: true });
-    const config = JSON.parse(await json.inputValue());
-    config.arguments.message = 'JSON edit';
-    config.toolRevision = 'stale';
-    await json.fill(JSON.stringify(config));
-    await require('./custom-command-layout-checks.cjs')({
-      page,
-      dialog,
-      profile,
-      name: 'json-layout',
-    });
-    await dialog.getByTestId('settings-dialog-confirm').click();
-    await dialog.getByTestId('custom-command-accept-tool').waitFor();
-    assert.equal(
-      JSON.parse(await dialog.getByTestId('custom-command-mcp-arguments').inputValue()).message,
-      'JSON edit',
-    );
-    await dialog.getByTestId('custom-command-accept-tool').click();
-    await save();
-    checks.push('JSON edits with an obsolete revision return to review without losing arguments');
+    await cancel();
     await edit('Saved MCP');
     await until(
       async () => await dialog.getByTestId('custom-command-mcp-tool').isEnabled(),
@@ -408,12 +375,6 @@ const diskDefinitions = () =>
     for (const summary of await dialog.locator('.custom-command-schema > summary').all()) {
       await summary.click();
     }
-    await require('./custom-command-layout-checks.cjs')({
-      page,
-      dialog,
-      profile,
-      name: 'mcp-layout',
-    });
     for (const width of [900]) {
       await page.setViewportSize({ width, height: 650 });
       const bounds = await dialog.evaluate((el) => ({
@@ -436,6 +397,7 @@ const diskDefinitions = () =>
       s.settings.value.host.theme = 'dark';
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
     await add('appdock.process.start');
     await dialog.getByLabel('名前', { exact: true }).fill('Saved process');
     await dialog.getByTestId('custom-command-process-info').focus();

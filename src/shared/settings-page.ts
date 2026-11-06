@@ -70,6 +70,12 @@ export interface SettingsPageAuxiliary {
     revision: string;
     error?: string;
     connections: import('./mcp-client').McpLocalStatus[];
+    commands: {
+      id: string;
+      commandId: string;
+      available: boolean;
+      unavailableReason: string | null;
+    }[];
     jobs: import('./mcp-client').McpJob[];
   };
   customCommands?: {

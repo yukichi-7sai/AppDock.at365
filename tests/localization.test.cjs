@@ -266,7 +266,7 @@ test('host renderers and localized shared modules do not reintroduce inline Japa
       'versions',
       'web-content',
       'commands',
-      'mcp-command',
+      'mcp-device-settings',
       'update-commands',
       'settings-commands',
       'settings-defaults',

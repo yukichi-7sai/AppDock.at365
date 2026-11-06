@@ -78,14 +78,36 @@ async function launch() {
     () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
     'CDP',
   );
-  host = await until(
-    () =>
-      browser
-        .contexts()
-        .flatMap((c) => c.pages())
-        .find((p) => p.url().startsWith('appdock://host/')),
-    'host',
-  );
+  try {
+    host = await until(
+      () =>
+        browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .find((p) => p.url().startsWith('appdock://host/index.html')),
+      'host',
+    );
+  } catch (error) {
+    fs.writeFileSync(
+      path.join(profile, 'startup-diagnostics.json'),
+      JSON.stringify(
+        {
+          pages: browser
+            .contexts()
+            .flatMap((c) => c.pages())
+            .map((page) => page.url()),
+          main: await inspect(
+            inspector,
+            `JSON.stringify({ready:${electronExpression}.app.isReady(),windows:${electronExpression}.BrowserWindow.getAllWindows().map(w=>({visible:w.isVisible(),url:w.webContents.getURL()}))})`,
+          ).catch(String),
+          output,
+        },
+        null,
+        2,
+      ),
+    );
+    throw error;
+  }
   host.setDefaultTimeout(15000);
   host.on('pageerror', (error) => errors.push(error.message));
   await until(async () => (await snapshot()).startupReady, 'startup');
@@ -95,7 +117,7 @@ async function launch() {
 async function stop() {
   if (host) await host.evaluate(() => window.dock.executeCommand('appdock.quit'));
   else if (child && child.exitCode === null) child.kill();
-  if (child) await until(() => child.exitCode !== null, 'shutdown');
+  if (child) await until(() => child.exitCode !== null || child.signalCode !== null, 'shutdown');
   if (browser) await browser.close();
   host = browser = child = null;
 }
@@ -435,6 +457,9 @@ async function checkSectionTitles() {
         },
       ];
       initial.ribbon.order = ['group:color', 'settings'];
+      initial.ribbon.bottom = initial.ribbon.bottom.filter(
+        (id) => !initial.ribbon.groups[0].children.includes(id),
+      );
       initial.trayMenu = [
         { id: 'tray.first', type: 'command', command: 'appdock.open' },
         {
@@ -453,10 +478,29 @@ async function checkSectionTitles() {
           name: 'Action server',
         },
       ];
-      initial.mcpServers = {
-        version: 1,
-        items: [
+      initial.mcpClient = {
+        commands: [
           {
+            id: '00000000-0000-0000-0000-000000000040',
+            title: 'Action MCP command',
+            description: '',
+            enabled: false,
+            automation: false,
+            serverId: '00000000-0000-0000-0000-000000000039',
+            toolName: 'echo',
+            arguments: {},
+            timeoutMs: 60000,
+            toolBinding: null,
+          },
+        ],
+        version: 1,
+        servers: [
+          {
+            requiresEnvironment: false,
+            connection: {
+              ...require('../out/main/shared/mcp-client').defaultMcpConnection(),
+              url: 'http://127.0.0.1:1/mcp',
+            },
             id: '00000000-0000-0000-0000-000000000039',
             name: 'Action MCP',
             description: 'Unconfigured test entry',
@@ -650,10 +694,7 @@ async function checkSectionTitles() {
     if (webAccountListOnly)
       require('./settings-web-fixture.cjs').installWebSettings(profile, initial);
     require('../out/main/shared/settings-schema').parseSettings(initial);
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(initial),
-    );
+    require('./test-settings.cjs').write(profile, initial, path.join(profile, 'local'));
     if (source) {
       require('./copy-host.cjs').copyHost(source, testHostPath(profile));
       assert.equal(hash(source), hash(testHostPath(profile)));

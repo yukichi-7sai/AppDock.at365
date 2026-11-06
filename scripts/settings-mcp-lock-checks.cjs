@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { settingsItemId } = require('../out/main/shared/settings-catalog');
 
 module.exports = async ({ page, profile, local, checks, value, until, fixtureId }) => {
-  const credentialFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
+  const credentialFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client-secrets.json']
     .map((name) => path.join(local, name))
     .filter((file) => fs.existsSync(file));
   const credentials = credentialFiles.map((file) => fs.readFileSync(file));
@@ -100,8 +100,22 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
 
   await nav('tts');
   await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
-  assert.equal(await field('tts', 'apiKey').locator('[data-mcp-lock]').count(), 1);
-  assert.equal(await count(field('tts', 'baseUrl')), 0);
+  await page
+    .getByRole('dialog')
+    .getByRole('combobox', { name: '認証方式', exact: true })
+    .selectOption('bearer');
+  assert.equal(
+    await page
+      .getByRole('dialog')
+      .getByRole('group', { name: 'APIキー', exact: true })
+      .locator('[data-mcp-lock]')
+      .count(),
+    1,
+  );
+  assert.equal(
+    await count(page.getByRole('dialog').getByRole('group', { name: 'APIのURL', exact: true })),
+    0,
+  );
   assert.equal(await count(field('tts', 'model')), 0);
   await page.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
   await nav('applets');
@@ -110,7 +124,7 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
   await nav('permissions');
   assert.equal(
     await page.locator('[data-testid^="permission-row-"] [data-mcp-lock="unsupported"]').count(),
-    8,
+    9,
   );
   const write = page.locator('[data-testid="permission-row-write"]').getByRole('switch').nth(1);
   await write.click();

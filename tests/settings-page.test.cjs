@@ -8,6 +8,21 @@ const {
 } = require('../out/main/main/core/settings-page');
 const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog');
 
+test('MCP form-only page projects device definitions and resets without exposing JSON editing', async () => {
+  const f = fixture();
+  f.saved.value.mcpClient = { version: 1, servers: [], commands: [] };
+  await f.act({ kind: 'select', pageId: 'mcp-client' });
+  const model = f.page.snapshot();
+  assert.equal(model.content.page.json, false);
+  assert.deepEqual(model.content.values.mcpClient, f.saved.value.mcpClient);
+  const { settingsPaths, resetSettingsPage } = require('../out/main/shared/settings-catalog');
+  assert.deepEqual(settingsPaths(model.content.page, []), [['mcpClient']]);
+  assert.throws(() => applySettingsJson(f.saved.value, model.content.page, [], '{}'));
+  assert.deepEqual(resetSettingsPage(f.saved.value, model.content.page, []), f.saved.value);
+  assert.deepEqual(f.editor.jsonProjection(), model.content.jsonValues);
+  f.page.dispose();
+});
+
 test('page links validate the source session, issued action and target before navigation', async () => {
   const opened = [];
   const f = fixture({

@@ -9,14 +9,12 @@ const {
   StreamableHTTPServerTransport,
 } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { fixtureServer } = require('./fixtures/mcp-server.cjs');
-const { SettingsStore } = require('../out/main/main/core/settings');
+const { DeviceSettingsStore } = require('../out/main/main/core/device-settings-store');
 const { McpClientSettings } = require('../out/main/main/core/mcp-client-settings');
 const { McpClientService } = require('../out/main/main/core/mcp-client');
 const { parseMcpRoster, defaultMcpConnection } = require('../out/main/shared/mcp-client');
 const { operationsFor } = require('../out/main/shared/appdock-api');
-const { CustomCommandService } = require('../out/main/main/core/custom-commands');
-const { SettingsCommands } = require('../out/main/main/core/settings-commands');
-const { mcpCommandType } = require('../out/main/shared/mcp-command');
+const { McpToolCommandService } = require('../out/main/main/core/mcp-tool-commands');
 const host = { owner: 'host', kind: 'host', external: false },
   external = { owner: 'mcp:1', kind: 'mcp', external: true },
   applet = { owner: 'applet:a:1', kind: 'applet', external: false };
@@ -29,8 +27,8 @@ test('large environment settings survive encrypted storage without an aggregate 
   );
   const id = f.add({ transport: 'stdio', command: process.execPath }, { environment });
   assert.deepEqual(f.settings.secrets(id).env, environment);
-  const file = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json')));
-  assert(file.entries[id].secret.length > 131072);
+  const file = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json')));
+  assert(file.entries[id].length > 131072);
   assert.equal(f.settings.publicSettings(id).connection.command, process.execPath);
 });
 
@@ -40,9 +38,9 @@ test('public settings and external metadata edits never decrypt a damaged cipher
       { url: 'http://127.0.0.1:12345/mcp', authentication: 'bearer' },
       { token: 'PRIVATE_TOKEN' },
     ),
-    file = path.join(f.dir, 'mcp-client.json');
+    file = path.join(f.dir, 'mcp-client-secrets.json');
   const document = JSON.parse(fs.readFileSync(file));
-  document.entries[id].secret = 'DAMAGED_CIPHER';
+  document.entries[id] = 'DAMAGED_CIPHER';
   fs.writeFileSync(file, JSON.stringify(document, null, 3));
   let crypts = 0,
     changes = 0;
@@ -107,7 +105,7 @@ test('external configuration excludes encrypted credentials and cannot erase or 
     { environment: { PRIVATE_ENVIRONMENT: 'PRIVATE_VALUE' } },
   );
   const plainId = f.add({ url: 'http://127.0.0.1:12345/plain' });
-  const file = path.join(f.dir, 'mcp-client.json');
+  const file = path.join(f.dir, 'mcp-client-secrets.json');
   const before = fs.readFileSync(file, 'utf8'),
     settingsBefore = fs.readFileSync(f.store.file, 'utf8');
   for (const serverId of [undefined, id, envId]) {
@@ -161,18 +159,12 @@ test('external configuration excludes encrypted credentials and cannot erase or 
     },
     true,
   );
-  assert.equal(
-    JSON.parse(fs.readFileSync(file)).entries[id].secret,
-    JSON.parse(before).entries[id].secret,
-  );
+  assert.equal(JSON.parse(fs.readFileSync(file)).entries[id], JSON.parse(before).entries[id]);
   f.settings.update(
     { op: 'reorder', ids: [plainId, envId, id], expectedRevision: f.settings.revision() },
     true,
   );
-  assert.equal(
-    JSON.parse(fs.readFileSync(file)).entries[envId].secret,
-    JSON.parse(before).entries[envId].secret,
-  );
+  assert.equal(JSON.parse(fs.readFileSync(file)).entries[envId], JSON.parse(before).entries[envId]);
   f.settings.update({ op: 'remove', id: plainId, expectedRevision: f.settings.revision() }, true);
   assert.equal(f.settings.roster().length, 2);
   // Local settings retain the existing credential editor and removal path.
@@ -180,33 +172,42 @@ test('external configuration excludes encrypted credentials and cannot erase or 
   assert.equal(f.settings.roster().length, 1);
 });
 
-test('external repair cannot discard an unreadable encrypted entry', (t) => {
+test('external repair cannot discard an unreadable cipher while local repair retains its connection', (t) => {
   const f = fixture(t),
-    id = f.add({ url: 'http://127.0.0.1:12345/mcp' }),
-    file = path.join(f.dir, 'mcp-client.json');
-  const entries = JSON.parse(fs.readFileSync(file));
-  entries.entries[id] = { connection: { invalid: true }, secret: 'UNREADABLE_CIPHERTEXT' };
-  fs.writeFileSync(file, JSON.stringify(entries));
-  const before = fs.readFileSync(file, 'utf8'),
-    expectedRevision = f.settings.revision();
+    id = f.add(
+      { url: 'http://127.0.0.1:12345/mcp', authentication: 'bearer' },
+      { token: 'private' },
+    ),
+    file = f.settings.file;
+  const doc = JSON.parse(fs.readFileSync(file));
+  doc.entries[id] = { invalid: 'cipher' };
+  fs.writeFileSync(file, JSON.stringify(doc));
+  const before = fs.readFileSync(file),
+    connection = f.settings.connection(id);
   assert.throws(
-    () =>
-      f.settings.update(
-        {
-          op: 'save',
-          item: f.settings.roster()[0],
-          connection: { ...defaultMcpConnection(), url: 'http://127.0.0.1:12345/mcp' },
-          expectedRevision,
-        },
-        true,
-      ),
+    () => f.settings.update({ op: 'remove', id, expectedRevision: f.settings.revision() }, true),
     { code: 'PRIVATE_SETTING' },
   );
-  assert.throws(() => f.settings.update({ op: 'remove', id, expectedRevision }, true), {
-    code: 'PRIVATE_SETTING',
+  f.settings.update(
+    {
+      op: 'save',
+      item: { ...f.settings.roster()[0], name: 'Renamed' },
+      connection,
+      expectedRevision: f.settings.revision(),
+    },
+    true,
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  f.settings.update({
+    op: 'save',
+    item: f.settings.roster()[0],
+    connection,
+    token: 'repaired',
+    expectedRevision: f.settings.revision(),
   });
-  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(f.settings.secrets(id).token, 'repaired');
 });
+
 async function until(fn) {
   for (let i = 0; i < 250; i++) {
     const v = await fn();
@@ -216,15 +217,16 @@ async function until(fn) {
   throw Error('Timed out');
 }
 function fixture(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-mcp-'));
-  const store = new SettingsStore(path.join(dir, 'settings.json'));
+  const dir = path.resolve('.artifacts/mcp-client-unit', randomUUID());
+  fs.mkdirSync(dir, { recursive: true });
+  const store = new DeviceSettingsStore(path.join(dir, 'settings.json'), dir, 'TEST');
   store.load();
   let service,
     allowed = true,
     management = false;
   const settings = new McpClientSettings(
     store,
-    path.join(dir, 'mcp-client.json'),
+    path.join(dir, 'mcp-client-secrets.json'),
     {
       encrypt: (v) => randomUUID() + ':' + Buffer.from(v).toString('base64'),
       decrypt: (v) => Buffer.from(v.slice(37), 'base64').toString(),
@@ -337,12 +339,16 @@ test('management settings preview and save preserve unrelated data and keep cred
   const preview = f.settings.update({ ...request, dryRun: true });
   assert.deepEqual(preview, { saved: false, validated: true, revision });
   assert.deepEqual(f.store.value, initial);
-  assert.equal(fs.existsSync(path.join(f.dir, 'mcp-client.json')), false);
+  assert.equal(fs.existsSync(path.join(f.dir, 'mcp-client-secrets.json')), false);
   assert.equal(server.received.length, 0);
   assert.equal(f.settings.update(request).saved, true);
   assert.deepEqual(f.store.value, {
     ...initial,
-    mcpServers: { version: 1, items: [request.item] },
+    mcpClient: {
+      version: 1,
+      servers: [{ ...request.item, connection: request.connection, requiresEnvironment: false }],
+      commands: [],
+    },
   });
   const details = f.settings.getSettings(id);
   assert.deepEqual(details.connection, request.connection);
@@ -350,7 +356,7 @@ test('management settings preview and save preserve unrelated data and keep cred
   assert(!JSON.stringify(details).includes(request.token));
   assert(!JSON.stringify(f.settings.getSettings()).includes(server.url));
   assert.equal(server.received.length, 0);
-  const localBefore = fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8');
+  const localBefore = fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8');
   assert.throws(() => f.settings.update(request), { code: 'REVISION_CONFLICT' });
   assert.throws(() =>
     f.settings.update({ ...request, expectedRevision: details.revision, token: 'bad\ncredential' }),
@@ -363,7 +369,7 @@ test('management settings preview and save preserve unrelated data and keep cred
       token: 'ignored-secret',
     }),
   );
-  assert.equal(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8'), localBefore);
+  assert.equal(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8'), localBefore);
   const originalSave = f.store.save;
   f.store.save = () => {
     throw new (require('../out/main/main/core/settings').SettingsConflictError)('concurrent save');
@@ -372,7 +378,7 @@ test('management settings preview and save preserve unrelated data and keep cred
     code: 'REVISION_CONFLICT',
   });
   f.store.save = originalSave;
-  assert.equal(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8'), localBefore);
+  assert.equal(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8'), localBefore);
   f.store.save(
     { ...f.store.value, host: { ...f.store.value.host, theme: 'dark' } },
     f.store.revision,
@@ -384,30 +390,34 @@ test('management settings preview and save preserve unrelated data and keep cred
   assert.equal(f.store.value.host.theme, 'dark');
   assert.deepEqual(f.settings.roster(), []);
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8')).entries,
+    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8')).entries,
     {},
   );
 });
-test('concurrent PC connection edits survive a management save conflict and rollback', (t) => {
+test('concurrent secret edits survive a save conflict and rollback', (t) => {
   const f = fixture(t),
-    id = f.add({ url: 'http://127.0.0.1:9876/mcp' });
-  const file = path.join(f.dir, 'mcp-client.json'),
-    revision = f.settings.revision();
-  const sharedBefore = fs.readFileSync(f.store.file, 'utf8');
-  const edited = JSON.parse(fs.readFileSync(file, 'utf8'));
-  edited.entries[id].connection.enabled = true;
-  const externalContent = JSON.stringify(edited);
-  const originalSave = f.store.save.bind(f.store);
+    id = f.add(
+      { url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' },
+      { token: 'private' },
+    ),
+    file = f.settings.file;
+  const revision = f.settings.revision(),
+    before = fs.readFileSync(f.store.device.file),
+    doc = JSON.parse(fs.readFileSync(file));
+  doc.entries[id] = 'external-cipher';
+  const externalContent = JSON.stringify(doc),
+    save = f.store.save.bind(f.store);
   f.store.save = (...args) => {
     fs.writeFileSync(file, externalContent);
-    return originalSave(...args);
+    return save(...args);
   };
   assert.throws(() => f.settings.update({ op: 'remove', id, expectedRevision: revision }), {
     code: 'REVISION_CONFLICT',
   });
   assert.equal(fs.readFileSync(file, 'utf8'), externalContent);
-  assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), before);
 });
+
 test('management catalog can inspect unpublished tools but cannot execute or outlive permission revocation', async (t) => {
   const f = fixture(t),
     server = await httpFixture(t);
@@ -453,19 +463,18 @@ test('MCP roster, local binding, encryption and atomic revisions do not share en
   const shared = fs.readFileSync(f.store.file, 'utf8');
   assert(!shared.includes('secret-value'));
   assert(!shared.includes('9876'));
-  assert(!fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8').includes('secret-value'));
-  const revision = f.settings.revision();
-  assert.throws(
-    () =>
-      f.settings.update({
-        op: 'save',
-        expectedRevision: revision,
-        item: f.settings.roster()[0],
-        connection: { ...f.settings.connection(id), url: 'http://127.0.0.1:9877/mcp' },
-      }),
-    /再入力/,
+  assert(
+    !fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8').includes('secret-value'),
   );
-  assert.equal(f.settings.revision(), revision);
+  const revision = f.settings.revision();
+  f.settings.update({
+    op: 'save',
+    expectedRevision: revision,
+    item: f.settings.roster()[0],
+    connection: { ...f.settings.connection(id), url: 'http://127.0.0.1:9877/mcp' },
+  });
+  assert.equal(f.settings.secrets(id).token, undefined);
+  assert.equal(f.settings.connection(id).enabled, true);
   assert.throws(
     () => f.settings.update({ op: 'enabled', id, enabled: false, expectedRevision: 'stale' }),
     /変更/,
@@ -486,8 +495,8 @@ test('MCP roster, local binding, encryption and atomic revisions do not share en
   f.store.save = save;
   assert.equal(f.settings.revision(), before);
   const identity = f.settings.identity(id),
-    encrypted = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8')).entries[id]
-      .secret;
+    encrypted = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8'))
+      .entries[id];
   f.settings.update({
     op: 'save',
     expectedRevision: f.settings.revision(),
@@ -496,7 +505,7 @@ test('MCP roster, local binding, encryption and atomic revisions do not share en
   });
   assert.equal(f.settings.identity(id), identity);
   assert.equal(
-    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8')).entries[id].secret,
+    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client-secrets.json'), 'utf8')).entries[id],
     encrypted,
   );
   f.settings.update({
@@ -755,132 +764,121 @@ test('HTTP redirects never forward the downstream credential', async (t) => {
   assert.equal(calls, 0);
 });
 
-test('saved MCP commands validate without execution, retain identity, and detach accepted job lifetime', async (t) => {
-  const remote = await httpFixture(t),
+test('saved MCP commands validate without execution, preserve identity, and recover after key re-entry', async (t) => {
+  const remote = await httpFixture(t, { bearer: 'key' }),
     f = fixture(t),
-    serverId = f.add({
-      enabled: true,
-      url: remote.url,
-      published: true,
-      publishedTools: ['delay'],
-    });
-  const settingsCommands = new SettingsCommands({
-    settings: f.store,
-    applets: () => [],
-    save: (v, r) => f.store.save(v, r),
-  });
-  const service = new CustomCommandService({
-    settings: f.store,
-    settingsCommands,
-    providers: () => [],
-    save: (v, r) => f.store.save(v, r),
-  });
-  service.registerHost(
-    mcpCommandType,
-    async (config, context) => {
-      const job = await f.service.start(
-        external,
-        {
-          serverId: config.serverId,
-          name: config.toolName,
-          arguments: config.arguments,
-          toolRevision: config.toolRevision,
-          requestId: randomUUID(),
-        },
-        context.signal,
-        true,
-      );
-      return { completion: 'accepted', jobId: job.jobId };
-    },
-    {
-      validateConfig: (c) => f.service.commandValidation(c),
-      unavailableReason: (c) => f.service.commandUnavailable(c),
-      stateVersion: () => f.service.commandStateVersion(),
-    },
-  );
-  const tool = (await f.service.tool(host, { serverId, name: 'delay' })).tool;
-  const config = {
-    serverId,
-    toolName: 'delay',
-    toolRevision: tool.toolRevision,
-    arguments: { delay: 150 },
-  };
-  const id = randomUUID(),
-    type = service.descriptors()[0];
-  const operations = [
-    {
-      op: 'add',
-      expectedTypeRevision: type.typeRevision,
-      item: {
-        id,
-        typeId: type.id,
-        title: 'Saved MCP',
+    serverId = f.add(
+      {
         enabled: true,
-        automation: true,
-        configVersion: 1,
-        config,
+        url: remote.url,
+        authentication: 'bearer',
+        published: true,
+        publishedTools: ['echo', 'delay'],
       },
-    },
-  ];
-  const before = fs.readFileSync(path.join(f.dir, 'settings.json'), 'utf8');
-  service.update({ expectedRevision: settingsCommands.revision(), operations, dryRun: true });
-  assert.equal(fs.readFileSync(path.join(f.dir, 'settings.json'), 'utf8'), before);
+      { token: 'key' },
+    );
+  const service = new McpToolCommandService({
+    settings: f.settings,
+    client: f.service,
+    actor: (context) => (context.origin?.kind === 'mcp' ? external : host),
+  });
+  const tool = (await f.service.tool(host, { serverId, name: 'echo' })).tool,
+    id = randomUUID(),
+    commandId = 'appdock.mcp.tool.' + id;
+  const item = {
+    id,
+    title: 'Saved MCP',
+    description: '',
+    enabled: true,
+    automation: true,
+    serverId,
+    toolName: 'echo',
+    arguments: { message: 'saved' },
+    timeoutMs: 60000,
+    toolRevision: tool.toolRevision,
+  };
+  const save = (value, dryRun = false) =>
+    service.update({ op: 'save', item: value, expectedRevision: f.settings.revision(), dryRun });
+  const before = fs.readFileSync(f.store.device.file);
+  save(item, true);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), before);
   assert.equal(remote.state.count, 0);
-  service.update({ expectedRevision: settingsCommands.revision(), operations });
+  save(item);
   assert.equal(remote.state.count, 0);
+  assert(service.has(commandId));
   const catalog = service.uiCommands();
   assert.equal(service.uiCommands(), catalog);
-  const session = f.service.sessions.get(serverId),
-    fetchedAt = session.fetchedAt;
-  session.fetchedAt = Date.now() - 30000;
-  assert.notEqual(
-    service.uiCommands(),
-    catalog,
-    'tool expiry invalidates presentation without a notification',
-  );
-  session.fetchedAt = fetchedAt;
-  assert.equal(service.uiCommands()[0].available, true);
-  const accepted = await service.execute('appdock.custom.' + id, { origin: { kind: 'mcp' } });
-  assert.equal(accepted.result.completion, 'accepted');
+  const binding = structuredClone(service.items()[0].toolBinding),
+    stored = JSON.parse(fs.readFileSync(f.store.device.file));
+  assert(!JSON.stringify(stored).includes('toolRevision'));
+  assert.deepEqual(stored.mcpClient.commands[0].toolBinding, binding);
+  fs.unlinkSync(f.settings.file);
+  f.service.reconcile();
+  assert.equal(service.uiCommands()[0].available, false);
+  assert.equal(f.settings.connection(serverId).enabled, true);
+  assert.equal(service.items()[0].enabled, true);
+  const detail = f.settings.getSettings(serverId);
+  await f.service.updateForSettings(host, {
+    op: 'save',
+    item: detail.item,
+    connection: detail.connection,
+    token: 'key',
+    expectedRevision: detail.revision,
+  });
+  assert.equal(remote.state.count, 0);
+  assert.equal(f.settings.connection(serverId).enabled, true);
+  const refreshed = (await f.service.tool(host, { serverId, name: 'echo' })).tool;
+  assert.notEqual(refreshed.toolRevision, tool.toolRevision);
+  assert.deepEqual(refreshed.toolBinding, binding);
+  const accepted = await service.execute(commandId, { origin: { kind: 'mcp' } });
+  assert.equal(accepted.completion, 'accepted');
   const completed = await until(() => {
-    const j = f.service.get(external, accepted.result.jobId);
-    return j.state !== 'running' && j;
+    const job = f.service.get(external, accepted.jobId);
+    return job.state !== 'running' && job;
   });
   assert.equal(completed.state, 'succeeded');
   assert.equal(remote.state.count, 1);
-  service.update({
-    expectedRevision: settingsCommands.revision(),
-    operations: [{ op: 'update', id, changes: { title: 'Renamed' } }],
+  const replaceKey = (token) =>
+    f.settings.update({
+      op: 'save',
+      item: f.settings.roster().find((row) => row.id === serverId),
+      connection: f.settings.connection(serverId),
+      token,
+      expectedRevision: f.settings.revision(),
+    });
+  replaceKey('invalid-key');
+  await assert.rejects(f.service.tools(host, { serverId, refresh: true }), {
+    code: 'AUTH_REQUIRED',
   });
-  assert.equal(service.summaries()[0].commandId, 'appdock.custom.' + id);
-  assert.match(f.service.commandValidation({ ...config, arguments: { delay: 'bad' } }), /Schema/);
-  assert.match(f.service.commandValidation({ ...config, toolRevision: '0'.repeat(64) }), /再取得/);
-  const localFile = path.join(f.dir, 'mcp-client.json');
-  const localBytes = fs.readFileSync(localFile);
-  const local = JSON.parse(localBytes);
-  local.entries[serverId].connection.enabled = false;
-  fs.writeFileSync(localFile, JSON.stringify(local));
-  assert.equal(
-    service.uiCommands()[0].available,
-    false,
-    'external connection edits invalidate the cached UI',
-  );
-  await assert.rejects(service.execute('appdock.custom.' + id), { code: 'TYPE_UNAVAILABLE' });
-  fs.writeFileSync(localFile, localBytes);
-  assert.equal(service.uiCommands()[0].available, true);
-  f.settings.update({
-    op: 'enabled',
-    id: serverId,
-    enabled: false,
-    expectedRevision: f.settings.revision(),
-  });
-  assert.match(f.service.commandUnavailable(config), /OFF/);
   assert.equal(service.uiCommands()[0].available, false);
-  await assert.rejects(
-    service.execute('appdock.custom.' + id),
-    (e) => e.code === 'TYPE_UNAVAILABLE',
-  );
+  await assert.rejects(service.execute(commandId), { code: 'COMMAND_UNAVAILABLE' });
   assert.equal(remote.state.count, 1);
+  replaceKey('key');
+  assert.equal(
+    service.summaries()[0].available,
+    false,
+    'known connection failure requires a successful check',
+  );
+  await f.service.tools(host, { serverId, refresh: true });
+  assert.equal(service.uiCommands()[0].available, true);
+  assert.deepEqual(service.items()[0].toolBinding, binding);
+  const { toolBinding, ...metadata } = service.items()[0];
+  save({ ...metadata, title: 'Renamed' });
+  assert.equal(service.summaries()[0].commandId, commandId);
+  remote.state.changed = true;
+  await assert.rejects(service.execute(commandId), { code: 'SCHEMA_CHANGED' });
+  assert.equal(remote.state.count, 1);
+  assert.deepEqual(service.items()[0].toolBinding, binding);
+  const changed = (await f.service.tool(host, { serverId, name: 'echo' })).tool;
+  assert.throws(
+    () => save({ ...metadata, arguments: { message: 'updated' }, toolRevision: tool.toolRevision }),
+    { code: 'SCHEMA_CHANGED' },
+  );
+  save({ ...metadata, toolRevision: changed.toolRevision });
+  assert.notDeepEqual(service.items()[0].toolBinding, binding);
+  f.settings.update({ op: 'remove', id: serverId, expectedRevision: f.settings.revision() });
+  assert(service.has(commandId));
+  assert.equal(service.uiCommands()[0].available, false);
 });
 
 test('saved MCP acceptance checks cancellation and external publication before sending', async (t) => {
@@ -895,6 +893,15 @@ test('saved MCP acceptance checks cancellation and external publication before s
     arguments: {},
     requestId: randomUUID(),
   };
+  await assert.rejects(
+    f.service.start(host, { ...params, requestId: randomUUID() }, undefined, true, () => false),
+    { code: 'REVISION_CONFLICT' },
+  );
+  assert.equal(
+    remote.state.count,
+    0,
+    'a deleted or replaced saved definition cannot send after discovery',
+  );
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(
@@ -947,91 +954,108 @@ test('the shared API can discover and execute a 128-character downstream tool na
   assert.equal(result.result.structuredContent.message, 'long-name');
 });
 
-test('damaged local MCP settings remain intact and expose a read-only health error', (t) => {
+test('whole secret corruption preserves definitions and supports explicit local reset with encrypted evidence', (t) => {
   const f = fixture(t),
-    file = path.join(f.dir, 'mcp-client.json');
-  f.add({ url: 'http://127.0.0.1:9876/mcp' });
+    id = f.add(
+      { enabled: true, url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' },
+      { token: 'secret' },
+    ),
+    file = f.settings.file;
+  const before = structuredClone(f.settings.block());
   fs.writeFileSync(file, '{invalid');
-  assert.equal(f.settings.health().revision, '');
-  assert.match(f.settings.health().error, /読み取り専用/);
-  assert.throws(() => f.settings.update({ op: 'remove', id: randomUUID(), expectedRevision: '' }));
+  assert.match(f.settings.health().revision, /^[a-f0-9]{64}$/);
+  assert(f.settings.health().error);
+  f.settings.update({
+    op: 'save',
+    item: { ...f.settings.roster()[0], name: 'Recovered metadata' },
+    connection: f.settings.connection(id),
+    expectedRevision: f.settings.revision(),
+  });
   assert.equal(fs.readFileSync(file, 'utf8'), '{invalid');
-  assert.equal(f.settings.statuses()[0].state, 'error');
-  assert.equal(f.service.needsConfigurationAttention(), true);
+  assert.equal(f.settings.connection(id).enabled, true);
+  assert.throws(
+    () =>
+      f.settings.update({
+        op: 'save',
+        item: f.settings.roster()[0],
+        connection: f.settings.connection(id),
+        token: 'new',
+        expectedRevision: f.settings.revision(),
+      }),
+    { code: 'CONFIGURATION_REQUIRED' },
+  );
+  f.settings.resetSecrets(f.settings.revision());
+  assert.equal(f.settings.health().error, undefined);
+  assert.equal(f.settings.connection(id).enabled, true);
+  const archives = fs
+    .readdirSync(path.join(f.dir, 'settings-backups', 'mcp-secrets'))
+    .filter((v) => v.startsWith('recovery-'));
+  assert.equal(
+    fs.readFileSync(path.join(f.dir, 'settings-backups', 'mcp-secrets', archives[0]), 'utf8'),
+    '{invalid',
+  );
+  assert.equal(f.settings.statuses()[0].state, 'credentials-required');
 });
 
-test('shared-only and OFF connections need no warning, including unreadable OFF credentials', (t) => {
+test('old shared roster is ignored and OFF connections keep damaged credentials editable without attention', (t) => {
   const f = fixture(t),
     id = f.add({ url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' }, { token: 'secret' }),
     sharedId = randomUUID();
-  f.store.save(
-    {
-      ...f.store.value,
-      mcpServers: {
-        version: 1,
-        items: [...f.settings.roster(), { id: sharedId, name: 'Other PC', description: '' }],
-      },
-    },
-    f.store.revision,
-  );
-  const file = path.join(f.dir, 'mcp-client.json'),
-    local = JSON.parse(fs.readFileSync(file));
-  local.entries[id].secret = 'damaged-credential';
-  fs.writeFileSync(file, JSON.stringify(local));
-  assert.equal(f.settings.statuses().find((s) => s.id === sharedId).state, 'unconfigured');
-  assert.equal(f.settings.statuses().find((s) => s.id === id).state, 'disabled');
+  const shared = JSON.parse(fs.readFileSync(f.store.shared.file));
+  shared.mcpServers = { version: 1, items: [{ id: sharedId, name: 'Legacy', description: '' }] };
+  fs.writeFileSync(f.store.shared.file, JSON.stringify(shared));
+  f.store.reload();
+  const doc = JSON.parse(fs.readFileSync(f.settings.file));
+  doc.entries[id] = 'damaged';
+  fs.writeFileSync(f.settings.file, JSON.stringify(doc));
+  assert.equal(f.settings.server(sharedId), undefined);
+  assert.equal(f.settings.statuses()[0].state, 'disabled');
   assert.equal(f.service.needsConfigurationAttention(), false);
   f.settings.update({ op: 'enabled', id, enabled: true, expectedRevision: f.settings.revision() });
-  assert.equal(f.settings.statuses().find((s) => s.id === id).connection.enabled, true);
   assert.equal(f.service.needsConfigurationAttention(), true);
 });
 
-test('one malformed local entry does not block healthy edits, reorder or explicit repair', async (t) => {
+test('one damaged cipher does not block healthy edits, ordering, or explicit credential repair', async (t) => {
   const f = fixture(t),
     remote = await httpFixture(t),
-    badId = f.add({ url: 'http://127.0.0.1:9876/mcp' }),
+    badId = f.add(
+      { enabled: true, url: remote.url, authentication: 'bearer' },
+      { token: 'secret' },
+    ),
     goodId = f.add({ url: remote.url }),
-    file = path.join(f.dir, 'mcp-client.json'),
-    local = JSON.parse(fs.readFileSync(file));
-  const broken = { connection: { enabled: false, url: 'damaged' }, secret: 'keep-exactly' };
-  local.entries[badId] = broken;
+    file = f.settings.file;
+  const local = JSON.parse(fs.readFileSync(file));
+  local.entries[badId] = { invalid: 'preserve' };
   fs.writeFileSync(file, JSON.stringify(local));
   assert.equal(f.settings.health().error, undefined);
-  assert.equal(f.settings.statuses().find((s) => s.id === badId).connection, undefined);
-  assert.equal(f.service.needsConfigurationAttention(), false);
-  const enabled = await f.service.updateForSettings(host, {
-    op: 'enabled',
-    id: goodId,
-    enabled: true,
-    expectedRevision: f.settings.revision(),
-  });
-  assert.equal(enabled.warning, undefined);
-  assert.equal(f.service.statuses().find((s) => s.id === goodId).state, 'connected');
+  assert.equal(f.settings.connection(badId).enabled, true);
+  assert.equal(f.service.needsConfigurationAttention(), true);
+  assert.equal(
+    (
+      await f.service.updateForSettings(host, {
+        op: 'enabled',
+        id: goodId,
+        enabled: true,
+        expectedRevision: f.settings.revision(),
+      })
+    ).warning,
+    undefined,
+  );
   f.settings.update({
     op: 'reorder',
     ids: [goodId, badId],
     expectedRevision: f.settings.revision(),
   });
-  assert.deepEqual(JSON.parse(fs.readFileSync(file)).entries[badId], broken);
-  broken.connection.enabled = true;
-  const edited = JSON.parse(fs.readFileSync(file));
-  edited.entries[badId] = broken;
-  fs.writeFileSync(file, JSON.stringify(edited));
-  assert.equal(f.service.needsConfigurationAttention(), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)).entries[badId], local.entries[badId]);
   f.settings.update({
     op: 'save',
-    item: { ...f.settings.roster().find((s) => s.id === goodId), name: 'Healthy rename' },
-    connection: f.settings.connection(goodId),
+    item: { ...f.settings.roster().find((r) => r.id === badId), name: 'Repair' },
+    connection: f.settings.connection(badId),
+    token: 'new',
     expectedRevision: f.settings.revision(),
   });
-  assert.deepEqual(JSON.parse(fs.readFileSync(file)).entries[badId], broken);
-  f.settings.update({
-    op: 'save',
-    item: f.settings.roster().find((s) => s.id === badId),
-    connection: { ...defaultMcpConnection(), url: remote.url },
-    expectedRevision: f.settings.revision(),
-  });
-  assert.equal(f.settings.statuses().find((s) => s.id === badId).state, 'disabled');
+  assert.equal(f.settings.secrets(badId).token, 'new');
+  assert.equal(f.settings.connection(badId).enabled, true);
 });
 
 test('UI activation checks the server and returns a warning with OFF persisted on failure', async (t) => {
@@ -1059,7 +1083,8 @@ test('UI activation checks the server and returns a warning with OFF persisted o
   assert(!result.warning.message.includes('private-network-detail'));
   assert.equal(f.settings.connection(id).enabled, false);
   assert.equal(
-    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'))).entries[id].connection.enabled,
+    JSON.parse(fs.readFileSync(f.store.device.file)).mcpClient.servers.find((row) => row.id === id)
+      .connection.enabled,
     false,
   );
   assert.equal(fs.readFileSync(f.store.file, 'utf8'), beforeShared);
@@ -1098,9 +1123,9 @@ test('UI connection inspection returns warning data without reporting a processi
 test('temporary ON during UI activation does not publish persistent configuration warnings', async (t) => {
   const f = fixture(t),
     id = f.add({ url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' }, { token: 'secret' }),
-    file = path.join(f.dir, 'mcp-client.json'),
+    file = path.join(f.dir, 'mcp-client-secrets.json'),
     local = JSON.parse(fs.readFileSync(file));
-  local.entries[id].secret = 'unreadable';
+  local.entries[id] = 'unreadable';
   fs.writeFileSync(file, JSON.stringify(local));
   const attention = [];
   f.settings.changed = () => {

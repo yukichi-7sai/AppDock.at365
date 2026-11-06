@@ -15,7 +15,21 @@ exports.write = (profile, value, localRoot = path.join(profile, 'data')) => {
     generationSettings,
     withoutGenerationSettings,
   } = require('../out/main/main/core/generation-settings');
-  fs.writeFileSync(exports.file(profile), JSON.stringify(withoutGenerationSettings(value)));
+  const { mcpClient, ...shared } = withoutGenerationSettings(value);
+  fs.writeFileSync(exports.file(profile), JSON.stringify(shared));
+  if (mcpClient !== undefined) {
+    const name = require('node:os').hostname();
+    const deviceFile = exports.file(profile, `settings-${name}.json`);
+    const { initialDeviceSettings } = require('../out/main/main/core/device-settings');
+    const device = fs.existsSync(deviceFile)
+      ? JSON.parse(fs.readFileSync(deviceFile))
+      : initialDeviceSettings(
+          name,
+          require('../out/main/shared/settings-schema').parseSettings(value),
+        );
+    device.mcpClient = mcpClient;
+    fs.writeFileSync(deviceFile, JSON.stringify(device));
+  }
   fs.mkdirSync(localRoot, { recursive: true });
   fs.writeFileSync(
     path.join(localRoot, 'generation-ai.json'),
@@ -27,10 +41,14 @@ exports.read = (profile, localRoot = path.join(profile, 'data')) => {
     withGenerationSettings,
     parseGenerationSettings,
   } = require('../out/main/main/core/generation-settings');
-  return withGenerationSettings(
+  const result = withGenerationSettings(
     JSON.parse(fs.readFileSync(exports.file(profile))),
     parseGenerationSettings(
       JSON.parse(fs.readFileSync(path.join(localRoot, 'generation-ai.json'))),
     ),
   );
+  const deviceFile = exports.file(profile, `settings-${require('node:os').hostname()}.json`);
+  if (fs.existsSync(deviceFile))
+    result.mcpClient = JSON.parse(fs.readFileSync(deviceFile)).mcpClient;
+  return result;
 };

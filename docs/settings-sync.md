@@ -1,7 +1,6 @@
 # 設定同期と保存領域
 
-今後の変更: [MCP接続・ツールコマンドの端末別保存](mcp-device-settings-design.md)は未実装。現在のMCP保存先は[共通MCPクライアント](mcp-client-design.md)を参照する。
-
+MCP接続先とMCPツールコマンドは自端末の`settings-<端末名>.json`の`mcpClient`へ固定保存する。Bearerとstdio環境変数の名前・値は配置別LocalAppDataの`mcp-client-secrets.json`へ暗号化して保存する。共有値からの継承・旧形式の引き継ぎはしない。[保存形式と復旧](mcp-device-settings-design.md)を参照する。
 未導入Appletのカタログ結果は配置別のPC専用rootに `applet-catalog-cache.json` として保存する。公開版・開発版の取得時刻、表示用情報とAPI再開時刻を保持する。削除後は未導入分だけを再取得する。[カタログの表示と更新](applet-management-settings-design.md#未インストールのapplet)を参照。
 
 新規Appletと宣言型の子ページは、このPCで有効状態が未保存なら有効とし、保存済みのOFFを保持する。Appletの再起動では有効状態を変更しない。
@@ -115,6 +114,7 @@ data/
   settings-backups/            従来の共有設定の正常世代
     device/<端末キー>/         この端末のJSONの正常世代とinitialized.json
   settings-transactions/      保存途中の回復用。同期しない
+  mcp-client-secrets.json     MCPの暗号化秘密
   ...                         認証・許可等の既存データ
 ```
 

@@ -145,7 +145,10 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
       ...(item.category !== undefined ? { category: commandCategory(item.category) } : {}),
     };
   });
-  return structuredClone({ version: customCommandVersion, items });
+  return structuredClone({
+    version: customCommandVersion,
+    items: items.filter((item) => (item as Record<string, unknown>).typeId !== 'appdock.mcp.call'),
+  });
 }
 
 // Deliberate common subset of JSON Schema 2020-12 and draft-07. No remote/recursive

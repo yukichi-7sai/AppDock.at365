@@ -20,7 +20,7 @@ const safeError = (error: unknown): never => {
   );
 };
 
-/** The MCP client owns the shared roster and its separate, encrypted device configuration. */
+/** The MCP client owns device definitions and separately encrypted local credentials. */
 export function mcpClientSettingsTarget(
   owner: McpClientSettings,
   checkRevision: (revision: string) => void,

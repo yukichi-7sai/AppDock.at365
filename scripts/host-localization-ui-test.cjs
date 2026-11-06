@@ -10,10 +10,9 @@ const portable = process.argv[2] && path.resolve(process.argv[2]);
 const name = '日本語 {{name}} $t(language.ja)';
 const imageName = name + '.png';
 const pack = {
+  'settings.mcpCommands.title': 'MCP tool commands',
   'commands.basic.open': 'Open AppDock',
   'commands.updates.installHost': 'Update AppDock',
-  'commands.mcp.title': 'Run MCP tool',
-  'commands.mcp.serverId': 'MCP server ID',
   'commands.palette.search': 'Search commands',
   'workspace.ribbon': 'Ribbon',
   'workspace.bars.minimize': 'Minimize',
@@ -182,11 +181,11 @@ async function start() {
       return (await window.dock.settingsPage.get(element.dataset.settingsConnection)).content
         .auxiliary.customCommands.types;
     });
-    const mcp = types.find((t) => t.id === 'appdock.mcp.call');
-    assert.equal(mcp.title, 'Run MCP tool');
-    assert.equal(mcp.fields.find((f) => f.key === 'serverId').title, 'MCP server ID');
+    assert(!types.some((t) => t.id === 'appdock.mcp.call'));
+    await command('appdock.settings.mcp-client.open');
+    await host.getByRole('tab', { name: 'MCP tool commands', exact: true }).waitFor();
     checks.push(
-      'Command palette and registered MCP type refresh declarations after language changes',
+      'Command palette and MCP command settings refresh after language changes; removed custom type stays absent',
     );
     await command('appdock.logs.open');
     await host.getByRole('heading', { name: 'Logs', exact: true }).waitFor();

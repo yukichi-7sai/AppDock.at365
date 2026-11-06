@@ -27,7 +27,12 @@ import {
 } from '../../shared/mcp-client';
 import { AutomationError } from './appdock-api';
 import { compileCustomType } from './custom-commands';
-import { McpClientSettings, mcpDigest } from './mcp-client-settings';
+import {
+  McpClientSettings,
+  mcpDigest,
+  mcpStableDigest,
+  mcpEndpointIdentity,
+} from './mcp-client-settings';
 
 export interface McpActor {
   owner: string;
@@ -186,6 +191,8 @@ export class McpClientService {
       return fail('NOT_FOUND', hostText('services.mcpClient.publishedToolMissing'));
     if (!c?.enabled)
       return fail('CONNECTION_DISABLED', hostText('services.mcpClient.configureConnection'));
+    const credentialReason = this.options.settings.credentialReason(id);
+    if (credentialReason) return fail('AUTH_REQUIRED', credentialReason);
     return c;
   }
   private page<T>(items: T[], params: Record<string, unknown>, identity: string) {
@@ -248,7 +255,8 @@ export class McpClientService {
   }
   needsConfigurationAttention() {
     return Boolean(
-      this.options.settings.health().error || this.statuses().some((s) => s.state === 'error'),
+      this.options.settings.health().error ||
+      this.statuses().some((s) => ['error', 'credentials-required'].includes(s.state)),
     );
   }
   private async connectionAttempt<T>(id: string, work: () => Promise<T>) {
@@ -281,7 +289,8 @@ export class McpClientService {
             ? request.item.id
             : undefined
         : undefined;
-    if (typeof id !== 'string') return this.options.settings.update(request);
+    if (typeof id !== 'string' || this.options.settings.connection(id)?.enabled)
+      return this.options.settings.update(request);
     if (this.connectionChecks.has(id))
       return {
         saved: false,
@@ -510,6 +519,11 @@ export class McpClientService {
               ...(raw.outputSchema ? { outputSchema: raw.outputSchema as JsonObject } : {}),
               ...(raw.annotations ? { annotations: raw.annotations as JsonObject } : {}),
               toolRevision: mcpDigest([record.identity, raw]),
+              toolBinding: {
+                version: 1,
+                endpointFingerprint: mcpEndpointIdentity(this.options.settings.connection(id)!),
+                definitionFingerprint: mcpStableDigest(raw),
+              },
               ...(unsupportedReason ? { unsupportedReason } : {}),
             });
           }
@@ -599,35 +613,31 @@ export class McpClientService {
       ? null
       : hostText('services.mcpClient.fixedArgumentsSchema');
   }
-  commandUnavailable(config: JsonObject): string | null {
-    try {
-      if (
-        !mcpUuid(config.serverId) ||
-        !this.options.settings.roster().some((s) => s.id === config.serverId)
-      )
-        return hostText('services.mcpClient.unregisteredConnection');
-      const connection = this.options.settings.connection(config.serverId);
-      if (!connection?.enabled) return hostText('services.mcpClient.connectionDisabled');
-      if (
-        connection.authentication === 'bearer' &&
-        !this.options.settings.secrets(config.serverId).token
-      )
-        return hostText('services.mcpClient.resetBearer');
-      const record = this.sessions.get(config.serverId);
-      if (record?.tools && Date.now() - record.fetchedAt < 30000)
-        return this.commandValidation(config);
-      if (this.connectionErrors.has(config.serverId))
-        return this.connectionErrors.get(config.serverId)!;
-      return null; // No current catalog after restart: validate on execution.
-    } catch {
-      return hostText('services.mcpClient.invalidCredentials');
-    }
+  connectionError(serverId: string) {
+    return this.connectionErrors.get(serverId) ?? this.sessions.get(serverId)?.error;
+  }
+  cachedTool(serverId: string, toolName: string) {
+    const record = this.sessions.get(serverId);
+    if (
+      !record?.tools ||
+      record.closed ||
+      record.error ||
+      Date.now() - record.fetchedAt >= 30000 ||
+      record.identity !== this.options.settings.identity(serverId)
+    )
+      return undefined;
+    return record.tools.find((tool) => tool.name === toolName) ?? null;
+  }
+  checkCommandAccess(actor: McpActor, serverId: string, toolName: string) {
+    this.allow(actor, true);
+    this.configuration(actor, serverId, toolName);
   }
   start(
     actor: McpActor,
     params: Record<string, unknown>,
     signal?: AbortSignal,
     detachAfterAcceptance = false,
+    stillCurrent?: () => boolean,
   ): Promise<McpJob> {
     if (actor.management)
       return Promise.reject(
@@ -674,9 +684,14 @@ export class McpClientService {
               hostText('services.mcpClient.requestIdConflict'),
             ),
           );
-    const promise = this.createJob(actor, params, signature, signal, detachAfterAcceptance).finally(
-      () => this.starts.delete(key),
-    );
+    const promise = this.createJob(
+      actor,
+      params,
+      signature,
+      signal,
+      detachAfterAcceptance,
+      stillCurrent,
+    ).finally(() => this.starts.delete(key));
     this.starts.set(key, { signature, promise });
     return promise;
   }
@@ -686,12 +701,15 @@ export class McpClientService {
     signature: string,
     signal?: AbortSignal,
     detachAfterAcceptance = false,
+    stillCurrent?: () => boolean,
   ) {
     const serverId = p.serverId as string,
       name = p.name as string;
     const tool = (await this.catalog(actor, serverId, true)).find((t) => t.name === name);
     this.allow(actor, true);
     this.configuration(actor, serverId, name);
+    if (stillCurrent && !stillCurrent())
+      return fail('REVISION_CONFLICT', hostText('settings.mcp-client-settings.changed'));
     if (signal?.aborted) return fail('CANCELLED', hostText('services.mcpClient.cancelled'));
     if (!tool) return fail('NOT_FOUND', hostText('services.mcpClient.toolMissing'));
     if (tool.unsupportedReason) return fail('UNSUPPORTED_SCHEMA', tool.unsupportedReason);

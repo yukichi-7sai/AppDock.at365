@@ -6,12 +6,15 @@ const assert = require('node:assert/strict'),
 module.exports = async ({ page, client, profile, local, secretId, checks, tool, value, until }) => {
   const tools = JSON.stringify((await client.listTools()).tools),
     target = (await value('appdock_settings_list_targets', { query: 'mcp-client' })).items.find(
-      (item) => item.category === 'mcp-client',
+      (item) => item.targetId === 'service.mcp.servers',
     ),
     targetId = target.targetId,
     sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
-    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
-    localFile = path.join(local, 'mcp-client.json'),
+    deviceFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    ),
+    localFile = path.join(local, 'mcp-client-secrets.json'),
     bytes = () => [sharedFile, deviceFile, localFile].map((file) => fs.readFileSync(file)),
     read = () => value('appdock_settings_list_items', { targetId }),
     row = async (id) => (await read()).items.find((item) => item.values.id === id);
@@ -29,7 +32,7 @@ module.exports = async ({ page, client, profile, local, secretId, checks, tool, 
     apply = async (operations, dryRun = false) =>
       value('appdock_settings_apply', await request(operations, dryRun));
   const secretBytes = fs.readFileSync(localFile),
-    cipher = JSON.parse(secretBytes).entries[secretId].secret;
+    cipher = JSON.parse(secretBytes).entries[secretId];
   const schema = await value('appdock_settings_get_schema', { targetId });
   assert.equal(schema.kind, 'list');
   assert.equal(schema.maxItems, undefined);
@@ -77,7 +80,7 @@ module.exports = async ({ page, client, profile, local, secretId, checks, tool, 
       saved = await value('appdock_settings_apply', saveRequest);
     assert.equal(saved.effectVerified, false);
     assert.deepEqual(await value('appdock_settings_apply', saveRequest), saved);
-    const id = JSON.parse(fs.readFileSync(sharedFile)).mcpServers.items.find(
+    const id = JSON.parse(fs.readFileSync(deviceFile)).mcpClient.servers.find(
       (item) => item.name === 'Gateway MCP fixture',
     ).id;
     await apply([
@@ -100,9 +103,9 @@ module.exports = async ({ page, client, profile, local, secretId, checks, tool, 
       true,
     );
     assert.equal(requests, 0);
-    assert.deepEqual(fs.readFileSync(deviceFile), before[1]);
+    assert.deepEqual(fs.readFileSync(sharedFile), before[0]);
     checks.push(
-      'Real MCP add/dryRun/replay and partial connection updates keep execute/useMcp OFF, preserve shared/device storage, and send no HTTP requests',
+      'Real MCP add/dryRun/replay and partial connection updates keep execute/useMcp OFF, preserve shared storage, and send no HTTP requests',
     );
 
     await apply([
@@ -164,7 +167,7 @@ module.exports = async ({ page, client, profile, local, secretId, checks, tool, 
     await apply([{ kind: 'remove', itemRef: (await row(id)).itemRef }]);
     assert.equal((await read()).items.length, 1);
     assert.equal(JSON.parse(fs.readFileSync(localFile)).entries[id], undefined);
-    assert.equal(JSON.parse(fs.readFileSync(localFile)).entries[secretId].secret, cipher);
+    assert.equal(JSON.parse(fs.readFileSync(localFile)).entries[secretId], cipher);
     for (const hidden of [
       'PRIVATE_CREDENTIAL_FIXTURE',
       'tokenConfigured',

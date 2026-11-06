@@ -85,6 +85,7 @@ export class AppDockApi {
       serviceSettingsTargets?(): SettingsTarget[];
       settingsAccessRevision?(page: SettingsPageDefinition): string;
       customCommands?: CustomCommandService;
+      mcpToolCommands?: import('./mcp-tool-commands').McpToolCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
       processesAllowed?(): boolean;
@@ -250,6 +251,7 @@ export class AppDockApi {
           ...this.options
             .commands()
             .filter((command) => !this.settingsCommands.hasGenerated(command.id)),
+          ...(this.options.mcpToolCommands?.publicCommands(context) ?? []),
           ...(this.options.customCommands
             ? [
                 ...this.options.customCommands.publicCommands(context),
@@ -639,6 +641,12 @@ export class AppDockApi {
               ...result,
             };
           }
+          if (this.options.mcpToolCommands?.has(id))
+            return await this.options.mcpToolCommands.execute(id, {
+              ...context,
+              apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+              origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+            });
           if (this.options.customCommands?.has(id))
             return await this.options.customCommands.execute(id, {
               ...context,

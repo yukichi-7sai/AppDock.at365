@@ -21,7 +21,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   const assets = path.join(profile, 'data/assets/images');
   const preserved = [
     ...files.map((file) => path.join(assets, file)),
-    ...['ai-keys.json', 'tts-keys.json', 'mcp-client.json']
+    ...['ai-keys.json', 'tts-keys.json', 'mcp-client-secrets.json']
       .map((file) => path.join(local, file))
       .filter((file) => fs.existsSync(file)),
   ].map((file) => ({ file, sha256: hash(file) }));

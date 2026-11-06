@@ -99,7 +99,6 @@ export function settingsStorageDefaults(): Settings {
     ...createDefaultSettings(),
     keybindings: defaultKeybindings(),
     notificationPreferences: { overrides: [] },
-    mcpServers: { version: 1, items: [] },
     customCommands: { version: customCommandVersion, items: [] },
     imageLibrary: { groups: [] },
   };
@@ -124,7 +123,7 @@ export function settingsStorageValue(
     if (key !== 'keybindingOptions') delete result[key].bindings;
     if (!Object.keys(result[key]).length) delete result[key];
   }
-  for (const key of ['customCommands', 'mcpServers'] as const)
+  for (const key of ['customCommands', 'mcpClient'] as const)
     if (result[key]) result[key].version = value[key]!.version;
   result.schemaVersion = 1;
   // Keep compatibility metadata and the identity of known/unknown Applets.

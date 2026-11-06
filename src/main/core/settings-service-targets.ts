@@ -63,6 +63,8 @@ import {
 import type { TtsSecrets } from './tts-secrets';
 import type { McpClientSettings } from './mcp-client-settings';
 import { mcpClientSettingsTarget } from './settings-mcp-client-target';
+import { mcpToolCommandSettingsTarget } from './settings-mcp-tool-command-target';
+import type { McpToolCommandService } from './mcp-tool-commands';
 import type { WindowsLaunch } from './windows-launch';
 import { launchSettingsTarget } from './settings-launch-target';
 import {
@@ -153,6 +155,7 @@ export class SettingsServiceTargets {
       applets?(): ExtensionSnapshot[];
       appletManagement?: AppletManagement;
       mcpSettings?(): McpClientSettings;
+      mcpToolCommands?(): McpToolCommandService;
       launch?: WindowsLaunch;
       assertWritable?(): void;
     },
@@ -192,6 +195,15 @@ export class SettingsServiceTargets {
       this.appletOrder(),
       ...(this.options.mcpSettings
         ? [mcpClientSettingsTarget(this.options.mcpSettings(), this.options.checkRevision)]
+        : []),
+      ...(this.options.mcpSettings && this.options.mcpToolCommands
+        ? [
+            mcpToolCommandSettingsTarget(
+              this.options.mcpToolCommands(),
+              this.options.mcpSettings(),
+              this.options.checkRevision,
+            ),
+          ]
         : []),
       ...(this.options.launch
         ? [launchSettingsTarget({ ...this.options, launch: this.options.launch })]

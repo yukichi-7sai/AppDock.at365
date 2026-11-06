@@ -44,7 +44,7 @@ export interface ExtensionSettings extends Partial<
   settings: Record<string, unknown>;
 }
 export interface Settings {
-  mcpServers?: import('./mcp-client').McpServerRoster;
+  mcpClient?: import('./mcp-device-settings').McpDeviceSettings;
   customCommands?: import('./custom-commands').CustomCommandBlock;
   migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
   tts?: import('./tts').TtsConfiguration;

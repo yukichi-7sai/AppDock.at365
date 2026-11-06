@@ -63,10 +63,7 @@ settings.tts = {
   ],
 };
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(settings),
-);
+require('./test-settings.cjs').write(profile, settings, local);
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -253,7 +250,8 @@ async function main() {
     'Disabled MCP integration leaves public fields unlocked and private fields marked without a client connection',
   );
   await permissions();
-  assert.equal(await page.locator('[data-testid^="permission-row-"]').count(), 8);
+  assert.equal(await page.locator('[data-testid^="permission-row-"]').count(), 9);
+  assert.equal(await page.getByTestId('permission-row-useImageAi').count(), 1);
   await toggle('write', 'MCP', true);
   await toggle('execute', 'MCP', false);
   await toggle('write', 'Applet', false);
@@ -269,7 +267,7 @@ async function main() {
       .count(),
     1,
   );
-  checks.push('8 permission rows; independent Applet/MCP write; execute remains OFF');
+  checks.push('9 permission rows; independent Applet/MCP write; execute remains OFF');
   await page.evaluate(async (file) => {
     await window.dock.automation({ kind: 'selectConfig', file });
     const s = (await window.dock.automation({ kind: 'status' })).state;
@@ -429,12 +427,17 @@ async function main() {
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(async () => (await page.getByRole('dialog').count()) === 0, 'local credential saved');
   const secretId = JSON.parse(
-    fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
-  ).mcpServers.items[0].id;
+    fs.readFileSync(
+      require('./test-settings.cjs').file(
+        profile,
+        'settings-' + require('node:os').hostname() + '.json',
+      ),
+    ),
+  ).mcpClient.servers[0].id;
   const detail = await value('appdock_mcp_get_server_settings', { serverId: secretId });
   for (const hidden of ['PRIVATE_CREDENTIAL_FIXTURE', 'tokenConfigured', 'environmentNames'])
     assert.equal(JSON.stringify(detail).includes(hidden), false);
-  const secretFile = path.join(local, 'mcp-client.json'),
+  const secretFile = path.join(local, 'mcp-client-secrets.json'),
     secretBytes = fs.readFileSync(secretFile, 'utf8');
   assert.equal(secretBytes.includes('PRIVATE_CREDENTIAL_FIXTURE'), false);
   for (const dryRun of [true, false]) {

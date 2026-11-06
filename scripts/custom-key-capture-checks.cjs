@@ -6,6 +6,15 @@ module.exports = async ({ page, item, call, profile, until }) => {
   const capture = () => dialog.getByRole('button', { name: '送信キーを入力', exact: true });
   const editButton = page.getByRole('button', { name: item.title + 'を編集', exact: true });
   const keys = () => capture().locator('kbd').allTextContents();
+  const press = async (key) => {
+    await page.bringToFront();
+    await capture().focus();
+    await until(
+      async () => (await capture().innerText()).includes('押して入力'),
+      'key recorder ready',
+    );
+    await capture().press(key);
+  };
   const edit = async () => {
     await editButton.click();
     await dialog.waitFor();
@@ -30,7 +39,7 @@ module.exports = async ({ page, item, call, profile, until }) => {
   };
   await page.evaluate(() => window.dock.executeCommand('appdock.open'));
   await edit();
-  await capture().press('Enter');
+  await press('Enter');
   assert.deepEqual(await keys(), ['Enter']);
   assert(await dialog.isVisible(), 'Enter records without applying');
   await capture().dispatchEvent('keydown', { key: 'b', code: 'KeyB', repeat: true });
@@ -40,7 +49,7 @@ module.exports = async ({ page, item, call, profile, until }) => {
   await capture().dispatchEvent('keydown', { key: 'F25', code: 'F25' });
   await dialog.getByRole('alert').waitFor();
   assert.deepEqual(await keys(), ['Enter'], 'unsupported input retains the previous value');
-  await capture().press('Alt+ArrowLeft');
+  await press('Alt+ArrowLeft');
   assert.deepEqual(await keys(), ['Alt', 'Left']);
   assert.equal(await dialog.getByRole('alert').count(), 0);
   await capture().press('Tab');
@@ -93,12 +102,12 @@ module.exports = async ({ page, item, call, profile, until }) => {
   await apply('Escape');
 
   await edit();
-  await capture().press('Meta+e');
+  await press('Meta+e');
   assert.deepEqual(await keys(), ['Win', 'E']);
   await dialog.getByLabel('設定をJSONで編集').check();
   assert.equal(JSON.parse(await dialog.getByLabel('固定設定（JSON）').inputValue()).keys, 'Win+E');
   await dialog.getByLabel('設定をJSONで編集').uncheck();
-  await capture().press('Control+Shift+T');
+  await press('Control+Shift+T');
   await apply('Ctrl+Shift+T');
 
   for (const theme of ['light', 'dark']) {

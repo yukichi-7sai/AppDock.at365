@@ -146,6 +146,7 @@ export function SettingsForm({
       <McpClientSettingsForm
         settings={editor.value}
         auxiliary={aux.mcpClient}
+        move={model.content.move}
         invoke={invoke}
         busy={busy}
       />

@@ -31,7 +31,6 @@ import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
-import { McpCommandFields } from './McpCommandFields';
 import { ProcessCommandFields } from './ProcessCommandFields';
 import { defaultProcessLaunch } from '../../shared/process-launch';
 import type { UiCommand } from '../../shared/commands';
@@ -386,7 +385,6 @@ function CustomCommandDialog({
   const [enabled, setEnabled] = useState(original?.enabled ?? true);
   const [migrate, setMigrate] = useState(false);
   const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({});
-  const [mcpRefresh, setMcpRefresh] = useState(0);
   const [section, setSection] = useState<'common' | 'action'>('common');
   const type = types.find((t) => t.id === typeId);
   const oldVersion = !!original && original.configVersion !== type?.configVersion;
@@ -424,15 +422,6 @@ function CustomCommandDialog({
       )}
     </>
   );
-  const confirmMcpTool = async (nextConfig: Record<string, unknown>) => {
-    const reply = await invoke('mcpTool', [nextConfig.serverId, nextConfig.toolName]);
-    if (reply.tool.toolRevision !== nextConfig.toolRevision) {
-      setConfig(nextConfig);
-      setJsonMode(false);
-      setMcpRefresh((value) => value + 1);
-      throw new Error(translate('settings.mcpCommandFields.changed'));
-    }
-  };
   let validStackMode = true;
   if (typeId === commandStackTypeId && editableConfig && !jsonMode) {
     try {
@@ -482,7 +471,6 @@ function CustomCommandDialog({
             automation,
           };
           if (!original) {
-            if (typeId === 'appdock.mcp.call') await confirmMcpTool(nextConfig);
             return onApply({
               op: 'add',
               expectedTypeRevision: type!.typeRevision,
@@ -497,11 +485,6 @@ function CustomCommandDialog({
           );
           if ('configVersion' in changes) changes.config = nextConfig;
           if (!Object.keys(changes).length) return;
-          if (
-            typeId === 'appdock.mcp.call' &&
-            ('config' in changes || changes.enabled === true || changes.automation === true)
-          )
-            await confirmMcpTool(nextConfig);
           return onApply({ op: 'update', id, changes, expectedTypeRevision: type?.typeRevision });
         }}
       >
@@ -702,17 +685,6 @@ function CustomCommandDialog({
                         setInvalidFields((previous) => ({ ...previous, process: !valid }))
                       }
                     />
-                  ) : typeId === 'appdock.mcp.call' ? (
-                    <McpCommandFields
-                      advancedOptions={advancedOptions}
-                      refreshKey={mcpRefresh}
-                      config={config}
-                      onChange={setConfig}
-                      invoke={invoke}
-                      onValidity={(valid) =>
-                        setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
-                      }
-                    />
                   ) : (
                     type!.fields!.map((field) => (
                       <SettingsField key={field.key} title={field.title}>
@@ -772,7 +744,7 @@ function CustomCommandDialog({
                 {(!editableConfig ||
                   jsonMode ||
                   jsonOnly ||
-                  !['appdock.process.start', 'appdock.mcp.call'].includes(typeId)) && (
+                  typeId !== 'appdock.process.start') && (
                   <CustomCommandOptions>{advancedOptions}</CustomCommandOptions>
                 )}
               </section>

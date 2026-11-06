@@ -18,7 +18,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
       profile,
       `settings-${require('node:os').hostname()}.json`,
     ),
-    privateFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client.json'].map((name) =>
+    privateFiles = ['ai-keys.json', 'tts-keys.json', 'mcp-client-secrets.json'].map((name) =>
       path.join(local, name),
     ),
     privateBytes = privateFiles.map((file) => fs.readFileSync(file)),

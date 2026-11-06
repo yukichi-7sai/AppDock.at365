@@ -2,7 +2,7 @@
 
 [生成AIのPC専用設定とプリセット別MCP許可](docs/generation-settings.md)
 
-[MCP接続・ツールコマンドの端末別保存と認証復旧（未実装の設計）](docs/mcp-device-settings-design.md)
+[MCP接続・ツールコマンドの端末別保存と認証復旧](docs/mcp-device-settings-design.md)
 
 機能の説明・操作方法・設定・既定値・動作環境は[機能・操作・設定](docs/usage.md)を参照してください。共通の文書構成は[ドキュメント方針](docs/documentation.md)に従います。
 

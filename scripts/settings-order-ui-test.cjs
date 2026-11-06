@@ -108,11 +108,17 @@ initial.ai.connections = Array.from({ length: 3 }, (_, i) => ({
   baseUrl: `http://127.0.0.1:1/order-${i}`,
 }));
 initial.ai.defaultConnectionId = initial.ai.connections[0].id;
-initial.mcpServers = {
+initial.mcpClient = {
+  commands: [],
   version: 1,
-  items: Array.from({ length: 18 }, (_, index) => ({
+  servers: Array.from({ length: 18 }, (_, index) => ({
     id: randomUUID(),
     name: `MCP ${index + 1}`,
+    requiresEnvironment: false,
+    connection: {
+      ...require('../out/main/shared/mcp-client').defaultMcpConnection(),
+      url: 'http://127.0.0.1:1/mcp',
+    },
     description: '',
   })),
 };
@@ -219,8 +225,8 @@ const cases = [
     page: 'mcp-client',
     add: '接続先を追加',
     button: 'MCP接続先を並べ替え',
-    ids: initial.mcpServers.items.map((c) => c.id),
-    values: (s) => s.mcpServers.items.map((c) => c.id),
+    ids: initial.mcpClient.servers.map((c) => c.id),
+    values: (s) => s.mcpClient.servers.map((c) => c.id),
   },
   {
     page: 'custom-commands',

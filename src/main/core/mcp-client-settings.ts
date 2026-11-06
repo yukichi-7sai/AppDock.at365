@@ -1,19 +1,43 @@
-import { hostText } from '../../shared/i18n';
+import { hostText, type HostTextKey } from '../../shared/i18n';
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { boundedJson, jsonObject } from '../../shared/custom-commands';
 import {
-  mcpUuid,
   parseMcpConnection,
   parseMcpRoster,
   type McpConnection,
   type McpServerEntry,
 } from '../../shared/mcp-client';
-import { atomicWrite, SettingsConflictError, type SettingsStore } from './settings';
+import {
+  emptyMcpDeviceSettings,
+  parseMcpDeviceSettings,
+  type McpDeviceServer,
+  type McpToolCommand,
+} from '../../shared/mcp-device-settings';
+import {
+  atomicWrite,
+  SettingsConflictError,
+  type SettingsAsset,
+  type SettingsStore,
+} from './settings';
+import { observeFile } from './file-observer';
+import type { FileWatchAssistance } from './file-watch-assistance';
 
 export const mcpDigest = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const canonical = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(canonical)
+    : jsonObject(value)
+      ? Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((key) => [key, canonical(value[key])]),
+        )
+      : value;
+export const mcpStableDigest = (value: unknown) => mcpDigest(canonical(value));
 export const mcpEndpointIdentity = (c: McpConnection) =>
   mcpDigest({
     transport: c.transport,
@@ -23,11 +47,6 @@ export const mcpEndpointIdentity = (c: McpConnection) =>
     url: c.url,
     authentication: c.authentication,
   });
-interface LocalEntry {
-  connection: McpConnection;
-  secret?: string;
-}
-const hasSecret = (entry: unknown) => jsonObject(entry) && Object.hasOwn(entry, 'secret');
 export interface PublicMcpRow extends McpServerEntry {
   connection?: McpConnection;
 }
@@ -39,84 +58,103 @@ export class McpSettingsError extends Error {
     super(message);
   }
 }
+const failure = (code: string, key: HostTextKey): never => {
+  throw new McpSettingsError(code, hostText(key));
+};
+const privateSetting = () =>
+  failure('PRIVATE_SETTING', 'settings.mcp-client-settings.privateSetting');
 export class McpClientSettings {
+  private observer?: ReturnType<typeof observeFile>;
+  private indexedServers?: McpDeviceServer[];
+  private serversById = new Map<string, McpDeviceServer>();
   constructor(
     private settings: SettingsStore,
-    private file: string,
+    readonly file: string,
     private encryption: { encrypt(v: string): string; decrypt(v: string): string },
     private changed: () => void,
     private writable?: () => void,
   ) {}
+  block() {
+    return this.settings.value.mcpClient ?? emptyMcpDeviceSettings();
+  }
+  roster(): McpServerEntry[] {
+    return this.block().servers.map(({ id, name, description }) => ({ id, name, description }));
+  }
+  server(id: string) {
+    const servers = this.block().servers;
+    if (servers !== this.indexedServers) {
+      this.indexedServers = servers;
+      this.serversById = new Map(servers.map((row) => [row.id, row]));
+    }
+    return this.serversById.get(id);
+  }
+  connection(id: string) {
+    return this.server(id)?.connection;
+  }
+  private bytes() {
+    return fs.existsSync(this.file) ? fs.readFileSync(this.file) : undefined;
+  }
   private read(): Record<string, unknown> {
-    if (!fs.existsSync(this.file)) return {};
     try {
-      const data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      if (data.version !== 1 || !jsonObject(data.entries)) throw Error();
+      const bytes = this.bytes();
+      if (!bytes) return {};
+      const data = JSON.parse(bytes.toString('utf8'));
+      if (
+        !jsonObject(data) ||
+        data.version !== 1 ||
+        !jsonObject(data.entries) ||
+        Object.keys(data).some((k) => !['version', 'entries'].includes(k))
+      )
+        throw Error();
       return data.entries;
     } catch {
-      throw new McpSettingsError(
-        'CONFIGURATION_REQUIRED',
-        hostText('settings.mcp-client-settings.unreadable'),
-      );
+      return failure('CONFIGURATION_REQUIRED', 'settings.mcp-client-settings.unreadable');
     }
-  }
-  private entry(id: string, entries = this.read()): LocalEntry | undefined {
-    if (!Object.hasOwn(entries, id)) return undefined;
-    const value = entries[id];
-    if (
-      !mcpUuid(id) ||
-      !jsonObject(value) ||
-      Object.keys(value).some((key) => !['connection', 'secret'].includes(key)) ||
-      (value.secret !== undefined && typeof value.secret !== 'string')
-    )
-      throw new McpSettingsError(
-        'CONFIGURATION_REQUIRED',
-        hostText('settings.mcp-client-settings.invalidDeviceSettings'),
-      );
-    parseMcpConnection(value.connection);
-    return value as unknown as LocalEntry;
-  }
-  roster() {
-    return parseMcpRoster(this.settings.value.mcpServers).items;
   }
   revision() {
-    return mcpDigest([this.settings.revision, this.read()]);
+    return mcpDigest([this.settings.revision, this.bytes()?.toString('base64') ?? null]);
   }
-  /** Presentation invalidation only; permissions, secrets and execution still use current reads. */
   stateVersion() {
     try {
-      const stat = fs.statSync(this.file, { bigint: true, throwIfNoEntry: false });
-      return [this.settings.revision, stat?.ino, stat?.size, stat?.mtimeNs, stat?.ctimeNs].join(
-        ':',
-      );
+      const stat = fs.statSync(this.file);
+      return [this.settings.revision, stat.mtimeMs, stat.ctimeMs, stat.size, stat.ino];
     } catch {
-      return 'unreadable';
+      return [this.settings.revision, 'missing'];
     }
+  }
+  identity(id: string) {
+    const row = this.server(id);
+    if (!row) return mcpDigest(null);
+    const needsSecret = row.connection.authentication === 'bearer' || row.requiresEnvironment;
+    return mcpDigest([
+      row.connection,
+      row.requiresEnvironment,
+      needsSecret ? (this.read()[id] ?? null) : null,
+    ]);
   }
   health(): { revision: string; error?: string } {
     try {
+      this.read();
       return { revision: this.revision() };
     } catch {
       return {
-        revision: '',
+        revision: this.revision(),
         error: hostText('settings.mcp-client-settings.readonly'),
       };
     }
   }
-  connection(id: string) {
-    return this.entry(id)?.connection;
-  }
-  identity(id: string) {
-    return mcpDigest(this.entry(id) ?? null);
-  }
   secrets(id: string): { token?: string; env: Record<string, string> } {
-    const entry = this.entry(id);
-    if (!entry?.secret) return { env: {} };
+    const row = this.server(id);
+    if (!row || (row.connection.authentication === 'none' && !row.requiresEnvironment))
+      return { env: {} };
+    const cipher = this.read()[id];
+    if (cipher === undefined) return { env: {} };
     try {
-      const data = JSON.parse(this.encryption.decrypt(entry.secret));
+      if (typeof cipher !== 'string') throw Error();
+      const data = JSON.parse(this.encryption.decrypt(cipher));
       boundedJson(data, Infinity, 4, Infinity);
       if (
-        data.binding !== mcpEndpointIdentity(entry.connection) ||
+        data.binding !== mcpEndpointIdentity(row.connection) ||
         !jsonObject(data.env) ||
         Object.entries(data.env).some(
           ([k, v]) =>
@@ -131,52 +169,57 @@ export class McpClientSettings {
             /[\x00-\x1f\x7f]/.test(data.token)))
       )
         throw Error();
-      return { token: data.token, env: data.env };
+      return {
+        token: row.connection.authentication === 'bearer' ? data.token : undefined,
+        env: row.requiresEnvironment ? data.env : {},
+      };
     } catch {
-      throw new McpSettingsError(
-        'CONFIGURATION_REQUIRED',
-        hostText('settings.mcp-client-settings.decryptFailed'),
-      );
+      return failure('CONFIGURATION_REQUIRED', 'settings.mcp-client-settings.decryptFailed');
+    }
+  }
+  credentialReason(id: string): string | null {
+    const row = this.server(id);
+    if (!row) return hostText('settings.mcp-client-settings.missingServer');
+    try {
+      const secret = this.secrets(id);
+      if (row.connection.authentication === 'bearer' && !secret.token)
+        return hostText('settings.mcpRecovery.tokenRequired');
+      if (row.requiresEnvironment && !Object.keys(secret.env).length)
+        return hostText('settings.mcpRecovery.environmentRequired');
+      return null;
+    } catch {
+      return hostText('settings.mcpRecovery.credentialsUnreadable');
     }
   }
   statuses() {
-    return this.roster().map(({ id }) => {
-      let connection: McpConnection | undefined;
+    return this.block().servers.map((row) => {
+      const error = this.credentialReason(row.id);
+      let secret: { token?: string; env: Record<string, string> } = { env: {} };
       try {
-        connection = this.connection(id);
-        const secrets = this.secrets(id);
-        return {
-          id,
-          connection,
-          tokenConfigured: !!secrets.token,
-          environmentNames: Object.keys(secrets.env),
-          state: connection ? (connection.enabled ? 'disconnected' : 'disabled') : 'unconfigured',
-        };
+        secret = this.secrets(row.id);
       } catch {
-        let disabled = false;
-        try {
-          const raw = this.read()[id];
-          disabled =
-            jsonObject(raw) && jsonObject(raw.connection) && raw.connection.enabled === false;
-        } catch {
-          // An unreadable document is reported by health(), without breaking the page snapshot.
-        }
-        return {
-          id,
-          connection,
-          tokenConfigured: false,
-          environmentNames: [],
-          state: disabled ? 'disabled' : 'error',
-          error: hostText('settings.mcp-client-settings.unhealthy'),
-        };
+        /* Keep the definition editable. */
       }
+      return {
+        id: row.id,
+        connection: row.connection,
+        tokenConfigured: !!secret.token,
+        environmentNames: Object.keys(secret.env),
+        requiresEnvironment: row.requiresEnvironment,
+        state: !row.connection.enabled
+          ? 'disabled'
+          : error
+            ? 'credentials-required'
+            : 'disconnected',
+        ...(error ? { error } : {}),
+      };
     });
   }
   getSettings(serverId?: unknown) {
-    const revision = this.revision();
-    const items = this.roster();
-    if (serverId === undefined) {
-      const statuses = this.statuses();
+    const revision = this.revision(),
+      items = this.roster(),
+      statuses = this.statuses();
+    if (serverId === undefined)
       return {
         revision,
         items: items.map((item) => ({
@@ -184,41 +227,39 @@ export class McpClientSettings {
           state: statuses.find((s) => s.id === item.id)?.state,
         })),
       };
-    }
-    const item = items.find((item) => item.id === serverId);
-    if (!item)
-      throw new McpSettingsError(
-        'NOT_FOUND',
-        hostText('settings.mcp-client-settings.missingServer'),
-      );
-    return { revision, item, ...this.statuses().find((s) => s.id === serverId) };
+    const item = items.find((v) => v.id === serverId);
+    if (!item) return failure('NOT_FOUND', 'settings.mcp-client-settings.missingServer');
+    return { revision, item, ...statuses.find((s) => s.id === serverId) };
   }
   publicConfiguration() {
-    const entries = this.read();
-    const rows: PublicMcpRow[] = [];
-    const protectedIds: string[] = [];
-    const states: Record<string, string> = {};
-    for (const item of this.roster()) {
-      let connection: McpConnection | undefined;
-      try {
-        connection = this.entry(item.id, entries)?.connection;
-        states[item.id] = connection
-          ? connection.enabled
-            ? 'disconnected'
-            : 'disabled'
-          : 'unconfigured';
-      } catch {
-        // Invalid rows stay editable as roster metadata without repairing their local data.
-        const raw = entries[item.id];
-        states[item.id] =
-          jsonObject(raw) && jsonObject(raw.connection) && raw.connection.enabled === false
-            ? 'disabled'
-            : 'error';
-      }
-      rows.push({ ...item, ...(connection ? { connection: structuredClone(connection) } : {}) });
-      if (hasSecret(entries[item.id])) protectedIds.push(item.id);
+    let entries: Record<string, unknown> | undefined;
+    try {
+      entries = this.read();
+    } catch {
+      /* Public metadata never decrypts secrets. */
     }
-    return { rows, protectedIds, states, revision: mcpDigest([this.settings.revision, entries]) };
+    const rows: PublicMcpRow[] = [],
+      protectedIds: string[] = [],
+      states: Record<string, string> = {};
+    for (const row of this.block().servers) {
+      const { requiresEnvironment, ...publicRow } = row;
+      rows.push(structuredClone(publicRow));
+      if (
+        !entries ||
+        Object.hasOwn(entries, row.id) ||
+        requiresEnvironment ||
+        row.connection.authentication === 'bearer'
+      )
+        protectedIds.push(row.id);
+      states[row.id] = !row.connection.enabled
+        ? 'disabled'
+        : !entries ||
+            ((requiresEnvironment || row.connection.authentication === 'bearer') &&
+              !Object.hasOwn(entries, row.id))
+          ? 'credentials-required'
+          : 'disconnected';
+    }
+    return { rows, protectedIds, states, revision: this.revision() };
   }
   publicSettings(serverId?: unknown) {
     const { rows, revision, states } = this.publicConfiguration();
@@ -230,219 +271,142 @@ export class McpClientSettings {
           state: states[item.id],
         })),
       };
-    const row = rows.find((row) => row.id === serverId);
-    if (!row)
-      throw new McpSettingsError(
-        'NOT_FOUND',
-        hostText('settings.mcp-client-settings.missingServer'),
-      );
+    const row = rows.find((r) => r.id === serverId);
+    if (!row) return failure('NOT_FOUND', 'settings.mcp-client-settings.missingServer');
     const { connection, ...item } = row;
     return { revision, item, id: item.id, connection, state: states[item.id] };
   }
-  private assertPublicRevision(expectedRevision: string) {
+  assertRevision(expected: string) {
     try {
       this.writable?.();
     } catch {
-      throw new McpSettingsError('BUSY', hostText('services.index.settingsRestoring'));
+      return failure('BUSY', 'services.index.settingsRestoring');
     }
     try {
       this.settings.assertRevision(this.settings.revision);
     } catch {
-      throw new McpSettingsError(
-        'REVISION_CONFLICT',
-        hostText('settings.mcp-client-settings.conflict'),
-      );
+      return failure('REVISION_CONFLICT', 'settings.mcp-client-settings.conflict');
     }
-    if (expectedRevision !== this.revision())
-      throw new McpSettingsError(
-        'REVISION_CONFLICT',
-        hostText('settings.mcp-client-settings.editConflict'),
-      );
+    if (expected !== this.revision())
+      return failure('REVISION_CONFLICT', 'settings.mcp-client-settings.editConflict');
   }
-  /** Plan a complete public snapshot while retaining every untouched local entry and cipher. */
-  planPublicConfiguration(rows: PublicMcpRow[], expectedRevision: string) {
-    this.assertPublicRevision(expectedRevision);
-    const entries = this.read(),
-      previousEntries = structuredClone(entries),
-      before = this.roster();
-    let items: McpServerEntry[];
+  private save(
+    servers: McpDeviceServer[],
+    commands: McpToolCommand[],
+    expected: string,
+    asset?: SettingsAsset,
+  ) {
+    this.assertRevision(expected);
+    const mcpClient = parseMcpDeviceSettings({ version: 1, servers, commands });
+    if (isDeepStrictEqual(mcpClient, this.block()) && !asset) return;
     try {
-      if (
-        !Array.isArray(rows) ||
-        rows.some(
-          (row) =>
-            !jsonObject(row) ||
-            Object.keys(row).some(
-              (key) => !['id', 'name', 'description', 'connection'].includes(key),
-            ),
-        )
-      )
-        throw Error();
-      items = parseMcpRoster({
-        version: 1,
-        items: rows.map(({ id, name, description }) => ({ id, name, description })),
-      }).items;
-      const itemIds = new Set(items.map((item) => item.id));
-      const beforeIds = new Set(before.map((item) => item.id));
-      for (const item of before) {
-        if (itemIds.has(item.id)) continue;
-        if (hasSecret(entries[item.id]))
-          throw new McpSettingsError(
-            'PRIVATE_SETTING',
-            hostText('settings.mcp-client-settings.privateSetting'),
-          );
-        delete entries[item.id];
-      }
-      for (const row of rows) {
-        let old: LocalEntry | undefined;
-        try {
-          old = this.entry(row.id, entries);
-        } catch {
-          /* Explicit connection edits may repair a non-secret row. */
-        }
-        if (row.connection === undefined) {
-          if (!beforeIds.has(row.id) || old) throw Error();
-          continue;
-        }
-        if (old && isDeepStrictEqual(old.connection, row.connection)) continue;
-        const connection = parseMcpConnection(row.connection);
-        // Validation must not rewrite an untouched endpoint spelling or its credential binding.
-        if (old && old.connection.url === row.connection.url) connection.url = old.connection.url;
-        if (
-          hasSecret(entries[row.id]) &&
-          (!old || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(connection))
-        )
-          throw new McpSettingsError(
-            'PRIVATE_SETTING',
-            hostText('settings.mcp-client-settings.privateSetting'),
-          );
-        if (connection.authentication === 'bearer' && !hasSecret(entries[row.id]))
-          throw new McpSettingsError(
-            'PRIVATE_SETTING',
-            hostText('settings.mcp-client-settings.privateSetting'),
-          );
-        entries[row.id] = {
-          connection,
-          ...(old && Object.hasOwn(old, 'secret') ? { secret: old.secret } : {}),
-        };
-      }
+      this.settings.save({ ...this.settings.value, mcpClient }, this.settings.revision, asset);
     } catch (error) {
-      if (error instanceof McpSettingsError) throw error;
-      throw new McpSettingsError(
-        'INVALID_ARGUMENT',
-        hostText('settings.mcp-client-settings.invalidUpdate'),
+      return failure(
+        error instanceof SettingsConflictError ? 'REVISION_CONFLICT' : 'SAVE_FAILED',
+        error instanceof SettingsConflictError
+          ? 'settings.mcp-client-settings.conflict'
+          : 'settings.mcp-client-settings.saveFailed',
       );
     }
-    const next = { ...this.settings.value, mcpServers: { version: 1 as const, items } };
-    const localChanged = !isDeepStrictEqual(entries, previousEntries);
-    const changed = localChanged || !isDeepStrictEqual(before, items);
-    // Prepare the asset without writing or decrypting anything.
-    const asset = localChanged
-      ? this.asset(entries, expectedRevision)
-      : {
-          commit: () => {
-            if (this.revision() !== expectedRevision)
-              throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
-          },
-          rollback: () => {},
-        };
-    this.assertPublicRevision(expectedRevision);
+    this.changed();
+  }
+  saveCommands(commands: McpToolCommand[], expected: string) {
+    this.save(this.block().servers, commands, expected);
+  }
+  planPublicConfiguration(rows: PublicMcpRow[], expected: string) {
+    this.assertRevision(expected);
+    const snapshot = this.publicConfiguration(),
+      before = this.block().servers;
+    if (
+      !Array.isArray(rows) ||
+      rows.some(
+        (r) =>
+          !jsonObject(r) ||
+          Object.keys(r).some((k) => !['id', 'name', 'description', 'connection'].includes(k)),
+      )
+    )
+      return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidUpdate');
+    const roster = parseMcpRoster({
+      version: 1,
+      items: rows.map(({ id, name, description }) => ({ id, name, description })),
+    }).items;
+    for (const row of before)
+      if (!rows.some((r) => r.id === row.id) && snapshot.protectedIds.includes(row.id))
+        return privateSetting();
+    const servers = rows.map((row, i) => {
+      const old = before.find((r) => r.id === row.id),
+        connection = parseMcpConnection(row.connection);
+      if (
+        snapshot.protectedIds.includes(row.id) &&
+        (!old || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(connection))
+      )
+        return privateSetting();
+      if (connection.authentication === 'bearer' && old?.connection.authentication !== 'bearer')
+        return privateSetting();
+      return { ...roster[i], connection, requiresEnvironment: old?.requiresEnvironment ?? false };
+    });
     return {
-      changed,
-      commit: () => {
-        this.assertPublicRevision(expectedRevision);
-        if (!changed) return;
-        try {
-          this.settings.save(next, this.settings.revision, asset);
-        } catch (error) {
-          throw new McpSettingsError(
-            error instanceof SettingsConflictError ? 'REVISION_CONFLICT' : 'SAVE_FAILED',
-            hostText(
-              error instanceof SettingsConflictError
-                ? 'settings.mcp-client-settings.conflict'
-                : 'settings.mcp-client-settings.saveFailed',
-            ),
-          );
-        }
-        this.changed();
-      },
+      changed: !isDeepStrictEqual(servers, before),
+      commit: () => this.save(servers, this.block().commands, expected),
     };
   }
-  private updatePublic(request: Record<string, unknown>) {
-    const snapshot = this.publicConfiguration();
-    let rows = snapshot.rows;
-    if (request.op === 'save') {
-      const item = parseMcpRoster({ version: 1, items: [request.item] }).items[0];
-      const row = { ...item, connection: parseMcpConnection(request.connection) };
-      rows = rows.some((value) => value.id === item.id)
-        ? rows.map((value) => (value.id === item.id ? row : value))
-        : [...rows, row];
-    } else if (request.op === 'remove') {
-      if (!rows.some((row) => row.id === request.id))
-        throw new McpSettingsError(
-          'NOT_FOUND',
-          hostText('settings.mcp-client-settings.missingServer'),
-        );
-      rows = rows.filter((row) => row.id !== request.id);
-    } else if (request.op === 'enabled') {
-      const row = rows.find((row) => row.id === request.id);
-      if (!row?.connection || typeof request.enabled !== 'boolean')
-        throw new McpSettingsError(
-          'INVALID_ARGUMENT',
-          hostText('settings.mcp-client-settings.configureFirst'),
-        );
-      row.connection.enabled = request.enabled;
-    } else {
-      const rowsById = new Map(rows.map((row) => [row.id, row]));
-      if (
-        !Array.isArray(request.ids) ||
-        request.ids.length !== rows.length ||
-        new Set(request.ids).size !== rows.length ||
-        request.ids.some((id) => !rowsById.has(id))
-      )
-        throw new McpSettingsError(
-          'INVALID_ARGUMENT',
-          hostText('settings.mcp-client-settings.order'),
-        );
-      rows = request.ids.map((id) => rowsById.get(id)!);
-    }
-    const plan = this.planPublicConfiguration(rows, request.expectedRevision as string);
-    if (request.dryRun === true)
-      return { saved: false, validated: true, revision: this.revision() };
-    plan.commit();
-    return { saved: true, revision: this.revision() };
-  }
-  private asset(entries: Record<string, unknown>, expectedRevision: string) {
-    const content = JSON.stringify({ version: 1, entries }) + '\n';
-    const previous = fs.existsSync(this.file) ? fs.readFileSync(this.file) : undefined;
+  private asset(entries: Record<string, unknown>, expected: string): SettingsAsset {
+    const previous = this.bytes(),
+      content = Buffer.from(JSON.stringify({ version: 1, entries }) + '\n');
     let committed = false;
     return {
+      recovery: {
+        scope: 'mcp-secrets',
+        before: previous?.toString('base64') ?? null,
+        after: content.toString('base64'),
+      },
       commit: () => {
-        if (this.revision() !== expectedRevision)
+        if (expected !== this.revision())
           throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
+        if (previous)
+          atomicWrite(
+            path.join(path.dirname(this.file), 'settings-backups', 'mcp-secrets', 'previous.json'),
+            previous,
+          );
         atomicWrite(this.file, content, { previous });
         committed = true;
+        this.observer?.invalidate(content.toString('utf8'));
       },
       rollback: () => {
         if (!committed) return;
-        const written = Buffer.from(content, 'utf8');
-        if (previous) atomicWrite(this.file, previous, { previous: written });
-        else {
-          if (!fs.readFileSync(this.file).equals(written))
-            throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
-          fs.rmSync(this.file);
-        }
+        if (previous) atomicWrite(this.file, previous, { previous: content });
+        else if (this.bytes()?.equals(content)) fs.unlinkSync(this.file);
+        else throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
       },
     };
   }
+  resetSecrets(expected: string) {
+    this.assertRevision(expected);
+    const previous = this.bytes();
+    if (previous)
+      atomicWrite(
+        path.join(
+          path.dirname(this.file),
+          'settings-backups',
+          'mcp-secrets',
+          `recovery-${Date.now()}-${randomUUID()}.json`,
+        ),
+        previous,
+        { previous: undefined },
+      );
+    this.save(this.block().servers, this.block().commands, expected, this.asset({}, expected));
+    return { saved: true, revision: this.revision() };
+  }
+  reset(expected: string) {
+    this.assertRevision(expected);
+    this.read();
+    this.save([], [], expected, this.asset({}, expected));
+  }
   update(request: unknown, external = false) {
     if (!jsonObject(request) || typeof request.expectedRevision !== 'string')
-      throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
-    if (external && (Object.hasOwn(request, 'token') || Object.hasOwn(request, 'environment')))
-      throw new McpSettingsError(
-        'PRIVATE_SETTING',
-        hostText('settings.mcp-client-settings.privateSetting'),
-      );
+      return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidUpdate');
+    if (external && ('token' in request || 'environment' in request)) return privateSetting();
     const fields: Record<string, string[]> = {
       save: ['item', 'connection', 'token', 'environment'],
       remove: ['id'],
@@ -457,155 +421,132 @@ export class McpClientSettings {
       ) ||
       (request.dryRun !== undefined && typeof request.dryRun !== 'boolean')
     )
-      throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
-    boundedJson(request, Infinity, 8, Infinity);
-    if (external) return this.updatePublic(request);
-    try {
-      this.settings.assertRevision(this.settings.revision);
-    } catch {
-      throw new McpSettingsError(
-        'REVISION_CONFLICT',
-        hostText('settings.mcp-client-settings.conflict'),
-      );
-    }
-    if (request.expectedRevision !== this.revision())
-      throw new McpSettingsError(
-        'REVISION_CONFLICT',
-        hostText('settings.mcp-client-settings.editConflict'),
-      );
-    const entries = this.read();
-    let items = this.roster();
+      return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidUpdate');
+    this.assertRevision(request.expectedRevision);
+    let servers = structuredClone(this.block().servers),
+      entries: Record<string, unknown> | undefined;
+    const originalEntries = () => (entries ??= this.read());
+    let secretsChanged = false;
     if (request.op === 'save') {
-      const item = parseMcpRoster({ version: 1, items: [request.item] }).items[0];
-      const connection = parseMcpConnection(request.connection);
-      let previous: { token?: string; env: Record<string, string> } = { env: {} };
-      let old: LocalEntry | undefined;
-      try {
-        old = this.entry(item.id, entries);
-      } catch {
-        // Explicitly saving this row repairs it; untouched entries remain verbatim JSON values.
-      }
+      const item = parseMcpRoster({ version: 1, items: [request.item] }).items[0],
+        connection = parseMcpConnection(request.connection);
+      const old = servers.find((v) => v.id === item.id),
+        endpointChanged =
+          !old || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(connection);
+      let requiresEnvironment = old?.requiresEnvironment ?? false;
       if (
-        external &&
-        hasSecret(entries[item.id]) &&
-        (!old || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(connection))
-      )
-        throw new McpSettingsError(
-          'PRIVATE_SETTING',
-          hostText('settings.mcp-client-settings.privateSetting'),
-        );
-      if (old && mcpEndpointIdentity(old.connection) === mcpEndpointIdentity(connection)) {
-        try {
-          previous = this.secrets(item.id);
-        } catch {
-          if (request.token === undefined && request.environment === undefined)
-            throw Error(hostText('settings.mcp-client-settings.credentialRequired'));
+        !external &&
+        ((endpointChanged && !!old) ||
+          request.token !== undefined ||
+          request.environment !== undefined)
+      ) {
+        const values = originalEntries(),
+          originalCipher = values[item.id];
+        let previous: { token?: string; env: Record<string, string> } = { env: {} };
+        if (!endpointChanged && originalCipher !== undefined) {
+          try {
+            previous = this.secrets(item.id);
+          } catch {
+            if (request.token === undefined && request.environment === undefined)
+              return failure(
+                'CONFIGURATION_REQUIRED',
+                'settings.mcp-client-settings.credentialRequired',
+              );
+          }
         }
-      }
-      const token = request.token === undefined ? previous.token : request.token;
-      if (
-        token !== undefined &&
-        (typeof token !== 'string' || token.length > 8192 || /[\x00-\x1f\x7f]/.test(token))
-      )
-        throw Error(hostText('settings.mcp-client-settings.invalidBearer'));
-      const env = request.environment === undefined ? previous.env : request.environment;
-      if (
-        !jsonObject(env) ||
-        Object.entries(env).some(
-          ([k, v]) =>
-            !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
-            typeof v !== 'string' ||
-            v.length > 8192 ||
-            /[\x00]/.test(v),
+        const token =
+          connection.authentication === 'bearer'
+            ? request.token === undefined
+              ? previous.token
+              : request.token
+            : undefined;
+        const env =
+          connection.transport === 'stdio'
+            ? request.environment === undefined
+              ? previous.env
+              : request.environment
+            : {};
+        if (
+          (token !== undefined &&
+            (typeof token !== 'string' || token.length > 8192 || /[\x00-\x1f\x7f]/.test(token))) ||
+          !jsonObject(env) ||
+          Object.entries(env).some(
+            ([k, v]) =>
+              !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
+              typeof v !== 'string' ||
+              v.length > 8192 ||
+              /[\x00]/.test(v),
+          )
         )
-      )
-        throw Error(hostText('settings.mcp-client-settings.invalidEnvironment'));
-      boundedJson(env, Infinity, 2, Infinity);
-      if (connection.authentication === 'bearer' && !token)
-        throw Error(hostText('settings.mcp-client-settings.bearerRequired'));
-      const secretData = {
-        binding: mcpEndpointIdentity(connection),
-        token: connection.authentication === 'bearer' ? token : undefined,
-        env: connection.transport === 'stdio' ? env : {},
-      };
-      entries[item.id] =
-        external && old && Object.hasOwn(old, 'secret')
-          ? { connection, secret: old.secret }
-          : {
-              connection,
-              ...(secretData.token || Object.keys(secretData.env).length
-                ? {
-                    secret:
-                      old?.secret &&
-                      mcpEndpointIdentity(old.connection) === secretData.binding &&
-                      isDeepStrictEqual(
-                        { token: previous.token, env: previous.env },
-                        { token: secretData.token, env: secretData.env },
-                      )
-                        ? old.secret
-                        : this.encryption.encrypt(JSON.stringify(secretData)),
-                  }
-                : {}),
-            };
-      items = items.some((v) => v.id === item.id)
-        ? items.map((v) => (v.id === item.id ? item : v))
-        : [...items, item];
+          return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidEnvironment');
+        if (request.environment !== undefined || connection.transport !== 'stdio')
+          requiresEnvironment = Object.keys(env).length > 0;
+        const hasValues = !!token || Object.keys(env).length > 0;
+        if (hasValues) {
+          if (endpointChanged || !isDeepStrictEqual(previous, { token, env }))
+            values[item.id] = this.encryption.encrypt(
+              JSON.stringify({ binding: mcpEndpointIdentity(connection), token, env }),
+            );
+        } else delete values[item.id];
+        secretsChanged = !isDeepStrictEqual(originalCipher, values[item.id]);
+      }
+      const row = { ...item, connection, requiresEnvironment };
+      servers = old ? servers.map((v) => (v.id === row.id ? row : v)) : [...servers, row];
     } else if (request.op === 'remove') {
-      if (!mcpUuid(request.id) || !items.some((v) => v.id === request.id))
-        throw Error(hostText('settings.mcp-client-settings.missingConnection'));
-      if (external && hasSecret(entries[request.id]))
-        throw new McpSettingsError(
-          'PRIVATE_SETTING',
-          hostText('settings.mcp-client-settings.privateSetting'),
-        );
-      items = items.filter((v) => v.id !== request.id);
-      delete entries[request.id];
-    } else if (request.op === 'reorder') {
-      const itemsById = new Map(items.map((item) => [item.id, item]));
+      if (!servers.some((r) => r.id === request.id))
+        return failure('NOT_FOUND', 'settings.mcp-client-settings.missingServer');
+      if (!external) {
+        const values = originalEntries();
+        secretsChanged = Object.hasOwn(values, String(request.id));
+        delete values[String(request.id)];
+      }
+      servers = servers.filter((r) => r.id !== request.id);
+    } else if (request.op === 'enabled') {
+      const row = servers.find((r) => r.id === request.id);
+      if (!row || typeof request.enabled !== 'boolean')
+        return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.configureFirst');
+      row.connection.enabled = request.enabled;
+    } else {
+      const indexed = new Map(servers.map((r) => [r.id, r]));
       if (
         !Array.isArray(request.ids) ||
-        request.ids.length !== items.length ||
-        new Set(request.ids).size !== items.length ||
-        request.ids.some((id) => !itemsById.has(id))
+        request.ids.length !== servers.length ||
+        new Set(request.ids).size !== servers.length ||
+        request.ids.some((id) => !indexed.has(id))
       )
-        throw Error(hostText('settings.mcp-client-settings.order'));
-      items = request.ids.map((id) => itemsById.get(id)!);
-    } else if (request.op === 'enabled') {
-      if (
-        !mcpUuid(request.id) ||
-        !items.some((v) => v.id === request.id) ||
-        !entries[request.id] ||
-        typeof request.enabled !== 'boolean'
-      )
-        throw Error(hostText('settings.mcp-client-settings.configureFirst'));
-      const entry = this.entry(request.id, entries);
-      if (!entry) throw Error(hostText('settings.mcp-client-settings.configureFirst'));
-      entry.connection.enabled = request.enabled;
-    } else throw Error(hostText('settings.mcp-client-settings.unsupported'));
-    const mcpServers = parseMcpRoster({ version: 1, items });
-    const next = { ...this.settings.value, mcpServers };
-    if (request.expectedRevision !== this.revision())
-      throw new McpSettingsError(
-        'REVISION_CONFLICT',
-        hostText('settings.mcp-client-settings.conflict'),
-      );
-    const asset = this.asset(entries, request.expectedRevision);
-    if (request.dryRun === true)
-      return { saved: false, validated: true, revision: this.revision() };
-    try {
-      this.settings.save(next, this.settings.revision, asset);
-    } catch (error) {
-      if (error instanceof SettingsConflictError)
-        throw new McpSettingsError(
-          'REVISION_CONFLICT',
-          hostText('settings.mcp-client-settings.conflict'),
-        );
-      throw new McpSettingsError(
-        'SAVE_FAILED',
-        hostText('settings.mcp-client-settings.saveFailed'),
-      );
+        return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.order');
+      servers = request.ids.map((id) => indexed.get(id)!);
     }
-    this.changed();
-    return { saved: true, revision: this.revision() };
+    if (external) {
+      const plan = this.planPublicConfiguration(
+        servers.map(({ requiresEnvironment: _required, ...row }) => row),
+        request.expectedRevision,
+      );
+      if (!request.dryRun) plan.commit();
+    } else {
+      const block = parseMcpDeviceSettings({ ...this.block(), servers });
+      if (!request.dryRun)
+        this.save(
+          block.servers,
+          block.commands,
+          request.expectedRevision,
+          secretsChanged ? this.asset(entries!, request.expectedRevision) : undefined,
+        );
+    }
+    return request.dryRun
+      ? { saved: false, validated: true, revision: this.revision() }
+      : { saved: true, revision: this.revision() };
+  }
+  watch(assistance?: FileWatchAssistance) {
+    this.observer?.close();
+    this.observer = observeFile(
+      this.file,
+      () => this.changed(),
+      () => this.changed(),
+      assistance,
+    );
+  }
+  close() {
+    this.observer?.close();
   }
 }

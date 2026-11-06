@@ -13,8 +13,9 @@ const { defaultMcpConnection } = require('../out/main/shared/mcp-client');
 const targetId = 'service.mcp.servers';
 function fixture(t) {
   const dir = path.resolve('.artifacts/settings-mcp-client-unit', randomUUID()),
-    localFile = path.join(dir, 'local', 'mcp-client.json');
+    localFile = path.join(dir, 'local', 'mcp-client-secrets.json');
   fs.mkdirSync(path.dirname(localFile), { recursive: true });
+  fs.writeFileSync(localFile, JSON.stringify({ version: 1, entries: {} }));
   const store = new DeviceSettingsStore(
     path.join(dir, 'settings.json'),
     path.join(dir, 'local'),
@@ -108,7 +109,7 @@ function fixture(t) {
   };
 }
 
-test('MCP roster list uses fixed settings entries and preserves shared/device storage and id identity', (t) => {
+test('MCP connections use fixed device storage and stable IDs without changing shared bytes', (t) => {
   const f = fixture(t),
     discovery = f.call('targets.list').items.find((item) => item.targetId === targetId);
   assert.equal(discovery.category, 'mcp-client');
@@ -145,10 +146,11 @@ test('MCP roster list uses fixed settings entries and preserves shared/device st
   assert.equal(f.row(id).values.name, 'Same');
   assert.equal(f.row(id).values['connection.url'], 'http://example.test/');
   const shared = JSON.parse(fs.readFileSync(f.store.shared.file)),
-    local = JSON.parse(fs.readFileSync(f.localFile));
-  assert.deepEqual(Object.keys(shared.mcpServers.items[0]).sort(), ['description', 'id', 'name']);
-  assert.equal(local.entries[id].connection.enabled, false);
-  assert.equal(local.entries[id].connection.published, false);
+    device = JSON.parse(fs.readFileSync(f.store.device.file));
+  assert.equal(shared.mcpClient, undefined);
+  assert.equal(device.mcpClient.servers[0].id, id);
+  assert.equal(device.mcpClient.servers[0].connection.enabled, false);
+  assert.equal(device.mcpClient.servers[0].connection.published, false);
   assert.equal(f.crypts(), 0);
   assert.equal(f.changes(), 1);
 });
@@ -188,7 +190,8 @@ test('partial edits, duplicate names, full ordering, deletion, no-op and stale i
   f.apply([{ kind: 'remove', itemRef: f.row(one).itemRef }]);
   assert.equal(f.owner.roster().length, 1);
   assert.equal(JSON.parse(fs.readFileSync(f.localFile)).entries[one], undefined);
-  assert.equal(JSON.parse(local).entries[two].connection.url, f.row(two).values['connection.url']);
+  assert.deepEqual(fs.readFileSync(f.localFile), local);
+  assert.equal(f.row(two).values['connection.url'], 'http://example.test/mcp');
   assert.throws(() => f.apply([{ kind: 'update', itemRef: old, changes: { name: 'Old' } }]), {
     code: 'REVISION_CONFLICT',
   });
@@ -200,8 +203,7 @@ test('encrypted and unreadable entries retain exact ciphers without any decrypti
     broken = f.add('Broken'),
     plain = f.add('Plain');
   const entries = JSON.parse(fs.readFileSync(f.localFile));
-  entries.entries[secure].connection.authentication = 'bearer';
-  entries.entries[secure].secret = 'UNREADABLE_ENCRYPTED_CIPHER';
+  entries.entries[secure] = 'UNREADABLE_ENCRYPTED_CIPHER';
   entries.entries[broken] = { connection: { invalid: true }, secret: null, extra: 'PRESERVE_RAW' };
   fs.writeFileSync(f.localFile, JSON.stringify(entries, null, 3));
   const fileBefore = fs.readFileSync(f.localFile);
@@ -251,7 +253,7 @@ test('encrypted and unreadable entries retain exact ciphers without any decrypti
     { kind: 'update', itemRef: f.row(broken).itemRef, changes: { description: 'Still damaged' } },
   ]);
   const after = JSON.parse(fs.readFileSync(f.localFile));
-  assert.equal(after.entries[secure].secret, entries.entries[secure].secret);
+  assert.equal(after.entries[secure], entries.entries[secure]);
   assert.deepEqual(after.entries[broken], entries.entries[broken]);
   const detail = f.owner.publicSettings(secure);
   f.owner.update(
@@ -270,7 +272,7 @@ test('encrypted and unreadable entries retain exact ciphers without any decrypti
   );
   assert.deepEqual(fs.readFileSync(f.localFile), beforeOrder);
   assert.equal(f.crypts(), 0);
-  assert.notDeepEqual(fs.readFileSync(f.localFile), fileBefore);
+  assert.deepEqual(fs.readFileSync(f.localFile), fileBefore);
 });
 
 test('secret input and new bearer bindings are rejected; both endpoint kinds preserve owner validation and limits', (t) => {
@@ -327,14 +329,15 @@ test('secret input and new bearer bindings are rejected; both endpoint kinds pre
   assert.equal(f.crypts(), 0);
 });
 
-test('unrelated edits and non-binding connection edits retain a valid noncanonical encrypted endpoint', (t) => {
+test('unrelated edits and non-binding connection edits retain encrypted credentials', (t) => {
   const f = fixture(t),
     secure = f.add('Secure'),
     plain = f.add('Plain');
   const document = JSON.parse(fs.readFileSync(f.localFile));
-  document.entries[secure].connection.url = 'http://example.test';
-  document.entries[secure].connection.authentication = 'bearer';
-  document.entries[secure].secret = 'PRESERVED_CIPHER';
+  const device = structuredClone(f.store.value);
+  device.mcpClient.servers.find((row) => row.id === secure).connection.authentication = 'bearer';
+  f.store.save(device, f.store.revision);
+  document.entries[secure] = 'PRESERVED_CIPHER';
   fs.writeFileSync(f.localFile, JSON.stringify(document, null, 2));
   const before = fs.readFileSync(f.localFile);
   f.apply([
@@ -345,8 +348,8 @@ test('unrelated edits and non-binding connection edits retain a valid noncanonic
   f.apply([
     { kind: 'update', itemRef: f.row(secure).itemRef, changes: { 'connection.enabled': true } },
   ]);
-  assert.equal(f.row(secure).values['connection.url'], 'http://example.test');
-  assert.equal(JSON.parse(fs.readFileSync(f.localFile)).entries[secure].secret, 'PRESERVED_CIPHER');
+  assert.equal(f.row(secure).values['connection.url'], 'http://example.test/mcp');
+  assert.equal(JSON.parse(fs.readFileSync(f.localFile)).entries[secure], 'PRESERVED_CIPHER');
   assert.equal(f.crypts(), 0);
 });
 
@@ -395,24 +398,28 @@ test('permission revocation, owner busy, external local edits and final commit r
     { code: 'BUSY' },
   );
   f.setBusy(false);
+  fs.writeFileSync(
+    f.localFile,
+    JSON.stringify({ version: 1, entries: { [id]: 'ORIGINAL_CIPHER' } }),
+  );
   const stale = f.request([
       { kind: 'update', itemRef: f.row(id).itemRef, changes: { name: 'Stale' } },
     ]),
     entries = JSON.parse(fs.readFileSync(f.localFile));
-  entries.entries[id].connection.enabled = true;
+  entries.entries[id] = 'CHANGED_CIPHER';
   fs.writeFileSync(f.localFile, JSON.stringify(entries));
   assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
   const snapshot = f.owner.publicConfiguration();
   snapshot.rows[0].name = 'Commit race';
   const plan = f.owner.planPublicConfiguration(snapshot.rows, snapshot.revision),
     before = fs.readFileSync(f.store.shared.file);
-  entries.entries[id].secret = 'NEW_CIPHER';
+  entries.entries[id] = 'NEW_CIPHER';
   fs.writeFileSync(f.localFile, JSON.stringify(entries));
   assert.throws(() => plan.commit(), { code: 'REVISION_CONFLICT' });
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
 });
 
-test('whole-file corruption is discoverable but unavailable, while unconfigured roster metadata preserves the local file', (t) => {
+test('whole secret corruption protects endpoints while metadata remains editable', (t) => {
   const f = fixture(t),
     id = f.add();
   const entries = JSON.parse(fs.readFileSync(f.localFile));
@@ -432,21 +439,22 @@ test('whole-file corruption is discoverable but unavailable, while unconfigured 
   for (const text of ['{invalid', '{"version":2,"entries":{}}']) {
     fs.writeFileSync(f.localFile, text);
     const target = f.call('targets.list').items.find((item) => item.targetId === targetId);
-    assert.equal(target.available, false);
+    assert.equal(target.available, true);
     assert.equal(f.row(id).removable, false);
     assert.throws(() => f.apply([{ kind: 'remove', itemRef: f.row(id).itemRef }]), {
-      code: 'UNAVAILABLE',
+      code: 'LOCAL_ACTION_REQUIRED',
     });
+    f.apply([{ kind: 'update', itemRef: f.row(id).itemRef, changes: { name: 'Still editable' } }]);
     assert.equal(fs.readFileSync(f.localFile, 'utf8'), text);
   }
 });
 
-test('failure saving the shared roster rolls back a committed local configuration asset', (t) => {
+test('device save failure leaves all files unchanged', (t) => {
   const f = fixture(t),
     id = f.add(),
     before = f.bytes(),
-    save = f.store.shared.save.bind(f.store.shared);
-  f.store.shared.save = () => {
+    save = f.store.device.save.bind(f.store.shared);
+  f.store.device.save = () => {
     throw Error('PRIVATE_IO_DETAILS');
   };
   assert.throws(
@@ -460,18 +468,28 @@ test('failure saving the shared roster rolls back a committed local configuratio
       ]),
     (error) => error.code === 'SAVE_FAILED' && !error.message.includes('PRIVATE_IO_DETAILS'),
   );
-  f.store.shared.save = save;
+  f.store.device.save = save;
   assert.deepEqual(f.bytes(), before);
   assert.equal(f.crypts(), 0);
 });
 
-test('the existing roster limit and restart-loaded IDs and device values remain authoritative', (t) => {
+test('additional connection rows and restart-loaded IDs retain device values', (t) => {
   const f = fixture(t);
   const ids = Array.from({ length: 32 }, () => randomUUID());
   f.store.save(
     {
       ...f.store.value,
-      mcpServers: { version: 1, items: ids.map((id) => ({ id, name: 'Same', description: '' })) },
+      mcpClient: {
+        version: 1,
+        commands: [],
+        servers: ids.map((id) => ({
+          id,
+          name: 'Same',
+          description: '',
+          connection: { ...defaultMcpConnection(), url: 'http://example.test/mcp' },
+          requiresEnvironment: false,
+        })),
+      },
     },
     f.store.revision,
   );
@@ -500,7 +518,7 @@ test('the existing roster limit and restart-loaded IDs and device values remain 
   );
   assert.deepEqual(
     reloaded.roster().map((item) => item.id),
-    f.store.value.mcpServers.items.map((item) => item.id),
+    f.store.value.mcpClient.servers.map((item) => item.id),
   );
   assert.equal(reloaded.publicSettings(ids[0]).connection.url, 'http://device.test/mcp');
   assert.equal(f.crypts(), 0);

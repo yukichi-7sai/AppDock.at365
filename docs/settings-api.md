@@ -211,17 +211,15 @@ kind=list、category=applet-managementで、現在の管理対象パッケージ
 
 read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検証だけを行い、保存後は通常の設定通知で管理画面・設定インデックス等へ反映する。無変更・同じ要求の再送では保存やworker再起動を繰り返さない。MCPツール定義は増やさない。
 
-## MCP接続一覧
+## MCP接続一覧とツールコマンド
 
-保存先の変更とMCPツールコマンドのlist対象追加は[端末別保存と認証復旧の設計](mcp-device-settings-design.md)に記載する。未実装であり、以下は現在の契約とする。
+`category: mcp-client`にlist対象`service.mcp.servers`と`service.mcp.toolCommands`を提供する。固定6入口と外側tools/listは変えない。両方とも自端末の`settings-<端末名>.json`へ保存する。IDは読取り専用で追加時にUUIDを発行し、items.listのitemRefを使って編集・削除・並べ替えを行う。
 
-`category: mcp-client`のlist対象は、既存の共有名簿とPC専用接続を同じ所有サービスから読み書きする。行のidは読取り専用で、追加時にUUIDを生成する。name/descriptionは共有名簿へ、`connection.enabled/transport/command/args/cwd/url/authentication/published/publishedTools`はPC専用のmcp-client.jsonへ保存する。取得したitemRefを使い、部分編集・全行の並べ替え・秘密のない行の削除を行う。行数・引数・公開ツール名に固定件数上限は設けず、公開ツール名の重複を拒否する。空の引数も既存の接続検証に従って保持する。
+接続一覧はname/descriptionと非秘密のconnection設定を扱う。新規行は既定で無効・非公開。token/environment、暗号文、環境変数名、requiresEnvironmentを設定APIへ公開しない。Bearer・環境変数が必要な復旧待ち行と秘密付き行は、接続先変更・削除をローカルに限定する。名前・説明・ON/OFF・公開設定・順序は認証を復号せず編集できる。ファイル全体が壊れていても秘密を書き換えない編集は可能で、秘密の修復は原本退避後のローカル初期化を使う。
 
-新規行の接続は既定で無効・非公開とし、HTTPは有効なURL、stdioは絶対EXEパス等の既存条件を満たす必要がある。token/environment・暗号文・環境変数名はSchema/値/プレビューに公開せず、MCPから指定できない。秘密のない行をBearer認証へ切り替える操作はローカル設定を必要とする。秘密付きの行は接続先・EXE・引数・作業フォルダー・認証方法の変更と削除を拒否し、名前・説明・有効状態・公開設定の編集や順序変更では暗号文をそのまま保持する。現在の制限はitems.listのwritableKeys/removableで確認する。
+MCPツールコマンドはtitle/description/category/enabled/automation/serverId/toolName/arguments/timeoutMsを扱う。無効・非公開の未確認保存以外の新規登録・実行内容変更・有効化・公開追加には、取得済みツールの`toolRevision`を仮想フィールドとして指定する。本体が最新カタログと引数を検証して永続`toolBinding`を生成し、toolRevision自体は保存しない。名前編集・無効化・削除に再探索は不要。概要のavailable/unavailableReasonは読取り専用で、ツール未取得時も読取りによる自動接続はしない。
 
-取得・計画・保存の保護判定は秘密を復号しない。形式不備のある個別行のPCデータは、名前/説明だけの編集や他の行の編集で保持する。PC上で未設定の行は名簿だけを編集でき、必要な非秘密接続情報を指定して設定できる。秘密付きの壊れた接続の修復・削除はローカル操作とする。ファイル全体の不正JSON・未対応版ではavailable=falseとなり、原本を保持して保存を拒否する。
-
-read + writeで変更でき、execute/useMcpは保存の追加条件にしない。複数行の編集は既存の共有/PC専用トランザクションで一括保存し、後半の検証やファイル保存が失敗した場合も部分保存しない。無変更・dryRun・同じ要求の再送で保存を繰り返さず、共有名簿だけの変更ではPC接続ファイルを再書込みしない。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=falseであり、接続・ツール探索・stdio起動は始めない。従来の管理APIも同じ非秘密保存計画を使い、公開する状態は接続設定の状態であり、認証の成否を保証しない。接続試験と実行は[共通MCPクライアント](mcp-client-design.md)の独立した操作を使う。
+管理はread + write、探索は既存read + execute + useMcpで分離する。管理更新・dryRunは接続・stdio起動・ツール実行をしない。複数行を検証後に1回保存し、expectedRevision/schemaRevision・再送・無変更・原子的保存を共通基盤で扱う。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=false。Appletが本体所有の定義を管理する権限は追加しない。詳細は[端末別MCP設定](mcp-device-settings-design.md)と[通信・ジョブ](mcp-client-design.md)を参照する。
 
 ## Webアカウント名簿
 

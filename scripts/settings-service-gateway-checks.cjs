@@ -110,7 +110,7 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
       ).content.auxiliary.tts.connections[0],
   );
   await invoke('ttsSaveConnection', [
-    ttsOriginal,
+    { ...ttsOriginal, authentication: 'bearer' },
     ttsOriginal,
     'PRIVATE_TTS_SERVICE_FIXTURE',
     ttsStatus.keyRevision,

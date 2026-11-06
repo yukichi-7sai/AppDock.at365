@@ -22,21 +22,27 @@ export function GenerationAuthentication({
 }) {
   const { t } = useHostTranslation();
   return (
-    <SettingsField
-      className="server-editor-full"
-      settingKey="authentication"
-      title={t('settings.aiConnectionDialog.auth')}
-    >
-      <select
-        aria-label={t('settings.aiConnectionDialog.authLabel')}
-        value={authentication}
-        onChange={(e) => onAuthenticationChange(e.target.value as 'none' | 'bearer')}
+    <>
+      <SettingsField
+        className="server-editor-full"
+        settingKey="authentication"
+        title={t('settings.aiConnectionDialog.auth')}
       >
-        <option value="none">{t('settings.aiConnectionDialog.noAuth')}</option>
-        <option value="bearer">{t('settings.aiConnectionDialog.bearer')}</option>
-      </select>
+        <select
+          aria-label={t('settings.aiConnectionDialog.authLabel')}
+          value={authentication}
+          onChange={(e) => onAuthenticationChange(e.target.value as 'none' | 'bearer')}
+        >
+          <option value="none">{t('settings.aiConnectionDialog.noAuth')}</option>
+          <option value="bearer">{t('settings.aiConnectionDialog.bearer')}</option>
+        </select>
+      </SettingsField>
       {authentication === 'bearer' && (
-        <>
+        <SettingsField
+          className="server-editor-full"
+          settingKey="apiKey"
+          title={t('settings.aiConnectionDialog.apiKey')}
+        >
           <SettingsInput
             aria-label={t('settings.aiConnectionDialog.apiKey')}
             type="password"
@@ -52,8 +58,8 @@ export function GenerationAuthentication({
             onKeyDown={onKeyDown}
           />
           <small className="muted">{hint ?? t('settings.generation.keyHint')}</small>
-        </>
+        </SettingsField>
       )}
-    </SettingsField>
+    </>
   );
 }
