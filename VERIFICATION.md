@@ -9,6 +9,8 @@
 - 0.174.0の固定EXEでMCP Hub、設定基盤、MCP設定、Applet API、生成AI設定、WebApplet 0.6.0、文章・音声生成、設定操作と通知のリンクを含む14試験が成功した。旧通知総合の試行はショートカット入力でタイムアウトした。接続テストと通知の設定リンクは個別試験で確認した。0.174.1では起動・移行、MCP Events、Codex登録、設定の使い勝手、生成AIの端末設定、翻訳の固定EXE試験6件が成功した。Codex CLIのパスを1本に指定して、旧登録の修復後に専用ポートへ実際に接続した。ネットワーク待ち受けは同一PCの隔離profileで確認した。
 - `A:/40.ARTIFACT/AppDock.at365/worktrees/appdock-codex-mcp-main-0.174.1/`へ発行した。固定ビルダー、seal・deploy・packを使用し、ビルド出力・発行物・更新ZIPの管理対象101ファイルをSHA256照合した。EXEは`436b97ef36353cff7ec915ef396187cb593d50a55d1a8624e4a5fbbe84f54a59`、更新ZIPは`dd2ac072d4e58d66a872d886cc013c5d04cd9fdfcdabfc68625242b85603ef06`（175,183,169 bytes）。両段階の試験プロセス終了後に専用fixture 85ファイルを整理した。試験入力・ログ・配布物および親・最終treeの照合は`.artifacts/main-sync-mcp-receivers/`。
 
+- 検証済みの0.174.1を標準発行先の `A:/40.ARTIFACT/AppDock.at365/` へ発行した。本体配置は終了0。管理対象101ファイル、manifest、更新ZIP、更新feedが発行元とSHA256一致した。標準発行先のEXEを共通の固定ランタイムから隔離起動し、Codex登録試験7項目が成功した。照合と起動のログは`.artifacts/worktree-cleanup-appdock-codex-mcp-20261107/retained-evidence/.artifacts/main-sync-mcp-receivers/final-0.174.1/standard-publish/`。
+
 ## 2026-11-07 MCPサーバーとCodex連携の受信分離（0.171.1）
 
 - 専用worktreeで実装した。発行前にmainの`180f53d`を土台へ取り込み、既存の生成プリセットとMCPクライアントのタブ・リセットを保持した。worktreeの発行先と兄弟Appletの回帰fixtureの解決は`f428ab6`へ分離した。廃止済みShellのCSS参照と.NETホストのビルド出力の検査には、mainの`7eb3dc2`を採用した。
