@@ -9,6 +9,7 @@ import { minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsConfiguration, parseTtsConfiguration } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
+import { defaultImageAiSettings, parseImageAiSettings } from './image-ai';
 import { parseNotificationPreferences } from './notification-types';
 import {
   parseKeybindings,
@@ -43,6 +44,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
 export const createDefaultSettings = (): Settings => ({
   tts: defaultTtsConfiguration(),
   ai: defaultAiSettings(),
+  imageAi: defaultImageAiSettings(),
   appletOrder: [],
   touchpadGestures: defaultTouchpadGestures(),
   gestures: defaultGestures(),
@@ -281,6 +283,7 @@ export function parseSettings(value: unknown): Settings {
       : { customCommands: parseCustomCommands(value.customCommands) }),
     tts: parseTtsConfiguration(value.tts),
     ai: parseAiSettings(value.ai),
+    imageAi: parseImageAiSettings(value.imageAi),
     touchpadGestures: parseTouchpadGestures(value.touchpadGestures),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
     keybindingOptions: parseKeybindingOptions(value.keybindingOptions),

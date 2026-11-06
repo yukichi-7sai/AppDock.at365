@@ -9,6 +9,7 @@ const { SettingsCommands } = require('../out/main/main/core/settings-commands');
 const { SettingsServiceTargets } = require('../out/main/main/core/settings-service-targets');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { AiSettingsController } = require('../out/main/main/core/ai-settings');
+const { ImageAiSettingsController } = require('../out/main/main/core/image-ai-settings');
 const { AiSecrets } = require('../out/main/main/core/ai-secrets');
 const { TtsSecrets } = require('../out/main/main/core/tts-secrets');
 const { newAiConnection, parseAiSettings } = require('../out/main/shared/ai');
@@ -92,6 +93,8 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
       },
     },
   );
+  const imageSecrets = new AiSecrets(path.join(dir, 'image-keys.json'), encryption);
+  const imageAi = new ImageAiSettingsController(store, imageSecrets, () => {});
   const types = notificationCatalog([]);
   const validate = (value) => {
     const next = parseSettings(value);
@@ -110,6 +113,7 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
     validate,
     save,
     ai,
+    imageAi,
     tts: ttsSecrets,
     notifications: () => types,
     applets: () => updateApplets,
@@ -165,6 +169,8 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
     dir,
     store,
     aiSecrets,
+    imageAi,
+    imageSecrets,
     ttsSecrets,
     aiFile,
     ttsFile,
@@ -2652,5 +2658,75 @@ test('update saves do not run checks, and the existing updater reads the latest 
   assert.equal(requests.length, 1);
   await updater.checkHostOnAboutOpen();
   assert.deepEqual(requests, ['https://example.test/one.json', 'https://example.test/two.json']);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('image preset settings support dry run, nested defaults, stable IDs and default removal', (t) => {
+  const f = fixture(t),
+    targetId = 'service.imageAi.connections';
+  const add = {
+    kind: 'add',
+    values: {
+      name: 'Image fixture',
+      baseUrl: 'http://image.test/v1/',
+      authentication: 'none',
+      defaultModel: 'fixture',
+      'defaults.size': '1536x1024',
+    },
+  };
+  const apply = (operations, dryRun = false) =>
+    f.call('apply', f.request(targetId, operations, dryRun));
+  const schema = f.call('schema.get', { targetId });
+  assert.equal(schema.maxItems, undefined);
+  assert(!schema.items.find((i) => i.key === 'protocol').writable);
+  assert(!schema.items.some((i) => i.key === 'apiKey'));
+  apply([add], true);
+  assert.equal(f.store.value.imageAi.connections.length, 0);
+  apply([add]);
+  const c = f.store.value.imageAi.connections[0];
+  assert.equal(c.baseUrl, 'http://image.test/v1');
+  assert.equal(c.defaults.size, '1536x1024');
+  assert.equal(f.store.value.imageAi.defaultConnectionId, c.id);
+  let row = f.call('items.list', { targetId }).items[0];
+  apply([
+    {
+      kind: 'update',
+      itemRef: row.itemRef,
+      changes: { 'defaults.providerOptions.quality': 'high' },
+    },
+  ]);
+  assert.equal(f.store.value.imageAi.connections[0].defaults.size, '1536x1024');
+  assert.equal(f.store.value.imageAi.connections[0].defaults.providerOptions.quality, 'high');
+  assert.equal(f.store.value.imageAi.connections[0].id, c.id);
+  row = f.call('items.list', { targetId }).items[0];
+  apply([{ kind: 'remove', itemRef: row.itemRef }]);
+  assert.equal(f.store.value.imageAi.defaultConnectionId, undefined);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('image preset settings never expose keys or change a credential-bound endpoint', (t) => {
+  const f = fixture(t);
+  const { newImageAiConnection } = require('../out/main/shared/image-ai');
+  const c = {
+    ...newImageAiConnection('protected-image'),
+    name: 'Protected image',
+    baseUrl: 'http://image.test/v1',
+  };
+  f.imageAi.save(c, null, 'fixture-key');
+  const targetId = 'service.imageAi.connections',
+    row = f.call('items.list', { targetId }).items[0];
+  assert(!JSON.stringify(row).includes('fixture-key'));
+  for (const operation of [
+    { kind: 'update', itemRef: row.itemRef, changes: { baseUrl: 'http://other.test/v1' } },
+    { kind: 'remove', itemRef: row.itemRef },
+  ])
+    assert.throws(() => f.call('apply', f.request(targetId, [operation])));
+  f.call(
+    'apply',
+    f.request(targetId, [
+      { kind: 'update', itemRef: row.itemRef, changes: { defaultModel: 'another' } },
+    ]),
+  );
+  assert.equal(f.store.value.imageAi.connections[0].defaultModel, 'another');
   assert.equal(f.decrypts(), 0);
 });

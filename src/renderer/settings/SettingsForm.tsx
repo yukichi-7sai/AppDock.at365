@@ -27,6 +27,7 @@ import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
 import { TtsSettingsForm } from './TtsSettings';
 import { AiSettingsForm } from './AiSettings';
+import { ImageAiSettingsForm } from './ImageAiSettings';
 import { CustomCommandsSettings } from './CustomCommandsSettings';
 import { TriggerStackSettings } from './TriggerStackSettings';
 import { WebAccountSettings } from './WebAccountSettings';
@@ -134,6 +135,10 @@ export function SettingsForm({
     );
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
+  if (category === 'image-ai')
+    return (
+      <ImageAiSettingsForm editor={editor} auxiliary={aux.imageAi} invoke={invoke} busy={busy} />
+    );
   if (category === 'ai')
     return <AiSettingsForm editor={editor} auxiliary={aux.ai} invoke={invoke} busy={busy} />;
   if (category === 'mcp-client')

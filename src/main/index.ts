@@ -238,6 +238,9 @@ import { InformationReporter } from './core/information-reporter';
 import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { AiService } from './core/ai-service';
+import { ImageAiService } from './core/image-ai-service';
+import { ImageAiSettingsController } from './core/image-ai-settings';
+import { defaultImageAiSettings } from '../shared/image-ai';
 import { AiSecrets } from './core/ai-secrets';
 import { AiSettingsController } from './core/ai-settings';
 import { ErrorReporter } from './core/error-reporter';
@@ -1023,6 +1026,18 @@ const aiSettings = new AiSettingsController(settings, aiSecrets, (id) => {
   ai.reconcile(id ?? false);
   changed();
 });
+const imageAiSecrets = new AiSecrets(path.join(dataDirectory, 'image-ai-keys.json'), {
+  encrypt: (value) => {
+    if (!safeStorage.isEncryptionAvailable())
+      throw Error(hostText('services.index.credentialProtectionUnavailable'));
+    return safeStorage.encryptString(value).toString('base64');
+  },
+  decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+});
+const imageAiSettings = new ImageAiSettingsController(settings, imageAiSecrets, (id) => {
+  imageAi.reconcile(id);
+  changed();
+});
 const serviceSettings = new SettingsServiceTargets({
   settings,
   revision: () => settingsCommands.revision(),
@@ -1031,6 +1046,7 @@ const serviceSettings = new SettingsServiceTargets({
   save: (value, revision, rewrite) =>
     commitSettings(prepareSettings(value), revision, undefined, rewrite),
   ai: aiSettings,
+  imageAi: imageAiSettings,
   tts: ttsSecrets,
   notifications: () => notificationCatalog(allApplets()),
   applets: allApplets,
@@ -1110,6 +1126,38 @@ const ai = new AiService({
       }),
     }),
 });
+const imageAi = new ImageAiService({
+  validateImage: (bytes) => decodeRegisteredImage(bytes),
+  settings: () => settings.value.imageAi ?? defaultImageAiSettings(),
+  key: (c) => imageAiSecrets.key(c),
+  canUse: (owner, kind) => {
+    if (quitting) return false;
+    if (owner === 'host') return startupReady;
+    const item = [...(manager?.items.values() ?? [])].find((e) => owner === aiOwner(e.manifest.id));
+    const grants =
+      item && ['starting', 'running'].includes(item.state)
+        ? appletApiAccess.get(item.manifest)
+        : {};
+    return (
+      !!grants.read &&
+      (kind === 'read' ||
+        (kind === 'cancel'
+          ? !!grants.execute
+          : !!grants.useImageAi && (kind !== 'generate' || !!grants.execute)))
+    );
+  },
+  fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
+  changed: () => changed(),
+  failed: (owner, id, error) =>
+    errors.report({
+      eventId: id,
+      source: owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
+      title: hostText('imageAi.failed'),
+      code: error.code,
+      message: error.message,
+    }),
+});
+const imageAiPreviewJobs = new Set<string>();
 const aiPreviewJobs = new Set<string>();
 const previewJobs = new Set<string>();
 const notificationPreviewJobs = new Set<string>();
@@ -1533,6 +1581,13 @@ const operationApi = new AppDockApi({
     }),
     'mcp.jobs.get': async (p, id, c) => ({ ...mcpClient.get(mcpActor(id, c), p.jobId) }),
     'mcp.jobs.cancel': async (p, id, c) => ({ ...mcpClient.cancel(mcpActor(id, c), p.jobId) }),
+    'ai.image.connections.list': async (_params, id) => ({ ...imageAi.connections(aiOwner(id)) }),
+    'ai.image.generate': async (params, id) => ({ ...imageAi.generate(aiOwner(id), params) }),
+    'ai.image.jobs.get': async (params, id) => ({ ...imageAi.get(aiOwner(id), params.jobId) }),
+    'ai.image.jobs.cancel': async (params, id) => ({
+      ...imageAi.cancel(aiOwner(id), params.jobId),
+    }),
+    'ai.image.results.read': async (params, id) => ({ ...imageAi.read(aiOwner(id), params) }),
     'ai.text.generate': async (params, id) => ({ ...ai.generate(aiOwner(id), params) }),
     'ai.jobs.get': async (params, id) => ({ ...ai.get(aiOwner(id), params.jobId) }),
     'ai.jobs.cancel': async (params, id) => ({ ...ai.cancel(aiOwner(id), params.jobId) }),
@@ -2880,6 +2935,22 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
         }),
       },
     };
+  if (id === 'image-ai')
+    return {
+      imageAi: {
+        connections: (settings.value.imageAi?.connections ?? []).map((c) =>
+          imageAiSecrets.status(c),
+        ),
+        jobs: [...imageAiPreviewJobs].flatMap((id) => {
+          try {
+            return [imageAi.get('host', id)];
+          } catch {
+            imageAiPreviewJobs.delete(id);
+            return [];
+          }
+        }),
+      },
+    };
   if (id === 'permissions')
     return {
       permissions: { permissions: appletApiAccess.get(), error: appletApiAccess.error },
@@ -3198,6 +3269,28 @@ function settingsPageActions(
       const error = await shell.openPath(file);
       if (error) throw Error(error);
     };
+  if (page.id === 'image-ai') {
+    actions.imageAiSaveConnection = async ([draft, original, key, keyRevision]) => {
+      assertSettingsWritable();
+      imageAiSettings.save(draft, original, key, keyRevision);
+    };
+    actions.imageAiDeleteConnection = async ([original, keyRevision]) => {
+      assertSettingsWritable();
+      imageAiSettings.remove(original, keyRevision);
+    };
+    actions.imageAiOrderConnections = async ([original, ordered]) => {
+      assertSettingsWritable();
+      imageAiSettings.reorder(original, ordered);
+    };
+    actions.imageAiPreview = async ([input]) => {
+      const job = imageAi.generate('host', input);
+      imageAiPreviewJobs.add(job.jobId);
+      changed();
+      return job;
+    };
+    actions.imageAiCancel = async ([id]) => imageAi.cancel('host', id);
+    actions.imageAiRead = async ([input]) => imageAi.read('host', input);
+  }
   if (page.id === 'ai') {
     actions.aiSaveConnection = async ([draft, original, key, keyRevision]) =>
       aiSettings.save(draft, original, key, keyRevision);
@@ -3611,6 +3704,7 @@ function settingsPageActions(
       customCommands.reconcile();
       mcpClient.reconcile();
       ai.reconcile();
+      imageAi.reconcile();
       tts.reconcile();
       return reply;
     };
@@ -3620,6 +3714,7 @@ function settingsPageActions(
         customCommands.reconcile();
         mcpClient.reconcile();
         ai.reconcile();
+        imageAi.reconcile();
         tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
         changed();
@@ -3912,6 +4007,7 @@ function registerIpc() {
     appletApiAccess.set(permissions);
     customCommands.reconcile();
     ai.reconcile();
+    imageAi.reconcile();
     tts.reconcile();
     for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
     log.audit('info', 'host', '[Applet API] shared permissions updated');
@@ -3921,6 +4017,7 @@ function registerIpc() {
     if (!automation || quitting) throw Error(hostText('services.index.automationNotReady'));
     const reply = await automation.action(action);
     ai.reconcile();
+    imageAi.reconcile();
     tts.reconcile();
     return reply;
   });
@@ -4537,6 +4634,7 @@ async function initialize() {
     pageCollections.reconcile();
     ribbonBadges.reconcile();
     ai.reconcile();
+    imageAi.reconcile();
     automation?.reconcileEvents();
     notificationSpeech?.reconcile();
     notificationTone?.reconcile();
@@ -4557,6 +4655,7 @@ async function initialize() {
       applyAudioPlaybackSettings();
       ribbonBadges.reconcile();
       ai.reconcile();
+      imageAi.reconcile();
       automation?.reconcileEvents();
       notificationSpeech?.reconcile();
       notificationTone?.reconcile();
@@ -5574,6 +5673,7 @@ async function initialize() {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
     changed: () => {
       ai.reconcile();
+      imageAi.reconcile();
       customCommands.reconcile();
       mcpClient.reconcile();
       changed();
@@ -5585,6 +5685,7 @@ async function initialize() {
       aiMcpGeneration++;
       mcpClient.reconcile();
       ai.forgetOwner(owner);
+      imageAi.forgetOwner(owner);
     },
     audit: (level, message) => log.audit(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),
@@ -5879,6 +5980,7 @@ app.on('before-quit', (event) => {
       () => tts.close(),
       () => audioPlayback.close(),
       () => ai.close(),
+      () => imageAi.close(),
       () => mcpClient.shutdown(),
       () => automation?.close(),
       () => touchpad?.close(),

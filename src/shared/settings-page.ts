@@ -100,6 +100,10 @@ export interface SettingsPageAuxiliary {
     busy: boolean;
     launchRecovery?: boolean;
   };
+  imageAi?: {
+    connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
+    jobs: import('./image-ai').ImageAiJob[];
+  };
   ai?: {
     connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
     jobs: import('./ai').AiJob[];

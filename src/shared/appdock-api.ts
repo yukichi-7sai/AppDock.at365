@@ -2,6 +2,7 @@ import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { mcpClientOperations } from './mcp-client';
 import { aiOperations } from './ai-api';
+import { imageAiOperations } from './image-ai-api';
 import { customCommandOperations } from './custom-commands';
 import { processLaunchOperations } from './process-launch';
 import { settingsOperations } from './settings-operations';
@@ -10,6 +11,7 @@ export const appDockOperations = localizedMetadata(
   () =>
     ({
       ...aiOperations,
+      ...imageAiOperations,
       ...mcpClientOperations,
       ...customCommandOperations,
       ...processLaunchOperations,
@@ -493,6 +495,7 @@ export const appletApiPermissionLabels = localizedMetadata(
     ({
       useMcp: hostText('settings.appdock-api.mcpUse'),
       useAi: hostText('settings.appdock-api.ai'),
+      useImageAi: hostText('imageAi.title'),
       useTts: hostText('settings.appdock-api.tts'),
       sendInput: hostText('settings.appdock-api.input'),
       runProcesses: hostText('settings.appdock-api.process'),
@@ -525,33 +528,45 @@ export class AppDockApiError extends Error {
     super(message);
   }
 }
-export type AppDockResult<M extends AppDockMethod> = M extends 'ai.text.generate'
-  ? import('./ai').AiJob & { completion: 'accepted' }
-  : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
-    ? import('./ai').AiJob
-    : M extends 'ai.models.list'
-      ? { models: import('./ai').AiModel[] }
-      : M extends 'tts.speak'
-        ? import('./tts').TtsSpeakResult
-        : M extends 'tts.connections.list'
-          ? import('./tts').TtsConnectionsResult
-          : M extends 'tts.voices.list'
-            ? import('./tts').TtsVoicesResult
-            : M extends 'tts.jobs.get' | 'tts.stop'
-              ? import('./tts').TtsJob
-              : Record<string, unknown>;
+export type AppDockResult<M extends AppDockMethod> = M extends 'ai.image.connections.list'
+  ? import('./image-ai').ImageAiConnectionsResult
+  : M extends 'ai.image.generate'
+    ? import('./image-ai').ImageAiJob & { completion: 'accepted' }
+    : M extends 'ai.image.jobs.get' | 'ai.image.jobs.cancel'
+      ? import('./image-ai').ImageAiJob
+      : M extends 'ai.image.results.read'
+        ? import('./image-ai').ImageReadResult
+        : M extends 'ai.text.generate'
+          ? import('./ai').AiJob & { completion: 'accepted' }
+          : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
+            ? import('./ai').AiJob
+            : M extends 'ai.models.list'
+              ? { models: import('./ai').AiModel[] }
+              : M extends 'tts.speak'
+                ? import('./tts').TtsSpeakResult
+                : M extends 'tts.connections.list'
+                  ? import('./tts').TtsConnectionsResult
+                  : M extends 'tts.voices.list'
+                    ? import('./tts').TtsVoicesResult
+                    : M extends 'tts.jobs.get' | 'tts.stop'
+                      ? import('./tts').TtsJob
+                      : Record<string, unknown>;
 export interface AppDockClient {
   call<M extends AppDockMethod>(
     method: M,
-    params?: M extends 'ai.text.generate'
-      ? import('./ai').AiGenerateInput
-      : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
-        ? { jobId: string }
-        : M extends 'tts.speak'
-          ? import('./tts').TtsSpeakInput
-          : M extends 'tts.jobs.get' | 'tts.stop'
+    params?: M extends 'ai.image.generate'
+      ? import('./image-ai').ImageGenerateInput
+      : M extends 'ai.image.results.read'
+        ? import('./image-ai').ImageReadInput
+        : M extends 'ai.text.generate'
+          ? import('./ai').AiGenerateInput
+          : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
             ? { jobId: string }
-            : Record<string, unknown>,
+            : M extends 'tts.speak'
+              ? import('./tts').TtsSpeakInput
+              : M extends 'tts.jobs.get' | 'tts.stop'
+                ? { jobId: string }
+                : Record<string, unknown>,
   ): Promise<AppDockResult<M>>;
 }
 export function createAppDockClient(

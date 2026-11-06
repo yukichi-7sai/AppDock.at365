@@ -94,6 +94,11 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       hostText('settings.settings-catalog.customCommandsHint'),
     ],
   ],
+  'image-ai': [
+    ['connections', hostText('imageAi.connections')],
+    ['defaultConnectionId', hostText('settings.aiSettings.defaultConnection')],
+    ['preview', hostText('imageAi.test')],
+  ],
   ai: [
     [
       'defaultConnectionId',
@@ -372,6 +377,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       {
         useTts: hostText('settings.settings-catalog.permissionTts'),
         useAi: hostText('settings.settings-catalog.permissionAi'),
+        useImageAi: hostText('imageAi.permissionDescription'),
         read: hostText('settings.settings-catalog.permissionRead'),
         execute: hostText('settings.settings-catalog.permissionExecute'),
         write: hostText('settings.settings-catalog.permissionWrite'),
@@ -671,6 +677,8 @@ export function settingsPaths(
       return [['tts']];
     case 'ai':
       return [['ai']];
+    case 'image-ai':
+      return [['imageAi']];
     case 'shortcuts':
       return [
         ['keybindings'],

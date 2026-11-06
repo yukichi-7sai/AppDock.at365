@@ -49,6 +49,7 @@ export interface Settings {
   migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
   tts?: import('./tts').TtsConfiguration;
   ai?: import('./ai').AiSettings;
+  imageAi?: import('./image-ai').ImageAiSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];
   commandTriggerOptions?: import('./command-trigger-options').CommandTriggerOptions;

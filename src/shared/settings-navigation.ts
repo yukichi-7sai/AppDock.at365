@@ -22,6 +22,7 @@ export const hostSettingsPages = localizedMetadata(
       ['permissions', hostText('settings.settings-navigation.permissions')],
       ['tts', hostText('pages.tts.title')],
       ['ai', hostText('pages.ai.title')],
+      ['image-ai', hostText('imageAi.title')],
       ['codex', hostText('settings.settings-navigation.codex')],
       ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
       ['about', hostText('settings.settings-navigation.about')],

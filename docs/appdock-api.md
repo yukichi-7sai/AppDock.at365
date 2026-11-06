@@ -18,6 +18,10 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 非秘密の接続定義は管理APIでも登録・変更できます。秘密の入力・消去と、秘密付きの行の削除・接続先変更は本体設定UIで行います。未対応Schema・変更済みtoolRevision・非公開ツール・上限超過・再起動後のジョブは明確なエラーとして返します。
 
+## 画像生成AI
+
+Applet向けの `ai.image.connections.list/generate/jobs.get/jobs.cancel/results.read` を提供します。プリセットIDで接続先と生成設定を選び、受付後はジョブ状態を確認して画像を分割取得します。最低本体版・許可・引数・保持期限は[画像生成AI](image-ai.md)を参照してください。MCPへの画像生成公開は未対応です。
+
 ## 構造と公開範囲
 
 本体と全Appletの更新・本体のみの更新・更新チェック、および設定インデックスの各ページを開く操作は、`commands.list`で公開コマンドとして取得し、`commands.execute`へそのIDを渡す。設定UIも同じコマンド処理を使う。コマンドID・通知と更新確認の契約は[更新](updates.md)、設定ページの自動生成と既存IDは[設定基盤](settings-foundation.md#カタログjson検索)を参照する。
@@ -51,7 +55,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信にもMCP列のsendInput許可を使い、元MCPのコマンド実行許可だけでは実行しません。プロセス起動も両方のrunProcessesを必要とします。どちらもMCPの生の引数指定APIとして直接公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
 
-設定編集の個別許可はwriteへ統合します。旧write/allowWriteの値を維持し、旧個別ONでwriteを有効化しません。writeがONなら旧個別OFFによる編集制限は適用しません。旧キーは読込互換だけを残し、次のローカルな許可保存時に整理します。読取りだけでは保存しません。未知キーや型不正は拒否します。許可画面はread/write/execute/useAi/useTts/useMcp/sendInput/runProcessesの8行です。
+設定編集の個別許可はwriteへ統合します。旧write/allowWriteの値を維持し、旧個別ONでwriteを有効化しません。writeがONなら旧個別OFFによる編集制限は適用しません。旧キーは読込互換だけを残し、次のローカルな許可保存時に整理します。読取りだけでは保存しません。未知キーや型不正は拒否します。許可画面はread/write/execute/useAi/useImageAi/useTts/useMcp/sendInput/runProcessesの9行です。
 
 ## プロセス起動
 

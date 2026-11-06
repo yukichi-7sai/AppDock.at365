@@ -139,6 +139,10 @@ MCPの列検証と保存時の一覧検証はUI/自己設定APIと同じ規則�
 
 この設定型は送信するキーの定義を保存し、MCPの設定操作はキー送信やコマンド実行を行わない。Applet固有の設定変更後の処理は従来の設定反映経路を使う。設定欄と3列の南京錠も同じ生成ownerから判定する。従来の単純設定コマンドと他Applet向けAPIの対応型は拡張しない。
 
+### 画像生成AI
+
+`service.imageAi` で既定ID、`service.imageAi.connections` で登録一覧、個別登録のfields対象で通常値を編集する。登録件数の固定上限はなく、IDは追加時に生成する。protocolとIDは変更不可。認証なしの追加はauthenticationをnoneとして指定し、Bearerキーの入力・秘密付き登録の接続先変更や削除はローカルUIで行う。生成設定の部分変更・dryRun・競合判定に対応し、保存だけで生成は実行しない。詳細は[画像生成AI](image-ai.md)を参照する。
+
 ### AI接続一覧
 
 AI接続一覧は最大8行。IDは読取り専用で追加時にUUIDを生成し、protocolは既存のOpenAI互換方式に固定する。追加時のpresetに応じて既存UIと同じ初期値を使い、名前とURLの検証・正規化も共有する。`name`・`baseUrl`を指定する通常の追加は、認証なしの接続として保存できる。Bearer認証を必要とする新規接続はLOCAL_ACTION_REQUIREDとし、暗号化キーの登録はローカル設定画面で行う。追加のdryRunに含まれるIDはプレビュー用であり、実保存後はitems.listで確認する。

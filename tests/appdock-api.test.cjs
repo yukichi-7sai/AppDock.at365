@@ -543,6 +543,7 @@ test('legacy Applet grants load without writeback, never enable write, and compa
     fs.writeFileSync(file, saved);
     const access = new AppletApiAccess(file);
     assert.deepEqual(access.get(), { read: true, write, execute: false });
+    assert.equal(!!access.get().useImageAi, false);
     assert.equal(fs.readFileSync(file, 'utf8'), saved);
     assert.throws(() => access.set({ write, editTray: false }));
     assert.equal(fs.readFileSync(file, 'utf8'), saved);
@@ -560,9 +561,11 @@ test('legacy Applet grants load without writeback, never enable write, and compa
     fs.writeFileSync(file, JSON.stringify({ version: 2, permissions }));
     assert(new AppletApiAccess(file).error);
   }
-  assert.equal(
-    Object.keys(require('../out/main/shared/appdock-api').appletApiPermissionLabels).length,
-    8,
+  assert(
+    Object.hasOwn(
+      require('../out/main/shared/appdock-api').appletApiPermissionLabels,
+      'useImageAi',
+    ),
   );
 });
 

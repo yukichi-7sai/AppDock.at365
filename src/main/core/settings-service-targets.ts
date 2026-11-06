@@ -54,6 +54,12 @@ import {
   type SettingsTarget,
 } from './settings-target-types';
 import type { AiSettingsController } from './ai-settings';
+import type { ImageAiSettingsController } from './image-ai-settings';
+import {
+  parseImageAiSettings,
+  newImageAiConnection,
+  type ImageAiConnection,
+} from '../../shared/image-ai';
 import type { TtsSecrets } from './tts-secrets';
 import type { McpClientSettings } from './mcp-client-settings';
 import { mcpClientSettingsTarget } from './settings-mcp-client-target';
@@ -141,6 +147,7 @@ export class SettingsServiceTargets {
       validate(value: Settings): Settings;
       save(value: Settings, revision: number, rewrite: ('shared' | 'device')[]): unknown;
       ai: AiSettingsController;
+      imageAi?: ImageAiSettingsController;
       tts: TtsSecrets;
       notifications(): NotificationTypeEntry[];
       applets?(): ExtensionSnapshot[];
@@ -161,6 +168,14 @@ export class SettingsServiceTargets {
         ...(this.options.applets?.() ?? [])
           .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
           .map((applet) => this.appletCommon(applet)),
+        ...(this.options.imageAi
+          ? [
+              this.imageAiGeneral(),
+              ...parseImageAiSettings(this.options.settings.value.imageAi).connections.map((c) =>
+                this.imageAiConnection(c.id),
+              ),
+            ]
+          : []),
         this.aiGeneral(),
         ...parseAiSettings(this.options.settings.value.ai).connections.map((connection) =>
           this.aiConnection(connection.id),
@@ -171,6 +186,7 @@ export class SettingsServiceTargets {
         ...this.options.notifications().map((type) => this.notification(type)),
       ].map((target) => this.target(target)),
       this.aiConnections(),
+      ...(this.options.imageAi ? [this.imageAiConnections()] : []),
       this.ttsConnections(),
       this.ttsVoices(),
       this.appletOrder(),
@@ -185,11 +201,13 @@ export class SettingsServiceTargets {
   private target(spec: Target): SettingsFieldTarget {
     const applies = (key: string) =>
       spec.applies?.(key) ??
-      (spec.category === 'ai'
-        ? 'aiSettingsChanged'
-        : spec.category === 'tts'
-          ? 'ttsSettingsChanged'
-          : 'notificationPreferencesChanged');
+      (spec.category === 'image-ai'
+        ? 'imageAiSettingsChanged'
+        : spec.category === 'ai'
+          ? 'aiSettingsChanged'
+          : spec.category === 'tts'
+            ? 'ttsSettingsChanged'
+            : 'notificationPreferencesChanged');
     const readOverrides = (): RecordValue | undefined => {
       try {
         const raw = spec.overrides(
@@ -911,6 +929,284 @@ export class SettingsServiceTargets {
           commit: () => {
             this.options.checkRevision(revision);
             this.options.ai.validatePublic(next.ai!);
+            if (!changed.length) return;
+            try {
+              this.options.save(next, store.revision, []);
+            } catch (error) {
+              if (error instanceof SettingsTargetError) throw error;
+              throw new SettingsTargetError(
+                'SAVE_FAILED',
+                hostText('services.settingsCommands.saveFailed'),
+              );
+            }
+          },
+        };
+      },
+    };
+  }
+  private imageAiGeneral(): Target {
+    const fields: Field[] = [
+      {
+        key: 'defaultConnectionId',
+        title: hostText('settings.aiSettings.defaultConnection'),
+        type: 'select',
+        options: parseImageAiSettings(this.options.settings.value.imageAi).connections.map(
+          (connection) => ({
+            value: connection.id,
+            label: connection.name,
+          }),
+        ),
+      },
+    ];
+    return {
+      id: 'service.imageAi',
+      ui: settingsUiFields('image-ai'),
+      title: hostText('settings.aiSettings.defaultConnection'),
+      category: 'image-ai',
+      fields,
+      values: (settings) => project(parseImageAiSettings(settings.imageAi), fields),
+      overrides: (raw) => project(raw.imageAi, fields),
+      replace: (settings, changes, reset) => {
+        const ai = { ...parseImageAiSettings(settings.imageAi) };
+        updateRecord(ai as unknown as RecordValue, changes, reset, fields);
+        settings.imageAi = parseImageAiSettings(ai);
+        return settings;
+      },
+      guard: (settings) =>
+        this.options.imageAi!.validatePublic(parseImageAiSettings(settings.imageAi)),
+    };
+  }
+  private imageAiConnection(id: string): Target {
+    const connection = (settings: Settings) =>
+      parseImageAiSettings(settings.imageAi).connections.find(
+        (connection) => connection.id === id,
+      ) ?? fail('NOT_FOUND');
+    const current = connection(this.options.settings.value),
+      fields = this.imageAiConnectionFields(
+        current,
+        this.options.imageAi!.configurationState(id).protected,
+      );
+    return {
+      id: 'service.imageAi.connection.' + Buffer.from(id).toString('base64url'),
+      title: current.name,
+      category: 'image-ai',
+      fields,
+      values: (settings) =>
+        Object.fromEntries(
+          fields.map((field) => [
+            field.key,
+            at(connection(settings), field.key.split('.')) ?? field.default,
+          ]),
+        ),
+      overrides: (raw) =>
+        project(
+          (object(raw.imageAi).connections as unknown[] | undefined)?.find(
+            (value) => object(value).id === id,
+          ),
+          fields,
+        ),
+      replace: (settings, changes, reset) => {
+        const ai = parseImageAiSettings(settings.imageAi),
+          value = ai.connections.find((connection) => connection.id === id)!;
+        updateRecord(value as unknown as RecordValue, changes, reset, fields);
+        for (const key of reset) {
+          const field = fields.find((field) => field.key === key)!;
+          if (field.default !== undefined)
+            assign(value as unknown as RecordValue, key.split('.'), field.default);
+        }
+        Object.assign(
+          value,
+          this.options.imageAi!.preparePublicConnection(
+            value,
+            Object.hasOwn(changes, 'name') || reset.includes('name'),
+          ),
+        );
+        settings.imageAi = parseImageAiSettings(ai);
+        return settings;
+      },
+      guard: (settings) =>
+        this.options.imageAi!.validatePublic(parseImageAiSettings(settings.imageAi)),
+      guardRevision: () => this.options.imageAi!.configurationState(id).revision,
+    };
+  }
+  private imageAiConnectionFields(current: ImageAiConnection, protectedKey: boolean): Field[] {
+    const defaults = newImageAiConnection(current.id);
+    return [
+      { key: 'name', title: hostText('settings.aiConnectionDialog.name'), type: 'string' },
+      {
+        key: 'protocol',
+        title: hostText('settings.aiConnectionDialog.kind'),
+        type: 'select',
+        options: options(['openai-images']),
+        default: 'openai-images',
+        writable: false,
+        resettable: false,
+      },
+      {
+        key: 'baseUrl',
+        title: hostText('settings.aiConnectionDialog.url'),
+        type: 'string',
+        writable: !protectedKey,
+        resettable: false,
+      },
+      {
+        key: 'authentication',
+        title: hostText('settings.aiConnectionDialog.auth'),
+        type: 'select',
+        options: options(['none', 'bearer']),
+        writable: !protectedKey && current.authentication === 'bearer',
+        resettable: false,
+      },
+      {
+        key: 'defaultModel',
+        title: hostText('settings.aiConnectionDialog.model'),
+        type: 'string',
+        default: '',
+      },
+      {
+        key: 'alwaysPrompt',
+        title: hostText('settings.aiConnectionDialog.alwaysPrompt'),
+        type: 'string',
+        default: '',
+      },
+      {
+        key: 'defaultPrompt',
+        title: hostText('settings.aiConnectionDialog.defaultPrompt'),
+        type: 'string',
+        default: '',
+      },
+      {
+        key: 'timeoutSeconds',
+        title: hostText('settings.aiConnectionDialog.timeout'),
+        type: 'number',
+        default: defaults.timeoutSeconds,
+        schema: { type: 'integer', minimum: 1, maximum: 2147483 },
+      },
+      { key: 'defaults.size', title: hostText('imageAi.size'), type: 'string', default: 'auto' },
+      {
+        key: 'defaults.count',
+        title: hostText('imageAi.count'),
+        type: 'number',
+        default: 1,
+        schema: { type: 'integer', minimum: 1, maximum: 10 },
+      },
+      {
+        key: 'defaults.format',
+        title: hostText('imageAi.format'),
+        type: 'select',
+        options: options(['png', 'jpeg', 'webp']),
+        default: 'png',
+      },
+      {
+        key: 'defaults.providerOptions.quality',
+        title: hostText('imageAi.quality'),
+        type: 'select',
+        options: options(['auto', 'low', 'medium', 'high', 'xhigh', 'max']),
+        default: 'auto',
+      },
+      {
+        key: 'defaults.providerOptions.background',
+        title: hostText('imageAi.background'),
+        type: 'select',
+        options: options(['auto', 'opaque', 'transparent']),
+        default: 'auto',
+      },
+      {
+        key: 'defaults.providerOptions.compression',
+        title: hostText('imageAi.compression'),
+        type: 'number',
+        schema: { type: 'integer', minimum: 0, maximum: 100 },
+      },
+    ].map((field) => ({ ...field, inherit: false }) as Field);
+  }
+  private imageAiConnections(): SettingsListTarget {
+    const rows = () =>
+      parseImageAiSettings(this.options.settings.value.imageAi)
+        .connections as unknown as RecordValue[];
+    const protectedKey = (row: RecordValue) =>
+      this.options.imageAi!.configurationState(String(row.id)).protected;
+    const fields: Field[] = [
+      { key: 'id', title: hostText('settings.aiSettings.connectionId'), type: 'string' },
+      ...this.imageAiConnectionFields(newImageAiConnection('defaults'), false).map((field) => ({
+        ...field,
+        propertyPath: field.key.split('.'),
+      })),
+    ];
+    const definition: SettingDefinition = {
+      key: 'connections',
+      title: hostText('imageAi.connections'),
+      type: 'object-list',
+      fields,
+      list: { idKey: 'id', titleKey: 'name', columns: ['name', 'baseUrl'] },
+    };
+    return {
+      kind: 'list',
+      targetId: 'service.imageAi.connections',
+      ui: settingsUiGroup('image-ai', 'connections'),
+      ownerId: 'appdock',
+      title: definition.title,
+      category: 'image-ai',
+      available: true,
+      definition,
+      fields,
+      rows,
+      applies: () => 'imageAiSettingsChanged',
+      inputSchema: (field) => (field as Field).schema ?? settingInputSchema(field),
+      writable: (field) => !['id', 'protocol'].includes(field.key),
+      removable: (row) => !protectedKey(row),
+      itemWritable: (row, field) =>
+        !['id', 'protocol'].includes(field.key) &&
+        (field.key === 'baseUrl'
+          ? !protectedKey(row)
+          : field.key !== 'authentication' ||
+            (!protectedKey(row) && row.authentication === 'bearer')),
+      overrides: () => {
+        try {
+          return {
+            connections: object(this.options.settings.storedValue().imageAi).connections,
+            $guard: rows().map(
+              (row) => this.options.imageAi!.configurationState(String(row.id)).revision,
+            ),
+          };
+        } catch {
+          return undefined;
+        }
+      },
+      createRow: () => newImageAiConnection(randomUUID()) as unknown as RecordValue,
+      prepareRow: (row, keys) => {
+        try {
+          Object.assign(
+            row,
+            this.options.imageAi!.preparePublicConnection(
+              row as unknown as ImageAiConnection,
+              keys.includes('name'),
+            ),
+          );
+        } catch {
+          fail();
+        }
+      },
+      plan: (connections, revision) => {
+        this.options.checkRevision(revision);
+        const store = this.options.settings,
+          before = parseImageAiSettings(store.value.imageAi);
+        let next: Settings;
+        try {
+          const ai = this.options.imageAi!.preparePublicConnections(connections);
+          next = this.options.validate({ ...structuredClone(store.value), imageAi: ai });
+        } catch (error) {
+          if (error instanceof SettingsTargetError) throw error;
+          return fail();
+        }
+        const changed = sameSetting(before, next.imageAi) ? [] : ['connections'];
+        return {
+          changed,
+          before: { connections: before.connections },
+          values: { connections: next.imageAi!.connections },
+          applies: Object.fromEntries(changed.map((key) => [key, 'imageAiSettingsChanged'])),
+          commit: () => {
+            this.options.checkRevision(revision);
+            this.options.imageAi!.validatePublic(next.imageAi!);
             if (!changed.length) return;
             try {
               this.options.save(next, store.revision, []);

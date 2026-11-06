@@ -1,0 +1,204 @@
+import { hostText } from './i18n';
+import { aiId, aiObject } from './ai';
+
+export type ImageFormat = 'png' | 'jpeg' | 'webp';
+export interface ImageGenerationOptions {
+  size: string;
+  count: number;
+  format: ImageFormat;
+  providerOptions: {
+    quality: string;
+    background: 'auto' | 'opaque' | 'transparent';
+    compression?: number;
+  };
+}
+export interface ImageAiConnection {
+  id: string;
+  name: string;
+  protocol: 'openai-images';
+  baseUrl: string;
+  authentication: 'none' | 'bearer';
+  defaultModel: string;
+  alwaysPrompt: string;
+  defaultPrompt: string;
+  timeoutSeconds: number;
+  defaults: ImageGenerationOptions;
+}
+export interface ImageAiSettings {
+  connections: ImageAiConnection[];
+  defaultConnectionId?: string;
+}
+export interface ImageGenerateInput {
+  requestId: string;
+  connectionId?: string;
+  prompt?: string;
+  model?: string;
+  options?: Partial<Omit<ImageGenerationOptions, 'providerOptions'>> & {
+    providerOptions?: Partial<ImageGenerationOptions['providerOptions']>;
+  };
+}
+export interface ImageAiCapabilities {
+  textToImage: boolean;
+  imageEditing: boolean;
+  formats: ImageFormat[];
+  progress: boolean;
+  cancellation: 'best-effort';
+}
+export interface ImageAiConnectionsResult {
+  defaultConnectionId?: string;
+  connections: {
+    id: string;
+    name: string;
+    protocol: ImageAiConnection['protocol'];
+    defaultModel: string;
+    capabilities: ImageAiCapabilities;
+  }[];
+}
+export interface GeneratedImageInfo {
+  id: string;
+  mimeType: string;
+  byteLength: number;
+}
+export interface ImageAiJob {
+  jobId: string;
+  connectionId: string;
+  model: string;
+  state: 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
+  createdAt: string;
+  updatedAt: string;
+  images?: GeneratedImageInfo[];
+  resultExpiresAt?: string;
+  resultExpired?: boolean;
+  error?: { code: string; message: string };
+}
+export interface ImageReadInput {
+  jobId: string;
+  imageId: string;
+  offset?: number;
+}
+export interface ImageReadResult extends GeneratedImageInfo {
+  offset: number;
+  nextOffset: number;
+  done: boolean;
+  data: string;
+}
+// The native Applet RPC line is limited to 1 MiB. Base64 plus metadata stays below it.
+export const imageReadChunkBytes = 256 * 1024;
+export const defaultImageAiSettings = (): ImageAiSettings => ({ connections: [] });
+export const newImageAiConnection = (id: string): ImageAiConnection => ({
+  id,
+  name: '',
+  protocol: 'openai-images',
+  baseUrl: 'https://api.openai.com/v1',
+  authentication: 'bearer',
+  defaultModel: '',
+  alwaysPrompt: '',
+  defaultPrompt: '',
+  timeoutSeconds: 600,
+  defaults: {
+    size: 'auto',
+    count: 1,
+    format: 'png',
+    providerOptions: { quality: 'auto', background: 'auto' },
+  },
+});
+const invalid = (): never => {
+  throw Error(hostText('imageAi.invalidSettings'));
+};
+export function imageAiUrl(value: string) {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return invalid();
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    /[\\\s]/.test(value.trim())
+  )
+    return invalid();
+  return url.href.replace(/\/+$/, '');
+}
+const keys = (v: Record<string, unknown>, allowed: string[]) => {
+  if (Object.keys(v).some((k) => !allowed.includes(k))) invalid();
+};
+export function parseImageOptions(value: unknown): ImageGenerationOptions {
+  if (!aiObject(value)) return invalid();
+  keys(value, ['size', 'count', 'format', 'providerOptions']);
+  const p = value.providerOptions;
+  if (!aiObject(p)) return invalid();
+  keys(p, ['quality', 'background', 'compression']);
+  if (
+    typeof value.size !== 'string' ||
+    !/^(auto|[1-9]\d*x[1-9]\d*)$/.test(value.size) ||
+    !Number.isSafeInteger(value.count) ||
+    Number(value.count) < 1 ||
+    Number(value.count) > 10 ||
+    !['png', 'jpeg', 'webp'].includes(String(value.format)) ||
+    !['auto', 'low', 'medium', 'high', 'xhigh', 'max'].includes(String(p.quality)) ||
+    !['auto', 'opaque', 'transparent'].includes(String(p.background)) ||
+    (p.compression !== undefined &&
+      (!Number.isInteger(p.compression) ||
+        Number(p.compression) < 0 ||
+        Number(p.compression) > 100)) ||
+    (value.format === 'jpeg' && p.background === 'transparent') ||
+    (value.format === 'png' && p.compression !== undefined)
+  )
+    return invalid();
+  return structuredClone(value) as unknown as ImageGenerationOptions;
+}
+export function parseImageAiSettings(value: unknown): ImageAiSettings {
+  if (value === undefined) return defaultImageAiSettings();
+  if (!aiObject(value)) return invalid();
+  keys(value, ['connections', 'defaultConnectionId']);
+  if (!Array.isArray(value.connections)) return invalid();
+  const connections = value.connections.map((c): ImageAiConnection => {
+    if (!aiObject(c)) return invalid();
+    keys(c, [
+      'id',
+      'name',
+      'protocol',
+      'baseUrl',
+      'authentication',
+      'defaultModel',
+      'alwaysPrompt',
+      'defaultPrompt',
+      'timeoutSeconds',
+      'defaults',
+    ]);
+    if (
+      !aiId(c.id) ||
+      c.protocol !== 'openai-images' ||
+      !['none', 'bearer'].includes(String(c.authentication)) ||
+      ['name', 'baseUrl', 'defaultModel', 'alwaysPrompt', 'defaultPrompt'].some(
+        (k) => typeof c[k] !== 'string',
+      ) ||
+      !String(c.name).trim() ||
+      !Number.isSafeInteger(c.timeoutSeconds) ||
+      Number(c.timeoutSeconds) < 1 ||
+      Number(c.timeoutSeconds) * 1000 > 2147483647
+    )
+      return invalid();
+    return {
+      ...c,
+      baseUrl: imageAiUrl(String(c.baseUrl)),
+      defaults: parseImageOptions(c.defaults),
+    } as unknown as ImageAiConnection;
+  });
+  if (
+    new Set(connections.map((c) => c.id)).size !== connections.length ||
+    (value.defaultConnectionId !== undefined &&
+      !connections.some((c) => c.id === value.defaultConnectionId))
+  )
+    return invalid();
+  return {
+    connections,
+    ...(value.defaultConnectionId === undefined
+      ? {}
+      : { defaultConnectionId: value.defaultConnectionId as string }),
+  };
+}

@@ -219,6 +219,7 @@ export class AppDockApi {
     return {
       useTts: this.options.ttsAllowed?.() ?? false,
       useAi: this.options.aiAllowed?.() ?? false,
+      useImageAi: false,
       useMcp: this.options.mcpClientAllowed?.() ?? false,
       sendInput: (this.options.inputAllowed?.() ?? false) && this.options.executable(),
       runProcesses: this.options.processesAllowed?.() ?? false,

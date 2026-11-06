@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-11-06 画像生成AIのプリセット設定と共通API（0.165.0）
+
+- 「画像生成AI」設定ページへ、接続先・認証・モデル・生成条件・共通/既定プロンプトをまとめた複数プリセットの追加/編集/削除/並べ替え/既定選択と試験生成を実装した。共通ダイアログの3タブは入力を保持し、OKで登録と暗号化キーを原子的に保存する。登録IDは安定し、固定登録件数上限はない。APIキーはPC専用の`image-ai-keys.json`へ保存する。設定APIの通常値編集にも接続した。
+- Applet共通APIへ`ai.image.connections.list/generate/jobs.get/jobs.cancel/results.read`を追加。ID指定または既定登録からOpenAI Images APIへ送信し、取消・待ち時間・requestId重複判定・所有元世代・独立したuseImageAi許可を検証する。ジョブへ画像本体を含めず、既存RPCの1MiB行上限に合わせて256KiBずつ取得する。画像結果15分/終端ジョブ30分の一時保持、無再送、エラー本文の非公開、実画像decode確認を行う。ライブラリー保存とMCP公開は未実装。将来のComfyUI等を追加するアダプター境界とcapabilitiesを設けた。
+- 発行前レビューで、設定APIによる既定登録削除時の解析順序、不明な明示connectionIdのNOT_FOUND、protocol/IDの読取専用宣言、不正JSONの分類、adapter所有のcapabilitiesを確認・修正した。保存失敗の検査は実際のrename失敗によるキー復元へ変更。関連111件成功。共通API・翻訳・設定公開範囲の37件中、旧8項目固定検査だけが新許可追加で失敗したため、既存保存値で画像生成が自動許可されない検査へ変更し、同ファイル17件成功。残り20件は製品不変で成功再利用、合計148件成功（最終の対象試験に未解決失敗なし）。無関係な全回帰は未実行。
+- 型検査・本体build・.NET ImageAiProbeのRelease build成功。隔離ローカルHTTP fixtureで、設定ダイアログ取消/原子的保存/秘密非公開、画像プレビュー、Applet権限拒否とNode/.NETの生成・結果取得、狭幅ダイアログの6群をソース版・固定EXE版で確認し、画像を目視確認した。初期UI試験の名称不一致と不正なPNG fixtureは試験側の原因として修正し、成功を確認。失敗ログは保持した。OpenAI実サービス・実課金・ComfyUI・MCPクライアントの画像表示は未検証。
+- 本体公開API・設定・秘密保存ファイル追加により0.164.0→0.165.0へ更新し、`publish.bat`終了0で`A:\40.ARTIFACT\AppDock.at365`へ発行。EXE SHA256=`a132ba4ed1bc1845d85e1a480d18772bc5211d7071ae7648e220cc8bea3c841b`（249,798,656 bytes）、ZIP SHA256=`62b3272ea9b6c023ddc5fc47d3d8ed0424ff151ef252e6c0dd99e78815003393`（175,175,099 bytes）。feed版/ZIP容量とhash、共用runtimeのEXEと発行EXEのhashが一致。既存のViteチャンクサイズ警告は残る。SDK/Runtimeは汎用CallAsyncを利用するため今回独自の版変更なし。既存の画像取り込みAPI削除に関する未コミット変更は保持した。
+- 証跡は`.artifacts/image-ai-validation-20261106/`の`result.json`、`review.md`、1,125入力の発行前後一致manifest、型検査/build/回帰/GUI/publishログ。UI結果は`image-ai-ui-1793954348316`と`image-ai-ui-1793954719465`。共通テストruntimeを使用し、成功profileは実行方式別の直近3回以内、失敗記録も保持したため削除なし。Windows x64、Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / .NET SDK 10.0.403。版更新後の依存照合は`install --frozen-lockfile`で解消し、lockfile変更なし。未コミット、push・GitHub Release・実利用先deployなし。
+- コミット確認: `.artifacts/commit-validation-image-ai-20261106/`に入力1,125件・既存8ログ・発行EXE/ZIP/feedのhash照合とstage/commit treeを記録。関連128件と型検査/build/固定EXE試験は一致した証跡を再利用し、前回混在ログだった翻訳/設定公開範囲20件と.NET fixtureのRelease buildだけログ付きで補完した。製品の追加変更はなく再発行不要。別作業の画像取り込みAPI削除、SDK/Runtime版変更、その文書・fixture・翻訳キー削除はステージ対象から除外し、作業ツリーに保持した。今回の機能はその削除APIを呼ばず、Node/.NET共通の汎用Call経路を使うため、除外差分は画像生成検証へ影響しない。発行版は既存差分も含む作業ツリーから作成したものとして区別する。
+
 ## 2026-11-06 大きな画像のファイル参照・縮小処理・容量制限撤去（0.163.1）
 
 - ファイルからの画像登録にある5MiB・各辺8192px・16Miピクセルの固定上限を撤去した。PNG/JPEG/WebP/SVGの静止画像、拡張子と内容の整合、正の表現可能な寸法、実decode、SVGの文書検証は維持する。Node/.NET共通の1MiB JSON-RPC行上限に由来するプログラム取り込みの512KiB制限は別に維持する。既存参照・原画像・設定用コピーの保存形式は変更しない。
