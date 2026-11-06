@@ -1,8 +1,8 @@
 # AI文章生成と共通API
 
-OpenAI互換Chat Completionsを使い、単発の文章を生成する。本体はサーバーごとの接続先・認証・プロンプトを管理し、AppletとMCPはモデル・追加プロンプト・入力を指定する。Gmail固有の設定と通知連携は別工程で、本体実装には含まれない。
+OpenAI互換Chat Completionsを使い、単発の文章を生成する。本体はサーバーごとの接続先・認証・モデル・プロンプトを管理し、AppletとMCPはサーバーID・追加プロンプト・入力を指定する。Gmail固有の設定と通知連携は別工程で、本体実装には含まれない。
 
-サーバーごとの常時・既定プロンプトはAppDock 0.157.0以上で利用できる。
+登録したモデルで生成する現行の契約はAppDock 0.170.0以上。
 
 エラーは共通の通知履歴へ記録する。通知設定で表示時間・通知先・読み上げを変更できる。
 
@@ -10,9 +10,9 @@ OpenAI互換Chat Completionsを使い、単発の文章を生成する。本体�
 
 MCPの[固定設定API](settings-api.md)から既定のサーバーと各接続の非秘密項目を編集し、接続一覧の追加・削除・並べ替えも行える。read/writeを使い、生成許可とは分ける。認証なしの接続はMCPから追加できる。暗号化キーの入力・消去、キーを持つ接続の削除や接続先の変更、キー必須の新規接続はローカルの設定画面で行う。MCPでの通常値の編集や並べ替えは暗号化ファイルを保持する。
 
-「設定 → 文章生成AI」で接続を追加し、名前・ベースURL・任意の既定モデル・認証方式を設定する。Ollamaは`http://<サーバー>:11434/v1`、LM Studioは`http://<サーバー>:1234/v1`、OpenAIは`https://api.openai.com/v1`が入口になる。llama.cppや他の互換サーバーは利用するサーバーのホスト・ポートとAPIルートを指定する。
+「設定 → 文章生成AI」で接続を追加し、名前・ベースURL・モデル・認証方式を設定する。同じURLで複数のモデルを使う場合は、モデルごとに別のサーバー登録を作る。Ollamaは`http://<サーバー>:11434/v1`、LM Studioは`http://<サーバー>:1234/v1`、OpenAIは`https://api.openai.com/v1`が入口になる。llama.cppや他の互換サーバーは利用するサーバーのホスト・ポートとAPIルートを指定する。
 
-接続一覧の「追加」で登録、各行の歯車で編集する。追加・編集は同じ3タブのダイアログを使う。「接続」は[生成AIの共通配置](generation-settings.md#共通の編集と試験操作)に従い、「モデル・プロンプト」に既定モデル・いつも加えるプロンプト・指定がないときのプロンプト、「詳細設定」に出力上限・待ち時間・互換性の項目を置く。項目名は入力欄の上、短い関連項目は横並び、長い入力は全幅にする。タイトル・タブ・確定/取消を固定し、選択中の本文だけをスクロールする。タブ切替で一時入力や取得済み候補を破棄しない。URLまたはAPIキーのEnter、モデル欄の取得ボタンで、保存前の入力からモデル一覧を取得できる。IME変換確定のEnterでは取得しない。URLの補正はEnterかblurの時だけ行い、blurでは通信しない。
+接続一覧の「追加」で登録、各行の歯車で編集する。追加・編集は同じ3タブのダイアログを使う。「接続」は[生成AIの共通配置](generation-settings.md#共通の編集と試験操作)に従い、「モデル・プロンプト」にモデル・いつも加えるプロンプト・指定がないときのプロンプト、「詳細設定」に出力上限・待ち時間・互換性の項目を置く。項目名は入力欄の上、短い関連項目は横並び、長い入力は全幅にする。タイトル・タブ・確定/取消を固定し、選択中の本文だけをスクロールする。タブ切替で一時入力や取得済み候補を破棄しない。URLまたはAPIキーのEnter、モデル欄の取得ボタンで、保存前の入力からモデル一覧を取得できる。IME変換確定のEnterでは取得しない。URLの補正はEnterかblurの時だけ行い、blurでは通信しない。
 
 ダイアログ入力と一覧取得では設定ファイルやAPIキーの保存ファイルを変更しない。OKで接続情報をまとめて保存し、キャンセル・Escape・画面の終了では破棄する。APIキーはOKの時にこのPCへ暗号化保存する。各接続の「MCPからの利用を許可」は既定OFF。本体・通知・通常のApplet利用はこの個別許可と独立する。AppletとMCPからの利用は、さらに「設定 → 操作の許可」の各列で「AI文章生成」と必要な前提操作を許可する。モデル一覧には情報取得、文章生成には情報取得・コマンド実行の許可が必要。
 
@@ -22,7 +22,7 @@ MCPの[固定設定API](settings-api.md)から既定のサーバーと各接続�
 
 各サーバーの`alwaysPrompt`（いつも加えるプロンプト）と`defaultPrompt`（指定がないときのプロンプト）は空欄を既定とし、ダイアログのOKで他のサーバー項目と一括保存する。生成受付時に、alwaysPromptと今回のadditionalPrompt（省略時はdefaultPrompt）の順で、空文字・空白だけの部分を除いて改行1文字で連結する。各部分の空白・内部改行は保持する。明示した空文字・空白のadditionalPromptはdefaultPromptを使わず、alwaysPromptだけを加える。省略と明示空文字はrequestIdの重複判定でも区別する。プロンプトの反映はモデルに依存し、常時付与分に特別な優先権は与えない。
 
-入力データはプロンプトと別のuserメッセージにする。試験・Applet・MCPは同じAiServiceで合成し、試験欄の追加プロンプトが空欄なら省略として扱う。試験するサーバーや今回の入力は登録・既定値を書き換えない。試験画面ではモデルを上書きせず、選択したサーバーの既定モデルを使用する。モデルの明示指定がなければサーバーの既定モデルを使い、両方なければエラーにする。設定変更はそのサーバーを使う待機・実行中ジョブを取消し、同じrequestIdの再送は元ジョブを返す。
+入力データはプロンプトと別のuserメッセージにする。試験・Applet・MCPは同じAiServiceで合成し、試験欄の追加プロンプトが空欄なら省略として扱う。試験のサーバー選択と入力はその試験にだけ適用する。選択したサーバー登録のモデルで生成する。モデルが空欄の登録を呼び出すと`AI_MODEL_REQUIRED`を返す。設定変更はそのサーバーを使う待機・実行中ジョブを取消し、同じrequestIdの再送は元ジョブを返す。
 
 ## モデルによる互換性の差
 
@@ -44,11 +44,11 @@ APIの`maxOutputTokens`／`timeoutMs`を明示した場合は、要求だけそ�
 
 ## 共通API
 
-同じ[AppDockApi](appdock-api.md)と操作カタログを使用する。Appletには`appdock-api` capabilityが必要。モデル・追加プロンプトを指定できるが、URL・APIキー・HTTPヘッダーを引数で上書きできない。
+同じ[AppDockApi](appdock-api.md)と操作カタログを使用する。Appletには`appdock-api` capabilityが必要。`connectionId`に登録済みのサーバーIDを指定し、省略時は既定のサーバーを使う。`model`など定義にない引数を渡した場合は`INVALID_ARGUMENT`を返す。
 
 | 操作               | MCPツール                  | 入力                                                                                   |
 | ------------------ | -------------------------- | -------------------------------------------------------------------------------------- |
-| `ai.text.generate` | `appdock_ai_generate_text` | 必須requestId、任意connectionId/model/additionalPrompt/input/timeoutMs/maxOutputTokens |
+| `ai.text.generate` | `appdock_ai_generate_text` | 必須requestId、任意connectionId/additionalPrompt/input/timeoutMs/maxOutputTokens       |
 | `ai.jobs.get`      | `appdock_ai_get_job`       | jobId                                                                                  |
 | `ai.jobs.cancel`   | `appdock_ai_cancel_job`    | jobId                                                                                  |
 | `ai.models.list`   | `appdock_ai_list_models`   | 任意connectionId                                                                       |
@@ -60,7 +60,7 @@ Nodeの例:
 ```ts
 const accepted = await context.appdock.call('ai.text.generate', {
   requestId: crypto.randomUUID(),
-  model: 'configured-model-id',
+  connectionId: 'registered-server-id',
   additionalPrompt: '入力を短い文章に整えてください。',
   input: '処理が完了しました。',
 });

@@ -119,6 +119,7 @@ const check = (name) => {
       path.join(nativeDir, 'AppDock.Extensions.ImageAiProbe.dll'),
     );
     settings.extensions[nativeId] = { enabled: true, settings: {} };
+    settings.operationPermissions = { applet: { read: true, execute: true } };
     require('./test-settings.cjs').write(profile, settings);
     host = await launch(profile, process.argv[2]);
     const page = host.main;
@@ -154,7 +155,7 @@ const check = (name) => {
       'fixture-api-key',
     );
     await dialog.getByRole('tab', { name: '生成設定', exact: true }).click();
-    await dialog.getByLabel('指定がないときのモデル', { exact: true }).fill('fixture');
+    await dialog.getByLabel('モデル', { exact: true }).fill('preview-model');
     await dialog.getByLabel('画像サイズ', { exact: true }).fill('1536x1024');
     await dialog.getByRole('tab', { name: 'プロンプト', exact: true }).click();
     await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).fill('always');
@@ -172,6 +173,7 @@ const check = (name) => {
       await page.evaluate(() => window.dock.snapshot())
     ).settings.value.imageAi.connections.find((c) => c.name === 'Preview preset');
     assert(saved.id);
+    assert.equal(saved.defaultModel, 'preview-model');
     assert.equal(saved.defaults.size, '1536x1024');
     assert(
       !JSON.stringify((await page.evaluate(() => window.dock.snapshot())).settings).includes(
@@ -198,6 +200,7 @@ const check = (name) => {
       'generated image rendered',
     );
     assert.equal(requests.at(-1).auth, 'Bearer fixture-api-key');
+    assert.equal(requests.at(-1).input.model, 'preview-model');
     assert.equal(requests.at(-1).input.prompt, 'always\nwatercolor\nfixture landscape');
     assert.equal(requests.at(-1).url, '/v1/images/generations');
     await page.locator('.image-ai-preview').scrollIntoViewIfNeeded();
@@ -209,12 +212,13 @@ const check = (name) => {
     const toggle = permission.getByRole('switch', { name: 'Applet：画像生成AI', exact: true });
     for (const value of [false, true]) {
       if ((await toggle.getAttribute('aria-checked')) !== String(value)) await toggle.click();
-      await until(
-        async () =>
-          (await page.evaluate(() => window.dock.snapshot())).appletApi.permissions.useImageAi ===
-            value && (await toggle.getAttribute('aria-checked')) === String(value),
-        'image permission saved',
-      );
+      await until(async () => {
+        const { appletApi } = await page.evaluate(() => window.dock.snapshot());
+        return (
+          (appletApi.permissions.useImageAi === true) === value &&
+          (await toggle.getAttribute('aria-checked')) === String(value)
+        );
+      }, 'image permission saved');
     }
     assert.equal(await permission.locator('[data-caller="MCP"]').innerText(), '未対応');
     await page.screenshot({ path: path.join(profile, 'image-ai-permission.png') });

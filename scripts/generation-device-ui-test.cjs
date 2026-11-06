@@ -147,14 +147,14 @@ const check = (name) => {
       check(id + ': copy writes the draft or saved ID without committing settings');
       if (id === 'image-ai') {
         await dialog.getByRole('tab', { name: '生成設定', exact: true }).click();
-        const model = dialog.getByRole('textbox', { name: '指定がないときのモデル', exact: true });
+        const model = dialog.getByRole('textbox', { name: 'モデル', exact: true });
         assert.equal(await model.isEditable(), true);
         assert.equal(
           await dialog.getByText(/利用する画像生成モデルのIDを入力してください/).count(),
           0,
         );
         await dialog.getByRole('tab', { name: '接続', exact: true }).click();
-        check('image-ai: default model remains editable without the removed explanation');
+        check('image-ai: edit the registered model through its Model field');
       }
       const authentication = dialog.getByLabel('認証方式', { exact: true });
       assert.equal(await authentication.inputValue(), 'none');

@@ -36,6 +36,12 @@ export interface McpDeviceSettings {
   servers: McpDeviceServer[];
   commands: McpToolCommand[];
 }
+export const mcpSettingsTabTitles = {
+  connections: 'settings.mcpClientSettings.connectionsTab',
+  commands: 'settings.mcpCommands.title',
+  tools: 'settings.mcpClientSettings.toolsTab',
+} as const;
+export type McpSettingsTab = keyof typeof mcpSettingsTabTitles;
 export const emptyMcpDeviceSettings = (): McpDeviceSettings => ({
   version: 1,
   servers: [],

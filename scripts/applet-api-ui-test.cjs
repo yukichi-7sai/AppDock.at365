@@ -22,6 +22,13 @@ const profile = path.join(
   ),
   local = path.join(profile, 'local');
 fs.mkdirSync(profile, { recursive: true });
+fs.mkdirSync(local, { recursive: true });
+const legacyPermissionFile = path.join(local, 'applet-api.json');
+const legacyPermissions = JSON.stringify({
+  version: 2,
+  permissions: { read: true, execute: true, write: true },
+});
+fs.writeFileSync(legacyPermissionFile, legacyPermissions);
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
@@ -52,7 +59,13 @@ for (const id of ids) {
       })),
       settings: [
         { key: 'flag', title: 'Flag', type: 'boolean', default: false, automation: true },
-        { key: 'privateFlag', title: 'Private', type: 'boolean', default: false },
+        {
+          key: 'privateFlag',
+          title: 'Private',
+          type: 'boolean',
+          default: false,
+          automation: false,
+        },
       ],
     }),
   );
@@ -215,35 +228,14 @@ async function grant(id, permissions) {
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
       false,
     );
+    assert.deepEqual((await snapshot()).appletApi.permissions, {});
     for (const id of ids) {
       assert.equal((await snapshot()).settings.value.extensions[id].settings.privateFlag, true);
-      assert.equal((await probe(id, 'read')).ok, true);
+      assert.equal((await probe(id, 'read')).code, 'API_DISABLED');
       assert.equal((await probe(id, 'legacy')).ok, true);
     }
     checks.push(
-      'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
-    );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 15);
-    assert.equal((await snapshot()).appletApi.permissions.useTts, false);
-    assert.equal((await snapshot()).appletApi.permissions.useAi, false);
-    assert.equal((await snapshot()).appletApi.permissions.useMcp, false);
-    assert.equal((await snapshot()).appletApi.permissions.manageCustomCommands, false);
-    assert.equal((await snapshot()).appletApi.permissions.manageMcpServers, false);
-    assert.equal((await snapshot()).appletApi.permissions.runProcesses, false);
-    assert.ok(
-      Object.entries((await snapshot()).appletApi.permissions)
-        .filter(
-          ([k]) =>
-            ![
-              'useTts',
-              'useAi',
-              'useMcp',
-              'manageCustomCommands',
-              'manageMcpServers',
-              'runProcesses',
-            ].includes(k),
-        )
-        .every(([, v]) => v === true),
+      'old Applet grants ignored; default denial on both SDKs; legacy self-setting remains available',
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
@@ -256,22 +248,16 @@ async function grant(id, permissions) {
     assert.deepEqual(await panel.locator('tbody > tr > th strong').allTextContents(), [
       '情報の取得',
       '設定の変更',
-      'Appletの有効・無効・再起動',
       'コマンドの実行',
-      'ショートカットの編集',
-      'マウスジェスチャーの編集',
-      'リボンの編集',
-      'タスクトレイの編集',
-      'カスタムコマンド定義の閲覧・編集',
       'Windowsへのキー・操作メッセージ送信',
       'コマンド・プロセスの起動',
-      'MCP接続先の管理',
       'MCP接続先の利用',
       '文章生成AIサーバーへの送信・文章生成',
+      '画像生成AI',
       '音声生成AIサーバーへの送信・読み上げ',
     ]);
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 15);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 15);
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 8);
     const fixedRead = panel.getByRole('switch', {
       name: 'Codexからの情報取得を許可する（MCP連携中は常に許可）',
       exact: true,
@@ -301,24 +287,13 @@ async function grant(id, permissions) {
       'requested row labels/order, fixed-ON disabled MCP read, six MCP-only warnings while OFF and keyboard tooltips',
     );
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
-      assert.equal(
-        await control.isChecked(),
-        !/TTS|AI|MCP|カスタム|プロセス/.test(await control.getAttribute('aria-label')),
-      );
+      assert.equal(await control.isChecked(), false);
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
     assert.ok(
       Object.entries(mcpDefaults)
         .filter(([key]) => key.startsWith('allow'))
         .every(([, v]) => v === false),
-    );
-    await grant(ids[0], {});
-    await until(
-      async () =>
-        await panel
-          .getByRole('switch', { name: /^Applet：/ })
-          .evaluateAll((nodes) => nodes.every((n) => n.getAttribute('aria-checked') === 'false')),
-      'all grants revoked',
     );
     assert.equal(await panel.getByText('直接公開なし', { exact: true }).count(), 0);
     assert.equal(await fixedRead.isChecked(), true);
@@ -353,14 +328,18 @@ async function grant(id, permissions) {
       .getByRole('textbox', { name: '設定JSON' })
       .inputValue();
     const draft = JSON.parse(originalJson);
+    draft.host ??= {};
     draft.host.startMinimized = true;
     const draftText = JSON.stringify(draft, null, 2);
     await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
     await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
     await settleSettings(page);
-    const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
+    const childGrant = panel.getByRole('switch', {
+      name: 'Applet：コマンド・プロセスの起動',
+      exact: true,
+    });
     await childGrant.click();
-    await panel.getByText(/未有効：情報の取得・コマンドの実行・設定の変更/).waitFor();
+    await panel.getByText(/未有効：情報の取得・コマンドの実行/).waitFor();
     assert.equal((await snapshot()).appletApi.permissions.read, undefined);
     await until(() => childGrant.isEnabled(), 'save child grant');
     await childGrant.click();
@@ -393,7 +372,6 @@ async function grant(id, permissions) {
         'permission save',
       );
     }
-    await grant(ids[1], { read: true, execute: true, write: true, manageApplets: true });
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'read')).ok, true);
     for (const id of ids) {
@@ -410,7 +388,6 @@ async function grant(id, permissions) {
       await window.dock.automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
@@ -435,11 +412,7 @@ async function grant(id, permissions) {
     });
     assert.equal(denied.structuredContent.code, 'WRITE_DISABLED');
     for (const id of ids) assert.equal((await probe(id, 'write', true)).code, 'WRITE_DISABLED');
-    await page.evaluate(
-      (port) =>
-        window.dock.automation({ kind: 'configure', enabled: true, allowWrite: true, port }),
-      state.port,
-    );
+    await page.evaluate(() => window.dock.automation({ kind: 'setWrite', allowed: true }));
     for (const id of ids) {
       assert.equal((await probe(id, 'write', true)).completion, 'settingsSaved');
       const read = await client.callTool({
@@ -536,12 +509,17 @@ async function grant(id, permissions) {
     await client.close();
     client = null;
     await page.evaluate(() =>
-      window.dock.automation({ kind: 'configure', enabled: false, allowWrite: false, port: 0 }),
+      window.dock.automation({ kind: 'configure', enabled: false, port: 0 }),
     );
     await stop(s);
     s = await start();
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'write')).completion, 'settingsSaved');
+    assert.equal(fs.readFileSync(legacyPermissionFile, 'utf8'), legacyPermissions);
+    const deviceFile = require('./test-settings.cjs').deviceFile(profile);
+    const { operationPermissions } = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+    assert.deepEqual(operationPermissions.applet, { read: true, execute: true, write: true });
+    assert.equal(operationPermissions.mcp.allowWrite, true);
     assert.equal(
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.running,
       false,

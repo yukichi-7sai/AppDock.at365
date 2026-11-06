@@ -9,7 +9,6 @@ exports.file = (profile, name = 'settings.json') => {
   fs.mkdirSync(directory, { recursive: true });
   return path.join(directory, name);
 };
-
 exports.deviceFile = (profile) => exports.file(profile, 'settings-' + machineName + '.json');
 
 /** Seed shared and device settings using the current on-disk layout. */
@@ -18,7 +17,7 @@ exports.write = (profile, value) => {
     generationSettings,
     withoutGenerationSettings,
   } = require('../out/main/main/core/generation-settings');
-  const { mcpClient, ...shared } = withoutGenerationSettings(value);
+  const { mcpClient, operationPermissions, ...shared } = withoutGenerationSettings(value);
   fs.writeFileSync(exports.file(profile), JSON.stringify(shared));
   const deviceFile = exports.deviceFile(profile);
   const {
@@ -33,6 +32,7 @@ exports.write = (profile, value) => {
         readDeviceCollections([path.join(profile, 'extensions')]),
       );
   if (mcpClient !== undefined) device.mcpClient = mcpClient;
+  if (operationPermissions !== undefined) device.operationPermissions = operationPermissions;
   device.generationAi = generationSettings(value);
   fs.writeFileSync(deviceFile, JSON.stringify(device));
 };

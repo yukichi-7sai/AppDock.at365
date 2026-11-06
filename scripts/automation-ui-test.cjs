@@ -101,10 +101,8 @@ exports.activate=async(context)=>{
 `,
 );
 settings.extensions[fixtureId] = { enabled: true, settings: {} };
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(settings),
-);
+settings.operationPermissions = { applet: { read: true, execute: true, write: true } };
+require('./test-settings.cjs').write(profile, settings);
 const local = path.join(profile, 'local'),
   configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });

@@ -34,7 +34,6 @@ export interface ImageGenerateInput {
   connectionId?: string;
   additionalPrompt?: string;
   input?: string;
-  model?: string;
   options?: Partial<Omit<ImageGenerationOptions, 'providerOptions'>> & {
     providerOptions?: Partial<ImageGenerationOptions['providerOptions']>;
   };

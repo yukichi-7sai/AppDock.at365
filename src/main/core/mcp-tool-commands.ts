@@ -144,7 +144,29 @@ export class McpToolCommandService {
         completion: 'accepted',
       }));
   }
-  plan(rows: unknown[], expected: string) {
+  /** JSON may edit definitions, but cannot manufacture or replace an approval binding. */
+  replacement(items: McpToolCommand[], serverIds: string[], expected: string) {
+    const previous = new Map(this.items().map((item) => [item.id, item]));
+    const rows = items.map((item) => {
+      const old = previous.get(item.id);
+      if (!isDeepStrictEqual(item.toolBinding, old?.toolBinding ?? null))
+        return fail('INVALID_ARGUMENT', 'settings.mcpJson.bindingReadonly');
+      const { toolBinding: _binding, ...row } = item;
+      const executionChanged =
+        !old ||
+        ['serverId', 'toolName', 'arguments', 'timeoutMs'].some(
+          (key) => !isDeepStrictEqual((item as any)[key], (old as any)[key]),
+        );
+      const approval =
+        (executionChanged && (item.enabled || item.automation)) ||
+        (!old?.enabled && item.enabled) ||
+        (!old?.automation && item.automation);
+      const toolRevision = approval ? this.currentToolRevision(item) : '';
+      return { ...row, ...(toolRevision ? { toolRevision } : {}) };
+    });
+    return this.plan(rows, expected, new Set(serverIds)).items;
+  }
+  plan(rows: unknown[], expected: string, serverIds?: Set<string>) {
     this.options.settings.assertRevision(expected);
     const previous = this.items();
     const next = rows.map((raw) => {
@@ -170,7 +192,9 @@ export class McpToolCommandService {
         return fail('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidUpdate');
       const old = previous.find((item) => item.id === raw.id);
       if (
-        !this.options.settings.server(String(raw.serverId)) &&
+        !(serverIds
+          ? serverIds.has(String(raw.serverId))
+          : this.options.settings.server(String(raw.serverId))) &&
         (!old || old.serverId !== raw.serverId)
       )
         return fail('NOT_FOUND', 'services.mcpClient.unregisteredConnection');
@@ -200,6 +224,7 @@ export class McpToolCommandService {
     if (new Set(next.map((item) => item.id)).size !== next.length)
       return fail('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidUpdate');
     return {
+      items: next,
       changed: !isDeepStrictEqual(next, previous),
       commit: () => this.options.settings.saveCommands(next, expected),
     };

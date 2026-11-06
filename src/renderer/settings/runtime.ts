@@ -408,7 +408,8 @@ export class SettingsViewClient {
       clearWebAccount: (id, confirmed) => invoke('clearWebAccount', [id, confirmed]),
 
       chooseDirectory: () => invoke('chooseDirectory'),
-      setAppletApiPermissions: (value) => invoke('setAppletApiPermissions', [value]),
+      setAppletApiPermissions: (value, before) =>
+        invoke('setAppletApiPermissions', [value, before]),
       automation: (value) => invoke('automation', [value]),
       executeCommand: (id) => invoke(`settingAction:${id}`),
     };

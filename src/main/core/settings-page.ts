@@ -145,8 +145,8 @@ export class SettingsPageSession {
       hostWidth: this.request.hostWidth ?? 1024,
       showHints: host.settings.value.host.showHints,
       language: host.settings.value.host.language,
-      values: page.json || page.id === 'mcp-client' ? this.options.editor.projection() : {},
-      jsonValues: page.json || page.id === 'mcp-client' ? this.options.editor.jsonProjection() : {},
+      values: page.json ? this.options.editor.projection() : {},
+      jsonValues: page.json ? this.options.editor.jsonProjection() : {},
       ...(this.request.context === 'full'
         ? projectSettingsIndex(
             catalog,

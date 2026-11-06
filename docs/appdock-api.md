@@ -34,7 +34,7 @@ Appletへは`ai.image.connections.list`（read + useImageAi）、`ai.image.jobs.
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.76.5"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境では、Applet列の全項目をONにします。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」で、Applet列とMCP列を独立して変更します。Applet列は操作カテゴリごとに全Applet共通で、共通APIを呼ぶにはmanifestのcapabilityも必要です。切り替え可能な項目は両列とも既定OFFです。許可は自端末の`data/settings-<端末名>.json`に即時保存します。保存先・復旧・旧値の扱いは[端末別の操作許可](settings-sync.md#端末別の操作許可)を参照してください。
 
 画面ではread／write／executeを「情報の取得」「設定の変更」「コマンドの実行」と表示します。MCP列の情報取得はON固定・操作不可のトグルで、「MCP連携中は常に許可」と補足します。Applet列の情報取得は従来どおり切り替えられます。コマンド実行・Windows入力・プロセス起動・MCP利用・AI送信・TTS送信の6項目は、MCP列のトグル横に注意アイコンを表示します。許可がOFFでも表示し、マウスを重ねるかキーボードでフォーカスすると注意理由を読めます。アイコンは表示上の案内で、許可の判定や保存値を変更しません。
 
@@ -140,9 +140,9 @@ await context.AppDock.CallAsync("commands.execute", new {
 
 ## 操作許可の画面
 
-ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCP情報取得は連携中許可の固定表示、入力は直接公開なしの固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsに残し相互リンクします。
+ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCPの情報取得は連携中許可の固定表示、画像生成AIは未対応の固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsで操作します。
 
-従来のPC専用APIで即時保存し、共有settings.jsonのrevisionとは独立します。この画面にはJSON切替を出しません。共有設定も即時保存し、全体保存ツールバーはありません。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。
+本体画面専用の操作で自端末のJSONへ即時保存し、保存前に端末ファイルのrevisionを照合します。この画面にはJSON切替を出しません。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。
 
 ## WebAppletの操作
 
@@ -158,7 +158,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## AI文章生成
 
-最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。選択したサーバーのプロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。サーバーの常時/既定プロンプトは最低ホスト版0.157.0。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
+現行の生成引数は最低ホスト版0.170.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。生成ではconnectionIdで登録を選び（省略時は既定）、登録したモデルを使います。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
 
 ## タッチパッドジェスチャー
 

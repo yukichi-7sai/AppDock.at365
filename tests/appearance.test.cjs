@@ -405,7 +405,7 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
         .includes("exposeInMainWorld('appdockAppearance'"),
     );
 });
-test('host CSS references canonical accents without redeclaring palette values', () => {
+test('host renderer CSS uses canonical accents without redeclaring palette values', () => {
   function visit(folder) {
     for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
       const file = path.join(folder, entry.name);

@@ -6,6 +6,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useRef, useState } from 'react';
 import type { Settings, SettingDefinition } from '../../shared/contracts';
+import type { McpSettingsTab } from '../../shared/mcp-device-settings';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import {
   defaultMcpConnection,
@@ -71,16 +72,21 @@ export function McpClientSettingsForm({
   move,
   invoke,
   busy,
+  tab,
+  setTab,
+  toolsReset,
 }: {
   settings: Settings;
   auxiliary?: SettingsPageAuxiliary['mcpClient'];
   move?: { id: string; itemId: string; completed?: boolean };
   invoke: Invoke;
   busy: boolean;
+  tab: McpSettingsTab;
+  setTab(tab: McpSettingsTab): void;
+  toolsReset: number;
 }) {
   const { t: translate } = useHostTranslation();
   const items = settings.mcpClient?.servers ?? [];
-  const [tab, setTab] = useState('connections');
   const [reset, setReset] = useState<string>();
   const [newCommand, setNewCommand] = useState<{
     item: Record<string, unknown>;
@@ -114,19 +120,43 @@ export function McpClientSettingsForm({
     [args, setArgs] = useState('{}'),
     [result, setResult] = useState<McpJob>();
   const running = useRef(false);
+  const toolsGeneration = useRef(0);
+  const [hiddenJobs, setHiddenJobs] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!toolsReset) return;
+    toolsGeneration.current++;
+    setServer('');
+    setTools([]);
+    setCursor(undefined);
+    setTool(undefined);
+    setArgs('{}');
+    setResult(undefined);
+    setError('');
+    setHiddenJobs(
+      new Set(auxiliary?.jobs.filter((job) => job.state !== 'running').map((job) => job.jobId)),
+    );
+  }, [toolsReset]);
+  const visibleJobs = auxiliary?.jobs.filter((job) => !hiddenJobs.has(job.jobId)) ?? [];
   const run = async (work: () => Promise<void>) => {
     if (running.current) return;
     running.current = true;
+    const generation = toolsGeneration.current;
     setPending(true);
     setError('');
     try {
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (generation === toolsGeneration.current)
+        setError(e instanceof Error ? e.message : String(e));
     } finally {
       running.current = false;
       setPending(false);
     }
+  };
+  const receive = async (work: Promise<any>, apply: (value: any) => void) => {
+    const generation = toolsGeneration.current;
+    const value = await work;
+    if (generation === toolsGeneration.current) apply(value);
   };
   const update = (op: Record<string, unknown>, revision = auxiliary?.revision) =>
     invoke('updateMcpConnection', [{ ...op, expectedRevision: revision }]);
@@ -145,52 +175,9 @@ export function McpClientSettingsForm({
     <div className="settings-sections">
       <p>{translate('settings.mcpClientSettings.deviceHint')}</p>
       <div
-        className="tabs server-editor-tabs"
-        role="tablist"
-        aria-label={translate('settings.mcpClientSettings.title')}
-      >
-        {(['connections', 'commands', 'tools'] as const).map((id, index, tabs) => (
-          <button
-            type="button"
-            role="tab"
-            id={'mcp-tab-' + id}
-            aria-controls={'mcp-panel-' + id}
-            aria-selected={tab === id}
-            tabIndex={tab === id ? 0 : -1}
-            className={tab === id ? 'selected' : ''}
-            key={id}
-            onClick={() => setTab(id)}
-            onKeyDown={(event) => {
-              const next =
-                event.key === 'ArrowRight'
-                  ? (index + 1) % tabs.length
-                  : event.key === 'ArrowLeft'
-                    ? (index + tabs.length - 1) % tabs.length
-                    : event.key === 'Home'
-                      ? 0
-                      : event.key === 'End'
-                        ? tabs.length - 1
-                        : -1;
-              if (next < 0) return;
-              event.preventDefault();
-              setTab(tabs[next]);
-              document.getElementById('mcp-tab-' + tabs[next])?.focus();
-            }}
-          >
-            {translate(
-              id === 'connections'
-                ? 'settings.mcpClientSettings.connectionsTab'
-                : id === 'commands'
-                  ? 'settings.mcpCommands.title'
-                  : 'settings.mcpClientSettings.toolsTab',
-            )}
-          </button>
-        ))}
-      </div>
-      <div
         id="mcp-panel-connections"
-        role="tabpanel"
-        aria-labelledby="mcp-tab-connections"
+        role="region"
+        aria-label={translate('settings.mcpClientSettings.connectionsTab')}
         hidden={tab !== 'connections'}
       >
         <SettingsContent
@@ -259,8 +246,8 @@ export function McpClientSettingsForm({
       </div>
       <div
         id="mcp-panel-commands"
-        role="tabpanel"
-        aria-labelledby="mcp-tab-commands"
+        role="region"
+        aria-label={translate('settings.mcpCommands.title')}
         hidden={tab !== 'commands'}
       >
         <McpToolCommandsSettings
@@ -273,8 +260,8 @@ export function McpClientSettingsForm({
       </div>
       <div
         id="mcp-panel-tools"
-        role="tabpanel"
-        aria-labelledby="mcp-tab-tools"
+        role="region"
+        aria-label={translate('settings.mcpClientSettings.toolsTab')}
         hidden={tab !== 'tools'}
       >
         <SettingsSection
@@ -296,11 +283,12 @@ export function McpClientSettingsForm({
                 setResult(undefined);
                 setError('');
                 if (id)
-                  void run(async () => {
-                    const r = await invoke('mcpTools', [id]);
-                    setTools(r.items);
-                    setCursor(r.nextCursor);
-                  });
+                  void run(() =>
+                    receive(invoke('mcpTools', [id]), (r) => {
+                      setTools(r.items);
+                      setCursor(r.nextCursor);
+                    }),
+                  );
               }}
             >
               <option value="">{translate('settings.mcpClientSettings.select')}</option>
@@ -326,7 +314,9 @@ export function McpClientSettingsForm({
                   const name = e.target.value;
                   setTool(undefined);
                   if (name)
-                    void run(async () => setTool((await invoke('mcpTool', [serverId, name])).tool));
+                    void run(() =>
+                      receive(invoke('mcpTool', [serverId, name]), (r) => setTool(r.tool)),
+                    );
                 }}
               >
                 <option value="">{translate('settings.mcpClientSettings.select')}</option>
@@ -344,11 +334,12 @@ export function McpClientSettingsForm({
               <button
                 disabled={pending}
                 onClick={() =>
-                  void run(async () => {
-                    const r = await invoke('mcpTools', [serverId, cursor]);
-                    setTools([...tools, ...r.items]);
-                    setCursor(r.nextCursor);
-                  })
+                  void run(() =>
+                    receive(invoke('mcpTools', [serverId, cursor]), (r) => {
+                      setTools([...tools, ...r.items]);
+                      setCursor(r.nextCursor);
+                    }),
+                  )
                 }
               >
                 {translate('settings.mcpClientSettings.more')}
@@ -378,9 +369,9 @@ export function McpClientSettingsForm({
                   className="primary"
                   disabled={pending || !!tool.unsupportedReason}
                   onClick={() =>
-                    void run(async () =>
-                      setResult(
-                        await invoke('mcpCall', [
+                    void run(() =>
+                      receive(
+                        invoke('mcpCall', [
                           {
                             serverId,
                             name: tool.name,
@@ -389,6 +380,7 @@ export function McpClientSettingsForm({
                             requestId: crypto.randomUUID(),
                           },
                         ]),
+                        setResult,
                       ),
                     )
                   }
@@ -422,10 +414,10 @@ export function McpClientSettingsForm({
         <SettingsSection
           title={translate('settings.mcpClientSettings.jobs')}
           description={translate('settings.mcpClientSettings.jobsHint', {
-            value: !auxiliary?.jobs.length ? translate('settings.mcpClientSettings.noJobs') : '',
+            value: !visibleJobs.length ? translate('settings.mcpClientSettings.noJobs') : '',
           })}
         >
-          {auxiliary?.jobs.map((j) => (
+          {visibleJobs.map((j) => (
             <SettingsField
               key={j.jobId}
               title={`${items.find((s) => s.id === j.serverId)?.name ?? j.serverId} / ${j.toolName}`}
@@ -439,9 +431,7 @@ export function McpClientSettingsForm({
               <SettingsActions>
                 <button
                   disabled={pending}
-                  onClick={() =>
-                    void run(async () => setResult(await invoke('mcpGetJob', [j.jobId])))
-                  }
+                  onClick={() => void run(() => receive(invoke('mcpGetJob', [j.jobId]), setResult))}
                 >
                   {translate('settings.mcpClientSettings.showResult')}
                 </button>
@@ -449,7 +439,7 @@ export function McpClientSettingsForm({
                   <button
                     disabled={pending}
                     onClick={() =>
-                      void run(async () => setResult(await invoke('mcpCancelJob', [j.jobId])))
+                      void run(() => receive(invoke('mcpCancelJob', [j.jobId]), setResult))
                     }
                   >
                     {translate('settings.mcpClientSettings.cancel')}

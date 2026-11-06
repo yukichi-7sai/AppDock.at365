@@ -74,10 +74,13 @@ function populated(store) {
 }
 test('all generators and the notification server follow the device across saves, restart and page scope changes', (t) => {
   const { store, file, local } = fixture(t);
+  store.saveOperationPermissions({ mcp: { allowUseTts: true } });
   store.save(populated(store), store.revision);
   const shared = read(file);
   const device = read(store.device.file);
   assert.equal(shared.generationAi, undefined);
+  assert.equal(shared.operationPermissions, undefined);
+  assert.deepEqual(device.operationPermissions, { mcp: { allowUseTts: true } });
   assert.equal(shared.notificationPreferences.speech.connectionId, undefined);
   assert.equal(shared.notificationPreferences.speech.instructions, 'calm');
   assert.equal(device.generationAi.notificationConnectionId, 'Voice');
@@ -97,6 +100,7 @@ test('all generators and the notification server follow the device across saves,
   );
   assert.equal(store.value.notificationPreferences.speech.connectionId, 'Voice');
   store.setHostPageLocalSettings('notifications', false, store.revision, undefined, 'share');
+  store.saveOperationPermissions({ mcp: { allowUseTts: false } });
   assert.deepEqual(read(store.device.file).generationAi, device.generationAi);
   assert.equal(read(file).notificationPreferences.speech.connectionId, undefined);
   const next = structuredClone(store.value);
@@ -107,12 +111,14 @@ test('all generators and the notification server follow the device across saves,
   reopened.load();
   assert.deepEqual(reopened.value.ai, store.value.ai);
   assert.equal(reopened.value.notificationPreferences.speech.connectionId, 'Voice');
+  assert.deepEqual(reopened.operationPermissions(), { mcp: { allowUseTts: false } });
   const other = new DeviceSettingsStore(file, local, 'OTHER');
   t.after(() => other.close());
   other.load();
   assert.deepEqual(other.value.ai.connections, []);
   assert.deepEqual(other.value.tts.connections, []);
   assert.deepEqual(other.value.imageAi.connections, []);
+  assert.deepEqual(other.operationPermissions(), {});
   assert.equal(other.value.notificationPreferences.speech?.connectionId, undefined);
   assert.equal(other.value.notificationPreferences.speech.instructions, 'calm');
 });

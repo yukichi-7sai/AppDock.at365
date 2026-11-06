@@ -71,7 +71,10 @@ export const createDefaultSettings = (): Settings => ({
   ribbon: defaultRibbon(),
 });
 export function parseSettings(value: unknown): Settings {
-  if (object(value)) value = restoreTriggerStackStorage(value);
+  if (object(value)) {
+    const { operationPermissions: _operationPermissions, ...settings } = value;
+    value = restoreTriggerStackStorage(settings);
+  }
   // Files may omit default-valued fields. Explicit invalid values still reach validation.
   if (object(value) && value.schemaVersion === 1) {
     const raw = value;
