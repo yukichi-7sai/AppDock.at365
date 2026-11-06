@@ -408,7 +408,7 @@ async function assertMcpWriteDenied() {
     await connectionDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await connectionDialog.waitFor({ state: 'hidden' });
     const mcpServerId = JSON.parse(fs.readFileSync(deviceFile(), 'utf8')).mcpClient.servers[0].id;
-    await page.getByRole('tab', { name: 'ツール確認', exact: true }).click();
+    await page.getByRole('button', { name: 'ツール確認', exact: true }).click();
     await page.getByLabel('確認するMCP接続先').selectOption(mcpServerId);
     await until(
       () => page.getByLabel('MCPツール', { exact: true }).isEnabled(),
@@ -505,7 +505,7 @@ async function assertMcpWriteDenied() {
     );
     await managedUpdate(request);
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
-    await page.getByRole('tab', { name: '接続先', exact: true }).click();
+    await page.getByRole('button', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: managedItem.name + 'を編集', exact: true }).click();
     const secretDialog = page.getByRole('dialog');
     await secretDialog.getByLabel('環境変数を入力・置換する', { exact: true }).check();
@@ -607,7 +607,7 @@ async function assertMcpWriteDenied() {
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     assert.equal((await call('appdock_mcp_list_servers')).items.length, 0);
-    await page.getByRole('tab', { name: '接続先', exact: true }).click();
+    await page.getByRole('button', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     let relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).check();
@@ -669,7 +669,7 @@ async function assertMcpWriteDenied() {
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await page.setViewportSize({ width: 740, height: 760 });
-    await page.getByRole('tab', { name: '接続先', exact: true }).click();
+    await page.getByRole('button', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     await checkDialogLayout(page.getByRole('dialog'));
     await page.screenshot({ path: path.join(profile, 'mcp-client-dialog-dark-narrow.png') });
@@ -1117,7 +1117,7 @@ async function assertMcpWriteDenied() {
       'stable ID retained after rename; existing shortcut dispatcher executes custom command',
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
-    await page.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPツールコマンド', exact: true }).click();
     await page.getByRole('button', { name: 'MCPツールコマンドを追加', exact: true }).click();
     dialog = page.getByRole('dialog');
     await dialog.getByLabel('有効', { exact: true }).check();
@@ -1220,7 +1220,7 @@ async function assertMcpWriteDenied() {
       1,
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
-    await page.getByRole('tab', { name: 'ツール確認', exact: true }).click();
+    await page.getByRole('button', { name: 'ツール確認', exact: true }).click();
     await until(async () => {
       const buttons = page.getByRole('button', { name: '結果を表示', exact: true });
       if (!(await buttons.count())) return false;
@@ -1228,7 +1228,7 @@ async function assertMcpWriteDenied() {
       const content = await page.getByLabel('MCP実行結果', { exact: true }).innerText();
       return content.includes('scheduledSeconds') && content.includes('600');
     }, 'shortcut MCP job result');
-    await page.getByRole('tab', { name: '接続先', exact: true }).click();
+    await page.getByRole('button', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).uncheck();
@@ -1243,7 +1243,7 @@ async function assertMcpWriteDenied() {
       ).isError,
       true,
     );
-    await page.getByRole('tab', { name: '接続先', exact: true }).click();
+    await page.getByRole('button', { name: '接続先', exact: true }).click();
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     relayDialog = page.getByRole('dialog');
     await relayDialog.getByLabel('MCPへ公開する', { exact: true }).check();

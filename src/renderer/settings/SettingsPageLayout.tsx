@@ -27,6 +27,7 @@ export function SettingsPageLayout({
   onReload,
   onReset,
   resetLabel,
+  jsonDescription,
   heading,
   children,
   announcement,
@@ -44,6 +45,7 @@ export function SettingsPageLayout({
   onReload(): void;
   onReset?(): void;
   resetLabel?: string;
+  jsonDescription?: string;
   heading?: ReactNode;
   children: ReactNode;
   announcement: ReactNode;
@@ -86,7 +88,9 @@ export function SettingsPageLayout({
                   <>
                     <h1>{page.title}</h1>
                     <p>
-                      <DescriptionText text={description} />
+                      <DescriptionText
+                        text={mode === 'json' && jsonDescription ? jsonDescription : description}
+                      />
                     </p>
                   </>
                 )}
@@ -197,7 +201,7 @@ export function SettingsPageLayout({
                   <span className="sr-only" role="status">
                     {pending ? t('settings.saving') : ''}
                   </span>
-                  {(page.json || page.id === 'mcp-client') && !page.unavailableReason && (
+                  {page.json && !page.unavailableReason && (
                     <button
                       type="button"
                       className="settings-page-reset"

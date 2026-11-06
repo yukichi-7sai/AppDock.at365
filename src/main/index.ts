@@ -132,6 +132,7 @@ import { SettingsCommands } from './core/settings-commands';
 import { SettingsInputSession } from './core/settings-input-session';
 import { CustomCommandService, CustomCommandError } from './core/custom-commands';
 import { McpToolCommandService } from './core/mcp-tool-commands';
+import { parseMcpDeviceSettings } from '../shared/mcp-device-settings';
 import type { InputInvocation } from './core/command-contexts';
 import { commandStackType, parseCommandStack, validateStackGraph } from '../shared/command-stacks';
 import { customItems } from '../shared/custom-commands';
@@ -2559,7 +2560,12 @@ function commitSettings(
   assertSettingsWritable();
   settings.assertRevision(revision);
   if (resetPage?.id === 'mcp-client') {
-    mcpSettings.reset(mcpSettings.revision());
+    if (!['page', 'mcp-connections', 'mcp-commands'].includes(resetScope))
+      throw Error(hostText('settings.inputError.resetScope'));
+    mcpSettings.reset(
+      mcpSettings.revision(),
+      resetScope as 'page' | 'mcp-connections' | 'mcp-commands',
+    );
     return settings.snapshot();
   }
   customCommands.validateReplacement(value);
@@ -2580,6 +2586,17 @@ function commitSettings(
         message: error.message,
       });
     throw error;
+  }
+  if (JSON.stringify(value.mcpClient) !== JSON.stringify(settings.value.mcpClient)) {
+    const expected = mcpSettings.revision();
+    const block = parseMcpDeviceSettings(value.mcpClient);
+    const commands = mcpToolCommands.replacement(
+      block.commands,
+      block.servers.map((row) => row.id),
+      expected,
+    );
+    mcpSettings.replace({ ...block, commands }, expected, value);
+    return settings.snapshot();
   }
   return settings.save(
     value,
@@ -2639,7 +2656,9 @@ function settingsPageStorage(
     files: [...scopes]
       .map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) }))
       .concat(
-        page.id === 'mcp-client' ? [{ scope: 'local', name: 'mcp-client-secrets.json' }] : [],
+        page.id === 'mcp-client' && resetScope !== 'mcp-commands'
+          ? [{ scope: 'local', name: 'mcp-client-secrets.json' }]
+          : [],
       ),
   };
 }

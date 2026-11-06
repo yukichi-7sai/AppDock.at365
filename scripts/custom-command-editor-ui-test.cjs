@@ -207,7 +207,7 @@ const diskDefinitions = () =>
         await details.locator(':scope > summary').click();
     };
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
-    await page.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPツールコマンド', exact: true }).click();
     await page.getByRole('button', { name: 'MCPツールコマンドを追加', exact: true }).click();
     await dialog.getByLabel('有効', { exact: true }).check();
     await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');

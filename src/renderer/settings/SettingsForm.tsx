@@ -1,6 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { isHostLanguage, hostLanguages, hostLanguageName } from '../../shared/host-language';
 import { McpClientSettingsForm } from './McpClientSettings';
+import type { McpSettingsTab } from '../../shared/mcp-device-settings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
@@ -53,6 +54,9 @@ export function SettingsForm({
   gestureView,
   onTriggerTab,
   triggerScrollPositions,
+  mcpTab,
+  onMcpTab,
+  mcpToolsReset,
 }: {
   model: SettingsPageModel;
   editor: FormEditor;
@@ -63,6 +67,9 @@ export function SettingsForm({
   gestureView: 'form' | 'triggers';
   onTriggerTab(tab: TriggerTab): void;
   triggerScrollPositions: TriggerScrollPositions;
+  mcpTab: McpSettingsTab;
+  onMcpTab(tab: McpSettingsTab): void;
+  mcpToolsReset: number;
 }) {
   const { t, language } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -144,6 +151,9 @@ export function SettingsForm({
   if (category === 'mcp-client')
     return (
       <McpClientSettingsForm
+        tab={mcpTab}
+        setTab={onMcpTab}
+        toolsReset={mcpToolsReset}
         settings={editor.value}
         auxiliary={aux.mcpClient}
         move={model.content.move}

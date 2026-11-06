@@ -15,6 +15,7 @@ import {
   parseMcpDeviceSettings,
   type McpDeviceServer,
   type McpToolCommand,
+  type McpDeviceSettings,
 } from '../../shared/mcp-device-settings';
 import {
   atomicWrite,
@@ -24,6 +25,7 @@ import {
 } from './settings';
 import { observeFile } from './file-observer';
 import type { FileWatchAssistance } from './file-watch-assistance';
+import type { Settings } from '../../shared/contracts';
 
 export const mcpDigest = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -295,12 +297,13 @@ export class McpClientSettings {
     commands: McpToolCommand[],
     expected: string,
     asset?: SettingsAsset,
+    base = this.settings.value,
   ) {
     this.assertRevision(expected);
     const mcpClient = parseMcpDeviceSettings({ version: 1, servers, commands });
-    if (isDeepStrictEqual(mcpClient, this.block()) && !asset) return;
+    if (isDeepStrictEqual({ ...base, mcpClient }, this.settings.value) && !asset) return;
     try {
-      this.settings.save({ ...this.settings.value, mcpClient }, this.settings.revision, asset);
+      this.settings.save({ ...base, mcpClient }, this.settings.revision, asset);
     } catch (error) {
       return failure(
         error instanceof SettingsConflictError ? 'REVISION_CONFLICT' : 'SAVE_FAILED',
@@ -398,10 +401,44 @@ export class McpClientSettings {
     this.save(this.block().servers, this.block().commands, expected, this.asset({}, expected));
     return { saved: true, revision: this.revision() };
   }
-  reset(expected: string) {
+  reset(expected: string, scope: 'page' | 'mcp-connections' | 'mcp-commands' = 'page') {
     this.assertRevision(expected);
+    if (scope === 'mcp-commands') {
+      this.save(this.block().servers, [], expected);
+      return;
+    }
     this.read();
-    this.save([], [], expected, this.asset({}, expected));
+    this.save(
+      [],
+      scope === 'mcp-connections' ? this.block().commands : [],
+      expected,
+      this.asset({}, expected),
+    );
+  }
+  /** Local JSON uses the same device/secret transaction as the connection editor. */
+  replace(value: McpDeviceSettings, expected: string, base?: Settings) {
+    this.assertRevision(expected);
+    const next = parseMcpDeviceSettings(value),
+      previous = this.block();
+    const byId = new Map(next.servers.map((row) => [row.id, row]));
+    const discard: string[] = [];
+    for (const old of previous.servers) {
+      const row = byId.get(old.id);
+      const changed =
+        !row || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(row.connection);
+      if (!changed && row.requiresEnvironment !== old.requiresEnvironment)
+        return failure('INVALID_ARGUMENT', 'settings.mcpJson.environmentReadonly');
+      if (changed) discard.push(old.id);
+    }
+    let asset: SettingsAsset | undefined;
+    if (discard.length) {
+      const entries = this.read();
+      if (discard.some((id) => Object.hasOwn(entries, id))) {
+        for (const id of discard) delete entries[id];
+        asset = this.asset(entries, expected);
+      }
+    }
+    this.save(next.servers, next.commands, expected, asset, base);
   }
   update(request: unknown, external = false) {
     if (!jsonObject(request) || typeof request.expectedRevision !== 'string')

@@ -55,6 +55,149 @@ function fixture(t) {
   };
   return { dir, store, owner, crypto, add };
 }
+test('MCP tab resets and local JSON replacement preserve unrelated definitions and secret bytes', (t) => {
+  const f = fixture(t),
+    serverId = f.add({ authentication: 'bearer' }, { token: 'key' });
+  const item = {
+    id: randomUUID(),
+    title: 'Saved',
+    description: '',
+    enabled: false,
+    automation: false,
+    serverId,
+    toolName: 'echo',
+    arguments: {},
+    timeoutMs: 60000,
+    toolBinding: null,
+  };
+  f.owner.saveCommands([item], f.owner.revision());
+  const initial = structuredClone(f.owner.block()),
+    cipher = fs.readFileSync(f.owner.file);
+  f.owner.reset(f.owner.revision(), 'mcp-commands');
+  assert.deepEqual(f.owner.block().servers, initial.servers);
+  assert.deepEqual(f.owner.block().commands, []);
+  assert.deepEqual(fs.readFileSync(f.owner.file), cipher);
+  f.owner.saveCommands([item], f.owner.revision());
+  const next = structuredClone(f.owner.block());
+  next.servers[0].name = 'JSON rename';
+  const base = { ...f.store.value, host: { ...f.store.value.host, soundEnabled: false } };
+  f.owner.replace(next, f.owner.revision(), base);
+  assert.equal(f.store.value.host.soundEnabled, false);
+  assert.deepEqual(fs.readFileSync(f.owner.file), cipher);
+  next.servers[0].connection.url = 'http://example.test/other';
+  f.owner.replace(next, f.owner.revision());
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.owner.file)).entries, {});
+  assert.deepEqual(f.owner.block().commands, [item]);
+  f.owner.reset(f.owner.revision(), 'mcp-connections');
+  assert.deepEqual(f.owner.block().servers, []);
+  assert.deepEqual(f.owner.block().commands, [item]);
+  f.owner.reset(f.owner.revision());
+  assert.deepEqual(f.owner.block(), { version: 1, servers: [], commands: [] });
+});
+test('JSON command replacement keeps approval readonly and validates edits against a current catalog', (t) => {
+  const f = fixture(t),
+    serverId = f.add({ enabled: true });
+  const tool = {
+    toolRevision: 'current',
+    toolBinding: {
+      version: 1,
+      endpointFingerprint: mcpEndpointIdentity(f.owner.connection(serverId)),
+      definitionFingerprint: 'a'.repeat(64),
+    },
+  };
+  const item = {
+    id: randomUUID(),
+    title: 'JSON',
+    description: '',
+    enabled: true,
+    automation: false,
+    serverId,
+    toolName: 'echo',
+    arguments: { text: 'one' },
+    timeoutMs: 60000,
+    toolBinding: tool.toolBinding,
+  };
+  f.owner.saveCommands([item], f.owner.revision());
+  let discovered = false;
+  const service = new McpToolCommandService({
+    settings: f.owner,
+    actor: () => ({}),
+    client: {
+      cachedTool: () => (discovered ? tool : undefined),
+      commandValidation: (row) =>
+        row.toolRevision === tool.toolRevision && typeof row.arguments.text === 'string'
+          ? null
+          : 'Invalid arguments',
+    },
+  });
+  assert.equal(
+    service.replacement([{ ...item, title: 'Metadata' }], [serverId], f.owner.revision())[0].title,
+    'Metadata',
+  );
+  assert.throws(
+    () =>
+      service.replacement(
+        [{ ...item, arguments: { text: 'two' } }],
+        [serverId],
+        f.owner.revision(),
+      ),
+    { code: 'SCHEMA_CHANGED' },
+  );
+  discovered = true;
+  assert.deepEqual(
+    service.replacement(
+      [{ ...item, arguments: { text: 'two' } }],
+      [serverId],
+      f.owner.revision(),
+    )[0].toolBinding,
+    tool.toolBinding,
+  );
+  assert.throws(
+    () =>
+      service.replacement([{ ...item, arguments: { text: 3 } }], [serverId], f.owner.revision()),
+    { code: 'SCHEMA_CHANGED' },
+  );
+  assert.throws(
+    () =>
+      service.replacement(
+        [{ ...item, toolBinding: { ...tool.toolBinding, definitionFingerprint: 'b'.repeat(64) } }],
+        [serverId],
+        f.owner.revision(),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.throws(
+    () => service.replacement([{ ...item, id: randomUUID() }], [serverId], f.owner.revision()),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  const draft = { ...item, id: randomUUID(), enabled: false, toolBinding: null };
+  assert.equal(service.replacement([draft], [serverId], f.owner.revision())[0].toolBinding, null);
+  assert.deepEqual(f.owner.block().commands, [item]);
+});
+test('JSON endpoint deletion rolls back with the device write and command reset works with corrupt secrets', (t) => {
+  const f = fixture(t),
+    id = f.add({ authentication: 'bearer' }, { token: 'secret' });
+  const before = fs.readFileSync(f.owner.file),
+    device = fs.readFileSync(f.store.device.file);
+  const save = f.store.device.save;
+  f.store.device.save = () => {
+    throw Error('disk failure');
+  };
+  assert.throws(
+    () => f.owner.replace({ version: 1, servers: [], commands: [] }, f.owner.revision()),
+    { code: 'SAVE_FAILED' },
+  );
+  f.store.device.save = save;
+  assert.deepEqual(fs.readFileSync(f.owner.file), before);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  fs.writeFileSync(f.owner.file, 'corrupt');
+  f.owner.reset(f.owner.revision(), 'mcp-commands');
+  assert.equal(f.owner.block().servers[0].id, id);
+  assert.equal(fs.readFileSync(f.owner.file, 'utf8'), 'corrupt');
+  assert.throws(() => f.owner.reset(f.owner.revision(), 'mcp-connections'), {
+    code: 'CONFIGURATION_REQUIRED',
+  });
+});
 test('same-name device restore retains IDs and bindings, another PC stays empty, and secrets stay local', (t) => {
   const f = fixture(t),
     id = f.add({ enabled: true, authentication: 'bearer' }, { token: 'private-token' }),

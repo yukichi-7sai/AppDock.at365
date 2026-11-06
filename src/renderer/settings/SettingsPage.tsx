@@ -14,6 +14,7 @@ import { CommandSelectionPins } from '../settings-ui/CommandSelectionDialog';
 import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
 import type { SettingsResetScope } from '../../shared/settings-catalog';
+import { mcpSettingsTabTitles, type McpSettingsTab } from '../../shared/mcp-device-settings';
 import { SettingsForm } from './SettingsForm';
 import {
   triggerTabTitles,
@@ -62,10 +63,14 @@ export function SettingsPage({
   const [commandTarget, setCommandTarget] = useState<CommandSettingsTarget>();
   const [triggerTab, setTriggerTab] = useState<TriggerTab>('commands');
   const [gestureView, setGestureView] = useState<'form' | 'triggers'>('form');
+  const [mcpTab, setMcpTab] = useState<McpSettingsTab>('connections');
+  const [mcpToolsReset, setMcpToolsReset] = useState(0);
   const triggerScrollPositions = useRef<TriggerScrollPositions>({});
   useEffect(() => {
     setTriggerTab('commands');
     setGestureView('form');
+    setMcpTab('connections');
+    setMcpToolsReset(0);
     for (const tab of Object.keys(triggerScrollPositions.current) as TriggerTab[])
       delete triggerScrollPositions.current[tab];
   }, [model?.content.page.id]);
@@ -261,8 +266,17 @@ export function SettingsPage({
                 ? gestureView
                 : undefined;
         const scope: SettingsResetScope =
-          tab === undefined || tab === 'json' || tab === 'commands' ? 'page' : tab;
-        const tabTitle = tab ? t(resetTabTitles[tab]) : undefined;
+          page.id === 'mcp-client' && editing.mode === 'form'
+            ? `mcp-${mcpTab}`
+            : tab === undefined || tab === 'json' || tab === 'commands'
+              ? 'page'
+              : tab;
+        const tabTitle =
+          page.id === 'mcp-client' && editing.mode === 'form'
+            ? t(mcpSettingsTabTitles[mcpTab])
+            : tab
+              ? t(resetTabTitles[tab])
+              : undefined;
         setDisposition('keep');
         setConfirmation({
           kind,
@@ -381,13 +395,13 @@ export function SettingsPage({
           act({ kind: 'edit', action: { type: 'mode', value: mode } });
         }}
         formTabs={
-          page.id === 'command-triggers'
-            ? (Object.keys(triggerTabTitles) as TriggerTab[]).map((tab) => ({
+          page.id === 'mcp-client'
+            ? (Object.keys(mcpSettingsTabTitles) as McpSettingsTab[]).map((tab) => ({
                 id: tab,
-                title: t(triggerTabTitles[tab]),
-                selected: triggerTab === tab,
+                title: t(mcpSettingsTabTitles[tab]),
+                selected: mcpTab === tab,
                 select: () => {
-                  if (editing.mode === 'form') selectTriggerTab(tab);
+                  if (editing.mode === 'form') setMcpTab(tab);
                   else
                     void c
                       .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
@@ -396,18 +410,18 @@ export function SettingsPage({
                           c.model?.content.page.id === page.id &&
                           c.model.content.editing.mode === 'form'
                         )
-                          setTriggerTab(tab);
+                          setMcpTab(tab);
                       })
                       .catch(() => {});
                 },
               }))
-            : gesturePage
-              ? (['form', 'triggers'] as const).map((view) => ({
-                  id: view,
-                  title: t(view === 'form' ? 'settings.form' : 'settings.triggerList'),
-                  selected: gestureView === view,
+            : page.id === 'command-triggers'
+              ? (Object.keys(triggerTabTitles) as TriggerTab[]).map((tab) => ({
+                  id: tab,
+                  title: t(triggerTabTitles[tab]),
+                  selected: triggerTab === tab,
                   select: () => {
-                    if (editing.mode === 'form') setGestureView(view);
+                    if (editing.mode === 'form') selectTriggerTab(tab);
                     else
                       void c
                         .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
@@ -416,14 +430,40 @@ export function SettingsPage({
                             c.model?.content.page.id === page.id &&
                             c.model.content.editing.mode === 'form'
                           )
-                            setGestureView(view);
+                            setTriggerTab(tab);
                         })
                         .catch(() => {});
                   },
                 }))
-              : undefined
+              : gesturePage
+                ? (['form', 'triggers'] as const).map((view) => ({
+                    id: view,
+                    title: t(view === 'form' ? 'settings.form' : 'settings.triggerList'),
+                    selected: gestureView === view,
+                    select: () => {
+                      if (editing.mode === 'form') setGestureView(view);
+                      else
+                        void c
+                          .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
+                          .then(() => {
+                            if (
+                              c.model?.content.page.id === page.id &&
+                              c.model.content.editing.mode === 'form'
+                            )
+                              setGestureView(view);
+                          })
+                          .catch(() => {});
+                    },
+                  }))
+                : undefined
         }
-        formTabsId={gesturePage ? 'gesture-settings' : 'command-trigger'}
+        formTabsId={
+          page.id === 'mcp-client'
+            ? 'mcp-settings'
+            : gesturePage
+              ? 'gesture-settings'
+              : 'command-trigger'
+        }
         storage={model.content.auxiliary.storage}
         onLocalSettings={(enabled) => {
           if (!enabled) void confirm('storage');
@@ -431,8 +471,10 @@ export function SettingsPage({
             void c.invoke('set-local-settings', [true]).catch((error) => setError(String(error)));
         }}
         onReset={() => void confirm('reset')}
+        jsonDescription={page.id === 'mcp-client' ? t('settings.mcpJson.hint') : undefined}
         resetLabel={
-          editing.mode === 'form' && (gesturePage || page.id === 'command-triggers')
+          editing.mode === 'form' &&
+          (gesturePage || page.id === 'command-triggers' || page.id === 'mcp-client')
             ? t('settings.resetTab')
             : undefined
         }
@@ -507,6 +549,9 @@ export function SettingsPage({
             }
           >
             <SettingsForm
+              mcpTab={mcpTab}
+              onMcpTab={setMcpTab}
+              mcpToolsReset={mcpToolsReset}
               triggerTab={triggerTab}
               gestureView={gestureView}
               onTriggerTab={selectTriggerTab}
@@ -550,7 +595,15 @@ export function SettingsPage({
                 disposition,
                 expected.content.auxiliary.storage?.signature,
               ]);
-            else
+            else if (confirmation.scope === 'mcp-tools') {
+              if (
+                c.model?.content.page.id !== 'mcp-client' ||
+                c.model.content.editing.mode !== 'form' ||
+                mcpTab !== 'tools'
+              )
+                throw Error(t('settings.inputError.confirmationChanged'));
+              setMcpToolsReset((value) => value + 1);
+            } else
               await c.act({
                 kind: 'edit',
                 action: {
@@ -577,30 +630,41 @@ export function SettingsPage({
               <SettingsField
                 title={t('settings.resetContents')}
                 description={t(
-                  confirmation.scope === 'form'
-                    ? 'settings.resetFormDescription'
-                    : confirmation.scope !== 'page' ||
-                        (confirmation.model.content.page.id === 'command-triggers' &&
-                          confirmation.model.content.editing.mode === 'form')
-                      ? 'settings.resetTriggersDescription'
-                      : 'settings.resetDescription',
+                  confirmation.scope === 'mcp-connections'
+                    ? 'settings.mcpReset.connections'
+                    : confirmation.scope === 'mcp-commands'
+                      ? 'settings.mcpReset.commands'
+                      : confirmation.scope === 'mcp-tools'
+                        ? 'settings.mcpReset.tools'
+                        : confirmation.model.content.page.id === 'mcp-client'
+                          ? 'settings.mcpReset.json'
+                          : confirmation.scope === 'form'
+                            ? 'settings.resetFormDescription'
+                            : confirmation.scope !== 'page' ||
+                                (confirmation.model.content.page.id === 'command-triggers' &&
+                                  confirmation.model.content.editing.mode === 'form')
+                              ? 'settings.resetTriggersDescription'
+                              : 'settings.resetDescription',
                 )}
               />
-              <SettingsField
-                title={t('settings.storage.title')}
-                description={confirmation.model.content.auxiliary.storage?.files
-                  .filter(
-                    (file) =>
-                      confirmation.scope !== 'triggers' ||
-                      confirmation.model.content.page.id !== 'touchpad-gestures' ||
-                      file.scope === 'shared',
-                  )
-                  .map(
-                    (file) =>
-                      `${file.scope === 'local' ? t('settings.storage.local') : file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
-                  )
-                  .join('、')}
-              />
+              {confirmation.scope !== 'mcp-tools' && (
+                <SettingsField
+                  title={t('settings.storage.title')}
+                  description={confirmation.model.content.auxiliary.storage?.files
+                    .filter(
+                      (file) =>
+                        (confirmation.scope !== 'mcp-commands' || file.scope === 'device') &&
+                        (confirmation.scope !== 'triggers' ||
+                          confirmation.model.content.page.id !== 'touchpad-gestures' ||
+                          file.scope === 'shared'),
+                    )
+                    .map(
+                      (file) =>
+                        `${file.scope === 'local' ? t('settings.storage.local') : file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
+                    )
+                    .join('、')}
+                />
+              )}
               {confirmation.model.content.auxiliary.storage?.files.some(
                 (file) => file.scope === 'shared',
               ) && (

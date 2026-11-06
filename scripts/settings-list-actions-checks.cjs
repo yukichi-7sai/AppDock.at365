@@ -69,7 +69,7 @@ module.exports = async ({
         await select(title === 'MCPツールコマンド' ? 'MCPクライアント' : title);
         if (title.startsWith('MCP'))
           await host
-            .getByRole('tab', { name: title === 'MCPクライアント' ? '接続先' : title, exact: true })
+            .getByRole('button', { name: title === 'MCPクライアント' ? '接続先' : title, exact: true })
             .click();
         if (['Applet管理', '文章生成AI', 'MCPクライアント'].includes(title)) {
           const order = host.getByRole('button', { name: /並べ替え/ });

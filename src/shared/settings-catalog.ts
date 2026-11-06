@@ -41,7 +41,15 @@ import {
 
 export type SettingsPath = string[];
 export type SettingsResetScope =
-  'page' | 'form' | 'triggers' | 'shortcuts' | 'gestures' | 'touchpad-gestures';
+  | 'page'
+  | 'form'
+  | 'triggers'
+  | 'shortcuts'
+  | 'gestures'
+  | 'touchpad-gestures'
+  | 'mcp-connections'
+  | 'mcp-commands'
+  | 'mcp-tools';
 export interface SettingsItem {
   id: string;
   pageId: string;
@@ -510,7 +518,7 @@ export function settingsCatalog(
       id,
       title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
       kind: 'host' as const,
-      json: !['applets', 'web-accounts', 'permissions', 'codex', 'mcp-client'].includes(id),
+      json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
       items: [
         ...hostRows(id, current.host.language)
           .filter(([key]) => id !== 'tts' || ttsPageKeys.includes(key))
@@ -750,6 +758,11 @@ export function settingsResetPaths(
 ): SettingsPath[] {
   const paths = settingsPaths(page, applets);
   if (scope === 'page') return paths;
+  if (page.id === 'mcp-client') {
+    if (scope === 'mcp-connections') return [['mcpClient', 'servers']];
+    if (scope === 'mcp-commands') return [['mcpClient', 'commands']];
+    throw Error(hostText('settings.inputError.resetScope'));
+  }
   const triggerPath = (path: SettingsPath) =>
     path[0] === 'keybindings' || path[1] === 'bindings' || path[1] === 'inputExecutionModes';
   if (page.id === 'command-triggers') {
@@ -779,10 +792,10 @@ export function resetSettingsPage(
   scope: SettingsResetScope = 'page',
 ): Settings {
   const paths = settingsResetPaths(page, applets, scope);
-  if (page.id === 'mcp-client') return { ...current, mcpClient: emptyMcpDeviceSettings() };
   if (scope === 'page') return applySettingsJson(current, page, applets, '{}');
   const defaults = settingsPageDefaults(page, applets);
   const next = structuredClone(current);
+  if (page.id === 'mcp-client') next.mcpClient ??= emptyMcpDeviceSettings();
   for (const path of paths) writePath(next, path, readSettingsPath(defaults, path));
   return next;
 }
@@ -814,8 +827,7 @@ export function settingsProjection(
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
 ): Record<string, unknown> {
-  if (!page.json && page.id !== 'mcp-client')
-    throw Error(hostText('settings.settings-catalog.jsonUnsupported'));
+  if (!page.json) throw Error(hostText('settings.settings-catalog.jsonUnsupported'));
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);
     const fields = applet?.settings ?? [];
@@ -842,6 +854,7 @@ export function settingsProjection(
   return result;
 }
 export function settingsPageDefaults(page: SettingsPageDefinition, applets: ExtensionSnapshot[]) {
+  if (page.id === 'mcp-client') return { mcpClient: emptyMcpDeviceSettings() };
   const defaults = settingsStorageDefaults();
   for (const applet of applets) {
     defaults.extensions[applet.id] = {

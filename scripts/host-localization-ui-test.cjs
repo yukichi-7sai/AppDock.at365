@@ -183,7 +183,7 @@ async function start() {
     });
     assert(!types.some((t) => t.id === 'appdock.mcp.call'));
     await command('appdock.settings.mcp-client.open');
-    await host.getByRole('tab', { name: 'MCP tool commands', exact: true }).waitFor();
+    await host.getByRole('button', { name: 'MCP tool commands', exact: true }).waitFor();
     checks.push(
       'Command palette and MCP command settings refresh after language changes; removed custom type stays absent',
     );
