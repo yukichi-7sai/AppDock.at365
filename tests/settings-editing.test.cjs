@@ -1,3 +1,4 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
@@ -327,7 +328,7 @@ test('web partial arrays preserve other rows and immutable fields', () => {
         displayName: 'Site',
         runtime: 'node',
         collection: { owner: 'at365.web-applet', key: 'items', itemId: id },
-        settings: require('../../Applet.WebApplet.at365/extension.json').pageCollections[0].fields,
+        settings: siblingManifest('Applet.WebApplet.at365').pageCollections[0].fields,
       },
     ],
     p = settingsCatalog(a, v).find((p) => p.owner === id);

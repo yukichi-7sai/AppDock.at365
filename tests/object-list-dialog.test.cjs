@@ -1,3 +1,4 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'),
@@ -13,7 +14,7 @@ const {
 } = require('../out/main/shared/object-list');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { SettingsCommands } = require('../out/main/main/core/settings-commands');
-const manifest = require('../../Applet.WebApplet.at365/extension.json');
+const manifest = siblingManifest('Applet.WebApplet.at365');
 test('declarative lists validate columns, nested paths and option sources', () => {
   const fields = parseSettingDefinitions(manifest.settings);
   assert.equal(fields[0].list.titleKey, 'name');
@@ -47,7 +48,7 @@ test('declarative lists validate columns, nested paths and option sources', () =
 });
 
 test('numbered monitor lists migrate legacy rows on edit and still reject conflicting saves', (t) => {
-  const manifest = require('../../Applet.WallpaperSlideshow.at365/extension.json');
+  const manifest = siblingManifest('Applet.WallpaperSlideshow.at365');
   const definition = parseSettingDefinitions(manifest.settings).find(
     (field) => field.key === 'monitors',
   );

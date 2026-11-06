@@ -1,10 +1,11 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseDynamicPages } = require('../out/main/shared/dynamic-pages');
 const { parsePageCollections, collectionPages } = require('../out/main/shared/page-collections');
 const { parseSettings, createDefaultSettings } = require('../out/main/shared/settings-schema');
 const { initializeCollectionDefaults } = require('../out/main/shared/keybindings');
-const manifest = require('../../Applet.WebApplet.at365/extension.json');
+const manifest = siblingManifest('Applet.WebApplet.at365');
 const page = {
   id: 'one',
   title: 'One',

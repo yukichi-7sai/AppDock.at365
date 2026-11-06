@@ -1,3 +1,4 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'),
@@ -5,7 +6,7 @@ const fs = require('node:fs'),
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { SettingsCommands } = require('../out/main/main/core/settings-commands');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
-const webAppletSettingDefinitions = require('../../Applet.WebApplet.at365/extension.json')
+const webAppletSettingDefinitions = siblingManifest('Applet.WebApplet.at365')
   .pageCollections[0].fields;
 
 test('WebApplet public settings share revision, validation and caller permissions without exposing private fields', async (t) => {

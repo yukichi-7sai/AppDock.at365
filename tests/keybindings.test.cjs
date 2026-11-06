@@ -1,3 +1,4 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseSettings, createDefaultSettings } = require('../out/main/shared/settings-schema');
@@ -417,7 +418,7 @@ test('Applet manifest defaults are scoped to declared commands and applied only 
   );
 });
 test('new collection pages copy current template without changing existing bindings', () => {
-  const parent = require('../../Applet.WebApplet.at365/extension.json');
+  const parent = siblingManifest('Applet.WebApplet.at365');
   const initializeWebAppletDefaults = (value, prior) =>
     initializeCollectionDefaults(value, prior, [parent]);
   const previous = createDefaultSettings();

@@ -1,3 +1,4 @@
+const { siblingManifest } = require('./fixtures/sibling-manifest.cjs');
 const {
   webUrl,
   allowedWebNavigation: allowedWebAppletNavigation,
@@ -6,7 +7,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { validateCollectionRecords } = require('../out/main/shared/page-collections');
-const definition = require('../../Applet.WebApplet.at365/extension.json').pageCollections[0];
+const definition = siblingManifest('Applet.WebApplet.at365').pageCollections[0];
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ribbonItems } = require('../out/main/shared/applet-pages');
 const account = { id: `account.${randomUUID()}`, name: '仕事用' };
