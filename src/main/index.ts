@@ -244,6 +244,7 @@ import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { AiService } from './core/ai-service';
 import { ImageAiService } from './core/image-ai-service';
+import { readImageReference } from './core/image-ai-references';
 import { ImageAiSettingsController } from './core/image-ai-settings';
 import { defaultImageAiSettings } from '../shared/image-ai';
 import { AiSecrets } from './core/ai-secrets';
@@ -1158,6 +1159,7 @@ const ai = new AiService({
     }),
 });
 const imageAi = new ImageAiService({
+  readReference: (ref, active) => readImageReference(registeredImages, ref, active),
   registration: new ImageRegistration(registeredImages, imageLibraryHost),
   validateImage: (bytes) => decodeRegisteredImage(bytes),
   settings: () => settings.value.imageAi ?? defaultImageAiSettings(),

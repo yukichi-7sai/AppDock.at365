@@ -76,11 +76,10 @@ export class ImageGeneration {
       folder: s.folder,
       folders: [...new Set(['', ...this.options.library.images.folders])],
       defaultConnectionId: configuration.defaultConnectionId,
-      servers: configuration.connections.map(({ id, name, defaults, defaultPrompt }) => ({
+      servers: configuration.connections.map(({ id, name, defaults }) => ({
         id,
         name,
         defaults,
-        defaultPrompt,
       })),
       items: s.items,
     });
@@ -124,9 +123,7 @@ export class ImageGeneration {
         s.items.unshift({
           job,
           input: action.input.input ?? '',
-          prompt: [server!.alwaysPrompt, action.input.additionalPrompt ?? server!.defaultPrompt]
-            .filter((p) => p.trim())
-            .join('\n'),
+          referenceImages: structuredClone(action.input.referenceImages ?? []),
           options: {
             ...server!.defaults,
             ...action.input.options,

@@ -43,8 +43,7 @@ export function ImageAiSettingsForm({
     | { kind: 'order'; connections: ImageAiConnection[] }
     | null
   >(null);
-  const [prompt, setPrompt] = useState(''),
-    [input, setInput] = useState('');
+  const [input, setInput] = useState('');
   const [pending, setPending] = useState(false),
     [error, setError] = useState('');
   const operation = useRef(false);
@@ -176,21 +175,9 @@ export function ImageAiSettingsForm({
             ))}
           </select>
         </SettingsField>
-        <SettingsField
-          title={translate('settings.aiSettings.extraPrompt')}
-          description={translate('settings.aiSettings.extraPromptHint')}
-        >
+        <SettingsField title={translate('imageGeneration.input')}>
           <SettingsTextarea
-            aria-label={translate('settings.aiSettings.extraPromptLabel')}
-            commitOn="input"
-            value={prompt}
-            placeholder={translate('imageAi.extraPromptPlaceholder')}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-        </SettingsField>
-        <SettingsField title={translate('settings.aiSettings.input')}>
-          <SettingsTextarea
-            aria-label={translate('settings.aiSettings.inputLabel')}
+            aria-label={translate('imageGeneration.input')}
             commitOn="input"
             value={input}
             placeholder={translate('imageAi.inputPlaceholder')}
@@ -200,12 +187,7 @@ export function ImageAiSettingsForm({
             startLabel={translate('imageAi.generate')}
             stopLabel={translate('settings.aiSettings.cancel')}
             startDisabled={
-              busy ||
-              pending ||
-              active ||
-              !c ||
-              !c.defaultModel.trim() ||
-              !(c.alwaysPrompt.trim() || c.defaultPrompt.trim() || prompt.trim() || input.trim())
+              busy || pending || active || !c || !c.defaultModel.trim() || !input.trim()
             }
             stopDisabled={pending || !active}
             onStart={() =>
@@ -214,7 +196,6 @@ export function ImageAiSettingsForm({
                   {
                     requestId: crypto.randomUUID(),
                     connectionId: c!.id,
-                    ...(prompt.trim() ? { additionalPrompt: prompt } : {}),
                     input,
                   },
                 ]);

@@ -21,7 +21,6 @@ const connection = (id = 'one') => ({
   baseUrl: 'http://127.0.0.1/v1',
   authentication: 'none',
   defaultModel: 'fixture',
-  defaultPrompt: 'default',
 });
 const response = (bytes = png, n = 1) =>
   new Response(
@@ -74,38 +73,160 @@ const completed = (s, id) =>
     const v = s.get('one', id);
     return v.state === 'completed' && v;
   });
-test('image instructions and input combine once, inherit omitted defaults and suppress explicit empty defaults', async (t) => {
-  const f = fixture(t),
-    c = connection();
-  c.alwaysPrompt = 'always';
-  c.defaultPrompt = 'default style';
-  f.set({ connections: [c], defaultConnectionId: c.id });
-  const cases = [
-    [{ input: 'subject' }, 'always\ndefault style\nsubject'],
-    [{ additionalPrompt: 'watercolor', input: 'subject' }, 'always\nwatercolor\nsubject'],
-    [{ additionalPrompt: '', input: 'subject' }, 'always\nsubject'],
-  ];
-  for (const [input, expected] of cases) {
-    const job = f.s.generate('one', { requestId: String(f.requests.length), ...input });
-    await completed(f.s, job.jobId);
-    assert.equal(f.requests.at(-1).body.prompt, expected);
-  }
-  assert.throws(() => f.s.generate('one', { requestId: 'bad', input: {} }), {
-    code: 'INVALID_ARGUMENT',
+test('multipart edits preserve reference order and bytes, quality and automatic boundary', async (t) => {
+  const refs = [{ file: 'pictures/first.png' }, { file: 'pictures/second.webp' }];
+  const originals = [png, Buffer.from('RIFFfixtureWEBP')];
+  const reads = [];
+  const f = fixture(t, {
+    readReference: async (ref, active) => {
+      assert(active());
+      reads.push(ref.file);
+      return {
+        bytes: originals[refs.findIndex((r) => r.file === ref.file)],
+        mimeType: ref.file.endsWith('png') ? 'image/png' : 'image/webp',
+      };
+    },
+    fetcher: async (url, init) => {
+      assert.equal(url, 'http://127.0.0.1/v1/images/edits');
+      assert(!new Headers(init.headers).has('content-type'));
+      const wire = new Request(url, init);
+      assert.match(wire.headers.get('content-type'), /^multipart\/form-data; boundary=/);
+      const form = await wire.formData();
+      assert.equal(form.get('prompt'), 'use image 2');
+      assert.equal(form.get('quality'), 'high');
+      assert.equal(form.get('n'), '2');
+      const files = form.getAll('image[]');
+      assert.deepEqual(
+        files.map((file) => file.name),
+        ['image-1.png', 'image-2.webp'],
+      );
+      for (let i = 0; i < files.length; i++)
+        assert.deepEqual(Buffer.from(await files[i].arrayBuffer()), originals[i]);
+      return response(png, 2);
+    },
   });
-  assert.equal(c.defaultPrompt, 'default style');
+  const input = {
+    requestId: 'refs',
+    input: 'use image 2',
+    referenceImages: structuredClone(refs),
+    options: { count: 2, providerOptions: { quality: 'high' } },
+  };
+  const j = f.s.generate('one', input);
+  assert.equal(f.s.generate('one', input).jobId, j.jobId);
+  assert.throws(() => f.s.generate('one', { ...input, referenceImages: [...refs].reverse() }), {
+    code: 'IMAGE_AI_REQUEST_CONFLICT',
+  });
+  input.referenceImages.reverse();
+  await completed(f.s, j.jobId);
+  assert.deepEqual(
+    reads,
+    refs.map((ref) => ref.file),
+  );
+  assert.equal(f.config().connections[0].defaults.providerOptions.quality, 'auto');
+});
+test('invalid references and limits never send; cancellation during reads discards input', async (t) => {
+  let send = 0,
+    release;
+  const f = fixture(t, {
+    readReference: () => new Promise((resolve) => (release = resolve)),
+    fetcher: async () => {
+      send++;
+      return response();
+    },
+  });
+  for (const referenceImages of [
+    null,
+    {},
+    Array.from({ length: 17 }, () => ({ file: 'a.png' })),
+    [{ file: '../outside.png' }],
+    [{ file: 'https://example/a.png' }],
+    [{ file: 'a.png', url: 'secret' }],
+  ])
+    assert.throws(
+      () => f.s.generate('one', { requestId: 'bad-ref', input: 'subject', referenceImages }),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  const j = f.s.generate('one', {
+    requestId: 'cancel-ref',
+    input: 'subject',
+    referenceImages: [{ file: 'a.png' }],
+  });
+  await until(() => release);
+  f.s.cancel('one', j.jobId);
+  release({ bytes: png, mimeType: 'image/png' });
+  await until(() => f.s.active.size === 0);
+  assert.equal(send, 0);
+  assert.equal(f.failures.length, 0);
+  const adapter = new OpenAiImageAdapter(async () => {
+    send++;
+    return response();
+  });
+  for (const referenceImages of [
+    [{ bytes: png, mimeType: 'image/svg+xml' }],
+    [{ bytes: Buffer.alloc(50_000_000), mimeType: 'image/png' }],
+    [{ bytes: Buffer.alloc(0), mimeType: 'image/png' }],
+  ])
+    await assert.rejects(
+      adapter.generate(
+        connection(),
+        undefined,
+        { model: 'm', prompt: 'p', options: connection().defaults, referenceImages },
+        new AbortController().signal,
+      ),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  assert.equal(send, 0);
+});
+test('saved device settings discard retired image prompts while preserving text prompts', () => {
+  const { parseGenerationSettings } = require('../out/main/main/core/generation-settings');
+  const { newAiConnection } = require('../out/main/shared/ai');
+  const defaults = createDefaultSettings();
+  const ai = {
+    ...defaults.ai,
+    connections: [
+      { ...newAiConnection('text'), alwaysPrompt: 'keep', defaultPrompt: 'keep default' },
+    ],
+  };
+  const imageAi = {
+    connections: [{ ...connection(), alwaysPrompt: 'retired', defaultPrompt: 'retired default' }],
+    defaultConnectionId: 'one',
+  };
+  const parsed = parseGenerationSettings({ version: 1, ai, tts: defaults.tts, imageAi });
+  assert.equal(parsed.imageAi.connections[0].alwaysPrompt, undefined);
+  assert.equal(parsed.imageAi.connections[0].defaultPrompt, undefined);
+  assert.equal(parsed.ai.connections[0].alwaysPrompt, 'keep');
+  assert.equal(imageAi.connections[0].alwaysPrompt, 'retired');
+});
+test('single prompt is sent exactly once and retired prompt fields are rejected', async (t) => {
+  const f = fixture(t);
+  const job = f.s.generate('one', { requestId: 'single', input: ' subject\nstyle ' });
+  await completed(f.s, job.jobId);
+  assert.equal(f.requests[0].body.prompt, ' subject\nstyle ');
+  for (const input of [
+    { input: {} },
+    { input: '' },
+    { input: ' ', additionalPrompt: 'old' },
+    { input: 'subject', additionalPrompt: '' },
+  ])
+    assert.throws(() => f.s.generate('one', { requestId: 'invalid', ...input }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  const missing = { requestId: 'missing' };
+  delete missing.input;
+  assert.throws(() => f.s.generate('one', missing), { code: 'INVALID_ARGUMENT' });
+  for (const key of ['alwaysPrompt', 'defaultPrompt'])
+    assert.throws(() => parseImageAiSettings({ connections: [{ ...connection(), [key]: 'old' }] }));
 });
 test('preset model selection, per-call image options and canonical request IDs', async (t) => {
   const f = fixture(t);
   const other = connection('two');
   other.defaultModel = 'second-model';
-  other.alwaysPrompt = 'always';
   other.defaults.size = '1536x1024';
   f.set({ connections: [connection(), other], defaultConnectionId: 'one' });
   const input = {
     requestId: 'r',
     connectionId: 'two',
-    additionalPrompt: 'landscape',
+    input: 'landscape',
     options: { count: 2, providerOptions: { quality: 'high' } },
   };
   const j = f.s.generate('one', input);
@@ -114,20 +235,20 @@ test('preset model selection, per-call image options and canonical request IDs',
   assert.equal(
     f.s.generate('one', {
       options: { providerOptions: { quality: 'high' }, count: 2 },
-      additionalPrompt: 'landscape',
+      input: 'landscape',
       connectionId: 'two',
       requestId: 'r',
     }).jobId,
     j.jobId,
   );
-  assert.throws(() => f.s.generate('one', { ...input, additionalPrompt: 'different' }), {
+  assert.throws(() => f.s.generate('one', { ...input, input: 'different' }), {
     code: 'IMAGE_AI_REQUEST_CONFLICT',
   });
   const done = await completed(f.s, j.jobId);
   assert.equal(done.images.length, 2);
   assert.deepEqual(f.requests[0].body, {
     model: 'second-model',
-    prompt: 'always\nlandscape',
+    prompt: 'landscape',
     n: 2,
     size: '1536x1024',
     output_format: 'png',
@@ -144,9 +265,12 @@ test('preset model selection, per-call image options and canonical request IDs',
   assert.throws(() => f.s.read('other', { jobId: j.jobId, imageId: done.images[0].id }), {
     code: 'NOT_FOUND',
   });
-  assert.throws(() => f.s.generate('one', { requestId: 'missing', connectionId: 'missing' }), {
-    code: 'NOT_FOUND',
-  });
+  assert.throws(
+    () => f.s.generate('one', { input: 'fixture', requestId: 'missing', connectionId: 'missing' }),
+    {
+      code: 'NOT_FOUND',
+    },
+  );
   assert.throws(() => f.s.generate('one', { ...input, model: 'override' }), {
     code: 'INVALID_ARGUMENT',
   });
@@ -154,7 +278,7 @@ test('preset model selection, per-call image options and canonical request IDs',
 test('large results are read in bounded chunks and no raw image is in the job projection', async (t) => {
   const bytes = Buffer.concat([png, Buffer.alloc(imageReadChunkBytes * 5, 42)]);
   const f = fixture(t, { fetcher: async () => response(bytes) });
-  const j = f.s.generate('one', { requestId: 'large' });
+  const j = f.s.generate('one', { input: 'fixture', requestId: 'large' });
   const done = await completed(f.s, j.jobId);
   assert(JSON.stringify(done).length < 1000);
   let offset = 0,
@@ -174,8 +298,8 @@ test('large results are read in bounded chunks and no raw image is in the job pr
 test('cancellation discards late output, holds the transport slot and does not report failure', async (t) => {
   const resolve = [];
   const f = fixture(t, { fetcher: () => new Promise((r) => resolve.push(r)) });
-  const a = f.s.generate('one', { requestId: 'a' }),
-    b = f.s.generate('one', { requestId: 'b' });
+  const a = f.s.generate('one', { input: 'fixture', requestId: 'a' }),
+    b = f.s.generate('one', { input: 'fixture', requestId: 'b' });
   await until(() => resolve.length === 1);
   f.s.cancel('one', a.jobId);
   assert.equal(f.s.get('one', b.jobId).state, 'queued');
@@ -191,8 +315,8 @@ test('preset/key changes cancel only the affected work and owner shutdown forget
   const resolve = [];
   const f = fixture(t, { fetcher: () => new Promise((r) => resolve.push(r)) });
   f.set({ connections: [connection(), connection('two')], defaultConnectionId: 'one' });
-  const a = f.s.generate('one', { requestId: 'a' }),
-    b = f.s.generate('one', { requestId: 'b', connectionId: 'two' });
+  const a = f.s.generate('one', { input: 'fixture', requestId: 'a' }),
+    b = f.s.generate('one', { input: 'fixture', requestId: 'b', connectionId: 'two' });
   await until(() => resolve.length === 2);
   f.s.reconcile('one');
   assert.equal(f.s.get('one', a.jobId).state, 'canceled');
@@ -209,27 +333,28 @@ test('errors are sanitized and reported once; invalid requests never send', asyn
   assert.throws(
     () =>
       f.s.generate('one', {
+        input: 'fixture',
         requestId: 'bad',
         options: { format: 'jpeg', providerOptions: { background: 'transparent' } },
       }),
     { code: 'INVALID_ARGUMENT' },
   );
-  const j = f.s.generate('one', { requestId: 'denied' });
+  const j = f.s.generate('one', { input: 'fixture', requestId: 'denied' });
   await until(() => f.s.get('one', j.jobId).state === 'failed');
   assert.equal(f.s.get('one', j.jobId).error.code, 'IMAGE_AI_AUTH_FAILED');
-  f.s.generate('one', { requestId: 'denied' });
+  f.s.generate('one', { input: 'fixture', requestId: 'denied' });
   assert.equal(f.failures.length, 1);
   assert(!JSON.stringify(f.failures).includes('private-'));
 });
 test('expiry and permission revocation do not regenerate images', async (t) => {
   const f = fixture(t, { resultMs: 20 });
-  const j = f.s.generate('one', { requestId: 'expire' });
+  const j = f.s.generate('one', { input: 'fixture', requestId: 'expire' });
   const done = await completed(f.s, j.jobId);
   await until(() => f.s.get('one', j.jobId).resultExpired);
   assert.throws(() => f.s.read('one', { jobId: j.jobId, imageId: done.images[0].id }), {
     code: 'IMAGE_AI_RESULT_EXPIRED',
   });
-  f.s.generate('one', { requestId: 'expire' });
+  f.s.generate('one', { input: 'fixture', requestId: 'expire' });
   assert.equal(f.requests.length, 1);
   f.deny();
   f.s.reconcile();
@@ -261,17 +386,20 @@ test('adapter rejects malformed image bodies and never follows a returned URL', 
   }
   assert.equal(calls, 3);
 });
-test('empty explicit prompt differs from omission; credentials and prompts stay out of discovery', async (t) => {
+test('empty prompts are rejected; credentials and prompts stay out of discovery', async (t) => {
   const f = fixture(t);
-  assert.throws(() => f.s.generate('one', { requestId: 'empty', additionalPrompt: '' }), {
-    code: 'INVALID_ARGUMENT',
-  });
+  assert.throws(
+    () => f.s.generate('one', { input: 'fixture', requestId: 'empty', additionalPrompt: '' }),
+    {
+      code: 'INVALID_ARGUMENT',
+    },
+  );
   const list = f.s.connections('one');
   assert.equal(list.connections[0].capabilities.textToImage, true);
   assert(!JSON.stringify(list).includes('defaultPrompt'));
-  const j = f.s.generate('one', { requestId: 'default' });
+  const j = f.s.generate('one', { input: 'fixture', requestId: 'default' });
   await completed(f.s, j.jobId);
-  assert.equal(f.requests[0].body.prompt, 'default');
+  assert.equal(f.requests[0].body.prompt, 'fixture');
   assert.deepEqual(
     operationsFor('applet')
       .filter(([k]) => k.startsWith('ai.image.'))
@@ -372,8 +500,8 @@ test('timeouts include queue time and abort running requests without automatic r
   const resolve = [];
   const f = fixture(t, { fetcher: () => new Promise((r) => resolve.push(r)) });
   f.set({ connections: [{ ...connection(), timeoutSeconds: 1 }], defaultConnectionId: 'one' });
-  const a = f.s.generate('one', { requestId: 'timeout-a' }),
-    b = f.s.generate('one', { requestId: 'timeout-b' });
+  const a = f.s.generate('one', { input: 'fixture', requestId: 'timeout-a' }),
+    b = f.s.generate('one', { input: 'fixture', requestId: 'timeout-b' });
   await until(
     () => f.s.get('one', a.jobId).state === 'failed' && f.s.get('one', b.jobId).state === 'failed',
   );
@@ -390,7 +518,7 @@ test('malformed JSON is a response failure and decoder errors do not complete th
     fetcher: async () =>
       new Response('{broken', { headers: { 'Content-Type': 'application/json' } }),
   });
-  const j = f.s.generate('one', { requestId: 'json' });
+  const j = f.s.generate('one', { input: 'fixture', requestId: 'json' });
   await until(() => f.s.get('one', j.jobId).state === 'failed');
   assert.equal(f.s.get('one', j.jobId).error.code, 'IMAGE_AI_INVALID_RESPONSE');
   const g = fixture(t, {
@@ -398,7 +526,7 @@ test('malformed JSON is a response failure and decoder errors do not complete th
       throw Error('invalid pixel data');
     },
   });
-  const k = g.s.generate('one', { requestId: 'decode' });
+  const k = g.s.generate('one', { input: 'fixture', requestId: 'decode' });
   await until(() => g.s.get('one', k.jobId).state === 'failed');
   assert.equal(g.s.get('one', k.jobId).error.code, 'IMAGE_AI_INVALID_RESPONSE');
   assert.equal(g.s.get('one', k.jobId).images, undefined);

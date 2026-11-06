@@ -2701,6 +2701,9 @@ test('image preset settings support dry run, nested defaults, stable IDs and def
   assert.equal(schema.maxItems, undefined);
   assert(!schema.items.find((i) => i.key === 'protocol').writable);
   assert(!schema.items.some((i) => i.key === 'apiKey'));
+  assert(
+    !schema.items.some((i) => ['alwaysPrompt', 'defaultPrompt', 'referenceImages'].includes(i.key)),
+  );
   apply([add], true);
   assert.equal(f.store.value.imageAi.connections.length, 0);
   apply([add]);

@@ -5,6 +5,7 @@ const fs = require('node:fs/promises'),
 const { ImageAiService } = require('../out/main/main/core/image-ai-service');
 const { ImageRegistration } = require('../out/main/main/core/image-registration');
 const { RegisteredImages } = require('../out/main/main/core/registered-images');
+const { readImageReference } = require('../out/main/main/core/image-ai-references');
 const { newImageAiConnection } = require('../out/main/shared/image-ai');
 const png = require('./fixtures/image-ai-png.cjs');
 const until = async (fn) => {
@@ -47,7 +48,6 @@ async function fixture(t, extra = {}) {
     name: 'one',
     authentication: 'none',
     defaultModel: 'fixture',
-    defaultPrompt: 'default',
     mcpEnabled: true,
   };
   const config = { connections: [connection], defaultConnectionId: 'one' };
@@ -76,10 +76,12 @@ async function fixture(t, extra = {}) {
   });
   const input = {
     requestId: 'request',
+    input: 'fixture',
     destination: { folder: 'pictures', name: 'flower', group: 'favorites' },
     options: { count: 2 },
   };
   return {
+    directory,
     files,
     service,
     input,
@@ -98,6 +100,31 @@ async function fixture(t, extra = {}) {
     },
   };
 }
+test('reference reads use validated original library bytes and reject invalid or missing paths', async (t) => {
+  const f = await fixture(t);
+  await fs.writeFile(path.join(f.directory, 'pictures/reference.png'), png);
+  await f.files.refresh();
+  const ref = { file: 'pictures/reference.png' };
+  assert.deepEqual(await readImageReference(f.files, ref, () => true), {
+    bytes: png,
+    mimeType: 'image/png',
+  });
+  assert.deepEqual(await fs.readFile(path.join(f.directory, ref.file)), png);
+  for (const file of ['../outside.png', 'C:/private.png', 'missing.png', 'pictures/vector.svg'])
+    await assert.rejects(
+      readImageReference(f.files, { file }, () => true),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  await assert.rejects(
+    readImageReference(f.files, ref, () => false),
+    { name: 'AbortError' },
+  );
+  await fs.unlink(path.join(f.directory, ref.file));
+  await assert.rejects(
+    readImageReference(f.files, ref, () => true),
+    { code: 'INVALID_ARGUMENT' },
+  );
+});
 async function settled(f, job, state) {
   return until(() => {
     const view = f.service.get('host', job.jobId);

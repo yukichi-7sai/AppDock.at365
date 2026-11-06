@@ -21,11 +21,20 @@ export function parseGenerationSettings(raw: unknown): GenerationSettings {
     (raw.notificationConnectionId !== undefined && !ttsServerId(raw.notificationConnectionId))
   )
     throw Error('Invalid device generation settings');
+  // Retired image prompts are removed only when reading saved device settings.
+  // Public request/settings schemas remain strict and cannot restore these fields.
+  const imageAi = structuredClone(raw.imageAi);
+  if (aiObject(imageAi) && Array.isArray(imageAi.connections))
+    for (const connection of imageAi.connections) {
+      if (!aiObject(connection)) continue;
+      delete connection.alwaysPrompt;
+      delete connection.defaultPrompt;
+    }
   return {
     version: 1,
     ai: parseAiSettings(raw.ai),
     tts: parseTtsConfiguration(raw.tts),
-    imageAi: parseImageAiSettings(raw.imageAi),
+    imageAi: parseImageAiSettings(imageAi),
     ...(raw.notificationConnectionId === undefined
       ? {}
       : { notificationConnectionId: raw.notificationConnectionId }),

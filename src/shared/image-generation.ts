@@ -1,10 +1,10 @@
 import type { ImageAiJob, ImageGenerateInput, ImageGenerationOptions } from './image-ai';
-import type { LibraryEntry } from './library-assets';
+import type { LibraryEntry, LibraryRef } from './library-assets';
 
 export interface ImageGenerationItem {
   job: ImageAiJob;
   input: string;
-  prompt: string;
+  referenceImages: LibraryRef[];
   server: string;
   folder: string;
   options: ImageGenerationOptions;
@@ -16,7 +16,7 @@ export interface ImageGenerationModel {
   folder: string;
   folders: string[];
   defaultConnectionId?: string;
-  servers: { id: string; name: string; defaults: ImageGenerationOptions; defaultPrompt: string }[];
+  servers: { id: string; name: string; defaults: ImageGenerationOptions }[];
   items: ImageGenerationItem[];
 }
 export type ImageGenerationAction =

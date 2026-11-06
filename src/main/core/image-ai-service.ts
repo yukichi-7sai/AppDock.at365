@@ -4,10 +4,12 @@ import type { ImageRegistrationDestination } from '../../shared/image-ai';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { aiObject } from '../../shared/ai';
+import { libraryReference, type LibraryRef } from '../../shared/library-assets';
 import {
   parseImageAiSettings,
   parseImageOptions,
   imageReadChunkBytes,
+  imageReferenceMaxCount,
   type ImageAiSettings,
   type ImageAiConnection,
   type ImageAiJob,
@@ -21,6 +23,7 @@ import {
   OpenAiImageAdapter,
   type ImageAdapter,
   type ImageAdapterRequest,
+  type ImageAdapterImage,
 } from './image-ai-adapter';
 
 type Kind = 'generate' | 'register' | 'read' | 'result' | 'cancel';
@@ -33,6 +36,7 @@ type Job = {
   view: ImageAiJob;
   abort: AbortController;
   request?: ImageAdapterRequest;
+  referenceImages?: LibraryRef[];
   key?: string;
   images?: RegistrationImage[];
   destination?: ImageRegistrationDestination;
@@ -67,6 +71,7 @@ export class ImageAiService {
       failed?(owner: string, id: string, error: { code: string; message: string }): void;
       fetcher?: typeof fetch;
       validateImage?(bytes: Buffer): Promise<unknown>;
+      readReference?(ref: LibraryRef, active: () => boolean): Promise<ImageAdapterImage>;
       adapters?: ImageAdapter[];
       resultMs?: number;
       retentionMs?: number;
@@ -121,7 +126,7 @@ export class ImageAiService {
           ![
             'requestId',
             'connectionId',
-            'additionalPrompt',
+            'referenceImages',
             'input',
             'options',
             ...(register ? ['destination'] : []),
@@ -133,8 +138,12 @@ export class ImageAiService {
       /[\x00-\x1f\x7f]/.test(value.requestId) ||
       (value.connectionId !== undefined &&
         (typeof value.connectionId !== 'string' || !value.connectionId)) ||
-      (value.additionalPrompt !== undefined && typeof value.additionalPrompt !== 'string') ||
-      (value.input !== undefined && typeof value.input !== 'string') ||
+      typeof value.input !== 'string' ||
+      !value.input.trim() ||
+      (value.referenceImages !== undefined &&
+        (!Array.isArray(value.referenceImages) ||
+          value.referenceImages.length > imageReferenceMaxCount ||
+          value.referenceImages.some((ref) => !libraryReference(ref, 'image')))) ||
       (value.options !== undefined && !aiObject(value.options))
     )
       return imageFail('INVALID_ARGUMENT', 'invalidRequest');
@@ -175,9 +184,12 @@ export class ImageAiService {
       return imageFail('IMAGE_AI_AUTH_FAILED', 'authentication');
     }
     if (c.authentication === 'bearer' && !key) imageFail('IMAGE_AI_AUTH_FAILED', 'authentication');
-    const prompt = [c.alwaysPrompt, input.additionalPrompt ?? c.defaultPrompt, input.input ?? '']
-      .filter((p) => p.trim())
-      .join('\n');
+    const prompt = input.input;
+    if (
+      input.referenceImages?.length &&
+      (!this.options.readReference || !this.adapters.get(c.protocol)!.capabilities.imageEditing)
+    )
+      return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     const model = c.defaultModel;
     if (!model.trim() || !prompt.trim()) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     let generationOptions;
@@ -204,6 +216,7 @@ export class ImageAiService {
       signature: generationConfigurationSignature(c),
       key,
       request: { model, prompt, options: generationOptions },
+      referenceImages: structuredClone(input.referenceImages),
       abort: new AbortController(),
       deadline: now + c.timeoutSeconds * 1000,
       view: {
@@ -391,6 +404,7 @@ export class ImageAiService {
     j.view.state = state;
     j.view.updatedAt = new Date().toISOString();
     j.request = undefined;
+    j.referenceImages = undefined;
     j.key = undefined;
     j.view.resultExpiresAt = undefined;
     j.view.resultExpired = undefined;
@@ -444,8 +458,27 @@ export class ImageAiService {
       j.view.updatedAt = new Date().toISOString();
       this.options.changed?.();
       const adapter = this.adapters.get(j.connection.protocol)!;
-      void adapter
-        .generate(j.connection, j.key, j.request!, j.abort.signal)
+      void Promise.resolve()
+        .then(async () => {
+          const active = () => !terminal(j) && !j.abort.signal.aborted && this.valid(j);
+          const request = j.request;
+          if (!request || !active()) return [];
+          const referenceImages: ImageAdapterImage[] = [];
+          for (const ref of j.referenceImages ?? []) {
+            if (!active()) return [];
+            referenceImages.push(await this.options.readReference!(ref, active));
+          }
+          if (!active()) {
+            if (!terminal(j)) this.finish(j, 'canceled');
+            return [];
+          }
+          return adapter.generate(
+            j.connection,
+            j.key,
+            { ...request, referenceImages },
+            j.abort.signal,
+          );
+        })
         .then(async (images) => {
           if (terminal(j)) return;
           try {
@@ -474,7 +507,8 @@ export class ImageAiService {
         })
         .catch((error) => {
           if (!terminal(j)) {
-            if (error instanceof ImageAiError) this.finish(j, 'failed', error);
+            if (!this.valid(j) || j.abort.signal.aborted) this.finish(j, 'canceled');
+            else if (error instanceof ImageAiError) this.finish(j, 'failed', error);
             else
               this.finish(
                 j,

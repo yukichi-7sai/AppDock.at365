@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { aiObject } from '../../shared/ai';
 import { AutomationError } from './appdock-api';
+import { imageReferenceMaxBytes, imageReferenceMaxCount } from '../../shared/image-ai';
 import type {
   ImageAiConnection,
   ImageGenerationOptions,
@@ -29,6 +30,11 @@ export interface ImageAdapterRequest {
   model: string;
   prompt: string;
   options: ImageGenerationOptions;
+  referenceImages?: ImageAdapterImage[];
+}
+export interface ImageAdapterImage {
+  bytes: Buffer;
+  mimeType: string;
 }
 export interface ImageAdapter {
   protocol: ImageAiConnection['protocol'];
@@ -46,7 +52,7 @@ export class OpenAiImageAdapter implements ImageAdapter {
   readonly protocol = 'openai-images';
   readonly capabilities: ImageAiCapabilities = {
     textToImage: true,
-    imageEditing: false,
+    imageEditing: true,
     formats: ['png', 'jpeg', 'webp'],
     progress: false,
     cancellation: 'best-effort',
@@ -54,6 +60,16 @@ export class OpenAiImageAdapter implements ImageAdapter {
   constructor(private fetcher: typeof fetch = fetch) {}
   validate(request: ImageAdapterRequest) {
     if (Array.from(request.prompt).length > 32000) imageFail('INVALID_ARGUMENT', 'invalidRequest');
+    if (
+      (request.referenceImages?.length ?? 0) > imageReferenceMaxCount ||
+      request.referenceImages?.some(
+        (image) =>
+          !['image/png', 'image/jpeg', 'image/webp'].includes(image.mimeType) ||
+          !image.bytes.length ||
+          image.bytes.length >= imageReferenceMaxBytes,
+      )
+    )
+      imageFail('INVALID_ARGUMENT', 'invalidRequest');
   }
   async generate(
     c: ImageAiConnection,
@@ -61,30 +77,49 @@ export class OpenAiImageAdapter implements ImageAdapter {
     request: ImageAdapterRequest,
     signal: AbortSignal,
   ) {
+    this.validate(request);
     const { options: o } = request;
+    const fields = {
+      model: request.model,
+      prompt: request.prompt,
+      n: o.count,
+      size: o.size,
+      output_format: o.format,
+      quality: o.providerOptions.quality,
+      background: o.providerOptions.background,
+      ...(o.providerOptions.compression === undefined
+        ? {}
+        : { output_compression: o.providerOptions.compression }),
+    };
+    const editing = !!request.referenceImages?.length;
+    let body: string | FormData = JSON.stringify(fields);
+    if (editing) {
+      const form = new FormData();
+      for (const [name, value] of Object.entries(fields)) form.append(name, String(value));
+      request.referenceImages!.forEach((image, index) => {
+        form.append(
+          'image[]',
+          new Blob([new Uint8Array(image.bytes)], { type: image.mimeType }),
+          `image-${index + 1}.${image.mimeType === 'image/jpeg' ? 'jpg' : image.mimeType.slice(6)}`,
+        );
+      });
+      body = form;
+    }
     let response: Response | undefined;
     try {
-      response = await this.fetcher(c.baseUrl + '/images/generations', {
-        method: 'POST',
-        redirect: 'error',
-        signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(key ? { Authorization: 'Bearer ' + key } : {}),
+      response = await this.fetcher(
+        c.baseUrl + (editing ? '/images/edits' : '/images/generations'),
+        {
+          method: 'POST',
+          redirect: 'error',
+          signal,
+          headers: {
+            ...(!editing ? { 'Content-Type': 'application/json' } : {}),
+            ...(key ? { Authorization: 'Bearer ' + key } : {}),
+          },
+          body,
         },
-        body: JSON.stringify({
-          model: request.model,
-          prompt: request.prompt,
-          n: o.count,
-          size: o.size,
-          output_format: o.format,
-          quality: o.providerOptions.quality,
-          background: o.providerOptions.background,
-          ...(o.providerOptions.compression === undefined
-            ? {}
-            : { output_compression: o.providerOptions.compression }),
-        }),
-      });
+      );
       if ([401, 403].includes(response.status)) imageFail('IMAGE_AI_AUTH_FAILED', 'authentication');
       if (!response.ok) imageFail('IMAGE_AI_SERVER_ERROR', 'serverError');
       if (

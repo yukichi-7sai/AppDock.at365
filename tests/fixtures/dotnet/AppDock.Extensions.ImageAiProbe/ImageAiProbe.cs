@@ -8,6 +8,8 @@ public sealed class ImageAiProbe : IAppDockExtension
         context.Commands.Register(context.ExtensionId + ".register", "Image registration probe", async token => {
             var accepted = await context.AppDock.CallAsync("ai.image.generateAndRegister", new {
                 requestId = "dotnet-image-registration", input = "dotnet fixture",
+                referenceImages = new[] { new { file = "reference-one.png" } },
+                options = new { providerOptions = new { quality = "high" } },
                 destination = new { folder = "pictures", name = "dotnet" }
             }, token);
             var jobId = accepted.GetProperty("jobId").GetString();

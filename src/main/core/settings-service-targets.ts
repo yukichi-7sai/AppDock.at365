@@ -1081,18 +1081,6 @@ export class SettingsServiceTargets {
         default: '',
       },
       {
-        key: 'alwaysPrompt',
-        title: hostText('settings.aiConnectionDialog.alwaysPrompt'),
-        type: 'string',
-        default: '',
-      },
-      {
-        key: 'defaultPrompt',
-        title: hostText('settings.aiConnectionDialog.defaultPrompt'),
-        type: 'string',
-        default: '',
-      },
-      {
         key: 'timeoutSeconds',
         title: hostText('settings.aiConnectionDialog.timeout'),
         type: 'number',

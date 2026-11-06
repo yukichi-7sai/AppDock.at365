@@ -149,15 +149,23 @@ export function RegisteredImagePreview({
     </span>
   ) : null;
 }
-export function RegisteredImagePicker({
-  current,
-  onSelect,
-  onClose,
-}: {
-  current: RegisteredImageRef | null;
-  onSelect(image: RegisteredImageRef | null, sourceName?: string): Promise<unknown> | void;
+type ImagePickerProps = {
   onClose(): void;
-}) {
+} & (
+  | {
+      multiple?: false;
+      current: RegisteredImageRef | null;
+      onSelect(image: RegisteredImageRef | null, sourceName?: string): Promise<unknown> | void;
+    }
+  | {
+      multiple: true;
+      current: RegisteredImageRef[];
+      onSelect(images: RegisteredImageRef[]): Promise<unknown> | void;
+      selectionError?(images: RegisteredImageRef[]): string;
+    }
+);
+export function RegisteredImagePicker(props: ImagePickerProps) {
+  const { onClose } = props;
   const { t: translate } = useLibraryTranslation();
   const library = useImageLibrary();
   const media = useLibraryMedia();
@@ -167,11 +175,22 @@ export function RegisteredImagePicker({
     },
     [library.api],
   );
-  const [selected, setSelected] = useState(current),
+  const [selected, setSelected] = useState(props.multiple ? null : props.current),
     [folder, setFolder] = useState('*'),
     [group, setGroup] = useState('all'),
     [query, setQuery] = useState(''),
     [registering, setRegistering] = useState(false);
+  const [selectedImages, setSelectedImages] = useState(props.multiple ? props.current : []);
+  const selectionError = props.multiple ? (props.selectionError?.(selectedImages) ?? '') : '';
+  const choose = (ref: RegisteredImageRef) => {
+    if (props.multiple)
+      setSelectedImages((images) =>
+        images.some((image) => image.file === ref.file)
+          ? images.filter((image) => image.file !== ref.file)
+          : [...images, ref],
+      );
+    else setSelected(ref);
+  };
   const applied = useRef(false);
   const [reveal, setReveal] = useState<RegisteredImageRef | null>(null);
   const imageSession = useImageSession(library.api);
@@ -231,7 +250,11 @@ export function RegisteredImagePicker({
     try {
       const ref = await library.api!.register();
       if (ref) {
-        setSelected(ref);
+        if (props.multiple)
+          setSelectedImages((images) =>
+            images.some((image) => image.file === ref.file) ? images : [...images, ref],
+          );
+        else setSelected(ref);
         setGroup('all');
         setFolder('*');
         setQuery('');
@@ -249,7 +272,7 @@ export function RegisteredImagePicker({
       <SettingsDialog
         title={translate('settings.registeredImagePicker.select')}
         description={translate('settings.registeredImagePicker.keepOriginal')}
-        error={[library.error, viewError].filter(Boolean).join('\n')}
+        error={[selectionError, library.error, viewError].filter(Boolean).join('\n')}
         errorTarget={translate('settings.registeredImagePicker.selection')}
         errorAction={
           viewError ? (
@@ -274,6 +297,11 @@ export function RegisteredImagePicker({
         }}
         footerContent={
           <div className="image-picker-summary">
+            {props.multiple && (
+              <span role="status">
+                {translate('images.imageCount', { count: selectedImages.length })}
+              </span>
+            )}
             {media === 'sound' && (
               <SoundPickerControls
                 api={library.api}
@@ -282,36 +310,45 @@ export function RegisteredImagePicker({
                 onError={library.setError}
               />
             )}
-            <div
-              className="image-picker-selected-preview"
-              data-svg={!!selected && /\.svg$/i.test(selected.file)}
-            >
-              <RegisteredImagePreview
-                value={selected}
-                label={translate('settings.registeredImagePicker.selection')}
-              />
-            </div>
-            <span
-              className="image-picker-filename"
-              data-testid="image-picker-filename"
-              title={selected && !assignedImage(selected.file) ? selected.file : undefined}
-            >
-              {selected
-                ? assignedImage(selected.file)
-                  ? translate('images.assigned')
-                  : selected.file
-                : translate('settings.registeredImagePicker.none')}
-            </span>
+            {!props.multiple && (
+              <>
+                <div
+                  className="image-picker-selected-preview"
+                  data-svg={!!selected && /\.svg$/i.test(selected.file)}
+                >
+                  <RegisteredImagePreview
+                    value={selected}
+                    label={translate('settings.registeredImagePicker.selection')}
+                  />
+                </div>
+                <span
+                  className="image-picker-filename"
+                  data-testid="image-picker-filename"
+                  title={selected && !assignedImage(selected.file) ? selected.file : undefined}
+                >
+                  {selected
+                    ? assignedImage(selected.file)
+                      ? translate('images.assigned')
+                      : selected.file
+                    : translate('settings.registeredImagePicker.none')}
+                </span>
+              </>
+            )}
           </div>
         }
         applyLabel={translate('settings.registeredImagePicker.use')}
-        valid={!!library.api && !!selected && !registering}
+        valid={!!library.api && (props.multiple || !!selected) && !selectionError && !registering}
         onClose={() => {
           if (!applied.current) onClose();
         }}
         onApply={async () => {
+          if (props.multiple) {
+            await props.onSelect(selectedImages);
+            applied.current = true;
+            return;
+          }
           if (!selected) return;
-          await onSelect(
+          await props.onSelect(
             library.api?.retain ? await library.api.retain(selected) : selected,
             selected.file.split('/').at(-1),
           );
@@ -321,8 +358,9 @@ export function RegisteredImagePicker({
         <ImagePickerBrowser
           snapshot={library.snapshot}
           selected={selected}
+          selectedImages={props.multiple ? selectedImages : undefined}
           reveal={reveal}
-          onSelect={setSelected}
+          onSelect={choose}
           folder={folder}
           onFolder={setFolder}
           group={group}

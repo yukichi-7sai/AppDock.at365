@@ -1,7 +1,56 @@
 .image-generation-options {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+.image-generation-reference-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.image-generation-reference-list li {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.image-generation-reference-preview {
+  display: block;
+  width: 100%;
+  height: 88px;
+  background: var(--background);
+  border: 0;
+  border-radius: 4px;
+}
+.image-generation-reference-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.image-generation-reference-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 6px 0;
+}
+.image-generation-reference-list p {
+  font-size: 12px;
+}
+.image-generation-reference-list .settings-actions {
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.image-generation-reference-list .settings-action-button {
+  min-width: 32px;
+  padding-inline: 6px;
+}
+.image-generation-reference-empty {
+  color: var(--muted);
+  margin: 8px 0 0;
 }
 .image-generation-options input {
   width: 100%;

@@ -22,11 +22,18 @@ export const imageAiOperations = {
       properties: {
         requestId: { type: 'string', minLength: 1, maxLength: 100 },
         connectionId: { type: 'string', minLength: 1 },
-        input: { type: 'string' },
-        additionalPrompt: {
-          type: 'string',
+        input: { type: 'string', minLength: 1, description: '生成・編集する画像のプロンプト。' },
+        referenceImages: {
+          type: 'array',
           description:
-            '省略時はサーバーの既定プロンプト。空文字で既定だけを省略します。常時プロンプトは必ず追加します。',
+            '今回だけ参照する画像ライブラリーの画像。配列の順に送信します。省略または空配列で文章から生成します。',
+          maxItems: 16,
+          items: {
+            type: 'object',
+            properties: { file: { type: 'string', minLength: 1 } },
+            required: ['file'],
+            additionalProperties: false,
+          },
         },
         options: {
           type: 'object',
@@ -61,7 +68,7 @@ export const imageAiOperations = {
           },
         },
       },
-      required: ['requestId', 'destination'],
+      required: ['requestId', 'input', 'destination'],
       additionalProperties: false,
     },
     annotations: { ...localRead, readOnlyHint: false, idempotentHint: false, openWorldHint: true },

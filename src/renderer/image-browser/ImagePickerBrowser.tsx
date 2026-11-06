@@ -30,6 +30,7 @@ import './image-browser.css';
 export function ImagePickerBrowser({
   snapshot,
   selected,
+  selectedImages,
   reveal,
   onSelect,
   folder,
@@ -51,6 +52,7 @@ export function ImagePickerBrowser({
 }: {
   snapshot: ImageLibrarySnapshot;
   selected: RegisteredImageRef | null;
+  selectedImages?: RegisteredImageRef[];
   reveal: RegisteredImageRef | null;
   onSelect(ref: RegisteredImageRef): void;
   folder: string;
@@ -104,8 +106,9 @@ export function ImagePickerBrowser({
     };
     snapshot.groups.forEach((g) => g.images.forEach(include));
     if (selected && !assignedImage(selected.file)) include(selected);
+    selectedImages?.forEach(include);
     return entries;
-  }, [snapshot, selected]);
+  }, [snapshot, selected, selectedImages]);
   const refs = useMemo(() => [...entries.values()].map((e) => e.ref), [entries]);
   const filtered = useMemo(
     () => filterImageBrowser(refs, snapshot.groups, { folder, group, query }),
@@ -134,7 +137,7 @@ export function ImagePickerBrowser({
   const model: GalleryModel = {
     cardWidth,
     fit: 'contain',
-    selection: 'single',
+    selection: selectedImages ? 'multiple' : 'single',
     empty: t('settings.registeredImagePicker.noMatches'),
     items: filtered.slice(0, limit).map((ref) => {
       const entry = entries.get(imageKey(ref))!;
@@ -150,7 +153,9 @@ export function ImagePickerBrowser({
               : t('services.imageLibraryPage.dimensionsUnavailable'),
         labels: memberships.get(imageKey(ref)) ?? [],
         state: entry.available ? 'ready' : (entry.state ?? 'missing'),
-        selected: !!selected && imageKey(selected) === imageKey(ref),
+        selected: selectedImages
+          ? selectedImages.some((image) => imageKey(image) === imageKey(ref))
+          : !!selected && imageKey(selected) === imageKey(ref),
         selectable: !disabled,
         actions: [],
       };

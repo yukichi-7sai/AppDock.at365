@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-11-07 画像生成の複数参照と品質選択（0.176.0）
+
+- `main`の`e44f03b`、作業ツリー変更なしから開始し、`pull --ff-only`で追跡先が最新であることを確認した。画像生成画面のプロンプト直下に参照画像を常時表示し、共通ピッカーの複数選択・番号・拡大・順序変更・取り外しを追加した。品質はプリセットの既定値から始め、今回だけ変更する。
+- 公開要求へ`referenceImages: {file}[]`を追加し、添付なしはJSONの`/images/generations`、添付ありは`image[]`を繰り返すmultipartの`/images/edits`へ送る。品質は既存の`options.providerOptions.quality`を共用。元データの検証・パス制約・取消と権限の再判定を維持し、元ファイル・プリセットへ添付を保存しない。16枚・1枚50MB未満はOpenAI editsの送信制約に限定し、ライブラリー容量は制限しない。
+- 画像生成専用の`alwaysPrompt`/`defaultPrompt`/`additionalPrompt`を設定UI・設定API・生成APIから撤去し、必須の`input`へ一本化。旧device設定の読込時は廃止項目を取り除き、文章生成AI/TTSは変更しない。公開API・設定項目の変更のため本体を0.176.0へ更新し、汎用Call SDK/Runtimeと未変更Appletの版は維持した。
+- 発行前レビューで要件・既存単一ピッカー・設定移行・画像送信・非同期取消・検証範囲を確認した。参照番号の翻訳補間と操作ボタンの収まりを修正し、ファイルサイズ情報の更新後に上限を判定した。開発UI試行の失敗は翻訳補間と古い.NET fixture DLLが原因で、修正とfixture再ビルド後に成功。版更新による`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`は固定lockfileの再照合で解消した。
+- 固定Node 26.13.0/pnpm 12.15.0による依存照合、型検査、build、画像生成・参照読込・登録・端末設定・操作API・設定API・画像ライブラリー・galleryのunit **167/167件**が成功。multipartの自動boundary・順序・元バイト列・品質、参照の変更によるrequestId衝突、上限・無効パス・SVG・取消、旧設定からの読込を検査した。完全ログは`.artifacts/image-references-{install,typecheck,build,unit}.log`。
+- 開発版と発行EXEで`image-generation-ui-test.cjs`、`image-ai-ui-test.cjs`、`image-library-ui-test.cjs`を直列実行して成功した。生成UI 10項目、設定UI 8項目、ライブラリーUI 10項目。参照の複数選択・並べ替え・SVG拒否・取消時の保持・取り外し後のJSON生成・品質のプリセット非保存・生成結果の登録・拡大・改名・削除、1720×1000と900×620、Node/.NET/MCP/Codexの実通信、重複・所有者分離・許可撤回、既存単一選択・検索・分類・フォーカス・明暗表示・再起動保持を確認した。
+- 標準`publish.bat`は終了0。`A:/40.ARTIFACT/AppDock.at365/`へ発行し、build・発行先・更新ZIPの管理対象**101ファイル**がSHA256一致した。EXE: `f0595fa3095e71a3007f280efd36feff7d74b0facc5ce3be34f30f42d38b5992`。ZIP: `d109796a0762991cc2b3cd78bfc4cd3919d644f17e7a1371bac08e2a9c93db13`（175,193,035 bytes）。
+- 証跡は`.artifacts/image-references-20261107/`。発行前後のソース・試験・依存/ビルド定義**1,148ファイル**のハッシュは一致した。固定EXEのprofileは`image-generation-ui-1793997702675`、`image-ai-ui-1793997711388`、`image-library-ui-1793997718655`。プロセス終了後、今回の9 profile内の専用実行物・runtime関連ファイル1,009件と一時編集スクリプト2件を削除し、hash・ログ・画像・設定・失敗の証跡と共用runtimeを保持した。今回の成功profileは方式ごと3回以内のためフォルダー削除0件。以前の別作業の証跡は変更していない。
+- 有料の実画像生成サーバーへの送信は未実施。通信・保存の確認はローカルfixtureであり、接続先固有のモデル/品質対応や実生成結果は未確認。実装段階ではコミット・push・GitHub Release・実利用先deployを行っていない。
+- コミット前に、検証時の1,148ファイル・成功ログ8件・発行物101ファイルと更新ZIPを再照合し、すべて一致した。影響範囲をレビューし、上記の167件と固定EXEの生成・設定・画像ライブラリー試験を再利用する。追加の製品変更・版更新・再発行は不要。今回の変更だけをstageし、stage/worktree・commit treeの照合を`.artifacts/commit-validation-image-references-20261107/`へ記録する。push・Release・実利用先deployは対象外。
+
 ## 2026-11-07 画像生成とライブラリー登録（0.175.1）
 
 - `main`の`88d78d8`から開始し、変更なし・`origin/main`との一致を`pull --ff-only`で確認した。画像ライブラリーに生成画面を追加し、既存の画像生成設定・認証・待ち行列を共用した。選択中の実フォルダーとグループへ全画像を自動保存し、比較・拡大・名前変更・ごみ箱への削除を提供する。

@@ -14,6 +14,13 @@ const profile = path.join(root, '.artifacts', 'image-generation-ui-' + Date.now(
 const directory = path.join(profile, 'data/assets/images');
 fs.mkdirSync(path.join(directory, 'pictures'), { recursive: true });
 const png = require('../tests/fixtures/image-ai-png.cjs');
+const secondPng = Buffer.concat([png, Buffer.from('reference-two')]);
+fs.writeFileSync(path.join(directory, 'reference-one.png'), png);
+fs.writeFileSync(path.join(directory, 'reference-two.png'), secondPng);
+fs.writeFileSync(
+  path.join(directory, 'unsupported.svg'),
+  '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="red"/></svg>',
+);
 const requests = [],
   checks = [],
   errors = [],
@@ -29,9 +36,27 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
 (async () => {
   try {
     server = http.createServer(async (req, res) => {
-      let raw = '';
-      for await (const part of req) raw += part;
-      const input = JSON.parse(raw);
+      const parts = [];
+      for await (const part of req) parts.push(part);
+      const raw = Buffer.concat(parts);
+      const multipart = req.headers['content-type']?.startsWith('multipart/form-data;');
+      let input;
+      if (multipart) {
+        const form = await new Request('http://fixture', {
+          method: 'POST',
+          headers: req.headers,
+          body: raw,
+        }).formData();
+        input = Object.fromEntries([...form].filter(([name]) => name !== 'image[]'));
+        input.references = await Promise.all(
+          form.getAll('image[]').map(async (file) => ({
+            name: file.name,
+            type: file.type,
+            data: Buffer.from(await file.arrayBuffer()).toString('base64'),
+          })),
+        );
+      } else input = JSON.parse(raw.toString());
+      input.endpoint = req.url;
       requests.push(input);
       if (input.prompt.includes('hold')) {
         held = res;
@@ -61,8 +86,6 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
           baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
           authentication: 'none',
           defaultModel: 'fixture-model',
-          alwaysPrompt: 'always',
-          defaultPrompt: 'default',
           mcpEnabled: true,
         },
       ],
@@ -81,7 +104,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
         id,
         name: id,
         version: '1.0.0',
-        minimumHostVersion: '0.175.0',
+        minimumHostVersion: '0.176.0',
         runtime,
         capabilities: ['appdock-api'],
         commands: [{ id: id + '.register', title: 'Image registration probe' }],
@@ -91,7 +114,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
         fs.writeFileSync(
           path.join(dir, 'index.cjs'),
           `exports.activate = async c => c.commands.register('${id}.register', 'Image registration probe', async () => {
-          const input = {requestId:'node-image-registration', input:'node fixture', destination:{folder:'pictures',name:'node'}};
+          const input = {requestId:'node-image-registration', input:'node fixture', referenceImages:[{file:'reference-one.png'}], options:{providerOptions:{quality:'medium'}}, destination:{folder:'pictures',name:'node'}};
           const accepted = await c.appdock.call('ai.image.generateAndRegister', input);
           const repeated = await c.appdock.call('ai.image.generateAndRegister', input);
           if (accepted.jobId !== repeated.jobId) throw Error('duplicate request');
@@ -153,7 +176,36 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       await dialog().getByLabel('保存先フォルダー', { exact: true }).inputValue(),
       'pictures',
     );
-    await dialog().getByLabel('生成したい画像', { exact: true }).fill('flowers');
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('flowers');
+    assert.equal(await dialog().getByLabel('追加プロンプト', { exact: true }).count(), 0);
+    await dialog().getByLabel('品質', { exact: true }).selectOption('high');
+    await dialog().getByRole('button', { name: '参照画像を選ぶ', exact: true }).click();
+    const picker = page.locator('dialog.image-picker-dialog');
+    await picker.waitFor();
+    for (const file of ['reference-one.png', 'reference-two.png'])
+      await picker
+        .locator('[data-image-id]')
+        .filter({ hasText: file })
+        .locator('input[type=checkbox]')
+        .check();
+    await picker.getByRole('button', { name: '画像を使う', exact: true }).click();
+    await picker.waitFor({ state: 'detached' });
+    assert.equal(await dialog().locator('[data-reference-file]').count(), 2);
+    await dialog().getByRole('button', { name: '参照画像を選ぶ', exact: true }).click();
+    await picker.waitFor();
+    await picker
+      .locator('[data-image-id]')
+      .filter({ hasText: 'unsupported.svg' })
+      .locator('input[type=checkbox]')
+      .check();
+    assert(await picker.getByRole('button', { name: '画像を使う', exact: true }).isDisabled());
+    await picker.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.equal(await dialog().locator('[data-reference-file]').count(), 2);
+    await dialog().getByRole('button', { name: '参照画像2を前へ', exact: true }).click();
+    assert.equal(
+      await dialog().locator('[data-reference-file]').first().getAttribute('data-reference-file'),
+      'reference-two.png',
+    );
     await dialog().getByLabel('保存名', { exact: true }).fill('flowers');
     await dialog().getByLabel('生成枚数', { exact: true }).fill('2');
     await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();
@@ -169,7 +221,19 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       require('./test-settings.cjs').read(profile).imageLibrary.groups[0].images.length,
       2,
     );
-    assert.equal(requests[0].prompt, 'always\ndefault\nflowers');
+    assert.equal(requests[0].prompt, 'flowers');
+    assert.equal(requests[0].endpoint, '/v1/images/edits');
+    assert.equal(requests[0].quality, 'high');
+    assert.deepEqual(
+      requests[0].references.map((image) => image.data),
+      [secondPng, png].map((bytes) => bytes.toString('base64')),
+    );
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'reference-one.png')), png);
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'reference-two.png')), secondPng);
+    const preset = require('./test-settings.cjs').read(profile).imageAi.connections[0];
+    assert.equal(preset.defaults.providerOptions.quality, 'auto');
+    assert.equal(preset.referenceImages, undefined);
+    assert.equal(preset.alwaysPrompt, undefined);
     await until(
       () =>
         dialog()
@@ -181,7 +245,10 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
           ),
       'result thumbnails',
     );
-    check('selected folder/group, two exact PNGs, preset prompt, unique names and thumbnails');
+    check('selected folder/group, two exact PNGs, single prompt, unique names and thumbnails');
+    check(
+      'multiple references, ordered multipart originals and per-generation quality without changing preset',
+    );
     await dialog().locator('.image-generation-thumbnail').first().click();
     await page.locator('dialog.library-preview-dialog').waitFor();
     await page
@@ -212,10 +279,29 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     ]) {
       await app.resize(width, height);
       await page.screenshot({ path: path.join(profile, `layout-${width}.png`) });
+      await dialog()
+        .locator('.sound-generation-form')
+        .evaluate((element) => {
+          element.scrollTop = 0;
+        });
+      await page.screenshot({ path: path.join(profile, `references-${width}.png`) });
       assert(await dialog().getByRole('button', { name: '閉じる', exact: true }).isVisible());
       assert(await dialog().evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
     }
-    await dialog().getByLabel('生成したい画像', { exact: true }).fill('hold');
+    await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
+    await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('text only');
+    await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();
+    await until(
+      async () =>
+        (await model()).items.some(
+          (item) => item.input === 'text only' && item.job.state === 'completed',
+        ),
+      'text only generation',
+    );
+    assert.equal(requests.at(-1).endpoint, '/v1/images/generations');
+    check('removing references preserves original files and restores text-only JSON generation');
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('hold');
     await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();
     await until(() => held, 'pending generation');
     await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
@@ -244,6 +330,8 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       assert(job.images.every((image) => image.ref && !image.data));
       for (const image of job.images)
         assert.deepEqual(fs.readFileSync(path.join(directory, image.ref.file)), png);
+      assert.equal(requests.at(-1).endpoint, '/v1/images/edits');
+      assert.equal(requests.at(-1).references[0].data, png.toString('base64'));
       check(runtime + ' generic AppDock call registers images without returning binary');
     }
     const registered = [];
@@ -276,10 +364,21 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       const args = {
         requestId: 'same-id',
         input: receiver,
+        referenceImages: [{ file: 'reference-one.png' }],
+        options: { providerOptions: { quality: 'low' } },
         destination: { folder: 'pictures', name: receiver },
       };
       const accepted = (await call('appdock_image_generate_and_register', args)).structuredContent;
       assert.equal(accepted.completion, 'accepted');
+      assert(
+        (
+          await call('appdock_image_generate_and_register', {
+            ...args,
+            requestId: 'retired',
+            additionalPrompt: 'old',
+          })
+        ).isError,
+      );
       assert.equal(
         (await call('appdock_image_generate_and_register', args)).structuredContent.jobId,
         accepted.jobId,
@@ -290,6 +389,8 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
         return job?.state === 'completed' && job;
       }, receiver + ' registration');
       assert(job.images.every((image) => image.ref && !image.data));
+      assert.equal(requests.at(-1).endpoint, '/v1/images/edits');
+      assert.equal(requests.at(-1).quality, 'low');
       registered.push(job);
       if (registered.length === 2)
         assert((await call('appdock_image_get_job', { jobId: registered[0].jobId })).isError);
@@ -306,6 +407,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     check('revoking the image grant prevents new generation on both shared receiver paths');
     assert.deepEqual(errors, []);
   } catch (error) {
+    if (page) await page.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     errors.push(error.stack);
     process.exitCode = 1;
   } finally {

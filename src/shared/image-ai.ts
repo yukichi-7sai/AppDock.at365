@@ -3,6 +3,10 @@ import { aiId, aiObject } from './ai';
 import type { LibraryRef } from './library-assets';
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
+export const imageQualities = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+// OpenAI Images edits protocol limits, independent of library storage capacity.
+export const imageReferenceMaxCount = 16;
+export const imageReferenceMaxBytes = 50_000_000;
 export interface ImageGenerationOptions {
   size: string;
   count: number;
@@ -21,8 +25,6 @@ export interface ImageAiConnection {
   baseUrl: string;
   authentication: 'none' | 'bearer';
   defaultModel: string;
-  alwaysPrompt: string;
-  defaultPrompt: string;
   timeoutSeconds: number;
   defaults: ImageGenerationOptions;
 }
@@ -33,8 +35,8 @@ export interface ImageAiSettings {
 export interface ImageGenerateInput {
   requestId: string;
   connectionId?: string;
-  additionalPrompt?: string;
-  input?: string;
+  input: string;
+  referenceImages?: LibraryRef[];
   options?: Partial<Omit<ImageGenerationOptions, 'providerOptions'>> & {
     providerOptions?: Partial<ImageGenerationOptions['providerOptions']>;
   };
@@ -105,8 +107,6 @@ export const newImageAiConnection = (id: string): ImageAiConnection => ({
   baseUrl: 'https://api.openai.com/v1',
   authentication: 'bearer',
   defaultModel: '',
-  alwaysPrompt: '',
-  defaultPrompt: '',
   timeoutSeconds: 600,
   defaults: {
     size: 'auto',
@@ -179,8 +179,6 @@ export function parseImageAiSettings(value: unknown): ImageAiSettings {
       'baseUrl',
       'authentication',
       'defaultModel',
-      'alwaysPrompt',
-      'defaultPrompt',
       'timeoutSeconds',
       'defaults',
     ]);
@@ -189,9 +187,7 @@ export function parseImageAiSettings(value: unknown): ImageAiSettings {
       !aiId(c.id) ||
       c.protocol !== 'openai-images' ||
       !['none', 'bearer'].includes(String(c.authentication)) ||
-      ['name', 'baseUrl', 'defaultModel', 'alwaysPrompt', 'defaultPrompt'].some(
-        (k) => typeof c[k] !== 'string',
-      ) ||
+      ['name', 'baseUrl', 'defaultModel'].some((k) => typeof c[k] !== 'string') ||
       !String(c.name).trim() ||
       !Number.isSafeInteger(c.timeoutSeconds) ||
       Number(c.timeoutSeconds) < 1 ||

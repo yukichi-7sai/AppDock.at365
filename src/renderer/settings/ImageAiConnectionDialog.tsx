@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
-import { SettingsInput, SettingsTextarea, SettingsUrlInput } from '../settings-ui/SettingsInput';
+import { SettingsInput, SettingsUrlInput } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
 import {
   newImageAiConnection,
@@ -40,11 +40,7 @@ export function ImageAiConnectionDialog({
   const [compression, setCompression] = useState(
     String(draft.defaults.providerOptions.compression ?? ''),
   );
-  const titles = [
-    t('settings.aiConnectionDialog.tab.connection'),
-    t('imageAi.generationTab'),
-    t('imageAi.promptTab'),
-  ];
+  const titles = [t('settings.aiConnectionDialog.tab.connection'), t('imageAi.generationTab')];
   const patch = (value: Partial<ImageAiConnection>) => setDraft((v) => ({ ...v, ...value }));
   const options = (value: Partial<ImageGenerationOptions>) =>
     setDraft((v) => ({ ...v, defaults: { ...v.defaults, ...value } }));
@@ -93,13 +89,13 @@ export function ImageAiConnectionDialog({
             onKeyDown={(e) => {
               const next =
                 e.key === 'ArrowRight'
-                  ? (i + 1) % 3
+                  ? (i + 1) % titles.length
                   : e.key === 'ArrowLeft'
-                    ? (i + 2) % 3
+                    ? (i + titles.length - 1) % titles.length
                     : e.key === 'Home'
                       ? 0
                       : e.key === 'End'
-                        ? 2
+                        ? titles.length - 1
                         : -1;
               if (next >= 0) {
                 e.preventDefault();
@@ -274,35 +270,6 @@ export function ImageAiConnectionDialog({
             />
           </SettingsField>
         </div>
-      </SettingsSection>
-      <SettingsSection
-        variant="group"
-        className="server-editor-panel"
-        role="tabpanel"
-        id={`${id}-panel-2`}
-        aria-labelledby={`${id}-tab-2`}
-        hidden={tab !== 2}
-      >
-        <SettingsField
-          settingKey="alwaysPrompt"
-          title={t('settings.aiConnectionDialog.alwaysPrompt')}
-        >
-          <SettingsTextarea
-            aria-label={t('settings.aiConnectionDialog.alwaysPrompt')}
-            value={draft.alwaysPrompt}
-            onChange={(e) => patch({ alwaysPrompt: e.target.value })}
-          />
-        </SettingsField>
-        <SettingsField
-          settingKey="defaultPrompt"
-          title={t('settings.aiConnectionDialog.defaultPrompt')}
-        >
-          <SettingsTextarea
-            aria-label={t('settings.aiConnectionDialog.defaultPrompt')}
-            value={draft.defaultPrompt}
-            onChange={(e) => patch({ defaultPrompt: e.target.value })}
-          />
-        </SettingsField>
       </SettingsSection>
     </SettingsDialog>
   );

@@ -1,30 +1,32 @@
 # 画像生成AI
 
-設定 → 画像生成AIで、接続先と生成設定をまとめたプリセットサーバーを複数登録する。現在はOpenAI Images APIの文章から画像生成に対応する。登録数の固定上限は設けない。同じ接続先にも、モデル・品質・サイズ・プロンプトの異なる登録を作成できる。
+設定 → 画像生成AIで、接続先と生成設定をまとめたプリセットサーバーを複数登録する。OpenAI Images APIの文章からの生成と、参照画像を使う生成に対応する。登録数の固定上限は設けない。同じ接続先にも、モデル・品質・サイズの異なる登録を作成できる。プロンプトと参照画像は生成時に指定する。
 
 ## 設定と保存
 
-一覧の追加・編集は共通ダイアログで行う。「接続」「生成設定」「プロンプト」の入力を保持し、OKで登録と認証を原子的に保存する。キャンセルは保存しない。IDは追加時に生成し、改名・並べ替えでは変わらない。IDは接続タブで確認できる。最初の登録を既定に選び、既定登録を削除した場合は未選択にする。
+一覧の追加・編集は共通ダイアログで行う。「接続」「生成設定」の入力を保持し、OKで登録と認証を原子的に保存する。キャンセルは保存しない。IDは追加時に生成し、改名・並べ替えでは変わらない。IDは接続タブで確認できる。最初の登録を既定に選び、既定登録を削除した場合は未選択にする。
 
-- 接続は登録名、サーバーID、サーバーの種類、APIのURL、認証、MCPからの利用許可の順に配置する。OpenAIのURLは `https://api.openai.com/v1`。生成時に `/images/generations` を付加する。
+- 接続は登録名、サーバーID、サーバーの種類、APIのURL、認証、MCPからの利用許可の順に配置する。OpenAIのURLは `https://api.openai.com/v1`。添付なしは `/images/generations` へJSON、添付ありは `/images/edits` へmultipart/form-dataで送信する。
 - 生成設定: モデルID、画像サイズ、枚数、PNG/JPEG/WebP、品質、背景、圧縮品質、待ち時間。モデルIDは利用する画像生成モデルを入力する。モデルの自動列挙は行わない。
-- プロンプト: 「いつも加えるプロンプト」と「指定がないときのプロンプト」。alwaysPrompt、今回のadditionalPrompt（省略時はdefaultPrompt）、入力データinputの順で、空白だけの部分を除いて改行で結合し、送信先のpromptへ渡す。明示した空文字のadditionalPromptは既定プロンプトを抑制する。合成結果が空なら送信しない。
+- プロンプトは生成時の`input`だけをそのまま送信する。空欄・空白だけの入力は送信しない。プリセットにプロンプトや参照画像を保存しない。
 
 通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。ダイアログのMCP利用許可とともに`data/settings-<端末名>.json`の`generationAi.imageAi`へ保存する。[生成AIの端末別設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
 
-設定ページの「画像生成の試験」は選択したサーバー登録のモデルで生成し、生成画像を表示する。空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
+設定ページの「画像生成の試験」は選択したサーバー登録のモデルと入力したプロンプトで生成し、生成画像を表示する。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
 
-OpenAIの現在の生成契約に合わせ、枚数は1～10、プロンプトは結合後32,000文字以内。サイズ・品質の対応範囲はモデルに依存する。圧縮品質はJPEG/WebPのみ0～100、透過背景はPNG/WebPのみ。PNGでは圧縮品質を空欄にする。待ち時間は待機列を含み、既定600秒。HTTP失敗・取消時の自動再送、他サーバーへの自動切替は行わない。旧DALL-EのURL返却や画像編集は対象外。
+OpenAIの生成契約に合わせ、枚数は1～10、プロンプトは32,000文字以内。サイズ・品質の対応範囲はモデルに依存する。圧縮品質はJPEG/WebPのみ0～100、透過背景はPNG/WebPのみ。PNGでは圧縮品質を空欄にする。待ち時間は待機列を含み、既定600秒。HTTP失敗・取消時の自動再送、他サーバーへの自動切替は行わない。旧DALL-EのURL返却とマスク指定は対象外。
 
 ## 画像ライブラリーから生成
 
-画像ライブラリーの「画像を生成」で共通ダイアログを開く。選択中の実フォルダーとグループを引き継ぎ、生成した全画像を自動で追加する。保存名は拡張子なしで指定し、空欄なら自動命名する。同名ファイルは連番で別々に保存する。サーバー、追加プロンプト、サイズ・枚数・形式は今回だけ変更でき、登録済みの設定を書き換えない。
+画像ライブラリーの「画像を生成」で共通ダイアログを開く。選択中の実フォルダーとグループを引き継ぎ、生成した全画像を自動で追加する。保存名は拡張子なしで指定し、空欄なら自動命名する。同名ファイルは連番で別々に保存する。プロンプト直下に参照画像欄を常時表示し、共通の画像選択画面で複数選択する。番号付きサムネイルから拡大・順序変更・取り外しができ、元ファイルは変更しない。サーバー、品質、サイズ・枚数・形式は今回だけ変更でき、登録済みの設定を書き換えない。品質の初期値は選択したサーバーの既定値。
+
+参照画像は画像ライブラリー内のPNG/JPEG/WebPを使う。OpenAI Images editsのmultipart契約に従い1枚50MB未満、最大16枚で、配列順に`image[]`を繰り返して送信する。サムネイルではなく検証済みの元データを読み込み、送信ファイル名にローカルパスは含めない。SVG・削除済み画像・上限超過は送信前に拒否する。この上限は送信プロトコルにのみ適用し、画像ライブラリー自体の保存容量や登録件数を制限しない。対応範囲は[OpenAIのImages edits仕様](https://developers.openai.com/api/reference/go/resources/images/methods/edit)を参照。
 
 結果を並べて比較し、サムネイルから共通の拡大表示を開く。保存後の名前変更・ごみ箱への削除はライブラリーの共通処理を使う。生成条件を各結果へ残す。閉じるときは処理中・未保存の結果があれば確認し、このダイアログのジョブだけを取り消す。保存済み画像と外部APIのジョブは残る。
 
 ## Applet・MCP共通API
 
-最低ホスト版0.175.0。Appletは`appdock-api` capabilityと各操作の許可が必要。MCPサーバーとCodex連携は同じ操作カタログを使う。MCP全体の`allowUseImageAi`と接続ごとの`mcpEnabled`は既定OFFで、Appletの`useImageAi`とは独立して端末別に保存する。
+最低ホスト版0.176.0。Appletは`appdock-api` capabilityと各操作の許可が必要。MCPサーバーとCodex連携は同じ操作カタログを使う。MCP全体の`allowUseImageAi`と接続ごとの`mcpEnabled`は既定OFFで、Appletの`useImageAi`とは独立して端末別に保存する。
 
 | 操作 | MCPツール名 | 必要な許可 |
 | --- | --- | --- |
@@ -36,12 +38,14 @@ OpenAIの現在の生成契約に合わせ、枚数は1～10、プロンプト�
 
 接続一覧は登録ID・名前・種類・登録のモデル・対応機能・既定IDを返す。秘密値やプロンプトは返さず、サーバーへ通信しない。MCPでは公開を許可した接続だけを列挙し、明示指定でも非公開接続の利用を拒否する。
 
-生成登録の引数は`{requestId, connectionId?, additionalPrompt?, input?, options?, destination}`。destinationは`{folder, name?, group?}`。folderは既存の実フォルダーの相対パスで、ルートは空文字。nameは拡張子なしの保存名、groupは既存グループID。パス・グループ・書込可能性を生成前に検証する。モデルは接続設定から確定し、要求のmodel指定は拒否する。optionsのsize/count/formatとproviderOptions（quality/background/compression）は接続の既定値へ部分適用する。
+生成登録の引数は`{requestId, connectionId?, input, referenceImages?, options?, destination}`。`referenceImages`は`{file:string}[]`で、ライブラリー内の相対パスを指定する。省略・空配列は文章から生成する。URL・絶対パス・Base64入力は受け付けない。destinationは`{folder, name?, group?}`。folderは既存の実フォルダーの相対パスで、ルートは空文字。nameは拡張子なしの保存名、groupは既存グループID。パス・グループ・書込可能性を生成前に検証する。モデルは接続設定から確定し、要求のmodel指定は拒否する。optionsのsize/count/formatとproviderOptions（quality/background/compression）は接続の既定値へ部分適用する。品質は既存の`options.providerOptions.quality`を使い、追加のAPIを設けない。
 
 ```ts
 const accepted = await context.appdock.call('ai.image.generateAndRegister', {
   requestId: crypto.randomUUID(),
   input: '水彩の花',
+  referenceImages: [{ file: 'references/flower.png' }],
+  options: { providerOptions: { quality: 'high' } },
   destination: { folder: '', name: 'flower' },
 });
 const job = await context.appdock.call('ai.image.jobs.get', { jobId: accepted.jobId });

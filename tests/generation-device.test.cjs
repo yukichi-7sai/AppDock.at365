@@ -336,7 +336,6 @@ test('image MCP presets are filtered while generation plus registration is publi
     name: 'One',
     authentication: 'none',
     defaultModel: 'm',
-    defaultPrompt: 'image',
   };
   const config = { connections: [c], defaultConnectionId: 'one' };
   const s = new ImageAiService({
@@ -345,7 +344,9 @@ test('image MCP presets are filtered while generation plus registration is publi
     canUse: () => true,
   });
   t.after(() => s.close());
-  assert.throws(() => s.generate('mcp:0', { requestId: 'denied' }), { code: 'API_DISABLED' });
+  assert.throws(() => s.generate('mcp:0', { requestId: 'denied', input: 'subject' }), {
+    code: 'API_DISABLED',
+  });
   assert.equal(s.connections('mcp:0').connections.length, 0);
   c.mcpEnabled = true;
   assert.equal(s.connections('mcp:0').connections.length, 1);

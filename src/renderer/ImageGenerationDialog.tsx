@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ImageGenerationAction, ImageGenerationModel } from '../shared/image-generation';
-import type { ImageFormat } from '../shared/image-ai';
-import { libraryBasename, libraryPath, type LibraryEntry } from '../shared/library-assets';
+import { imageQualities, type ImageFormat } from '../shared/image-ai';
+import {
+  libraryBasename,
+  libraryPath,
+  type LibraryEntry,
+  type LibraryRef,
+} from '../shared/library-assets';
+import { ImageGenerationReferences, imageReferencesValid } from './ImageGenerationReferences';
 import { useHostTranslation } from './HostTranslation';
 import { SettingsModal, SettingsDialog } from './settings-ui/SettingsModal';
 import { SettingsField, SettingsActions } from './settings-ui/SettingsSections';
@@ -51,8 +57,8 @@ export function ImageGenerationDialog({
   const [serverId, setServerId] = useState(model.defaultConnectionId ?? '');
   const [input, setInput] = useState('');
   const [name, setName] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [useDefault, setUseDefault] = useState(true);
+  const [referenceImages, setReferenceImages] = useState<LibraryRef[]>([]);
+  const [quality, setQuality] = useState<string>();
   const [size, setSize] = useState<string>();
   const [count, setCount] = useState<string>();
   const [format, setFormat] = useState<ImageFormat>();
@@ -148,6 +154,7 @@ export function ImageGenerationDialog({
                 setSize(undefined);
                 setCount(undefined);
                 setFormat(undefined);
+                setQuality(undefined);
               }}
             >
               <option value="" disabled>
@@ -171,25 +178,12 @@ export function ImageGenerationDialog({
               onChange={(e) => setInput(e.target.value)}
             />
           </SettingsField>
-          <SettingsField title={t('imageGeneration.prompt')}>
-            <label className="sound-generation-default">
-              <input
-                type="checkbox"
-                checked={useDefault}
-                onChange={(e) => setUseDefault(e.target.checked)}
-              />
-              {t('soundGeneration.useDefault')}
-            </label>
-            <SettingsTextarea
-              commitOn="input"
-              newlineOnEnter
-              rows={2}
-              aria-label={t('imageGeneration.prompt')}
-              disabled={useDefault}
-              value={useDefault ? (server?.defaultPrompt ?? '') : prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
-          </SettingsField>
+          <ImageGenerationReferences
+            value={referenceImages}
+            entries={library.snapshot.images}
+            onChange={setReferenceImages}
+            onPreview={setPreview}
+          />
           <SettingsField
             title={t('imageGeneration.name')}
             description={t('imageGeneration.nameHint')}
@@ -201,6 +195,17 @@ export function ImageGenerationDialog({
             />
           </SettingsField>
           <div className="image-generation-options">
+            <SettingsField title={t('imageAi.quality')}>
+              <select
+                aria-label={t('imageAi.quality')}
+                value={quality ?? server?.defaults.providerOptions.quality ?? 'auto'}
+                onChange={(e) => setQuality(e.target.value)}
+              >
+                {imageQualities.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </SettingsField>
             <SettingsField title={t('imageAi.size')}>
               <SettingsInput
                 aria-label={t('imageAi.size')}
@@ -233,7 +238,13 @@ export function ImageGenerationDialog({
           <SettingsActions>
             <SettingsButton
               className="primary"
-              disabled={pending || !server || !model.folders.includes(folder)}
+              disabled={
+                pending ||
+                !server ||
+                !input.trim() ||
+                !model.folders.includes(folder) ||
+                !imageReferencesValid(referenceImages, library.snapshot.images)
+              }
               onClick={() =>
                 run({
                   kind: 'generate',
@@ -243,11 +254,12 @@ export function ImageGenerationDialog({
                     requestId: crypto.randomUUID(),
                     connectionId: serverId,
                     input,
-                    ...(useDefault ? {} : { additionalPrompt: prompt }),
+                    ...(referenceImages.length ? { referenceImages } : {}),
                     options: {
                       ...(size === undefined ? {} : { size }),
                       ...(count === undefined ? {} : { count: Number(count) }),
                       ...(format === undefined ? {} : { format }),
+                      ...(quality === undefined ? {} : { providerOptions: { quality } }),
                     },
                   },
                 })
@@ -269,7 +281,7 @@ export function ImageGenerationDialog({
                 className="sound-generation-item"
                 data-job-id={item.job.jobId}
               >
-                <strong>{item.input || item.prompt}</strong>
+                <strong>{item.input}</strong>
                 <p role="status">{t(`imageGeneration.state.${item.job.state}`)}</p>
                 {item.job.error && <p role="alert">{item.job.error.message}</p>}
                 {item.job.state === 'unsaved' && item.job.resultExpired && (
@@ -339,8 +351,14 @@ export function ImageGenerationDialog({
                     </dd>
                     <dt>{t('soundGeneration.folder')}</dt>
                     <dd>{item.folder || t('imageGeneration.rootFolder')}</dd>
-                    <dt>{t('imageGeneration.prompt')}</dt>
-                    <dd>{item.prompt}</dd>
+                    <dt>
+                      {t('imageGeneration.references', { count: item.referenceImages.length })}
+                    </dt>
+                    <dd>
+                      {item.referenceImages
+                        .map((ref, index) => `${index + 1}. ${ref.file}`)
+                        .join('\n') || t('imageGeneration.noReferences')}
+                    </dd>
                     <dt>{t('imageGeneration.input')}</dt>
                     <dd>{item.input}</dd>
                     <dt>{t('imageGeneration.options')}</dt>
