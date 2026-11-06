@@ -53,7 +53,6 @@
   margin: 0;
   font-size: 1em;
 }
-.sound-generation-note,
 .sound-generation-footer-note {
   color: var(--muted);
   overflow-wrap: anywhere;
@@ -67,16 +66,41 @@
 .sound-generation-conditions {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  margin: 0;
   padding-top: 8px;
+}
+.sound-generation-conditions dt {
+  color: var(--muted);
+  margin-top: 8px;
+}
+.sound-generation-conditions dd {
+  margin: 4px 0 0;
+}
+.sound-generation-item .settings-field-label strong,
+.sound-generation-information {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.5;
 }
 .sound-generation-status {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 1.5em;
   color: var(--muted);
+}
+.sound-generation-information {
+  min-width: 0;
+}
+.sound-generation-actions {
+  box-sizing: content-box;
+  min-height: var(--settings-control-height, 32px);
+  flex-wrap: nowrap;
 }
 .sound-generation-item details {
   margin-top: 8px;
+  line-height: 1.5;
 }
 .sound-generation-footer-note {
   margin-right: auto;

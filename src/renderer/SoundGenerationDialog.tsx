@@ -211,6 +211,27 @@ export function SoundGenerationDialog({
                 canceled: 'soundGeneration.canceled',
               } as const
             )[item.state];
+            const folderName = item.folder || t('soundGeneration.rootFolder');
+            const status = playback
+              ? t(
+                  playback.state === 'playing'
+                    ? 'sounds.playing'
+                    : playback.state === 'waiting'
+                      ? 'sounds.waiting'
+                      : 'sounds.loading',
+                )
+              : statusKey
+                ? t(statusKey)
+                : undefined;
+            const information = [
+              status,
+              folderName,
+              ...(item.seconds === undefined
+                ? []
+                : ['WAV', t('soundGeneration.seconds', { seconds: item.seconds.toFixed(1) })]),
+            ]
+              .filter(Boolean)
+              .join(' · ');
             return (
               <div
                 className="sound-generation-item"
@@ -219,33 +240,18 @@ export function SoundGenerationDialog({
                 aria-busy={itemBusy}
               >
                 <SettingsField
-                  title={
-                    item.file
-                      ? libraryBasename(item.file)
-                      : item.text.slice(0, 60) + (item.text.length > 60 ? '…' : '')
-                  }
+                  title={item.file ? libraryBasename(item.file) : item.text}
                   error={item.error}
                 >
-                  <div role="status" className="sound-generation-status">
-                    {item.busy && item.state !== 'queued' && (
-                      <span
-                        className="settings-action-spinner"
-                        data-pending="true"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span>
-                      {statusKey ? t(statusKey) : item.folder || t('soundGeneration.rootFolder')}
-                      {item.seconds !== undefined &&
-                        ` · WAV · ${t('soundGeneration.seconds', { seconds: item.seconds.toFixed(1) })}`}
-                    </span>
+                  <div role="status" className="sound-generation-status" title={information}>
+                    <span
+                      className="settings-action-spinner"
+                      data-pending={item.busy && item.state !== 'queued'}
+                      aria-hidden="true"
+                    />
+                    <span className="sound-generation-information">{information}</span>
                   </div>
-                  {item.state !== 'saved' && (
-                    <div className="sound-generation-note">
-                      {item.folder || t('soundGeneration.rootFolder')}
-                    </div>
-                  )}
-                  <SettingsActions>
+                  <SettingsActions className="sound-generation-actions">
                     {cancellable && (
                       <SettingsButton
                         icon
@@ -339,30 +345,28 @@ export function SoundGenerationDialog({
                       </SettingsButton>
                     )}
                   </SettingsActions>
-                  {playback && (
-                    <div role="status">
-                      {t(
-                        playback.state === 'playing'
-                          ? 'sounds.playing'
-                          : playback.state === 'waiting'
-                            ? 'sounds.waiting'
-                            : 'sounds.loading',
-                      )}
-                    </div>
-                  )}
                   <details>
                     <summary>{t('soundGeneration.conditions')}</summary>
-                    <div className="sound-generation-conditions">
-                      {item.text}
-                      <br />
-                      {item.server}
-                      {item.instructions && (
+                    <dl className="sound-generation-conditions">
+                      {item.file && (
                         <>
-                          <br />
-                          {item.instructions}
+                          <dt>{t('soundGeneration.filename')}</dt>
+                          <dd>{libraryBasename(item.file)}</dd>
                         </>
                       )}
-                    </div>
+                      <dt>{t('soundGeneration.folder')}</dt>
+                      <dd>{folderName}</dd>
+                      <dt>{t('soundGeneration.text')}</dt>
+                      <dd>{item.text}</dd>
+                      <dt>{t('soundGeneration.server')}</dt>
+                      <dd>{item.server}</dd>
+                      {item.instructions && (
+                        <>
+                          <dt>{t('soundGeneration.instructions')}</dt>
+                          <dd>{item.instructions}</dd>
+                        </>
+                      )}
+                    </dl>
                   </details>
                 </SettingsField>
               </div>

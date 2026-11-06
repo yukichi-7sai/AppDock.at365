@@ -22,6 +22,7 @@ settings.soundLibrary = { groups: [{ id: 'notice', name: '通知', files: [] }] 
 const requests = [],
   checks = [],
   errors = [],
+  layouts = [],
   held = [];
 let mode = 'success',
   app,
@@ -73,6 +74,26 @@ async function submit(text) {
 async function closeDialog() {
   await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
   await dialog().waitFor({ state: 'hidden' });
+}
+async function cardLayout(row, label) {
+  const geometry = await row.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    return {
+      height: box.height,
+      information: el.querySelector('[role="status"]').getBoundingClientRect().top - box.top,
+      actions: el.querySelector('.settings-actions').getBoundingClientRect().top - box.top,
+      details: el.querySelector('summary').getBoundingClientRect().top - box.top,
+    };
+  });
+  layouts.push({ label, ...geometry });
+  return geometry;
+}
+function sameLayout(actual, expected) {
+  for (const key of Object.keys(expected))
+    assert(
+      Math.abs(actual[key] - expected[key]) <= 1,
+      `${key}: ${actual[key]} != ${expected[key]}`,
+    );
 }
 (async () => {
   try {
@@ -160,10 +181,14 @@ async function closeDialog() {
     );
     let row = dialog().locator(`[data-generated-sound="${second.id}"]`);
     assert.match(await row.getByRole('status').first().innerText(), /^通知 · WAV · /);
+    const savedLayout = await cardLayout(row, 'saved');
     await row.getByRole('button', { name: '試聴', exact: true }).click();
     await until(async () => !!(await model()).playback, 'preview accepted');
+    await row.getByRole('button', { name: '停止', exact: true }).waitFor();
+    sameLayout(await cardLayout(row, 'preview'), savedLayout);
     await row.getByRole('button', { name: '停止', exact: true }).click();
     await until(async () => !(await model()).playback, 'preview stopped');
+    sameLayout(await cardLayout(row, 'preview stopped'), savedLayout);
     await row.getByRole('button', { name: '名前変更', exact: true }).press('Enter');
     const rename = host.getByRole('dialog', { name: '名前変更', exact: true });
     await rename.getByRole('textbox', { name: '新しい名前（.wav）' }).fill('完了のお知らせ');
@@ -217,13 +242,26 @@ async function closeDialog() {
     const state = async (id) => (await model()).items.find((value) => value.id === id);
     const card = (id) => dialog().locator(`[data-generated-sound="${id}"]`);
     mode = 'wait';
-    const generating = await submit('先に生成する音');
+    const longText = '先に生成する音。長い文章でもカードの高さを揃えます。'.repeat(4);
+    const generating = await submit(longText);
     await until(() => requests.length === 3, 'pending request');
     assert.equal((await state(generating.id)).state, 'generating');
     const queued = await submit('次に生成する音');
     const canceled = await submit('中止する音');
     assert.equal((await state(queued.id)).state, 'queued');
     assert.equal(requests.length, 3);
+    const pendingLayouts = new Map();
+    for (const [width, height] of [
+      [1720, 1000],
+      [900, 620],
+    ]) {
+      await app.resize(width, height);
+      const activeLayout = await cardLayout(card(generating.id), `generating ${width}`);
+      const waitingLayout = await cardLayout(card(queued.id), `queued ${width}`);
+      sameLayout(activeLayout, waitingLayout);
+      pendingLayouts.set(width, activeLayout);
+    }
+    await app.resize(1720, 1000);
     assert.equal(
       await dialog().getByRole('textbox', { name: '読み上げる文章', exact: true }).isEnabled(),
       true,
@@ -242,6 +280,7 @@ async function closeDialog() {
       async () => (await state(canceled.id)).state === 'canceled',
       'queued card canceled',
     );
+    sameLayout(await cardLayout(card(canceled.id), 'canceled'), pendingLayouts.get(1720));
     await host.screenshot({ path: path.join(profile, 'queued-cards.png') });
     mode = 'success';
     held[0].writeHead(200, { 'Content-Type': 'audio/wav' });
@@ -255,7 +294,39 @@ async function closeDialog() {
     );
     assert.deepEqual(
       requests.slice(2).map((value) => value.body.input),
-      ['先に生成する音', '次に生成する音'],
+      [longText, '次に生成する音'],
+    );
+    for (const [width, height] of [
+      [1720, 1000],
+      [900, 620],
+    ]) {
+      await app.resize(width, height);
+      sameLayout(
+        await cardLayout(card(generating.id), `completed ${width}`),
+        pendingLayouts.get(width),
+      );
+      sameLayout(
+        await cardLayout(card(queued.id), `queued then completed ${width}`),
+        pendingLayouts.get(width),
+      );
+    }
+    await app.resize(1720, 1000);
+    const detail = card(generating.id).locator('details');
+    await detail.locator('summary').click();
+    assert(
+      (await cardLayout(card(generating.id), 'details expanded')).height >
+        pendingLayouts.get(1720).height,
+    );
+    assert.equal(
+      await detail.locator('dd').nth(0).innerText(),
+      path.basename((await state(generating.id)).file),
+    );
+    assert.equal(await detail.locator('dd').nth(1).innerText(), '通知');
+    assert.equal(await detail.locator('dd').nth(2).innerText(), longText);
+    await detail.locator('summary').click();
+    sameLayout(
+      await cardLayout(card(generating.id), 'details collapsed'),
+      pendingLayouts.get(1720),
     );
     checks.push(
       'immediate cards, sequential shared queue, per-card cancellation, editable form, preview and rename while generating',
@@ -275,11 +346,17 @@ async function closeDialog() {
       async () => (await state(failed.id)).state === 'failed' && !(await state(failed.id)).busy,
       'invalid WAV card failure',
     );
+    const failedLayout = await cardLayout(card(failed.id), 'failed');
+    sameLayout(failedLayout, pendingLayouts.get(1720));
     mode = 'success';
     await card(failed.id).getByRole('button', { name: '再生成', exact: true }).click();
     await until(
       async () => (await state(failed.id)).state === 'saved' && !(await state(failed.id)).busy,
       'same card regenerated',
+    );
+    sameLayout(await cardLayout(card(failed.id), 'regenerated'), failedLayout);
+    checks.push(
+      'stable collapsed height and row positions across queue, generation, completion, cancellation, failure and preview; explicit details show full values',
     );
     await card(interrupted.id).getByRole('button', { name: '一覧から削除', exact: true }).click();
     await until(async () => !(await state(interrupted.id)), 'canceled card removed');
@@ -332,14 +409,22 @@ async function closeDialog() {
     assert.deepEqual(errors, []);
     fs.writeFileSync(
       path.join(profile, 'result.json'),
-      JSON.stringify({ ok: true, portable, sha256: app.hash, checks, requests, errors }, null, 2),
+      JSON.stringify(
+        { ok: true, portable, sha256: app.hash, checks, requests, errors, layouts },
+        null,
+        2,
+      ),
     );
     console.log(JSON.stringify({ profile, checks }, null, 2));
   } catch (error) {
     if (host) await host.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     fs.writeFileSync(
       path.join(profile, 'result.json'),
-      JSON.stringify({ ok: false, checks, errors, error: String(error.stack || error) }, null, 2),
+      JSON.stringify(
+        { ok: false, checks, errors, layouts, error: String(error.stack || error) },
+        null,
+        2,
+      ),
     );
     console.error(error);
     process.exitCode = 1;

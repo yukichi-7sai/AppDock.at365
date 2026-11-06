@@ -3670,6 +3670,7 @@
   "soundGeneration.dismiss": "一覧から削除",
   "soundGeneration.failed": "生成に失敗しました",
   "soundGeneration.fileStem": "音声",
+  "soundGeneration.filename": "ファイル名",
   "soundGeneration.folder": "保存先フォルダー",
   "soundGeneration.generate": "生成して保存",
   "soundGeneration.generating": "音声を生成しています…",
