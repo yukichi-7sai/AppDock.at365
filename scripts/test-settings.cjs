@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 /** Settings fixture paths follow the production data layout. No legacy file import. */
@@ -8,26 +9,27 @@ exports.file = (profile, name = 'settings.json') => {
   fs.mkdirSync(directory, { recursive: true });
   return path.join(directory, name);
 };
+exports.deviceFile = (profile) => exports.file(profile, `settings-${os.hostname()}.json`);
 
-/** Seed current local generation settings explicitly; this is not legacy-data migration. */
+/** Seed the current settings files for an isolated profile. */
 exports.write = (profile, value, localRoot = path.join(profile, 'data')) => {
   const {
     generationSettings,
     withoutGenerationSettings,
   } = require('../out/main/main/core/generation-settings');
-  const { mcpClient, ...shared } = withoutGenerationSettings(value);
+  const { mcpClient, operationPermissions, ...shared } = withoutGenerationSettings(value);
   fs.writeFileSync(exports.file(profile), JSON.stringify(shared));
-  if (mcpClient !== undefined) {
-    const name = require('node:os').hostname();
-    const deviceFile = exports.file(profile, `settings-${name}.json`);
+  if (mcpClient !== undefined || operationPermissions !== undefined) {
+    const deviceFile = exports.deviceFile(profile);
     const { initialDeviceSettings } = require('../out/main/main/core/device-settings');
     const device = fs.existsSync(deviceFile)
       ? JSON.parse(fs.readFileSync(deviceFile))
       : initialDeviceSettings(
-          name,
+          os.hostname(),
           require('../out/main/shared/settings-schema').parseSettings(value),
         );
-    device.mcpClient = mcpClient;
+    if (mcpClient !== undefined) device.mcpClient = mcpClient;
+    if (operationPermissions !== undefined) device.operationPermissions = operationPermissions;
     fs.writeFileSync(deviceFile, JSON.stringify(device));
   }
   fs.mkdirSync(localRoot, { recursive: true });
@@ -47,7 +49,7 @@ exports.read = (profile, localRoot = path.join(profile, 'data')) => {
       JSON.parse(fs.readFileSync(path.join(localRoot, 'generation-ai.json'))),
     ),
   );
-  const deviceFile = exports.file(profile, `settings-${require('node:os').hostname()}.json`);
+  const deviceFile = exports.deviceFile(profile);
   if (fs.existsSync(deviceFile))
     result.mcpClient = JSON.parse(fs.readFileSync(deviceFile)).mcpClient;
   return result;

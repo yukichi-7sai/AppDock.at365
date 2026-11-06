@@ -260,6 +260,8 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 初期無効・初期読取り専用。PC専用automation.jsonのconnectionScopeは省略時local（127.0.0.1）、networkでは0.0.0.0へbindします。どちらもHost/Origin/専用Bearer tokenを検査し、CORS許可は付けません。networkのHostはループバック・現在のNICのIPv4・このPCのホスト名・networkHostnamesへ明示登録したDNS名に限定し、実ポートを必須とします。Originは未指定または検証済みHostと同じHTTP originだけを許可します。接続元IPの許可一覧は持ちません。32byte乱数のトークンを、AppDock側ではElectron safeStorageで暗号化してPC専用rootのautomation.jsonへ保存します。共有設定や配布物へ含めません。
 
+「操作の許可」のMCP列は[端末別の操作許可](settings-sync.md#端末別の操作許可)に保存します。切り替え可能な項目は既定OFFです。`automation.json`の旧許可値は引き継ぎません。既存の連携有効状態・接続設定・認証・Codex登録を読み、許可の変更は設定画面で個別に行います。
+
 範囲切替では既存ポート・token・MCP許可・共通API・revisionを保持し、Codexの登録URLは常に127.0.0.1のままです。即時保存後に旧受付を停止して同じポートへ再bindします。起動中はランダムな識別子と認証付きの内部probeでループバックの到達先が自身のリスナーであることを確認し、実ポートの保存も成功してから公開要求を実行します。途中失敗では停止状態を表示し、勝手なポート変更・networkへの復帰はしません。保存失敗は以前の保存値と待受を保持します。「接続を再試行」は保存済み設定で再起動する操作です。MCP_SAVE_FAILED/MCP_START_FAILEDは共通エラー通知へ報告します。
 
 全MCPクライアントがtoken、許可、同時8要求の上限とAI/TTSの所有者を共有します。範囲切替は通信を一時切断しますが、開始済み操作の取消は保証しません。接続設定・認証を本文読込後とAPI呼出直前にも再検査し、停止した受付から新しい操作を開始しません。応答が失われた操作を自動で再実行しないでください。接続日時はsocketの接続元に基づき、このPCとネットワークを区別します。自己テストや内部probeは日時を更新せず、日時だけでCodex接続成功とは扱いません。
@@ -427,7 +429,7 @@ networkHostnames: string[];          // 省略時 []、追加の接続先ホス�
 
 `AutomationState`へ保存済み`connectionScope`・`networkHostnames`、実際の`activeConnectionScope`（停止中null）、`networkEndpoints: string[]`、`lastLocalClientAt`・`lastNetworkClientAt`、`canCopyToken: boolean`を追加する。canCopyTokenは保存済みの有効なtokenが利用できるかだけを示す。既存の`endpoint`はループバック専用のまま維持し、`lastClientAt`も互換用に保持する。トークンやAuthorizationは状態に含めない。
 
-新規操作は本体設定UI専用の`setConnectionScope { scope }`、`setNetworkHostnames { hostnames }`、`copyToken`、`copyEndpoint { endpoint }`、`retryStart`。copyEndpointは現在稼働中のendpointまたはnetworkEndpointsに含むURLだけをmainでコピーする。既存`configure { enabled, allowWrite, port }`へscopeを混ぜず、古い設定画面や操作許可画面からのconfigureでnetworkがlocalへ戻る事故を防ぐ。専用操作は指定されたフィールドだけを更新し、無関係なallow*を上書きしない。既存busyガードで操作を直列化する。
+接続操作は本体設定UI専用の`setConnectionScope { scope }`、`setNetworkHostnames { hostnames }`、`copyToken`、`copyEndpoint { endpoint }`、`retryStart`。copyEndpointは現在稼働中のendpointまたはnetworkEndpointsに含むURLだけをmainでコピーする。`configure { enabled, port }`は接続の有効状態とポートを変更する。「設定の変更」の許可は`setWrite { allowed }`で端末別JSONへ保存する。既存busyガードで操作を直列化する。
 
 追加操作は`dock:automation`と、本体設定ページの`codex`用action許可一覧へ接続する。`permissions`ページの許可一覧へは追加しない。Settings Hostとrendererで実装を重複させず、同じAutomationServiceを呼ぶ。公開操作カタログ、MCP、Applet、WebApplet、外部Webページからは呼べないことを確認する。
 

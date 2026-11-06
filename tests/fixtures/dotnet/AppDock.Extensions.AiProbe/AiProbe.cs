@@ -10,7 +10,7 @@ public sealed class AiProbe : IAppDockExtension
             try {
                 await context.AppDock.CallAsync("ai.models.list", new { connectionId = "sdk" }, token);
                 var accepted = await context.AppDock.CallAsync("ai.text.generate", new {
-                    requestId = Guid.NewGuid().ToString(), connectionId = "sdk", model = "dotnet-model",
+                    requestId = Guid.NewGuid().ToString(), connectionId = "sdk",
                     additionalPrompt = "用途別の架空指示", input = "架空の入力"
                 }, token);
                 var id = accepted.GetProperty("jobId").GetString();

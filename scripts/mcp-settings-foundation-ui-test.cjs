@@ -253,9 +253,13 @@ async function main() {
   assert.equal(await page.getByTestId('permission-row-useImageAi').count(), 1);
   await toggle('write', 'MCP', true);
   await toggle('execute', 'MCP', false);
+  await toggle('write', 'Applet', true);
   await toggle('write', 'Applet', false);
-  const grants = JSON.parse(fs.readFileSync(path.join(local, 'applet-api.json'))).permissions;
-  assert.equal(grants.write, false);
+  const deviceFile = require('./test-settings.cjs').deviceFile(profile);
+  const grants = JSON.parse(fs.readFileSync(deviceFile)).operationPermissions;
+  assert.equal(grants.applet.write, false);
+  assert.equal(grants.mcp.allowWrite, true);
+  assert.equal(fs.existsSync(path.join(local, 'applet-api.json')), false);
   let state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.equal(state.allowWrite, true);
   assert.equal(state.allowExecute, false);
@@ -269,11 +273,9 @@ async function main() {
   checks.push('9 permission rows; independent Applet/MCP write; execute remains OFF');
   await page.evaluate(async (file) => {
     await window.dock.automation({ kind: 'selectConfig', file });
-    const s = (await window.dock.automation({ kind: 'status' })).state;
     await window.dock.automation({
       kind: 'configure',
       enabled: true,
-      allowWrite: s.allowWrite,
       port: 0,
     });
     await window.dock.automation({ kind: 'register' });
@@ -574,6 +576,32 @@ async function main() {
   assert.equal(JSON.stringify((await client.listTools()).tools), toolsBefore);
   checks.push(
     'write revocation immediate; read remains available; MCP tool definitions unchanged by permission/value changes',
+  );
+  const synced = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+  synced.operationPermissions.mcp.allowWrite = true;
+  fs.writeFileSync(deviceFile, JSON.stringify(synced));
+  const writeSwitch = page
+    .getByTestId('permission-row-write')
+    .locator('[data-caller="MCP"]')
+    .getByRole('switch');
+  await until(() => writeSwitch.isChecked(), 'externally received MCP grant');
+  assert.equal((await value('appdock_get_info')).writable, true);
+  fs.writeFileSync(deviceFile, '{broken');
+  await until(
+    async () => !(await writeSwitch.isChecked()) && (await writeSwitch.isDisabled()),
+    'invalid device file fails closed',
+  );
+  assert.equal((await value('appdock_get_info')).writable, false);
+  assert.equal(
+    (await tool('appdock_settings_apply', gatewayReplay)).structuredContent.code,
+    'WRITE_DISABLED',
+  );
+  synced.operationPermissions.mcp.allowWrite = false;
+  fs.writeFileSync(deviceFile, JSON.stringify(synced));
+  await until(() => writeSwitch.isEnabled(), 'repaired device file accepted');
+  assert.equal(await writeSwitch.isChecked(), false);
+  checks.push(
+    'device file updates change live MCP authorization; corruption closes grants until recovery',
   );
   fs.writeFileSync(
     path.join(profile, 'result.json'),

@@ -1,6 +1,6 @@
 # WebApplet
 
-[Applet.WebApplet.at365](../../Applet.WebApplet.at365/docs/usage.md)は、登録したWebサイトをリボンのページまたは別ウィンドウで表示するNode Appletです。AppDock 0.170.0以上が必要です。
+[Applet.WebApplet.at365](../../Applet.WebApplet.at365/docs/usage.md)は、登録したWebサイトをリボンのページまたは別ウィンドウで表示するNode Appletです。AppDock 0.172.0以上が必要です。
 
 ## 導入と操作
 

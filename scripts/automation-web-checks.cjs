@@ -116,7 +116,7 @@ module.exports = async function ({
   assert.equal(
     back.value.completion,
     'settingsSaved',
-    'default Applet permission independent from MCP',
+    'explicit Applet permission independent from MCP',
   );
   assert.deepEqual((await read()).values, original.values);
   const grants = (await page.evaluate(() => window.dock.snapshot())).appletApi.permissions;

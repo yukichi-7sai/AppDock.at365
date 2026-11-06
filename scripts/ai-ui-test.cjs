@@ -146,7 +146,7 @@ async function errorNoticeFor(caller) {
         defaultPrompt: 'サーバーの既定指示',
         name: id,
         baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
-        defaultModel: 'fixture-model',
+        defaultModel: id === 'preview' ? 'fixture-model' : `${id}-model`,
         authentication: id === 'preview' ? 'bearer' : 'none',
       })),
     };
@@ -182,7 +182,7 @@ async function errorNoticeFor(caller) {
       else
         fs.writeFileSync(
           path.join(dir, 'index.cjs'),
-          `exports.activate=async c=>c.commands.register('${id}.generate','AI probe',async()=>{let r;try{await c.appdock.call('ai.models.list',{connectionId:'sdk'});const j=await c.appdock.call('ai.text.generate',{connectionId:'sdk',model:'node-model',additionalPrompt:'用途の架空指示',input:'架空の入力',requestId:require('node:crypto').randomUUID()});let v;do{await new Promise(r=>setTimeout(r,50));v=await c.appdock.call('ai.jobs.get',{jobId:j.jobId});}while(['queued','running'].includes(v.state));r={ok:v.state==='completed',jobId:j.jobId};}catch(e){r={code:e.code};}await c.log.info('ai-probe:'+JSON.stringify(r));});`,
+          `exports.activate=async c=>c.commands.register('${id}.generate','AI probe',async()=>{let r;try{await c.appdock.call('ai.models.list',{connectionId:'sdk'});const j=await c.appdock.call('ai.text.generate',{connectionId:'sdk',additionalPrompt:'用途の架空指示',input:'架空の入力',requestId:require('node:crypto').randomUUID()});let v;do{await new Promise(r=>setTimeout(r,50));v=await c.appdock.call('ai.jobs.get',{jobId:j.jobId});}while(['queued','running'].includes(v.state));r={ok:v.state==='completed',jobId:j.jobId};}catch(e){r={code:e.code};}await c.log.info('ai-probe:'+JSON.stringify(r));});`,
         );
     }
     require('./test-settings.cjs').write(profile, settings, local);
@@ -376,9 +376,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByLabel('登録名', { exact: true }).fill('追加したサーバー');
     await dialog.getByLabel('APIのURL', { exact: true }).fill(settings.ai.connections[0].baseUrl);
     await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
-    await dialog
-      .getByRole('combobox', { name: 'AIの既定モデル', exact: true })
-      .fill('manual-model');
+    await dialog.getByRole('combobox', { name: 'モデル', exact: true }).fill('manual-model');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).waitFor();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).click();
@@ -478,6 +476,7 @@ async function errorNoticeFor(caller) {
       window.dock.setAppletApiPermissions({ read: true, execute: true, useAi: true }),
     );
     for (const id of ['fixture.ai-node', 'fixture.ai-dotnet']) {
+      const before = requests.length;
       await host.evaluate((id) => window.dock.executeCommand(id + '.generate'), id);
       const result = await until(async () => {
         const log = (await snapshot()).logs.find(
@@ -486,10 +485,10 @@ async function errorNoticeFor(caller) {
         return log && JSON.parse(log.message.slice(9));
       }, id + ' result');
       assert.equal(result.ok, true);
-      checks.push(id + ' real SDK/RPC generated');
+      assert.equal(requests.length, before + 1);
+      assert.equal(requests.at(-1).body.model, 'sdk-model');
+      checks.push(id + ' real SDK/RPC used the registered model');
     }
-    assert(requests.some((r) => r.body.model === 'node-model'));
-    assert(requests.some((r) => r.body.model === 'dotnet-model'));
     const configFile = path.join(profile, 'config.toml');
     fs.writeFileSync(configFile, '');
     await host.evaluate(async (configFile) => {
@@ -497,7 +496,6 @@ async function errorNoticeFor(caller) {
       await window.dock.automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
@@ -518,6 +516,8 @@ async function errorNoticeFor(caller) {
       'appdock_ai_list_models',
     ])
       assert(tools.some((t) => t.name === name));
+    const generate = tools.find((t) => t.name === 'appdock_ai_generate_text');
+    assert(!Object.hasOwn(generate.inputSchema.properties, 'model'));
     const denied = await client.callTool({
       name: 'appdock_ai_generate_text',
       arguments: { requestId: 'denied', connectionId: 'mcp', input: '架空の入力' },
@@ -551,10 +551,17 @@ async function errorNoticeFor(caller) {
     const request = {
       requestId: 'mcp-one',
       connectionId: 'mcp',
-      model: 'mcp-model',
       additionalPrompt: 'MCPの用途指示',
       input: '架空の入力',
     };
+    const beforeOverride = requests.length;
+    const override = await client.callTool({
+      name: generate.name,
+      arguments: { ...request, model: 'override' },
+    });
+    assert.equal(override.isError, true);
+    assert.equal(override.structuredContent.code, 'INVALID_ARGUMENT');
+    assert.equal(requests.length, beforeOverride);
     const accepted = await call('appdock_ai_generate_text', request);
     assert.equal((await call('appdock_ai_generate_text', request)).jobId, accepted.jobId);
     await until(
@@ -562,6 +569,8 @@ async function errorNoticeFor(caller) {
         (await call('appdock_ai_get_job', { jobId: accepted.jobId })).state === 'completed',
       'MCP completed',
     );
+    assert.equal(requests.at(-1).body.model, 'mcp-model');
+    checks.push('MCP rejects model overrides and uses the selected registration');
     const log = (await snapshot()).logs.find(
       (l) => l.source === 'fixture.ai-node' && l.message.startsWith('ai-probe:'),
     );

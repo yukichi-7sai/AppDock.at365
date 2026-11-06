@@ -6,6 +6,7 @@ const fs = require('node:fs'),
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationApi } = require('../out/main/main/core/automation-api');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const {
   automationApplets,
   automationCommands,
@@ -340,6 +341,7 @@ test('registration recovery confirmation is private, single use and bound to act
   const options = {
     localDirectory: path.join(f.base, 'local'),
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -350,7 +352,7 @@ test('registration recovery confirmation is private, single use and bound to act
   const service = new AutomationService(options);
   t.after(() => service.close());
   await service.action({ kind: 'selectConfig', file });
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
   await service.action({ kind: 'register' });
   const registered = fs.readFileSync(file, 'utf8'),
     saved = fs.readFileSync(path.join(options.localDirectory, 'automation.json'), 'utf8');
@@ -531,6 +533,7 @@ test('corrupt local credentials remain untouched and expose a readable disabled 
   const service = new AutomationService({
     localDirectory,
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -694,6 +697,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   const options = {
     localDirectory: path.join(f.base, 'local'),
     baseDirectory: f.base,
+    settings: openOperationPermissions(t, f.base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -757,7 +761,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(legacyService.state().allowEditRibbon, false);
   assert.equal(legacyService.state().allowEditTray, false);
   await legacyService.close();
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
   let s = service.state();
   assert.equal(s.running, true);
   await service.action({ kind: 'register' });
@@ -944,7 +948,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     ).structuredContent.code,
     'WRITE_DISABLED',
   );
-  await service.action({ kind: 'configure', enabled: true, allowWrite: true, port: s.port });
+  await service.action({ kind: 'setWrite', allowed: true });
   get = await client.callTool({ name: 'appdock_get_settings', arguments: {} });
   const patch = await client.callTool({
     name: 'appdock_execute_command',
@@ -979,9 +983,10 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     ...options,
     localDirectory: path.join(f.base, 'other-local'),
     baseDirectory: path.join(f.base, 'other'),
+    settings: openOperationPermissions(t, path.join(f.base, 'other')),
   });
   t.after(() => conflict.close());
-  await conflict.action({ kind: 'configure', enabled: true, allowWrite: false, port: s.port });
+  await conflict.action({ kind: 'configure', enabled: true, port: s.port });
   assert.equal(conflict.state().running, false);
   assert.ok(conflict.state().error);
   assert.notEqual(conflict.id, restarted.id);

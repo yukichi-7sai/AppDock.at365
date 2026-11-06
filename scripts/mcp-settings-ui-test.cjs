@@ -219,7 +219,7 @@ async function main() {
   const sharedBefore = fs.readFileSync(sharedFile);
   await start();
   assert.equal(requests, 0);
-  assert.equal(await host.getByRole('button', { name: 'JSON', exact: true }).count(), 0);
+  assert.equal(await host.getByRole('button', { name: 'JSON', exact: true }).count(), 1);
   assert.match(await row('Restored server').innerText(), /認証情報を再設定/);
   assert.equal(
     JSON.parse(fs.readFileSync(deviceFile)).mcpClient.servers[0].connection.enabled,
@@ -252,6 +252,10 @@ async function main() {
     );
   };
   await repair();
+  await require('./mcp-toolbar-checks.cjs')({ host, profile, deviceFile, localFile, repair });
+  checks.push(
+    'shared top toolbar, JSON edits and invalid draft retention, isolated connection/command/tool resets, cancellation and whole JSON reset',
+  );
   await row('Restored server').getByRole('button', { name: '接続確認', exact: true }).click();
   await until(
     async () => (await row('Restored server').innerText()).includes('接続済み'),
@@ -266,7 +270,7 @@ async function main() {
   checks.push(
     'device-only definitions, restored ON retained, local key re-entry without connection, explicit connection check and failed OFF-to-ON rollback',
   );
-  await host.getByRole('tab', { name: 'ツール確認', exact: true }).click();
+  await host.getByRole('button', { name: 'ツール確認', exact: true }).click();
   await host.getByLabel('確認するMCP接続先', { exact: true }).selectOption(authId);
   await until(() => host.getByLabel('MCPツール', { exact: true }).isEnabled(), 'tools discovered');
   await host.getByLabel('MCPツール', { exact: true }).selectOption('echo');
@@ -288,7 +292,7 @@ async function main() {
   assert.equal(remoteState.count, 0);
   assert(!fs.readFileSync(deviceFile, 'utf8').includes('fixture-private-token'));
   assert(!fs.readFileSync(localFile, 'utf8').includes('fixture-private-token'));
-  await host.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+  await host.getByRole('button', { name: 'MCPツールコマンド', exact: true }).click();
   await host.getByRole('button', { name: 'Saved MCPを編集', exact: true }).click();
   dialog = host.getByRole('dialog');
   await dialog.getByLabel('固定引数（JSON）', { exact: true }).fill('{bad');
@@ -316,6 +320,28 @@ async function main() {
     1,
   );
   await until(() => remoteState.count === 1, 'saved command executes');
+  await host.getByRole('button', { name: 'ツール確認', exact: true }).click();
+  await until(async () => {
+    const surface = host.locator('.settings-surface');
+    const model = await host.evaluate(async () =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
+    return (
+      model.content.auxiliary.mcpClient.jobs.every((job) => job.state !== 'running') &&
+      (await surface.getByRole('button', { name: '結果を表示', exact: true }).count()) > 0
+    );
+  }, 'completed job displayed');
+  const beforeToolReset = fs.readFileSync(deviceFile);
+  await host.getByRole('button', { name: '結果を表示', exact: true }).first().click();
+  await host.getByRole('button', { name: 'このタブの設定を既定値に戻す', exact: true }).click();
+  dialog = host.getByRole('dialog');
+  await dialog.getByRole('button', { name: '既定値に戻す', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await host.getByRole('button', { name: '結果を表示', exact: true }).count(), 0);
+  assert.deepEqual(fs.readFileSync(deviceFile), beforeToolReset);
+  checks.push('tool reset clears completed result display without changing saved definitions');
   const binding = JSON.stringify(saved.toolBinding);
   await stop();
   fs.unlinkSync(localFile);
@@ -348,7 +374,7 @@ async function main() {
   remoteState.changed = true;
   await assert.rejects(host.evaluate((id) => window.dock.executeCommand(id), commandId));
   assert.equal(remoteState.count, 2);
-  await host.getByRole('tab', { name: 'MCPツールコマンド', exact: true }).click();
+  await host.getByRole('button', { name: 'MCPツールコマンド', exact: true }).click();
   await host.getByRole('button', { name: 'Saved MCPを編集', exact: true }).click();
   dialog = host.getByRole('dialog');
   await dialog.getByTestId('custom-command-tool-review').waitFor();
@@ -377,7 +403,7 @@ async function main() {
   }));
   assert(bounds.width <= bounds.client + 1 && bounds.bottom <= bounds.height);
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  await host.getByRole('tab', { name: '接続先', exact: true }).click();
+  await host.getByRole('button', { name: '接続先', exact: true }).click();
   await row('Restored server')
     .getByRole('button', { name: 'Restored serverを削除', exact: true })
     .click();
@@ -402,6 +428,7 @@ async function main() {
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(JSON.parse(fs.readFileSync(deviceFile)).mcpClient.commands[0].id, saved.id);
+  await host.getByRole('button', { name: 'JSON', exact: true }).click();
   await host.getByRole('button', { name: 'このページを既定値に戻す', exact: true }).click();
   dialog = host.getByRole('dialog');
   await dialog.getByRole('button', { name: '既定値に戻す', exact: true }).click();

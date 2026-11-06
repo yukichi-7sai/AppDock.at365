@@ -330,7 +330,10 @@ export interface DockApi {
   overlayViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
-  setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
+  setAppletApiPermissions(
+    permissions: import('./appdock-api').AppletApiPermissions,
+    before?: import('./appdock-api').AppletApiPermissions,
+  ): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,
   ): Promise<import('./automation').AutomationReply>;

@@ -404,7 +404,8 @@ export class SettingsViewClient {
       cancelCommandPalette: (id) => this.invokePalette('cancel', id),
 
       chooseDirectory: () => invoke('chooseDirectory'),
-      setAppletApiPermissions: (value) => invoke('setAppletApiPermissions', [value]),
+      setAppletApiPermissions: (value, before) =>
+        invoke('setAppletApiPermissions', [value, before]),
       automation: (value) => invoke('automation', [value]),
       executeCommand: (id) => invoke(`settingAction:${id}`),
     };

@@ -1,5 +1,17 @@
 export type ConnectionScope = 'local' | 'network';
 
+export const mcpPermissionKeys = [
+  'allowWrite',
+  'allowExecute',
+  'allowUseTts',
+  'allowUseAi',
+  'allowUseMcp',
+  'allowSendInput',
+  'allowRunProcesses',
+] as const;
+export type McpPermission = (typeof mcpPermissionKeys)[number];
+export type McpPermissions = Partial<Record<McpPermission, boolean>>;
+
 export const retiredMcpPermissionKeys = [
   'allowManageApplets',
   'allowEditShortcuts',
@@ -63,11 +75,12 @@ export type AutomationAction =
   | { kind: 'copyToken' | 'retryStart' }
   | { kind: 'copyEndpoint'; endpoint: string }
   | { kind: 'status' }
-  | { kind: 'configure'; enabled: boolean; allowWrite: boolean; port: number }
+  | { kind: 'configure'; enabled: boolean; port: number }
   | { kind: 'register' | 'unregister'; confirmationId?: string }
   | { kind: 'test' | 'rotateToken' }
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
+  | { kind: 'setWrite'; allowed: boolean }
   | { kind: 'setTts'; allowed: boolean }
   | { kind: 'setAi'; allowed: boolean }
   | { kind: 'setMcpClient'; allowed: boolean }
