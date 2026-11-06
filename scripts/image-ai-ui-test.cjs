@@ -154,7 +154,7 @@ const check = (name) => {
       'fixture-api-key',
     );
     await dialog.getByRole('tab', { name: '生成設定', exact: true }).click();
-    await dialog.getByLabel('指定がないときのモデル', { exact: true }).fill('fixture');
+    await dialog.getByLabel('モデル', { exact: true }).fill('preview-model');
     await dialog.getByLabel('画像サイズ', { exact: true }).fill('1536x1024');
     await dialog.getByRole('tab', { name: 'プロンプト', exact: true }).click();
     await dialog.getByLabel('いつも加えるプロンプト', { exact: true }).fill('always');
@@ -172,6 +172,7 @@ const check = (name) => {
       await page.evaluate(() => window.dock.snapshot())
     ).settings.value.imageAi.connections.find((c) => c.name === 'Preview preset');
     assert(saved.id);
+    assert.equal(saved.defaultModel, 'preview-model');
     assert.equal(saved.defaults.size, '1536x1024');
     assert(
       !JSON.stringify((await page.evaluate(() => window.dock.snapshot())).settings).includes(
@@ -198,6 +199,7 @@ const check = (name) => {
       'generated image rendered',
     );
     assert.equal(requests.at(-1).auth, 'Bearer fixture-api-key');
+    assert.equal(requests.at(-1).input.model, 'preview-model');
     assert.equal(requests.at(-1).input.prompt, 'always\nwatercolor\nfixture landscape');
     assert.equal(requests.at(-1).url, '/v1/images/generations');
     await page.locator('.image-ai-preview').scrollIntoViewIfNeeded();

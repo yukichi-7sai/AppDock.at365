@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-11-07 登録モデル固定のmain統合（0.170.1）
+
+- `pull --ff-only`で追跡先と一致したmain `8e10ff3`に`codex/generation-preset-models`の`7eb3dc2`と`70c767f`をマージした。競合した版番号と検証記録を解決し、両方の検証履歴を保持した。各親だけが変更した20ファイルずつと、統合した翻訳4,146キーを照合した。
+- 発行済みの専用worktree版0.170.0にmainのMCP設定修正0.169.2を合わせた別の配布物となるため、統合版は0.170.1とした。固定lockfileの復元、型検査、`dev.bat test`の1,802/1,802件（失敗・skip 0）、文章・画像の.NET試験AppletのReleaseビルドが成功した。
+- `publish.bat`終了0。発行先は`A:/40.ARTIFACT/AppDock.at365/`。package・PE・manifest・feedの版とfeedのサイズ・SHA256を確認し、ビルド出力・発行先・更新ZIP・固定試験共用runtimeの101ファイルが一致した。EXE SHA256は`2b955e9a8f53452c7c9c508509f51553b0e81d8c385c39a323a17a2ee008f4c7`。更新ZIPは175,186,086 bytes、SHA256は`d65a19183792c19d70180f0999caf4f451411921f3f7cb4d9745fe992dd1aa99`。
+- 固定EXEを隔離profileで起動し、文章生成17項目、画像生成8項目、生成設定18項目、MCP設定6群とスモークが成功した。登録モデルの送信と旧引数の拒否に加え、MCPの共通ツールバー・JSON・タブごとのリセットをローカルfixtureで確認した。
+- スモーク用の専用コピーは終了とhashの一致を確認して100ファイルを削除し、manifestと結果を含む87ファイルのhashを保持した。共用runtime・検証記録・専用worktreeを保持した。入力・ログ・配布物のhash、親の照合と最終treeは`.artifacts/integration-generation-preset-models-20261107/`を参照する。
+
 ## 2026-11-07 MCP設定の共通ツールバー・JSON・タブ別リセット（0.169.2）
 
 - 接続先／MCPツールコマンド／ツール確認を上部の共通ツールバーへ統合し、JSONを追加した。接続先タブは接続と対応する秘密、コマンドタブはコマンドだけ、ツール確認は一時入力・表示だけをリセットする。JSONタブは表示する両一覧と対応する秘密を対象とし、割り当て参照は保持する。
@@ -9,6 +17,15 @@
 - 設定項目・保存ファイル・公開APIの増減を伴わないローカル設定UI修正として0.169.1から0.169.2へパッチ更新し、`publish.bat`終了0。package/feed/manifest/PE版は0.169.2。build・発行先・共用runtime・更新ZIPの101ファイルがSHA256一致した。EXE=`7ff0a5473cb109e9a8c4f0387e5ef1b3fab26e52173defe65cab28460f527a58`、ZIP=`5a31bd39ba77d41907e8e0089d0abd1bd6f5b9d8904e5ed8576652b2bce599dc`、175,186,136 bytes。
 - 証跡は`.artifacts/mcp-toolbar-validation-20261107/`と`mcp-toolbar-*.log`。最終入力1090ファイル、各ログ・配布物のhash、コミットtreeを記録する。Windows x64、Node26.13.0、pnpm12.15.0、Electron45.1.0、.NET SDK10.0.403。既存のViteチャンクサイズ警告は継続した。
 - 全単体一括・MCPハブ総合・共通一覧の全組合せは今回再実行せず、変更に関係する上記回帰を実行した。実外部MCPサーバー・実PC交換・実利用プロファイルは操作していない。試験プロセスの終了を確認し、今回の一時編集ヘルパーを削除した。配布先は`A:\40.ARTIFACT\AppDock.at365`。push・Release・実利用先deployは行っていない。
+
+## 2026-11-07 文章・画像生成を登録モデルに固定（0.170.0）
+
+- `63e9b98`を基点に専用worktreeの`codex/generation-preset-models`で実装した。追加・編集の表示とアクセシブル名を「モデル」に揃え、文章生成の公開スキーマと文章・画像の生成入力から`model`を除いた。保存済みの`defaultModel`を使用し、`connectionId`省略時は既定のサーバーを選ぶ。直接モデルを指定した要求は`INVALID_ARGUMENT`で拒否する。
+- 発行前に画面、型、Applet/MCPの共通スキーマ、要求検証と送信モデル、保存済み設定、再送と文書をレビューした。Applet向け公開引数の削除につきマイナー更新とし、本体を0.169.1から0.170.0にした。
+- 型検査、ビルド、両.NET Applet試験用プロジェクトのReleaseビルド、変更したスクリプトの構文、差分空白検査が成功。初回の直列回帰の4失敗は、廃止済みShellへの外観検査と新規checkoutでのExtensionHost準備不足によるものだった。現行rendererの配色検査を保ち、標準試験で共通.NETホストを生成してページ試験も同じ出力を使うように修正した。対処後の`dev.bat test`は1,799/1,799件成功、失敗・skip 0。
+- `publish.bat`終了0。発行先は`A:/40.ARTIFACT/AppDock.at365-generation-preset-models/`。版とfeedのサイズ・SHA256を確認し、ビルド出力・発行物・更新ZIP・固定試験共用runtimeの101ファイルが一致した。EXE SHA256は`f1e201a769b64861d8ea35e6fe5a30ed79ba34325529b91a163f19d8e1691639`。更新ZIPは175,185,267 bytes、SHA256は`e95996567a67c582884f8565e650ef80f653fb677421d04ef6caeeb1abae6b7c`。
+- 固定EXEの隔離profileで文章生成17項目、画像生成8項目、生成設定18項目とスモークが成功した。Node/.NET AppletとMCPによるサーバーID指定、MCPでの`model`拒否と通信なし、画像試験で登録したモデルを送信して結果が表示されることをローカルfixtureで確認した。
+- スモークの専用コピーはプロセス終了と配布物との一致を確認し、manifestを残して100ファイルを削除した。保持した結果・設定など83ファイルのSHA256が一致した。GUIの成功profileと共用runtime、元の失敗ログは保持した。詳細なレビュー、入力・ログ・配布物のhashとstage/commitの照合は`.artifacts/commit-validation-generation-preset-models/`を参照する。
 
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 

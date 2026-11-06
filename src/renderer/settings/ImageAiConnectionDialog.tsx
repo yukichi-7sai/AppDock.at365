@@ -172,7 +172,11 @@ export function ImageAiConnectionDialog({
         hidden={tab !== 1}
       >
         <div className="server-editor-grid">
-          <SettingsField settingKey="defaultModel" title={t('settings.aiConnectionDialog.model')}>
+          <SettingsField
+            settingKey="defaultModel"
+            title={t('settings.aiConnectionDialog.model')}
+            hint={t('settings.aiConnectionDialog.modelHint')}
+          >
             <SettingsInput
               aria-label={t('settings.aiConnectionDialog.model')}
               value={draft.defaultModel}

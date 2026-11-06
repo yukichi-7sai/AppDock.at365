@@ -424,7 +424,7 @@ native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.Output
 
 現行の発話APIは最低ホスト版0.156.0。tts.speak / tts.connections.list / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。発話は任意connectionIdとinstructionsを受け取り、声は選択した登録を使い、常に等速で再生します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
-AIの文章生成は最低ホスト版0.37.0。既存context.appdock.call / context.AppDock.CallAsyncからai.text.generate等を利用できます。appdock-api capabilityと独立したuseAi許可が必要です。[モデル・追加プロンプトの指定とジョブAPI](ai.md#共通api)を参照してください。
+文章生成の現行引数は最低ホスト版0.170.0。既存context.appdock.call / context.AppDock.CallAsyncからai.text.generate等を利用できます。appdock-api capabilityと独立したuseAi許可が必要です。[サーバー・追加プロンプトの指定とジョブAPI](ai.md#共通api)を参照してください。
 
 ### 宣言型の一覧編集
 

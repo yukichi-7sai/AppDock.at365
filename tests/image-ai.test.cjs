@@ -95,9 +95,10 @@ test('image instructions and input combine once, inherit omitted defaults and su
   });
   assert.equal(c.defaultPrompt, 'default style');
 });
-test('preset selection, defaults, per-call overrides and canonical request IDs', async (t) => {
+test('preset model selection, per-call image options and canonical request IDs', async (t) => {
   const f = fixture(t);
   const other = connection('two');
+  other.defaultModel = 'second-model';
   other.alwaysPrompt = 'always';
   other.defaults.size = '1536x1024';
   f.set({ connections: [connection(), other], defaultConnectionId: 'one' });
@@ -109,6 +110,7 @@ test('preset selection, defaults, per-call overrides and canonical request IDs',
   };
   const j = f.s.generate('one', input);
   assert.equal(j.completion, 'accepted');
+  assert.equal(j.model, 'second-model');
   assert.equal(
     f.s.generate('one', {
       options: { providerOptions: { quality: 'high' }, count: 2 },
@@ -124,7 +126,7 @@ test('preset selection, defaults, per-call overrides and canonical request IDs',
   const done = await completed(f.s, j.jobId);
   assert.equal(done.images.length, 2);
   assert.deepEqual(f.requests[0].body, {
-    model: 'fixture',
+    model: 'second-model',
     prompt: 'always\nlandscape',
     n: 2,
     size: '1536x1024',
@@ -144,6 +146,9 @@ test('preset selection, defaults, per-call overrides and canonical request IDs',
   });
   assert.throws(() => f.s.generate('one', { requestId: 'missing', connectionId: 'missing' }), {
     code: 'NOT_FOUND',
+  });
+  assert.throws(() => f.s.generate('one', { ...input, model: 'override' }), {
+    code: 'INVALID_ARGUMENT',
   });
 });
 test('large results are read in bounded chunks and no raw image is in the job projection', async (t) => {
