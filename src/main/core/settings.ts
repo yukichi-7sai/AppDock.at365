@@ -38,7 +38,7 @@ class SettingsReadError extends Error {
   }
 }
 export interface SettingsRecoveryPlan {
-  readonly scope?: 'shared' | 'device';
+  readonly scope?: 'shared' | 'device' | 'local';
   readonly candidate: string;
   readonly candidateHash: string;
   readonly modifiedAt: number;
@@ -160,7 +160,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   appletConfigurationScope(_owner: string): 'shared' | 'device' {
     return 'shared';
   }
-  settingScope(_path: readonly string[]): 'shared' | 'device' {
+  settingScope(_path: readonly string[]): 'shared' | 'device' | 'local' {
     return 'shared';
   }
   storedAppletConfiguration(owner: string): Record<string, unknown> {

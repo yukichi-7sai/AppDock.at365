@@ -99,6 +99,16 @@ export class ImageAiSettingsController {
       );
     for (const connection of next.connections) {
       const before = currentById.get(connection.id);
+      if (
+        (connection.mcpEnabled === true) !== (before?.mcpEnabled === true) ||
+        (before?.mcpEnabled &&
+          (before.baseUrl !== connection.baseUrl ||
+            before.authentication !== connection.authentication))
+      )
+        throw new SettingsTargetError(
+          'LOCAL_ACTION_REQUIRED',
+          hostText('services.settingsTargets.localAction'),
+        );
       if (JSON.stringify(before) === JSON.stringify(connection)) continue;
       this.connection(connection);
       if (!before) {
@@ -142,6 +152,7 @@ export class ImageAiSettingsController {
       ? current.connections.map((v) => (v.id === c.id ? c : v))
       : [...current.connections, c];
     const imageAi = this.withConnections(current, connections);
+    const previousKeyRevision = this.secrets.revision(c.id);
     const asset =
       c.authentication === 'none'
         ? this.secrets.prepareKey(c, '')
@@ -149,7 +160,7 @@ export class ImageAiSettingsController {
           ? undefined
           : this.secrets.prepareKey(c, key);
     this.settings.save({ ...this.settings.value, imageAi }, this.settings.revision, asset);
-    this.changed(c.id);
+    this.changed(this.secrets.revision(c.id) !== previousKeyRevision ? c.id : undefined);
   }
   remove(original: unknown, keyRevision: unknown) {
     const c = parseImageAiSettings({ connections: [original] }).connections[0],

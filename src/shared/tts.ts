@@ -23,6 +23,7 @@ export interface TtsSettings extends TtsConnectionSettings {
   alwaysInstructions: string;
 }
 export interface TtsServer extends TtsSettings {
+  mcpEnabled?: boolean;
   id: string;
   name: string;
 }
@@ -34,8 +35,9 @@ export const defaultTtsConfiguration = (): TtsConfiguration => ({ connections: [
 export const newTtsServer = (id: string): TtsServer => ({ ...defaultTtsSettings(), id, name: '' });
 export function parseTtsServer(value: unknown): TtsServer {
   if (!object(value)) throw Error(hostText('settings.tts.object'));
-  const { id, name, ...speech } = value;
+  const { id, name, mcpEnabled, ...speech } = value;
   if (
+    (mcpEnabled !== undefined && typeof mcpEnabled !== 'boolean') ||
     typeof id !== 'string' ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(id) ||
     typeof name !== 'string' ||
@@ -43,7 +45,12 @@ export function parseTtsServer(value: unknown): TtsServer {
     name.length > 200
   )
     throw Error(hostText('settings.ttsServers.invalidServer'));
-  return { ...parseTtsSettings(speech), id, name: name.trim() };
+  return {
+    ...parseTtsSettings(speech),
+    id,
+    name: name.trim(),
+    ...(mcpEnabled === undefined ? {} : { mcpEnabled }),
+  };
 }
 export function parseTtsConfiguration(value: unknown): TtsConfiguration {
   if (value === undefined) return defaultTtsConfiguration();
@@ -78,7 +85,7 @@ export function selectedTtsServer(value?: TtsConfiguration, id = value?.defaultC
 }
 export function ttsServerSpeech(server?: TtsServer): TtsSettings {
   if (!server) return defaultTtsSettings();
-  const { id: _id, name: _name, ...speech } = server;
+  const { id: _id, name: _name, mcpEnabled: _mcp, ...speech } = server;
   return parseTtsSettings(speech);
 }
 export const ttsPresetIds = [

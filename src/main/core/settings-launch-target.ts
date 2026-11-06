@@ -20,7 +20,7 @@ export function launchSettingsTarget(options: {
   launch: WindowsLaunch;
   checkRevision(revision: string): void;
   validate(value: Settings): Settings;
-  save(value: Settings, revision: number, rewrite: ('shared' | 'device')[]): unknown;
+  save(value: Settings, revision: number, rewrite: ('shared' | 'device' | 'local')[]): unknown;
   assertWritable?(): void;
 }): SettingsFieldTarget {
   const { settings, launch } = options,

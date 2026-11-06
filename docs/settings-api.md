@@ -1,5 +1,7 @@
 # MCPの共通設定API
 
+生成AIの通常値は[PC専用設定](generation-settings.md)へ保存する。プリセット別のmcpEnabledは公開せず、APIから追加した登録はMCP利用OFF。通常値の編集は既存許可を保持し、許可済み登録の送信先変更は本体UIに限定する。
+
 設定対象や項目名をMCPツールの引数Schemaに埋め込まず、実行時のデータとして取得する。固定入口の初回導入時はクライアント側のツール更新が必要になる場合がある。その後、本体・Appletの通常設定や固定選択候補の追加ではtools/listを変更しない。
 
 `host.about`には`fileWatchAssistanceEnabled`と`fileWatchAssistanceIntervalSeconds`も通常項目として公開する。既存の取得・dry-run・apply・reset、revision検査と「AppDockについて」の端末専用保存を使い、待機時間は2以上の有限数を受け付ける。既定値と実行の意味は[ファイル監視補助](file-watch-assistance-design.md)を参照する。

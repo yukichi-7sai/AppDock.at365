@@ -115,7 +115,13 @@ export function AboutSystemSettings({
         {aux.settingsFiles?.map((file) => (
           <SettingsField
             key={file.scope}
-            title={file.scope === 'device' ? t('general.files.device') : t('general.files.shared')}
+            title={
+              file.scope === 'local'
+                ? t('settings.storage.local')
+                : file.scope === 'device'
+                  ? t('general.files.device')
+                  : t('general.files.shared')
+            }
             description={
               <>
                 <code>{file.path}</code> —{' '}

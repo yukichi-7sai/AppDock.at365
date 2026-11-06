@@ -64,7 +64,6 @@ function change(value, pageId, alternate = false) {
       overrides: [],
       speech: {
         instructions: alternate ? 'incoming' : 'local',
-        connectionId: alternate ? 'second' : 'first',
       },
     };
   } else if (pageId === 'ribbon') {

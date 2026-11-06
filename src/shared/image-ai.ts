@@ -15,6 +15,7 @@ export interface ImageGenerationOptions {
 export interface ImageAiConnection {
   id: string;
   name: string;
+  mcpEnabled?: boolean;
   protocol: 'openai-images';
   baseUrl: string;
   authentication: 'none' | 'bearer';
@@ -160,6 +161,7 @@ export function parseImageAiSettings(value: unknown): ImageAiSettings {
     if (!aiObject(c)) return invalid();
     keys(c, [
       'id',
+      'mcpEnabled',
       'name',
       'protocol',
       'baseUrl',
@@ -171,6 +173,7 @@ export function parseImageAiSettings(value: unknown): ImageAiSettings {
       'defaults',
     ]);
     if (
+      (c.mcpEnabled !== undefined && typeof c.mcpEnabled !== 'boolean') ||
       !aiId(c.id) ||
       c.protocol !== 'openai-images' ||
       !['none', 'bearer'].includes(String(c.authentication)) ||

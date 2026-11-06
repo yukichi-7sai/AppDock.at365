@@ -38,7 +38,7 @@ export function SettingsPageLayout({
   onMode(mode: 'form' | 'json'): void;
   formTabs?: { id: string; title: string; selected: boolean; select(): void }[];
   formTabsId?: string;
-  onOpenFile(scope?: 'shared' | 'device'): void;
+  onOpenFile(scope?: 'shared' | 'device' | 'local'): void;
   storage?: SettingsPageAuxiliary['storage'];
   onLocalSettings?(enabled: boolean): void;
   onReload(): void;
@@ -151,9 +151,11 @@ export function SettingsPageLayout({
                                   onOpenFile(file.scope);
                                 }}
                               >
-                                {file.scope === 'device'
-                                  ? t('settings.storage.device')
-                                  : t('settings.storage.shared')}
+                                {file.scope === 'local'
+                                  ? t('settings.storage.local')
+                                  : file.scope === 'device'
+                                    ? t('settings.storage.device')
+                                    : t('settings.storage.shared')}
                                 : {file.name}
                               </button>
                             ))}

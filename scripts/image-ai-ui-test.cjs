@@ -119,7 +119,7 @@ const check = (name) => {
       path.join(nativeDir, 'AppDock.Extensions.ImageAiProbe.dll'),
     );
     settings.extensions[nativeId] = { enabled: true, settings: {} };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(settings));
+    require('./test-settings.cjs').write(profile, settings);
     host = await launch(profile, process.argv[2]);
     const page = host.main;
     await until(async () => {

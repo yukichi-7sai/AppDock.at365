@@ -344,6 +344,20 @@ test('freshness deadline covers generation and is rechecked after late response'
   assert.equal(f.played.length, 0);
   assert(!f.speech.allows('notification:' + a.notificationId));
 });
+test('MCP preset permission changes preserve queued notification speech', async (t) => {
+  const f = setup(t);
+  f.ready(false);
+  f.publish();
+  await wait(() => f.availability.status() === 'allowed');
+  for (const allowed of [true, false]) {
+    f.settings.tts.connections[0].mcpEnabled = allowed;
+    f.reconcile();
+  }
+  f.ready(true);
+  await wait(() => f.played.length === 1);
+  assert.equal(f.posts.length, 1);
+});
+
 test('shared TTS queue preserves notification snapshots and isolates cancellation from other owner', async (t) => {
   let release;
   const f = setup(t, {

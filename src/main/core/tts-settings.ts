@@ -13,7 +13,7 @@ export class TtsSettingsController {
   constructor(
     private settings: SettingsStore,
     private secrets: TtsSecrets,
-    private changed: () => void,
+    private changed: (keyChanged?: boolean) => void,
   ) {}
   private current() {
     this.settings.assertRevision(this.settings.revision);
@@ -66,7 +66,7 @@ export class TtsSettingsController {
     const keyValue = key == null && before && before.baseUrl !== server.baseUrl ? '' : key;
     const asset = keyValue == null ? undefined : this.secrets.prepareKey(server, keyValue);
     this.settings.save({ ...this.settings.value, tts: next }, this.settings.revision, asset);
-    this.changed();
+    this.changed(!!asset);
   }
   remove(original: unknown, keyRevision: unknown, replacement: unknown, originalDefault: unknown) {
     const server = parseTtsServer(original),

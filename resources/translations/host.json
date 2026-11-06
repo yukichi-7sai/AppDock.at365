@@ -4115,5 +4115,12 @@
   "workspace.ribbon": "リボン",
   "workspace.ribbonBottom": "下寄せのリボン",
   "workspace.ribbonTop": "上寄せのリボン",
-  "workspace.shortcutPartial": "ショートカットの一部を実行できませんでした。ログを確認してください。"
+  "workspace.shortcutPartial": "ショートカットの一部を実行できませんでした。ログを確認してください。",
+  "settings.storage.local": "このPCの生成AI設定（LocalAppData）",
+  "settings.generation.mcp": "MCPからの利用を許可",
+  "settings.generation.mcpHint": "このPCで有効です。「操作の許可」のMCP側の許可も必要です。",
+  "settings.generation.mcpFuture": "将来の画像生成MCP APIで使用する、このPC専用の許可です。現在はMCPから画像生成を実行できません。",
+  "recovery.confirmLocal": "このPCの生成AI設定を復元しますか？",
+  "recovery.detailLocal": "LocalAppDataの生成AI設定を正常なバックアップから復元します。",
+  "settings.generation.permissionDenied": "このサーバーはMCPからの利用が許可されていません。"
 }

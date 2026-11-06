@@ -1213,7 +1213,7 @@ test('AI first addition chooses a default and removing that default clears it wi
   assert.equal(f.store.value.ai.defaultConnectionId, undefined);
   assert.equal(f.store.value.ai.connections.length, 1);
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(f.store.shared.file)).ai, 'defaultConnectionId'),
+    Object.hasOwn(JSON.parse(fs.readFileSync(f.store.local.file)).ai, 'defaultConnectionId'),
     false,
   );
   rows = listRows(f);
@@ -2729,4 +2729,56 @@ test('image preset settings never expose keys or change a credential-bound endpo
   );
   assert.equal(f.store.value.imageAi.connections[0].defaultModel, 'another');
   assert.equal(f.decrypts(), 0);
+});
+
+test('MCP cannot grant generator permissions or retarget allowed presets and edits remain local', (t) => {
+  const f = fixture(t, { device: true });
+  const { newImageAiConnection } = require('../out/main/shared/image-ai');
+  const next = structuredClone(f.store.value);
+  next.ai.connections[0].mcpEnabled = true;
+  next.tts.connections[0].mcpEnabled = true;
+  next.imageAi = {
+    connections: [
+      { ...newImageAiConnection('image'), name: 'Image', authentication: 'none', mcpEnabled: true },
+    ],
+  };
+  f.store.save(next, f.store.revision);
+  const shared = fs.readFileSync(f.store.shared.file, 'utf8');
+  const device = fs.readFileSync(f.store.device.file, 'utf8');
+  for (const kind of ['ai', 'tts', 'imageAi']) {
+    const targetId = 'service.' + kind + '.connections';
+    let row = f.call('items.list', { targetId }).items[0];
+    assert.equal(row.values.mcpEnabled, undefined);
+    assert.throws(
+      () =>
+        f.call(
+          'apply',
+          f.request(targetId, [
+            { kind: 'update', itemRef: row.itemRef, changes: { mcpEnabled: false } },
+          ]),
+        ),
+      { code: 'NOT_FOUND' },
+    );
+    assert.throws(
+      () =>
+        f.call(
+          'apply',
+          f.request(targetId, [
+            { kind: 'update', itemRef: row.itemRef, changes: { baseUrl: 'http://changed/v1' } },
+          ]),
+        ),
+      { code: 'LOCAL_ACTION_REQUIRED' },
+    );
+    f.call(
+      'apply',
+      f.request(targetId, [{ kind: 'update', itemRef: row.itemRef, changes: { name: 'Renamed' } }]),
+    );
+    assert.equal(f.store.value[kind].connections[0].mcpEnabled, true);
+    assert.equal(
+      JSON.parse(fs.readFileSync(f.store.local.file))[kind].connections[0].name,
+      'Renamed',
+    );
+  }
+  assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), shared);
+  assert.equal(fs.readFileSync(f.store.device.file, 'utf8'), device);
 });

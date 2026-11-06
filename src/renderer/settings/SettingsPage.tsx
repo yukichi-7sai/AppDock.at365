@@ -597,7 +597,7 @@ export function SettingsPage({
                   )
                   .map(
                     (file) =>
-                      `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
+                      `${file.scope === 'local' ? t('settings.storage.local') : file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
                   )
                   .join('、')}
               />

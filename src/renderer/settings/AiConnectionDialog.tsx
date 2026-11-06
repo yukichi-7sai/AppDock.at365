@@ -1,3 +1,4 @@
+import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
@@ -242,6 +243,10 @@ export function AiConnectionDialog({
         hidden={tab !== 'connection'}
       >
         <div className="server-editor-grid">
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => patch({ mcpEnabled })}
+          />
           <SettingsField settingKey="name" title={translate('settings.aiConnectionDialog.name')}>
             <SettingsInput
               data-initial-focus

@@ -725,7 +725,7 @@ const settingsCommands = new SettingsCommands({
         ? pageCollections.settingOptions(owner)
         : [],
   save: (value, revision, reset) => {
-    const rewrite = new Set<'shared' | 'device'>();
+    const rewrite = new Set<'shared' | 'device' | 'local'>();
     if (reset) {
       const owner = reset.collection?.owner ?? reset.ownerId;
       if (owner === 'appdock')
@@ -974,8 +974,9 @@ const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-keys.json'), {
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
 });
-const ttsOwner = (id?: string) =>
-  id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp';
+const ttsOwner = (id?: string, context: InputInvocation = {}) =>
+  (id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp') +
+  (id && context.origin?.kind === 'mcp' ? '|mcp:' + aiMcpGeneration : '');
 const tts = new TtsService({
   settings: () => settings.value.tts ?? { connections: [] },
   key: (server) => ttsSecrets.key(server),
@@ -984,8 +985,11 @@ const tts = new TtsService({
     if (owner === 'host' || owner === 'notification-preview') return startupReady;
     if (owner.startsWith('notification:')) return notificationSpeech?.allows(owner) ?? false;
     if (owner === 'mcp') return mcpAllowed('allowUseTts') && (!speak || mcpAllowed('allowExecute'));
+    const indirect = owner.includes('|mcp:');
+    if (indirect && (!mcpAllowed('allowUseTts') || (speak && !mcpAllowed('allowExecute'))))
+      return false;
     const item = [...(manager?.items.values() ?? [])].find(
-      (e) => owner === ttsOwner(e.manifest.id),
+      (e) => owner === ttsOwner(e.manifest.id, indirect ? { origin: { kind: 'mcp' } } : {}),
     );
     const grants =
       item && ['starting', 'running'].includes(item.state)
@@ -1009,9 +1013,9 @@ const tts = new TtsService({
       '[TTS] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
     ),
 });
-const ttsSettings = new TtsSettingsController(settings, ttsSecrets, () => {
-  notificationSpeech?.reconcile(true);
-  tts.reconcile(true);
+const ttsSettings = new TtsSettingsController(settings, ttsSecrets, (keyChanged = false) => {
+  notificationSpeech?.reconcile(keyChanged);
+  tts.reconcile(keyChanged);
   changed();
 });
 const aiSecrets = new AiSecrets(path.join(dataDirectory, 'ai-keys.json'), {
@@ -1056,8 +1060,9 @@ const serviceSettings = new SettingsServiceTargets({
   assertWritable: assertSettingsWritable,
 });
 let aiMcpGeneration = 0;
-const aiOwner = (id?: string) =>
-  id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration;
+const aiOwner = (id?: string, context: InputInvocation = {}) =>
+  (id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration) +
+  (id && context.origin?.kind === 'mcp' ? '|mcp:' + aiMcpGeneration : '');
 const errors = new ErrorReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('error', source, message),
@@ -1086,7 +1091,15 @@ const ai = new AiService({
             : mcpAllowed('allowUseAi') && (kind !== 'generate' || mcpAllowed('allowExecute'))))
       );
     }
-    const item = [...(manager?.items.values() ?? [])].find((e) => owner === aiOwner(e.manifest.id));
+    const indirect = owner.includes('|mcp:');
+    if (
+      indirect &&
+      (!mcpAllowed('allowUseAi') || (kind === 'generate' && !mcpAllowed('allowExecute')))
+    )
+      return false;
+    const item = [...(manager?.items.values() ?? [])].find(
+      (e) => owner === aiOwner(e.manifest.id, indirect ? { origin: { kind: 'mcp' } } : {}),
+    );
     const grants =
       item && ['starting', 'running'].includes(item.state)
         ? appletApiAccess.get(item.manifest)
@@ -1133,6 +1146,8 @@ const imageAi = new ImageAiService({
   canUse: (owner, kind) => {
     if (quitting) return false;
     if (owner === 'host') return startupReady;
+    const indirect = owner.includes('|mcp:');
+    if (indirect) return false;
     const item = [...(manager?.items.values() ?? [])].find((e) => owner === aiOwner(e.manifest.id));
     const grants =
       item && ['starting', 'running'].includes(item.state)
@@ -1581,22 +1596,38 @@ const operationApi = new AppDockApi({
     }),
     'mcp.jobs.get': async (p, id, c) => ({ ...mcpClient.get(mcpActor(id, c), p.jobId) }),
     'mcp.jobs.cancel': async (p, id, c) => ({ ...mcpClient.cancel(mcpActor(id, c), p.jobId) }),
-    'ai.image.connections.list': async (_params, id) => ({ ...imageAi.connections(aiOwner(id)) }),
-    'ai.image.jobs.get': async (params, id) => ({ ...imageAi.get(aiOwner(id), params.jobId) }),
-    'ai.image.jobs.cancel': async (params, id) => ({
-      ...imageAi.cancel(aiOwner(id), params.jobId),
+    'ai.image.connections.list': async (_params, id, context) => ({
+      ...imageAi.connections(aiOwner(id, context)),
     }),
-    'ai.text.generate': async (params, id) => ({ ...ai.generate(aiOwner(id), params) }),
-    'ai.jobs.get': async (params, id) => ({ ...ai.get(aiOwner(id), params.jobId) }),
-    'ai.jobs.cancel': async (params, id) => ({ ...ai.cancel(aiOwner(id), params.jobId) }),
-    'ai.models.list': async (params, id) => ({
-      ...(await ai.models(aiOwner(id), params.connectionId)),
+    'ai.image.jobs.get': async (params, id, context) => ({
+      ...imageAi.get(aiOwner(id, context), params.jobId),
     }),
-    'tts.speak': async (params, id) => tts.speak(ttsOwner(id), params),
-    'tts.connections.list': async (_params, id) => tts.connections(ttsOwner(id)),
-    'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
-    'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
-    'tts.stop': async (params, id) => ({ ...(await tts.stop(ttsOwner(id), params.jobId)) }),
+    'ai.image.jobs.cancel': async (params, id, context) => ({
+      ...imageAi.cancel(aiOwner(id, context), params.jobId),
+    }),
+    'ai.text.generate': async (params, id, context) => ({
+      ...ai.generate(aiOwner(id, context), params),
+    }),
+    'ai.jobs.get': async (params, id, context) => ({
+      ...ai.get(aiOwner(id, context), params.jobId),
+    }),
+    'ai.jobs.cancel': async (params, id, context) => ({
+      ...ai.cancel(aiOwner(id, context), params.jobId),
+    }),
+    'ai.models.list': async (params, id, context) => ({
+      ...(await ai.models(aiOwner(id, context), params.connectionId)),
+    }),
+    'tts.speak': async (params, id, context) => tts.speak(ttsOwner(id, context), params),
+    'tts.connections.list': async (_params, id, context) => tts.connections(ttsOwner(id, context)),
+    'tts.voices.list': async (_params, id, context) => ({
+      ...(await tts.voices(ttsOwner(id, context))),
+    }),
+    'tts.jobs.get': async (params, id, context) => ({
+      ...tts.get(ttsOwner(id, context), params.jobId),
+    }),
+    'tts.stop': async (params, id, context) => ({
+      ...(await tts.stop(ttsOwner(id, context), params.jobId)),
+    }),
     'ui.ribbon.get': async (params, id, context) => {
       const permissions = externalUiPermissions(id);
       const published = (await operationApi.call('commands.list', {}, id, context))
@@ -2443,10 +2474,18 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
       await dialog.showMessageBox({
         type: 'warning',
         message: hostText(
-          plan.scope === 'device' ? 'recovery.confirmDevice' : 'recovery.confirmShared',
+          plan.scope === 'local'
+            ? 'recovery.confirmLocal'
+            : plan.scope === 'device'
+              ? 'recovery.confirmDevice'
+              : 'recovery.confirmShared',
         ),
         detail: hostText(
-          plan.scope === 'device' ? 'recovery.detailDevice' : 'recovery.detailShared',
+          plan.scope === 'local'
+            ? 'recovery.detailLocal'
+            : plan.scope === 'device'
+              ? 'recovery.detailDevice'
+              : 'recovery.detailShared',
           { modifiedAt: new Date(plan.modifiedAt).toLocaleString() },
         ),
         buttons: [hostText('recovery.cancel'), hostText('recovery.restore')],
@@ -2488,7 +2527,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     return (['restore', 'open', 'reload', 'quit'] as const)[result.response] ?? 'quit';
   },
 };
-async function restoreSettingsBackup(scope?: 'shared' | 'device') {
+async function restoreSettingsBackup(scope?: 'shared' | 'device' | 'local') {
   if (settingsOperationBusy() || quitting) throw Error(hostText('services.index.settingsBusy'));
   settingsRecoveryBusy = true;
   settings.writesBlocked = true;
@@ -2521,7 +2560,7 @@ function commitSettings(
   value: Settings,
   revision: number,
   resetPage?: SettingsPageDefinition,
-  rewrite: ('shared' | 'device')[] = [],
+  rewrite: ('shared' | 'device' | 'local')[] = [],
   resetScope: SettingsResetScope = 'page',
 ) {
   assertSettingsWritable();
@@ -2563,7 +2602,8 @@ function settingsPageStorage(
     page.kind === 'applet'
       ? settings.localSettings(owner!)
       : isHostPageSettingsId(page.id) && settings.hostPageLocalSettings(page.id);
-  const scopes = new Set<'shared' | 'device'>();
+  const scopes = new Set<'shared' | 'device' | 'local'>();
+  if (page.id === 'notifications') scopes.add('local');
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
   for (const p of settingsResetPaths(page, allApplets(), resetScope)) {
     scopes.add(
@@ -3262,7 +3302,7 @@ function settingsPageActions(
       settings.assertRevision(revision);
       if (!settingsPageStorage(page).files.some((file) => file.scope === scope))
         throw Error(hostText('settings.index.wrongStorage'));
-      const file = settings.targetFile(scope as 'shared' | 'device');
+      const file = settings.targetFile(scope as 'shared' | 'device' | 'local');
       if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
@@ -3457,7 +3497,7 @@ function settingsPageActions(
   }
   if (page.id === 'about') {
     actions.restoreScopedSettings = async ([scope]) => {
-      if (scope !== 'shared' && scope !== 'device')
+      if (scope !== 'shared' && scope !== 'device' && scope !== 'local')
         throw Error(hostText('settings.index.invalidRecovery'));
       await restoreSettingsBackup(scope);
       return null;

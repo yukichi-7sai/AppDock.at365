@@ -2,6 +2,7 @@ import { hostText } from './i18n';
 export interface AiConnectionSettings {
   id: string;
   name: string;
+  mcpEnabled?: boolean;
   protocol: 'openai-chat-completions';
   preset: 'ollama' | 'lm-studio' | 'llama-cpp' | 'openai' | 'custom';
   baseUrl: string;
@@ -125,6 +126,7 @@ export function parseAiSettings(value: unknown): AiSettings {
     if (!aiObject(item)) throw Error(hostText('settings.ai.connection'));
     keys(item, [
       'id',
+      'mcpEnabled',
       'name',
       'protocol',
       'preset',
@@ -138,6 +140,7 @@ export function parseAiSettings(value: unknown): AiSettings {
       'compatibility',
     ]);
     if (
+      (item.mcpEnabled !== undefined && typeof item.mcpEnabled !== 'boolean') ||
       !aiId(item.id) ||
       ids.has(item.id) ||
       !aiString(item.name, 160) ||

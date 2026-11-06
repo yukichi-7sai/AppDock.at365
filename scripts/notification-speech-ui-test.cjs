@@ -21,7 +21,7 @@ let child,
   success = false;
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const savedNotifications = () =>
-  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile))).notificationPreferences;
+  require('./test-settings.cjs').read(profile).notificationPreferences;
 const until = async (fn, label) => {
   const end = Date.now() + 30000;
   while (Date.now() < end) {
@@ -149,10 +149,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         ");});c.commands.register('fixture.speech.real','Real',async()=>{id=(await c.notifications.publish({typeId:'message',title:'通知読み上げの動作確認です。',body:'',dedupeKey:'real'})).notificationId;});};",
     );
     initial.extensions[id] = { enabled: true, settings: {} };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(initial),
-    );
+    require('./test-settings.cjs').write(profile, initial);
     const exe = process.argv[2] ? testHostPath(profile) : require('electron');
     if (process.argv[2]) {
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);

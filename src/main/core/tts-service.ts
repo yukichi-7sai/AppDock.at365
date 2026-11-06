@@ -1,3 +1,4 @@
+import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
 import { AutomationError } from './appdock-api';
@@ -130,6 +131,7 @@ export interface TtsInternalOptions {
   audio?: { maximumBytes: number; receive(bytes: Buffer, seconds: number): void };
 }
 interface InternalJob {
+  connectionId?: string;
   view: TtsJob;
   owner: string;
   requestId: string;
@@ -188,7 +190,7 @@ export class TtsService {
       limits?: Partial<typeof ttsLimits>;
     },
   ) {
-    this.signature = JSON.stringify(options.settings());
+    this.signature = generationConfigurationSignature(options.settings());
     this.limits = { ...ttsLimits, ...options.limits };
   }
   private connection(id?: string) {
@@ -200,12 +202,25 @@ export class TtsService {
       );
     return server;
   }
+  private connectionAllowed(owner: string, id?: string) {
+    return generationConnectionAllowed(
+      owner,
+      this.options.settings().connections.find((c) => c.id === id),
+    );
+  }
+  private authorizeConnection(owner: string, id?: string) {
+    if (!this.connectionAllowed(owner, id))
+      fail('API_DISABLED', hostText('settings.generation.permissionDenied'));
+  }
   connections(owner: string): TtsConnectionsResult {
     this.authorize(owner, false);
     const config = this.options.settings();
     return {
-      connections: config.connections.map(({ id, name }) => ({ id, name })),
-      ...(config.defaultConnectionId === undefined
+      connections: config.connections
+        .filter((c) => generationConnectionAllowed(owner, c))
+        .map(({ id, name }) => ({ id, name })),
+      ...(config.defaultConnectionId === undefined ||
+      !this.connectionAllowed(owner, config.defaultConnectionId)
         ? {}
         : { defaultConnectionId: config.defaultConnectionId }),
     };
@@ -327,10 +342,15 @@ export class TtsService {
       (j) => j.owner === owner && j.requestId === requestId,
     );
     if (previous) {
+      this.authorizeConnection(owner, previous.connectionId);
       if (previous.fingerprint !== fingerprint)
         fail('TTS_REQUEST_CONFLICT', hostText('services.ttsService.requestIdConflict'));
       return { ...previous.view, completion: 'accepted' };
     }
+    const selectedId = internal?.configuration
+      ? undefined
+      : this.connection(connectionId as string | undefined).id;
+    this.authorizeConnection(owner, selectedId);
     const config = this.config(true, internal?.configuration, connectionId as string | undefined);
     const selectedInstructions =
       config.instructionsMode === 'none'
@@ -354,6 +374,7 @@ export class TtsService {
     const now = new Date().toISOString();
     const j: InternalJob = {
       owner,
+      connectionId: selectedId,
       internal,
       requestId: requestId as string,
       fingerprint,
@@ -425,19 +446,31 @@ export class TtsService {
     this.finish(j, 'canceled');
   }
   reconcile(keyChanged = false) {
-    const signature = JSON.stringify(this.options.settings());
+    const signature = generationConfigurationSignature(this.options.settings());
     const changed = keyChanged || signature !== this.signature;
     this.signature = signature;
     for (const j of this.jobs.values())
       if (
         !j.ended &&
-        (!this.options.canUse(j.owner, true) || (changed && j.view.state !== 'playing'))
+        (!this.options.canUse(j.owner, true) ||
+          !this.connectionAllowed(j.owner, j.connectionId) ||
+          (changed && j.view.state !== 'playing'))
       )
         this.cancel(j);
     for (const [owner, list] of this.lists)
-      if (changed || !this.options.canUse(owner, false)) list.abort.abort();
+      if (
+        changed ||
+        !this.options.canUse(owner, false) ||
+        !this.connectionAllowed(owner, this.options.settings().defaultConnectionId)
+      )
+        list.abort.abort();
     for (const [owner, list] of this.modelLists)
-      if (changed || !this.options.canUse(owner, false)) list.abort.abort();
+      if (
+        changed ||
+        !this.options.canUse(owner, false) ||
+        !this.connectionAllowed(owner, this.options.settings().defaultConnectionId)
+      )
+        list.abort.abort();
   }
   async stopAll() {
     for (const j of this.jobs.values()) this.cancel(j);
@@ -474,6 +507,7 @@ export class TtsService {
   private async run(j: InternalJob) {
     try {
       this.authorize(j.owner, true);
+      this.authorizeConnection(j.owner, j.connectionId);
       this.checkStart(j);
       this.state(j, 'generating');
       const controller = j.abort;
@@ -502,6 +536,7 @@ export class TtsService {
       const bytes = finalizeTtsWave(received);
       const seconds = waveDuration(bytes);
       this.authorize(j.owner, true);
+      this.authorizeConnection(j.owner, j.connectionId);
       this.checkStart(j);
       if (j.internal?.audio) {
         j.internal.audio.receive(bytes, seconds);
@@ -510,6 +545,7 @@ export class TtsService {
         if (j.ended === undefined)
           await this.options.play(bytes, seconds, controller.signal, () => {
             this.authorize(j.owner, true);
+            this.authorizeConnection(j.owner, j.connectionId);
             this.checkStart(j);
             clearTimeout(j.startTimer);
             this.state(j, 'playing');
@@ -606,6 +642,7 @@ export class TtsService {
     configuration?: { settings: TtsSettings; key?: string },
   ): Promise<{ models: TtsVoice[] }> {
     this.authorize(owner, false);
+    if (!configuration) this.authorizeConnection(owner, this.connection().id);
     const config = this.config(false, configuration);
     const existing = this.modelLists.get(owner);
     if (existing && !existing.abort.signal.aborted) {
@@ -634,6 +671,7 @@ export class TtsService {
         if (abort.signal.aborted)
           fail('TTS_TIMEOUT', hostText('services.ttsService.modelsCancelled'));
         this.authorize(owner, false);
+        if (!configuration) this.authorizeConnection(owner, this.connection().id);
         try {
           const value = JSON.parse(bytes.toString('utf8'));
           return { models: parseTtsModels(value) };
@@ -653,6 +691,7 @@ export class TtsService {
     configuration?: { settings: TtsSettings; key?: string },
   ): Promise<{ voices: TtsVoice[]; source: 'endpoint' | 'manual' }> {
     this.authorize(owner, false);
+    if (!configuration) this.authorizeConnection(owner, this.connection().id);
     const config = parseTtsSettings(configuration?.settings ?? ttsServerSpeech(this.connection()));
     if (config.voicesSource === 'manual')
       return Promise.resolve({ voices: config.manualVoices, source: 'manual' });
@@ -682,6 +721,7 @@ export class TtsService {
         if (abort.signal.aborted)
           fail('TTS_TIMEOUT', hostText('services.ttsService.voicesCancelled'));
         this.authorize(owner, false);
+        if (!configuration) this.authorizeConnection(owner, this.connection().id);
         try {
           const v = JSON.parse(bytes.toString('utf8'));
           return { voices: parseTtsVoices(v.voices), source: 'endpoint' as const };

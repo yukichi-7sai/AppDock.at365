@@ -104,6 +104,7 @@ async function configure(patch) {
         {
           ...require('../out/main/shared/tts').newTtsServer('default'),
           name: 'Primary',
+          mcpEnabled: true,
           baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
           model: 'test',
           defaultVoice: 'voice-a',
@@ -164,10 +165,7 @@ async function configure(patch) {
           `exports.activate=async c=>c.commands.register('fixture.tts-node.speak','TTS probe',async()=>{let r;try{await c.appdock.call('tts.connections.list');const j=await c.appdock.call('tts.speak',{text:'SDK音声テスト。',connectionId:'default',instructions:'Nodeのニュアンス',requestId:require('node:crypto').randomUUID()});r={ok:true,...await c.appdock.call('tts.jobs.get',{jobId:j.jobId})};}catch(e){r={code:e.code};}await c.log.info('tts-probe:'+JSON.stringify(r));});`,
         );
     }
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(settings),
-    );
+    require('./test-settings.cjs').write(profile, settings, local);
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
     const port = probe.address().port;
@@ -469,6 +467,26 @@ async function configure(patch) {
     assert.equal(media.rate, 1);
     assert.equal((await call('appdock_tts_stop', { jobId: long.jobId })).state, 'canceled');
     checks.push('31-second WAV playback and stop');
+    const presetRevoked = await call('appdock_tts_speak', {
+      text: 'long',
+      requestId: 'preset-revoke',
+    });
+    await until(
+      async () => (await state(presetRevoked)).state === 'playing',
+      'preset revoke playing',
+    );
+    await configure({ mcpEnabled: false });
+    await until(async () => (await state(presetRevoked)).state === 'canceled', 'preset revoked');
+    assert.deepEqual((await call('appdock_tts_list_connections')).connections, []);
+    const presetDenied = await client.callTool({
+      name: 'appdock_tts_speak',
+      arguments: { text: 'blocked', requestId: 'preset-denied' },
+    });
+    assert.equal(presetDenied.structuredContent.code, 'API_DISABLED');
+    await configure({ mcpEnabled: true });
+    checks.push(
+      'per-preset MCP revoke cancels playback, hides connections and rejects the default',
+    );
     const revoked = await call('appdock_tts_speak', { text: 'long', requestId: 'revoke' });
     await until(async () => (await state(revoked)).state === 'playing', 'revoke playing');
     await host.evaluate(() => window.dock.automation({ kind: 'setTts', allowed: false }));

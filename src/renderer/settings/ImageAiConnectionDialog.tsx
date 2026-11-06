@@ -1,3 +1,4 @@
+import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -120,6 +121,11 @@ export function ImageAiConnectionDialog({
         hidden={tab !== 0}
       >
         <div className="server-editor-grid">
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => patch({ mcpEnabled })}
+            future
+          />
           <SettingsField settingKey="name" title={t('settings.aiConnectionDialog.name')}>
             <SettingsInput
               aria-label={t('settings.aiConnectionDialog.name')}

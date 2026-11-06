@@ -1,3 +1,4 @@
+import { GenerationMcpPermission } from './GenerationMcpPermission';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -119,6 +120,10 @@ export function TtsConnectionDialog({
         hidden={tab !== 'connection'}
       >
         <div className="server-editor-grid">
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => change({ mcpEnabled })}
+          />
           <SettingsField settingKey="name" title={t('settings.ttsServers.name')}>
             <SettingsInput
               data-initial-focus

@@ -1,3 +1,4 @@
+import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { aiObject } from '../../shared/ai';
@@ -78,9 +79,14 @@ export class ImageAiService {
     this.authorize(owner, 'result');
     const settings = parseImageAiSettings(this.options.settings());
     return {
-      defaultConnectionId: settings.defaultConnectionId,
+      defaultConnectionId: generationConnectionAllowed(
+        owner,
+        settings.connections.find((c) => c.id === settings.defaultConnectionId),
+      )
+        ? settings.defaultConnectionId
+        : undefined,
       connections: settings.connections
-        .filter((c) => this.adapters.has(c.protocol))
+        .filter((c) => this.adapters.has(c.protocol) && generationConnectionAllowed(owner, c))
         .map((c) => ({
           id: c.id,
           name: c.name,
@@ -116,6 +122,13 @@ export class ImageAiService {
       (j) => j.owner === owner && j.requestId === input.requestId,
     );
     if (prior) {
+      if (
+        !generationConnectionAllowed(
+          owner,
+          this.options.settings().connections.find((c) => c.id === prior.connection.id),
+        )
+      )
+        imageFail('API_DISABLED', 'permission');
       if (prior.fingerprint !== fingerprint) imageFail('IMAGE_AI_REQUEST_CONFLICT', 'conflict');
       return { ...this.get(owner, prior.view.jobId), completion: 'accepted' };
     }
@@ -126,6 +139,7 @@ export class ImageAiService {
     if (!c && input.connectionId !== undefined) return imageFail('NOT_FOUND', 'notConfigured');
     if (!c || !this.adapters.has(c.protocol))
       return imageFail('IMAGE_AI_NOT_CONFIGURED', 'notConfigured');
+    if (!generationConnectionAllowed(owner, c)) imageFail('API_DISABLED', 'permission');
     let key: string | undefined;
     try {
       key = c.authentication === 'bearer' ? this.options.key(c) : undefined;
@@ -158,7 +172,7 @@ export class ImageAiService {
       requestId: input.requestId,
       fingerprint,
       connection: c,
-      signature: JSON.stringify(c),
+      signature: generationConfigurationSignature(c),
       key,
       request: { model, prompt, options: generationOptions },
       abort: new AbortController(),
@@ -234,8 +248,13 @@ export class ImageAiService {
   private valid(j: Job) {
     return (
       this.options.canUse(j.owner, 'generate') &&
-      JSON.stringify(this.options.settings().connections.find((c) => c.id === j.connection.id)) ===
-        j.signature
+      generationConnectionAllowed(
+        j.owner,
+        this.options.settings().connections.find((c) => c.id === j.connection.id),
+      ) &&
+      generationConfigurationSignature(
+        this.options.settings().connections.find((c) => c.id === j.connection.id),
+      ) === j.signature
     );
   }
   private expire(j: Job) {

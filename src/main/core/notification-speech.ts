@@ -1,4 +1,5 @@
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
+import { generationConfigurationSignature } from './generation-access';
 import {
   notificationCatalog,
   notificationTypeKey,
@@ -36,7 +37,7 @@ export class NotificationSpeechService {
       startMs?: number;
     },
   ) {
-    this.signature = JSON.stringify(options.settings().tts);
+    this.signature = generationConfigurationSignature(options.settings().tts);
     this.stops = [
       options.service.subscribeEnded((id, status) => {
         const r = this.records.get(id);
@@ -140,7 +141,7 @@ export class NotificationSpeechService {
     this.updateUse();
   }
   reconcile(keyChanged = false) {
-    const signature = JSON.stringify(this.options.settings().tts);
+    const signature = generationConfigurationSignature(this.options.settings().tts);
     const changed = keyChanged || signature !== this.signature;
     this.signature = signature;
     const status = this.options.availability.status();

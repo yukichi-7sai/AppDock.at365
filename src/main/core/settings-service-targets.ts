@@ -89,7 +89,7 @@ interface Target {
   values(settings: Settings): RecordValue;
   overrides(raw: RecordValue): RecordValue;
   stored?(): RecordValue;
-  rewriteScope?: 'shared' | 'device' | (() => 'shared' | 'device');
+  rewriteScope?: 'shared' | 'device' | 'local' | (() => 'shared' | 'device' | 'local');
   replace(settings: Settings, changes: RecordValue, reset: string[]): Settings;
   guard?(next: Settings): void;
   normalize?(changes: RecordValue): RecordValue;
@@ -145,7 +145,7 @@ export class SettingsServiceTargets {
       revision(): string;
       checkRevision(revision: string): void;
       validate(value: Settings): Settings;
-      save(value: Settings, revision: number, rewrite: ('shared' | 'device')[]): unknown;
+      save(value: Settings, revision: number, rewrite: ('shared' | 'device' | 'local')[]): unknown;
       ai: AiSettingsController;
       imageAi?: ImageAiSettingsController;
       tts: TtsSecrets;
@@ -306,7 +306,12 @@ export class SettingsServiceTargets {
                 ? [
                     typeof spec.rewriteScope === 'function'
                       ? spec.rewriteScope()
-                      : (spec.rewriteScope ?? 'shared'),
+                      : (spec.rewriteScope ??
+                        (['ai', 'tts', 'imageAi'].some((key) =>
+                          spec.id.startsWith('service.' + key),
+                        )
+                          ? 'local'
+                          : 'shared')),
                   ]
                 : [],
             );
@@ -1382,7 +1387,7 @@ export class SettingsServiceTargets {
           const after = selectedTtsServer(next.tts, before.id);
           if (
             after?.baseUrl !== before.baseUrl &&
-            this.options.tts.configurationState(before.id).protected
+            (this.options.tts.configurationState(before.id).protected || before.mcpEnabled === true)
           )
             fail('LOCAL_ACTION_REQUIRED');
         }
@@ -1536,7 +1541,14 @@ export class SettingsServiceTargets {
       overrides: (raw) => project(raw.tts, [definition]),
       replace: (settings, changes) => {
         const current = parseTtsConfiguration(settings.tts);
-        const connections = ((changes.connections as unknown[]) ?? []).map(parseTtsServer);
+        const connections = ((changes.connections as unknown[]) ?? []).map((row) => {
+          const c = parseTtsServer(row);
+          const before = current.connections.find((v) => v.id === c.id);
+          return {
+            ...c,
+            ...(before?.mcpEnabled === undefined ? {} : { mcpEnabled: before.mcpEnabled }),
+          };
+        });
         settings.tts = parseTtsConfiguration({
           connections,
           defaultConnectionId: connections.some((c) => c.id === current.defaultConnectionId)
@@ -1555,7 +1567,7 @@ export class SettingsServiceTargets {
           const changed = byId.get(c.id);
           if (
             (!changed || changed.baseUrl !== c.baseUrl) &&
-            this.options.tts.configurationState(c.id).protected
+            (this.options.tts.configurationState(c.id).protected || c.mcpEnabled === true)
           )
             fail('LOCAL_ACTION_REQUIRED');
         }

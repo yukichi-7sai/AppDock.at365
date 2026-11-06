@@ -1,3 +1,4 @@
+import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import { hostText } from '../../shared/i18n';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -71,14 +72,14 @@ export class AiService {
   ) {
     this.limits = { ...aiLimits, ...options.limits };
     this.adapter = new AiOpenAiChat(options.fetcher);
-    this.signature = JSON.stringify(options.settings());
+    this.signature = generationConfigurationSignature(options.settings());
   }
   private authorize(owner: string, kind: Kind) {
     if (this.closed) aiFail('NOT_READY', hostText('services.aiService.closed'));
     if (!this.options.canUse(owner, kind))
       aiFail('API_DISABLED', hostText('services.aiService.permission'));
   }
-  private connection(id: unknown) {
+  private connection(id: unknown, owner: string) {
     const settings = parseAiSettings(this.options.settings());
     const selected = id ?? settings.defaultConnectionId;
     if (id !== undefined && (typeof id !== 'string' || !id))
@@ -86,6 +87,8 @@ export class AiService {
     const c = settings.connections.find((c) => c.id === selected);
     if (!c || !c.baseUrl)
       return aiFail('AI_NOT_CONFIGURED', hostText('services.aiService.configureConnection'));
+    if (!generationConnectionAllowed(owner, c))
+      aiFail('API_DISABLED', hostText('settings.generation.permissionDenied'));
     let key: string | undefined;
     try {
       key = c.authentication === 'bearer' ? this.options.key(c) : undefined;
@@ -174,11 +177,18 @@ export class AiService {
       (j) => j.owner === owner && j.requestId === input.requestId,
     );
     if (prior) {
+      if (
+        !generationConnectionAllowed(
+          owner,
+          this.options.settings().connections.find((c) => c.id === prior.connectionId),
+        )
+      )
+        aiFail('API_DISABLED', hostText('settings.generation.permissionDenied'));
       if (prior.fingerprint !== fingerprint)
         aiFail('AI_REQUEST_CONFLICT', hostText('services.aiService.requestIdConflict'));
       return { ...this.view(prior), completion: 'accepted' };
     }
-    const { c, key } = this.connection(input.connectionId);
+    const { c, key } = this.connection(input.connectionId, owner);
     const model = input.model ?? c.defaultModel;
     if (!model?.trim())
       return aiFail('AI_MODEL_REQUIRED', hostText('services.aiService.selectModel'));
@@ -227,7 +237,7 @@ export class AiService {
       key,
       abort: new AbortController(),
       deadline: now + (input.timeoutMs ?? c.defaultTimeoutSeconds * 1000),
-      configSignature: JSON.stringify(c),
+      configSignature: generationConfigurationSignature(c),
       view: {
         jobId: randomUUID(),
         state: 'queued',
@@ -304,7 +314,11 @@ export class AiService {
     if (!j.c || !this.options.canUse(j.owner, 'generate')) return false;
     const current = this.options.settings();
     const c = current.connections.find((v) => v.id === j.c!.id);
-    return !!c && JSON.stringify(c) === j.configSignature;
+    return (
+      !!c &&
+      generationConnectionAllowed(j.owner, c) &&
+      generationConfigurationSignature(c) === j.configSignature
+    );
   }
   private pump() {
     if (this.closed) return;
@@ -371,7 +385,7 @@ export class AiService {
   }
   models(owner: string, id?: unknown): Promise<{ models: import('../../shared/ai').AiModel[] }> {
     this.authorize(owner, 'models');
-    const { c, key } = this.connection(id);
+    const { c, key } = this.connection(id, owner);
     const identity = JSON.stringify([owner, c.id]);
     const prior = this.lists.get(identity);
     if (prior && !prior.abort.signal.aborted)
@@ -385,9 +399,17 @@ export class AiService {
       .then((value) => {
         this.authorize(owner, 'models');
         if (
+          !generationConnectionAllowed(
+            owner,
+            this.options.settings().connections.find((v) => v.id === c.id),
+          )
+        )
+          aiFail('API_DISABLED', hostText('settings.generation.permissionDenied'));
+        if (
           abort.signal.aborted ||
-          JSON.stringify(this.options.settings().connections.find((v) => v.id === c.id)) !==
-            JSON.stringify(c)
+          generationConfigurationSignature(
+            this.options.settings().connections.find((v) => v.id === c.id),
+          ) !== generationConfigurationSignature(c)
         )
           return aiFail('AI_CANCELED', hostText('services.aiService.staleList'));
         return value;
@@ -401,7 +423,7 @@ export class AiService {
   }
   reconcile(keyChanged: boolean | string = false) {
     const current = this.options.settings(),
-      signature = JSON.stringify(current),
+      signature = generationConfigurationSignature(current),
       changed = signature !== this.signature;
     this.signature = signature;
     for (const j of this.records.values()) {
@@ -424,7 +446,11 @@ export class AiService {
         changed ||
         keyChanged === true ||
         keyChanged === list.c.id ||
-        !this.options.canUse(list.owner, 'models')
+        !this.options.canUse(list.owner, 'models') ||
+        !generationConnectionAllowed(
+          list.owner,
+          current.connections.find((c) => c.id === list.c.id),
+        )
       )
         list.abort.abort();
     for (const id of this.rates.keys())

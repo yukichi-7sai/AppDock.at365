@@ -82,10 +82,10 @@ export interface SettingsPageAuxiliary {
     local: boolean;
     signature: string;
     revision: number;
-    files: { scope: 'shared' | 'device'; name: string }[];
+    files: { scope: 'shared' | 'device' | 'local'; name: string }[];
   };
   settingsFiles?: {
-    scope: 'shared' | 'device';
+    scope: 'shared' | 'device' | 'local';
     path: string;
     recovered: boolean;
     errors: string[];

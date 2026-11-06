@@ -38,6 +38,7 @@ function setup(t, extra = {}) {
     connections: [
       {
         ...newAiConnection('local'),
+        mcpEnabled: true,
         alwaysPrompt: 'いつもの方針',
         baseUrl: 'http://localhost:11434/proxy/v1',
         defaultModel: 'default',
