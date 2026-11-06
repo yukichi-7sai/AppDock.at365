@@ -16,53 +16,23 @@
 
 OpenAIの現在の生成契約に合わせ、枚数は1～10、プロンプトは結合後32,000文字以内。サイズ・品質の対応範囲はモデルに依存する。圧縮品質はJPEG/WebPのみ0～100、透過背景はPNG/WebPのみ。PNGでは圧縮品質を空欄にする。待ち時間は待機列を含み、既定600秒。HTTP失敗・取消時の自動再送、他サーバーへの自動切替は行わない。旧DALL-EのURL返却や画像編集は対象外。
 
-## 共通API
+## 公開範囲と内部処理
 
-最低本体版は0.165.0。Appletは `appdock-api` capabilityを宣言し、Nodeは `context.appdock.call`、.NETは `context.AppDock.CallAsync` を使う。両者で同じ操作名・引数を利用できる。
+Applet向けには `ai.image.connections.list` を提供する。`appdock-api` capabilityとread + useImageAi許可が必要で、Nodeは`context.appdock.call('ai.image.connections.list', {})`、.NETは`context.AppDock.CallAsync("ai.image.connections.list", new {}, token)`を使う。登録ID・名前・種類・既定モデル・対応機能・既定IDを返し、認証情報やプロンプトを返さず、生成サーバーへの通信も開始しない。
 
-| 操作 | 内容 | 必要許可 |
-| --- | --- | --- |
-| `ai.image.connections.list` | ID・名前・種類・既定モデル・対応機能・既定ID | read + useImageAi |
-| `ai.image.generate` | 文章から画像生成を受け付ける | read + execute + useImageAi |
-| `ai.image.jobs.get` | 自分のジョブの状態・画像ID・期限を取得 | read |
-| `ai.image.jobs.cancel` | 自分のジョブを取り消す | read + execute |
-| `ai.image.results.read` | 自分の結果画像を分割取得 | read + useImageAi |
+付随する`ai.image.jobs.get`（read）と`ai.image.jobs.cancel`（read + execute）も維持する。引数は`{jobId}`で、呼び出し元のApplet実行世代に属するジョブだけを取得・取消する。他のAppletや本体の試験ジョブはNOT_FOUNDになる。状態取得は画像本体を返さない。現在はAppletから新しい画像生成ジョブを作る公開入口はなく、生成登録APIの追加時に登録までの状態・取消へ接続する。
 
-`useImageAi` は「操作の許可」のApplet列で切り替える。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は既存方針に従って許可する。MCPの画像生成操作は今回公開せず、MCP列は未対応と表示する。MCP経由のAppletコマンドも画像生成許可を迂回できない。
+`ai.image.generate`と、256KiBずつ生成画像を取得する`ai.image.results.read`はAppletへ公開しない。Node/.NETの汎用Callでも実行できず、公開操作の一覧にも含めない。MCPには接続一覧・ジョブ操作を含む画像生成操作をまだ公開しない。生成・接続一覧・状態取得・取消・一時結果取得の内部機能は維持し、本体の設定試験で使用する。
 
-生成の引数は `{requestId, connectionId?, prompt?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
+「操作の許可」の画像生成AI（`useImageAi`）は項目と保存値を維持する。現在の接続一覧と、後続の「生成してライブラリーに登録するAPI」で使い、公開終了を理由に廃止・移行しない。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は従来どおり許可する。MCP列は引き続き未対応と表示する。許可がONでも非公開の操作は呼び出せない。
 
-同じ呼び出し元のrequestIdと同じ引数は、保持中の既存ジョブを返す。異なる引数への再利用はIMAGE_AI_REQUEST_CONFLICT。返り値の `completion:'accepted'` は受付で、生成成功ではない。jobs.getのstateはqueued/running/completed/failed/canceled。失敗時は安全なcode/messageを返し、サーバーの応答本文は公開しない。
+本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, prompt?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
 
-`completed` のimagesは `{id,mimeType,byteLength}[]`。画像本体を含めず、results.readへ `{jobId,imageId,offset?}` を渡す。dataはBase64、offset/nextOffsetは復号後のバイト位置、doneがtrueになるまで取得する。1応答は画像256KiB以下に分割し、既存native RPCの1MiB行制約内に収める。画像全体の容量上限ではない。
+同じ所有者のrequestIdと同じ引数は、保持中の既存ジョブを返す。異なる引数への再利用はIMAGE_AI_REQUEST_CONFLICT。`completion:'accepted'` は受付で、生成成功ではない。stateはqueued/running/completed/failed/canceled。失敗時は安全なcode/messageを返し、サーバーの応答本文は公開しない。
 
-```ts
-const accepted = await context.appdock.call('ai.image.generate', {
-  requestId: crypto.randomUUID(),
-  connectionId: '設定画面に表示されたID',
-  prompt: '朝の光が差す、緑に囲まれた小さな家',
-});
-// 呼び出し側の待機処理でjobs.getを読み、completedを確認する。
-const job = await context.appdock.call('ai.image.jobs.get', { jobId: accepted.jobId });
-if (job.state === 'completed') {
-  for (const image of job.images ?? []) {
-    let offset = 0;
-    const parts: Buffer[] = [];
-    for (;;) {
-      const part = await context.appdock.call('ai.image.results.read', {
-        jobId: job.jobId, imageId: image.id, offset,
-      });
-      parts.push(Buffer.from(part.data, 'base64'));
-      offset = part.nextOffset;
-      if (part.done) break;
-    }
-    const bytes = Buffer.concat(parts);
-    // bytesを呼び出し側の用途へ渡す。
-  }
-}
-```
+本体の試験表示は、完了したジョブの画像IDから内部の結果取得処理を呼び出す。現在は画像256KiB単位のBase64応答を組み立てて表示する。これは内部プレビューの転送方法であり、AppletのAPIでも画像全体の容量上限でもない。Applet RPCの1MiB制限は今回変更しない。
 
-結果画像は15分、終端ジョブとrequestIdの重複判定は30分保持する。再起動後や保持期限後のrequestId再利用は新しい生成になり得る。結果期限切れはIMAGE_AI_RESULT_EXPIRED。取得の再試行は再生成しない。画像を永続利用する機能は期限内に保存する。ジョブは呼び出し元のApplet実行世代へ結び付け、他Applet・再起動後のAppletから取得できない。許可撤回・登録変更・削除・終了時は待機/実行中の処理を取り消し、取消後の応答は採用しない。サーバー側の処理・課金停止は保証しない。
+結果画像は15分、終端ジョブとrequestIdの重複判定は30分保持する。再起動後や保持期限後のrequestId再利用は新しい生成になり得る。結果期限切れはIMAGE_AI_RESULT_EXPIRED。取得の再試行は再生成しない。ジョブは所有者ごとに分離する。登録変更・削除・終了などによる取消後の応答は採用しない。サーバー側の処理・課金停止は保証しない。
 
 ## 設定API
 
@@ -72,14 +42,14 @@ if (job.state === 'completed') {
 
 ImageAiServiceがジョブ・権限・プリセット解決・重複判定・結果保持を所有し、ImageAdapterがサーバー固有の検証と通信を担当する。OpenAiImageAdapterはImages APIのBase64応答をバイト列へ変換し、本体は既存の画像decoderで検証してから結果へ採用する。応答URLの追加取得は行わない。
 
-ComfyUI追加時は設定のprotocol別SchemaとUI、ワークフロー/入力の対応、queue/history/output取得を扱うアダプターを追加する。呼び出し側の生成・ジョブ・結果取得APIは維持する。対応機能はアダプターのcapabilitiesから返し、モデル固有/サーバー固有の詳細を共通必須項目へ混在させない。現在ComfyUIへの接続機能はない。
+ComfyUI追加時は設定のprotocol別SchemaとUI、ワークフロー/入力の対応、queue/history/output取得を扱うアダプターを追加する。本体内部の生成・ジョブ・結果取得処理を再利用する。対応機能はアダプターのcapabilitiesから返し、モデル固有/サーバー固有の詳細を共通必須項目へ混在させない。現在ComfyUIへの接続機能はない。
 
-次段階では「生成」と「生成済み結果の画像ライブラリー登録」を分けて再試行できるサービスを用意し、それを「生成してライブラリーへ取り込む」MCP操作から利用する構成が適する。登録失敗を理由に再生成せず、登録済み画像IDを主な戻り値とし、必要時だけプレビュー画像を添える。MCPはimage contentを扱えるが、クライアント側の対応・画像転送量も考慮し、Base64を通常のJSONテキストへ詰め込む方式は採らない。ライブラリー連携とMCP公開は今回の実装範囲外。
+生成機能を公開するときは、[アセットの実装方針](applet-assets.md)に従い、サーバーとプロンプトを指定し、ライブラリーへの登録までを一つの公開操作として扱う。AppletとMCPの両方から呼び出せるようにし、接続一覧・ジョブ状態取得・取消もその契約に接続する。生成結果専用の画像取得API・URL取得APIは追加しない。登録済みアセットはライブラリーの共通参照・URL取得へ接続する。内部では生成と登録を独立して再試行できるようにし、保存の失敗で再生成しない。画像の生成・登録APIとUI、MCP公開、Applet向けの共通URL取得は後続実装とする。
 
 ## 検証
 
 `tests/image-ai.test.cjs` と `tests/settings-service-targets.test.cjs` はローカルfixtureで送信内容、重複、取消、期限、権限、分割取得、破損画像、保存競合と認証のロールバックを確認する。
 
-`dotnet build tests/fixtures/dotnet/AppDock.Extensions.ImageAiProbe/AppDock.Extensions.ImageAiProbe.csproj -c Release` の後、`dev.bat exec node scripts/image-ai-ui-test.cjs [固定EXE]` で隔離設定の画面操作・画像表示・Node/.NET Appletの共通APIを確認する。外部OpenAIの実通信・課金、ComfyUI、MCP画像表示はこのfixture試験では検証しない。
+`dotnet build tests/fixtures/dotnet/AppDock.Extensions.ImageAiProbe/AppDock.Extensions.ImageAiProbe.csproj -c Release` の後、`dev.bat exec node scripts/image-ai-ui-test.cjs [固定EXE]` で隔離設定の画面操作・本体の生成画像表示・画像生成AIの許可項目と保存値の保持、Node/.NET Appletからの非公開操作の拒否を確認する。外部OpenAIの実通信・課金、ComfyUI、MCP画像表示はこのfixture試験では検証しない。
 
 仕様参照: [OpenAI Images生成API](https://developers.openai.com/api/reference/resources/images/methods/generate)、[MCPのツール結果](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)。

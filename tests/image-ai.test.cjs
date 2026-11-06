@@ -246,8 +246,12 @@ test('empty explicit prompt differs from omission; credentials and prompts stay 
   const j = f.s.generate('one', { requestId: 'default' });
   await completed(f.s, j.jobId);
   assert.equal(f.requests[0].body.prompt, 'default');
-  const methods = operationsFor('applet').map(([k]) => k);
-  assert(methods.includes('ai.image.results.read'));
+  assert.deepEqual(
+    operationsFor('applet')
+      .filter(([k]) => k.startsWith('ai.image.'))
+      .map(([k]) => k),
+    ['ai.image.connections.list', 'ai.image.jobs.get', 'ai.image.jobs.cancel'],
+  );
   assert(!operationsFor('mcp').some(([k]) => k.startsWith('ai.image.')));
 });
 function settingsFixture(t) {

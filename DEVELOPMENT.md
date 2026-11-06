@@ -18,6 +18,8 @@
 
 ## 文書の入口
 
+Appletのアセット登録・利用・生成に関する今後の共通方針と、現在の提供範囲は[Appletとライブラリーアセット](docs/applet-assets.md)を参照してください。
+
 AppletのStorage保存先`memory`と、ファイルを書き出さずにlocalページへ元画像を渡す契約は[メモリStorageと元画像表示](docs/memory-storage.md)を参照してください。
 
 | 対象                                 | 正本                                                                                                                                                                                                                                                |

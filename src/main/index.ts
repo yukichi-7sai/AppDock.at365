@@ -1582,12 +1582,10 @@ const operationApi = new AppDockApi({
     'mcp.jobs.get': async (p, id, c) => ({ ...mcpClient.get(mcpActor(id, c), p.jobId) }),
     'mcp.jobs.cancel': async (p, id, c) => ({ ...mcpClient.cancel(mcpActor(id, c), p.jobId) }),
     'ai.image.connections.list': async (_params, id) => ({ ...imageAi.connections(aiOwner(id)) }),
-    'ai.image.generate': async (params, id) => ({ ...imageAi.generate(aiOwner(id), params) }),
     'ai.image.jobs.get': async (params, id) => ({ ...imageAi.get(aiOwner(id), params.jobId) }),
     'ai.image.jobs.cancel': async (params, id) => ({
       ...imageAi.cancel(aiOwner(id), params.jobId),
     }),
-    'ai.image.results.read': async (params, id) => ({ ...imageAi.read(aiOwner(id), params) }),
     'ai.text.generate': async (params, id) => ({ ...ai.generate(aiOwner(id), params) }),
     'ai.jobs.get': async (params, id) => ({ ...ai.get(aiOwner(id), params.jobId) }),
     'ai.jobs.cancel': async (params, id) => ({ ...ai.cancel(aiOwner(id), params.jobId) }),

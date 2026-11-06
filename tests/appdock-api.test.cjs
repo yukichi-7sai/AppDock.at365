@@ -66,6 +66,65 @@ function setup(t) {
     grant: (p) => access.set(p),
   };
 }
+test('image generation stays private even with every Applet grant and a registered handler', async (t) => {
+  const f = setup(t);
+  const methods = ['ai.image.generate', 'ai.image.results.read'];
+  let invoked = false;
+  f.options.handlers = Object.fromEntries(
+    methods.map((method) => [
+      method,
+      async () => {
+        invoked = true;
+        return {};
+      },
+    ]),
+  );
+  const connections = { connections: [], defaultConnectionId: null };
+  f.options.handlers['ai.image.connections.list'] = async () => connections;
+  const job = { jobId: 'owned', state: 'running' };
+  for (const method of ['ai.image.jobs.get', 'ai.image.jobs.cancel']) {
+    f.options.handlers[method] = async (params, owner) => {
+      assert.deepEqual(params, { jobId: 'owned' });
+      assert.equal(owner, f.manifest.id);
+      return job;
+    };
+    assert.equal((await f.call(method, { jobId: 'owned' })).value, job);
+    await assert.rejects(async () => f.api.call(method, { jobId: 'owned' }), { code: 'NOT_FOUND' });
+  }
+  assert.equal(f.access.get().useImageAi, true);
+  const info = await f.call('system.getInfo');
+  assert.equal(info.ok, true);
+  for (const method of methods) {
+    assert(!info.value.methods.includes(method));
+    assert.equal((await f.call(method)).error.code, 'INVALID_ARGUMENT');
+    await assert.rejects(async () => f.api.call(method, {}, f.manifest.id), { code: 'NOT_FOUND' });
+    await assert.rejects(async () => f.api.call(method), { code: 'NOT_FOUND' });
+  }
+  assert.equal(invoked, false);
+  assert(info.value.methods.includes('ai.text.generate'));
+  assert(info.value.methods.includes('tts.speak'));
+  assert(info.value.methods.includes('ai.image.connections.list'));
+  await assert.rejects(async () => f.api.call('ai.image.connections.list'), { code: 'NOT_FOUND' });
+  for (const useImageAi of [false, true]) {
+    f.grant({ read: true, execute: true, useImageAi });
+    const reloaded = new AppletApiAccess(path.join(f.dir, 'applet-api.json'));
+    assert.equal(reloaded.error, undefined);
+    assert.equal(reloaded.get().useImageAi, useImageAi);
+    const listed = await f.call('ai.image.connections.list');
+    if (useImageAi) assert.deepEqual(listed, { ok: true, value: connections });
+    else assert.equal(listed.error.code, 'API_DISABLED');
+    assert.equal((await f.call('ai.image.generate')).error.code, 'INVALID_ARGUMENT');
+  }
+  f.grant({ read: true, execute: false, useImageAi: false });
+  assert.equal((await f.call('ai.image.jobs.get', { jobId: 'owned' })).value, job);
+  assert.equal(
+    (await f.call('ai.image.jobs.cancel', { jobId: 'owned' })).error.code,
+    'API_DISABLED',
+  );
+  f.grant({ read: false, execute: true, useImageAi: true });
+  assert.equal((await f.call('ai.image.jobs.get', { jobId: 'owned' })).error.code, 'API_DISABLED');
+});
+
 test('internal publication IDs share the external catalog without granting execution', async (t) => {
   const f = setup(t);
   f.options.commands = () => [

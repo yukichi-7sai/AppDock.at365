@@ -5,32 +5,27 @@ public sealed class ImageAiProbe : IAppDockExtension
 {
     public Task ActivateAsync(IExtensionContext context, CancellationToken cancellationToken)
     {
-        context.Commands.Register(context.ExtensionId + ".generate", "Image API probe", async token => {
-            object result;
-            try {
-                var list = await context.AppDock.CallAsync("ai.image.connections.list", new {}, token);
-                var accepted = await context.AppDock.CallAsync("ai.image.generate", new {
-                    requestId = Guid.NewGuid().ToString(), connectionId = "sdk"
-                }, token);
-                var id = accepted.GetProperty("jobId").GetString();
-                JsonElement job;
-                do {
-                    await Task.Delay(30, token);
-                    job = await context.AppDock.CallAsync("ai.image.jobs.get", new { jobId = id }, token);
-                } while (job.GetProperty("state").GetString() is "queued" or "running");
-                if (job.GetProperty("state").GetString() != "completed") throw new InvalidOperationException(job.ToString());
-                var imageId = job.GetProperty("images")[0].GetProperty("id").GetString();
-                var offset = 0;
-                using var bytes = new MemoryStream();
-                while (true) {
-                    var part = await context.AppDock.CallAsync("ai.image.results.read", new { jobId = id, imageId, offset }, token);
-                    bytes.Write(Convert.FromBase64String(part.GetProperty("data").GetString()!));
-                    offset = part.GetProperty("nextOffset").GetInt32();
-                    if (part.GetProperty("done").GetBoolean()) break;
-                }
-                result = new { ok = true, bytes = bytes.Length, connections = list.GetProperty("connections").GetArrayLength() };
-            } catch (AppDockApiException error) { result = new { code = error.Code }; }
-            await context.Log.InfoAsync("image-api-probe:" + JsonSerializer.Serialize(result), token);
+        context.Commands.Register(context.ExtensionId + ".probe", "Image API probe", async token => {
+            var rejected = new List<object>();
+            foreach (var method in new[] {
+                "ai.image.generate", "ai.image.results.read"
+            }) {
+                var code = "ALLOWED";
+                try { await context.AppDock.CallAsync(method, new {}, token); }
+                catch (AppDockApiException error) { code = error.Code; }
+                rejected.Add(new { method, code });
+            }
+            var list = await context.AppDock.CallAsync("ai.image.connections.list", new {}, token);
+            var jobs = new List<object>();
+            foreach (var method in new[] { "ai.image.jobs.get", "ai.image.jobs.cancel" }) {
+                var code = "ALLOWED";
+                try { await context.AppDock.CallAsync(method, new { jobId = "missing" }, token); }
+                catch (AppDockApiException error) { code = error.Code; }
+                jobs.Add(new { method, code });
+            }
+            await context.Log.InfoAsync("image-api-probe:" + JsonSerializer.Serialize(new {
+                rejected, connections = list.GetProperty("connections").GetArrayLength(), jobs
+            }), token);
         });
         return Task.CompletedTask;
     }

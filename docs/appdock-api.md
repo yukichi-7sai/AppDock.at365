@@ -20,7 +20,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 ## 画像生成AI
 
-Applet向けの `ai.image.connections.list/generate/jobs.get/jobs.cancel/results.read` を提供します。プリセットIDで接続先と生成設定を選び、受付後はジョブ状態を確認して画像を分割取得します。最低本体版・許可・引数・保持期限は[画像生成AI](image-ai.md)を参照してください。MCPへの画像生成公開は未対応です。
+Appletへは`ai.image.connections.list`（read + useImageAi）、`ai.image.jobs.get`（read）、`ai.image.jobs.cancel`（read + execute）を提供します。生成単体の`ai.image.generate`と、256KiB分割取得の`ai.image.results.read`は公開しません。MCPは付随APIを含め未対応です。本体の画像生成設定・試験・内部サービスと「操作の許可」の画像生成AI（`useImageAi`）は維持します。将来はサーバーとプロンプトを指定してライブラリーへ登録するAPIをApplet/MCP共通で提供し、付随APIも接続します。生成結果専用の取得APIは設けません。[アセットの実装方針](applet-assets.md)と[画像生成AI](image-ai.md)を参照してください。
 
 ## 構造と公開範囲
 

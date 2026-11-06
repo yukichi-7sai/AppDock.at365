@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'image-ai-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const png = require('../tests/fixtures/image-ai-png.cjs');
+const privateMethods = ['ai.image.generate', 'ai.image.results.read'];
 const requests = [],
   checks = [];
 let host, server;
@@ -69,12 +70,27 @@ const check = (name) => {
         runtime: 'node',
         entry: 'index.cjs',
         capabilities: ['appdock-api'],
-        commands: [{ id: id + '.generate', title: 'Image API probe' }],
+        commands: [{ id: id + '.probe', title: 'Image API probe' }],
       }),
     );
     fs.writeFileSync(
       path.join(dir, 'index.cjs'),
-      `exports.activate=async c=>c.commands.register('${id}.generate','Image API probe',async()=>{let result;try{const list=await c.appdock.call('ai.image.connections.list',{});const j=await c.appdock.call('ai.image.generate',{connectionId:'sdk',requestId:require('node:crypto').randomUUID()});let v;do{await new Promise(r=>setTimeout(r,30));v=await c.appdock.call('ai.image.jobs.get',{jobId:j.jobId});}while(['queued','running'].includes(v.state));if(v.state!=='completed')throw Error(JSON.stringify(v));let offset=0,parts=[];for(;;){const p=await c.appdock.call('ai.image.results.read',{jobId:j.jobId,imageId:v.images[0].id,offset});parts.push(Buffer.from(p.data,'base64'));offset=p.nextOffset;if(p.done)break;}result={ok:true,bytes:Buffer.concat(parts).length,connections:list.connections.length};}catch(e){result={code:e.code,message:e.message};}await c.log.info('image-api-probe:'+JSON.stringify(result));});`,
+      `exports.activate = async c => c.commands.register('${id}.probe', 'Image API probe', async () => {
+        const rejected = [];
+        for (const method of ${JSON.stringify(privateMethods)}) {
+          let code = 'ALLOWED';
+          try { await c.appdock.call(method, {}); } catch (error) { code = error.code; }
+          rejected.push({method, code});
+        }
+        const list = await c.appdock.call('ai.image.connections.list', {});
+        const jobs = [];
+        for (const method of ['ai.image.jobs.get', 'ai.image.jobs.cancel']) {
+          let code = 'ALLOWED';
+          try { await c.appdock.call(method, {jobId: 'missing'}); } catch (error) { code = error.code; }
+          jobs.push({method, code});
+        }
+        await c.log.info('image-api-probe:' + JSON.stringify({rejected, connections: list.connections.length, jobs}));
+      });`,
     );
     settings.extensions[id] = { enabled: true, settings: {} };
     const nativeId = 'fixture.image-ai-dotnet',
@@ -87,12 +103,12 @@ const check = (name) => {
         id: nativeId,
         name: nativeId,
         version: '1.0.0',
-        minimumHostVersion: '0.165.0',
+        minimumHostVersion: '0.166.0',
         runtime: 'dotnet',
         entry: 'AppDock.Extensions.ImageAiProbe.dll',
         type: 'AppDock.Extensions.ImageAiProbe.ImageAiProbe',
         capabilities: ['appdock-api'],
-        commands: [{ id: nativeId + '.generate', title: 'Image API probe' }],
+        commands: [{ id: nativeId + '.probe', title: 'Image API probe' }],
       }),
     );
     require('./copy-host.cjs').copyHost(
@@ -172,44 +188,53 @@ const check = (name) => {
     await page.locator('.image-ai-preview').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(profile, 'image-ai-preview.png') });
     check('settings preview generates, downloads and displays a valid image');
-    await page.evaluate(() =>
-      window.dock.setAppletApiPermissions({ read: true, execute: true, useImageAi: false }),
-    );
-    await page.evaluate(() => window.dock.executeCommand('fixture.image-ai.generate'));
-    await until(async () => {
-      const s = await page.evaluate(() => window.dock.snapshot());
-      return s.logs.some(
-        (l) =>
-          l.source === 'fixture.image-ai' &&
-          l.message.includes('image-api-probe:') &&
-          l.message.includes('API_DISABLED'),
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.permissions.open'));
+    await settingsPage(page);
+    const permission = page.getByTestId('permission-row-useImageAi');
+    const toggle = permission.getByRole('switch', { name: 'Applet：画像生成AI', exact: true });
+    for (const value of [false, true]) {
+      if ((await toggle.getAttribute('aria-checked')) !== String(value)) await toggle.click();
+      await until(
+        async () =>
+          (await page.evaluate(() => window.dock.snapshot())).appletApi.permissions.useImageAi ===
+            value && (await toggle.getAttribute('aria-checked')) === String(value),
+        'image permission saved',
       );
-    }, 'denied image permission');
-    await page.evaluate(() =>
-      window.dock.setAppletApiPermissions({ read: true, execute: true, useImageAi: true }),
-    );
-    await page.evaluate(() => window.dock.executeCommand('fixture.image-ai.generate'));
-    await until(async () => {
-      const s = await page.evaluate(() => window.dock.snapshot());
-      return s.logs.some(
-        (l) =>
-          l.source === 'fixture.image-ai' &&
-          l.message.includes('image-api-probe:') &&
-          l.message.includes('"ok":true'),
+    }
+    assert.equal(await permission.locator('[data-caller="MCP"]').innerText(), '未対応');
+    await page.screenshot({ path: path.join(profile, 'image-ai-permission.png') });
+    check('image generation permission remains visible and can persist OFF and ON');
+    const before = requests.length;
+    for (const appletId of [id, nativeId]) {
+      await page.evaluate((id) => window.dock.executeCommand(id + '.probe'), appletId);
+      const result = await until(async () => {
+        const s = await page.evaluate(() => window.dock.snapshot());
+        const log = s.logs.find(
+          (l) => l.source === appletId && l.message.startsWith('image-api-probe:'),
+        );
+        return log && JSON.parse(log.message.slice('image-api-probe:'.length));
+      }, appletId + ' private API rejection');
+      assert.deepEqual(
+        result.rejected,
+        privateMethods.map((method) => ({ method, code: 'INVALID_ARGUMENT' })),
       );
-    }, 'Node image API round trip');
-    check('Node Applet permission and generation/result round trip');
-    await page.evaluate(() => window.dock.executeCommand('fixture.image-ai-dotnet.generate'));
-    const nativeResult = await until(async () => {
-      const s = await page.evaluate(() => window.dock.snapshot());
-      const log = s.logs.find(
-        (l) => l.source === 'fixture.image-ai-dotnet' && l.message.startsWith('image-api-probe:'),
+      assert.equal(result.connections, 2);
+      assert.deepEqual(
+        result.jobs,
+        ['ai.image.jobs.get', 'ai.image.jobs.cancel'].map((method) => ({
+          method,
+          code: 'NOT_FOUND',
+        })),
       );
-      return log && JSON.parse(log.message.slice('image-api-probe:'.length));
-    }, '.NET image API round trip');
-    assert.equal(nativeResult.ok, true);
-    assert.equal(nativeResult.bytes, png.length);
-    check('.NET Applet generation and chunked result round trip');
+      check(
+        appletId +
+          ' retains connection/job operations and rejects generation and result reads with permission ON',
+      );
+    }
+    assert.equal(requests.length, before);
+    check('rejected Applet calls do not contact the image server');
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.image-ai.open'));
+    await settingsPage(page);
     await host.resize(760, 700);
     await page.getByRole('button', { name: 'Preview presetの設定', exact: true }).click();
     dialog = page.getByRole('dialog');

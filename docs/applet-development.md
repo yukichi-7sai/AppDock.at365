@@ -1,5 +1,7 @@
 # 新しいAppletを作る
 
+画像・音声などの登録は本体のライブラリー機能へ接続する。共通参照とURL、将来の生成・登録API、内部機能と公開範囲の分担は[アセットの実装方針](applet-assets.md)に従う。後続実装のAPIを現在の機能と混同しない。
+
 GitHubで配布するAppletは `extension.json` の `updateRepository` に `owner/repository` を宣言します。本体はこの値でカタログの導入済み判定と既定の更新元を決めます。掲載するリポジトリは本体の[外部カタログ](applet-management-settings-design.md#未インストールのapplet)に登録します。
 
 ローカル画面のアクセント色はホストの[共通配色](appearance.md)を参照する。CSS変数を自動提供するため、Applet内にパレットや`--accent`の固定値を追加しない。警告やエラー等の意味を持つ色は分離する。

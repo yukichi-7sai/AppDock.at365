@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-11-06 Appletのアセット方針と画像生成結果の公開整理（0.166.0）
+
+- コミット前照合: 実装時の18ファイルのSHA256と開始commitが一致し、依存・試験入力に後続変更がないこと、発行済みEXE/ZIPのhashと成功ログを再確認した。型検査・108件の関連試験・固定EXEの8項目の成功結果を再利用し、製品の再変更・再発行・試験の再実行は不要と判定した。追加はこの検証記録だけで、実装・文書・試験を同じローカルコミットへまとめる。照合記録は`.artifacts/commit-validation-applet-assets-20261106/`、元のログは`.artifacts/applet-asset-policy-20261106/`を参照する。
+
+- `ai.image.generate`と、256KiBずつ画像を取得する`ai.image.results.read`をAppletの公開カタログ・型・呼出し口から外した。許可がONでもNode/.NETの汎用Callから実行できない。接続一覧`ai.image.connections.list`、状態取得`ai.image.jobs.get`、取消`ai.image.jobs.cancel`と既存の許可条件を維持した。
+- 画像生成AIの操作許可（`useImageAi`）の項目・保存値、本体のImageAiService/adapter、接続設定、試験生成・表示・取消・一時結果保持・内部の分割取得は維持した。Applet RPCの1MiB制限、ライブラリーの既存参照・コピー・音声再生の契約は変更していない。
+- 共通方針の正本を`docs/applet-assets.md`に追加し、AGENTSと開発入口・Applet API・画像生成・ライブラリー文書から参照した。登録は本体ライブラリー、利用は共通参照と利用時URLへまとめる。後続実装は「サーバーとプロンプトを指定し、生成画像をライブラリーへ登録する」Applet/MCP共通APIとUIとし、付随APIも接続する。生成結果専用の取得APIは作らず、登録だけの再試行で再生成しない。新しい生成登録API・共通URL取得・MCP公開は未実装として明記した。
+- 発行前レビューで、公開範囲と実際のdispatcher、内部機能・許可設定の保持、既存の保存形式・APIへの影響、今後の方針と現行機能の区別を確認した。発行阻害指摘なし。公開API削除のため本体を0.166.0に更新し、汎用Callを変更していない.NET SDK/Runtimeは0.32.0を維持した。
+- `dev.bat install --frozen-lockfile`、変更コードのPrettier、`dev.bat run typecheck`、`dev.bat run build`、ImageAiProbeの.NET Release buildが成功した。`dev.bat exec node --test --test-concurrency=1 tests/appdock-api.test.cjs tests/image-ai.test.cjs tests/settings-service-targets.test.cjs tests/registered-images-api.test.cjs tests/localization.test.cjs`は108/108成功、失敗・取消・skip・todoは0。内部生成・重複・取消・所有者分離・期限・分割取得と、公開操作拒否・付随API・許可保存・設定API・既存登録画像を検証した。
+- 新規試験の初回失敗は、同期throwをPromiseとしてassertした試験コードの誤りだった。async callbackで検査するよう修正し、上記108件を再実行して成功した。固定EXE試験の初回失敗は、許可トグルの非同期保存前に`setChecked`が即時判定したものだった。操作後に実際の保存値と表示値の一致を待つ検査へ修正し、同じ発行物で8項目すべて成功した。失敗ログを保持し、製品の期待値を緩和していない。
+- `publish.bat`終了0で`A:\40.ARTIFACT\AppDock.at365`へローカル発行。package/feed/manifest/PE FileVersionは0.166.0。build stage・発行先・共用runtime・更新ZIPの101ファイルがSHA256一致。EXE SHA256=`7a18ad1c1be45ed74d8216ab8201db2188cb422e0b4953d3de121c8a9ef5e450`、更新ZIP SHA256=`63b96167f28248de8b6f3af230500f49c40cba4741e0ac17af021b1a4c12ac49`、175,174,020 bytes。既存のViteチャンクサイズ警告は残る。
+- `dev.bat exec node scripts/image-ai-ui-test.cjs A:\40.ARTIFACT\AppDock.at365\win-unpacked\AppDock.at365.exe`の成功profileは`.artifacts/image-ai-ui-1793958996043`。本体の登録取消・原子的保存・秘密非公開・画像表示、画像生成AIの許可OFF/ON保存、Node/.NET双方で接続一覧とジョブ操作を維持したまま生成単体/結果取得を拒否すること、拒否時の画像サーバー通信0、狭幅ダイアログを確認し、3枚の画面も確認した。本体の生成だけがローカルfixtureへ1回送信された。
+- 証跡は`.artifacts/applet-asset-policy-20261106/`。Windows x64、Node 26.13.0/pnpm 12.15.0/Electron 45.1.0/.NET SDK 10.0.403。差分検査・変更文書の相対リンク検査も成功。試験プロセス終了を確認して今回の成功/失敗profile内のfixture DLLを2個削除し、hash・ログ・画像は保持した。同じスクリプトの成功は固定EXE方式2件、開発方式2件で、直近3件以内のためprofile削除0。失敗証跡・共用runtime・固定ビルド出力は保持する。実OpenAIへの通信・課金、実NAS、利用者の手動操作は未検証。commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-11-06 画像生成AIのプリセット設定と共通API（0.165.0）
 
 - 「画像生成AI」設定ページへ、接続先・認証・モデル・生成条件・共通/既定プロンプトをまとめた複数プリセットの追加/編集/削除/並べ替え/既定選択と試験生成を実装した。共通ダイアログの3タブは入力を保持し、OKで登録と暗号化キーを原子的に保存する。登録IDは安定し、固定登録件数上限はない。APIキーはPC専用の`image-ai-keys.json`へ保存する。設定APIの通常値編集にも接続した。

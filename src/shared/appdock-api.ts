@@ -530,43 +530,35 @@ export class AppDockApiError extends Error {
 }
 export type AppDockResult<M extends AppDockMethod> = M extends 'ai.image.connections.list'
   ? import('./image-ai').ImageAiConnectionsResult
-  : M extends 'ai.image.generate'
-    ? import('./image-ai').ImageAiJob & { completion: 'accepted' }
-    : M extends 'ai.image.jobs.get' | 'ai.image.jobs.cancel'
-      ? import('./image-ai').ImageAiJob
-      : M extends 'ai.image.results.read'
-        ? import('./image-ai').ImageReadResult
-        : M extends 'ai.text.generate'
-          ? import('./ai').AiJob & { completion: 'accepted' }
-          : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
-            ? import('./ai').AiJob
-            : M extends 'ai.models.list'
-              ? { models: import('./ai').AiModel[] }
-              : M extends 'tts.speak'
-                ? import('./tts').TtsSpeakResult
-                : M extends 'tts.connections.list'
-                  ? import('./tts').TtsConnectionsResult
-                  : M extends 'tts.voices.list'
-                    ? import('./tts').TtsVoicesResult
-                    : M extends 'tts.jobs.get' | 'tts.stop'
-                      ? import('./tts').TtsJob
-                      : Record<string, unknown>;
+  : M extends 'ai.image.jobs.get' | 'ai.image.jobs.cancel'
+    ? import('./image-ai').ImageAiJob
+    : M extends 'ai.text.generate'
+      ? import('./ai').AiJob & { completion: 'accepted' }
+      : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
+        ? import('./ai').AiJob
+        : M extends 'ai.models.list'
+          ? { models: import('./ai').AiModel[] }
+          : M extends 'tts.speak'
+            ? import('./tts').TtsSpeakResult
+            : M extends 'tts.connections.list'
+              ? import('./tts').TtsConnectionsResult
+              : M extends 'tts.voices.list'
+                ? import('./tts').TtsVoicesResult
+                : M extends 'tts.jobs.get' | 'tts.stop'
+                  ? import('./tts').TtsJob
+                  : Record<string, unknown>;
 export interface AppDockClient {
   call<M extends AppDockMethod>(
     method: M,
-    params?: M extends 'ai.image.generate'
-      ? import('./image-ai').ImageGenerateInput
-      : M extends 'ai.image.results.read'
-        ? import('./image-ai').ImageReadInput
-        : M extends 'ai.text.generate'
-          ? import('./ai').AiGenerateInput
-          : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
+    params?: M extends 'ai.text.generate'
+      ? import('./ai').AiGenerateInput
+      : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
+        ? { jobId: string }
+        : M extends 'tts.speak'
+          ? import('./tts').TtsSpeakInput
+          : M extends 'tts.jobs.get' | 'tts.stop'
             ? { jobId: string }
-            : M extends 'tts.speak'
-              ? import('./tts').TtsSpeakInput
-              : M extends 'tts.jobs.get' | 'tts.stop'
-                ? { jobId: string }
-                : Record<string, unknown>,
+            : Record<string, unknown>,
   ): Promise<AppDockResult<M>>;
 }
 export function createAppDockClient(
