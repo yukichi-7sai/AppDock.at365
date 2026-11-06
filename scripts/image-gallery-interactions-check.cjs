@@ -35,8 +35,22 @@ exports.checkGalleryInteractions = async ({
     await page.mouse.up();
     if (additive) await page.keyboard.up('Control');
   };
+  await page.getByRole('searchbox', { name: 'ファイル名で検索' }).focus();
   await range(0, 1);
   await until(async () => (await count()) === 2, 'background rectangle selects two cards');
+  await until(
+    async () => (await page.locator('.ad-gallery-check:checked').count()) === 2,
+    'marquee selection rendered',
+  );
+  await page.keyboard.press('Delete');
+  const deletion = page.getByRole('dialog', { name: '画像を削除', exact: true });
+  await deletion.waitFor();
+  await deletion.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await deletion.waitFor({ state: 'hidden' });
+  assert.equal(await count(), 2, 'Delete after a marquee preserves selection when cancelled');
+  await page.getByRole('searchbox', { name: 'ファイル名で検索' }).focus();
+  await page.keyboard.press('Delete');
+  assert.equal(await page.getByRole('dialog').count(), 0, 'Delete in search edits text only');
   await range(2, 2, true);
   await until(async () => (await count()) === 3, 'Ctrl rectangle adds a third card');
   await range(0, 1);

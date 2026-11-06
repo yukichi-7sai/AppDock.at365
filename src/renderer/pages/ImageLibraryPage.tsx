@@ -304,7 +304,11 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             : run({ command: 'drop', token, groupId: target }),
         reorder: (token, imageId, after) => run({ command: 'reorder', token, imageId, after }),
         clear: () => run({ command: 'clear' }),
-        selectRange: (imageIds, additive) => run({ command: 'select-range', imageIds, additive }),
+        selectRange: (imageIds, additive) => {
+          // A marquee starts on non-focusable space, possibly leaving focus in the search field.
+          root.current?.focus({ preventScroll: true });
+          run({ command: 'select-range', imageIds, additive });
+        },
         targets: () => [
           ...[
             ...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-group]') ?? []),
@@ -604,15 +608,19 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       data-media={media}
       data-narrow={narrow}
       inert={dialogPending}
+      tabIndex={-1}
       style={{ '--library-sidebar-width': layout.sidebarWidth + 'px' } as CSSProperties}
       onKeyDown={(e) => {
         if (
           e.nativeEvent.isComposing ||
           e.keyCode === 229 ||
+          e.repeat ||
           c.busy ||
           menu ||
           e.altKey ||
-          (e.target as Element).closest('input,select,textarea,[role="menu"],[role="separator"]')
+          (e.target as Element).closest(
+            'input:not([type="checkbox"]),select,textarea,[contenteditable],[role="menu"],[role="separator"]',
+          )
         )
           return;
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
