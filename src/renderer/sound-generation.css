@@ -19,6 +19,15 @@
 .sound-generation-form,
 .sound-generation-results {
   min-width: 0;
+  padding: 6px;
+  scrollbar-gutter: stable;
+}
+.sound-generation-results {
+  border-inline-start: 1px solid var(--border);
+  padding-inline-start: 24px;
+}
+.sound-generation-form > .settings-field {
+  border-bottom: 0;
 }
 .sound-generation-dialog .settings-dialog-body .settings-field {
   grid-template-columns: minmax(0, 1fr);
@@ -89,5 +98,10 @@
   .sound-generation-body {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+  }
+  .sound-generation-results {
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+    padding: 20px 6px 6px;
   }
 }

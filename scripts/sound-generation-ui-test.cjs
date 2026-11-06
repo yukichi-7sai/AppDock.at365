@@ -144,7 +144,7 @@ async function closeDialog() {
     assert.equal(requests[0].body.instructions, '日本語\nやさしく');
     await dialog().getByRole('combobox', { name: '音声サーバー' }).selectOption('alternate');
     await dialog().getByRole('checkbox', { name: 'サーバーの設定を使う' }).uncheck();
-    await dialog().getByRole('textbox', { name: 'ニュアンス', exact: true }).fill('明るく');
+    await dialog().getByRole('textbox', { name: '話し方', exact: true }).fill('明るく');
     const second = await generate(2);
     assert.equal(second.file, '通知/処理が完了しました。-002.wav');
     assert.notEqual(first.file, second.file);
@@ -159,11 +159,12 @@ async function closeDialog() {
       'adjacent entry, inherited folder/group, two distinct WAVs, server/nuance overrides without settings changes',
     );
     let row = dialog().locator(`[data-generated-sound="${second.id}"]`);
+    assert.match(await row.getByRole('status').first().innerText(), /^通知 · WAV · /);
     await row.getByRole('button', { name: '試聴', exact: true }).click();
     await until(async () => !!(await model()).playback, 'preview accepted');
     await row.getByRole('button', { name: '停止', exact: true }).click();
     await until(async () => !(await model()).playback, 'preview stopped');
-    await row.getByRole('button', { name: '名前変更', exact: true }).click();
+    await row.getByRole('button', { name: '名前変更', exact: true }).press('Enter');
     const rename = host.getByRole('dialog', { name: '名前変更', exact: true });
     await rename.getByRole('textbox', { name: '新しい名前（.wav）' }).fill('完了のお知らせ');
     await rename.getByRole('button', { name: '適用', exact: true }).click();
@@ -196,10 +197,20 @@ async function closeDialog() {
       assert(bounds.width <= width && bounds.height <= height);
       const overflow = await dialog().evaluate((el) => el.scrollWidth > el.clientWidth + 2);
       assert(!overflow);
+      const textInput = dialog().getByRole('textbox', { name: '読み上げる文章', exact: true });
+      await textInput.scrollIntoViewIfNeeded();
+      await textInput.focus();
+      await host.screenshot({ path: path.join(profile, `input-focus-${theme}.png`) });
+      const renameButton = row.getByRole('button', { name: '名前変更', exact: true });
+      await renameButton.scrollIntoViewIfNeeded();
+      const playButton = row.getByRole('button', { name: '試聴', exact: true });
+      await playButton.focus();
+      await playButton.press('Tab');
+      assert(await renameButton.evaluate((el) => el === document.activeElement));
       await host.screenshot({ path: path.join(profile, `dialog-${theme}.png`) });
     }
     checks.push(
-      'wide/light and minimum-window/dark layouts, visible footer and no horizontal overflow',
+      'wide/light and minimum-window/dark layouts, input and icon keyboard focus, visible footer and no horizontal overflow',
     );
     await app.resize(1720, 1000);
     await app.save({ host: { theme: 'light' } });
