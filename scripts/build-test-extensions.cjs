@@ -14,6 +14,7 @@ run(process.execPath, [
   '-p',
   'tsconfig.extensions.json',
 ]);
+run('dotnet', ['build', 'dotnet/AppDock.ExtensionHost/AppDock.ExtensionHost.csproj', '-c', 'Release']);
 run('dotnet', [
   'build',
   'tests/fixtures/dotnet/AppDock.Extensions.Demo/AppDock.Extensions.Demo.csproj',
