@@ -315,12 +315,12 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 
 | Node API                                                 | capability       | 動作                                                                        |
 | -------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------- |
-| `ui.pickFile('json' \| 'wav')`                           | `file-dialog`    | JSONはファイル選択、WAVは共通音選択。絶対パスまたは取消時null。RPC待機は5分 |
-| `audio.play(file?)`                                      | `audio`          | ローカルWAVを共通キューで再生。空文字/省略が無音。キュー受付時に戻る        |
+| `ui.pickFile('json' \| 'wav')`                           | `file-dialog`    | JSONはファイル選択、wavは共通音選択（トークンは互換維持）。絶対パスまたは取消時null。RPC待機は5分 |
+| `audio.play(file?)`                                      | `audio`          | 対応するローカル音声を共通キューで再生。空文字/省略が無音。キュー受付時に戻る        |
 | `tray.attention(boolean)`                                | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示                  |
 | `notifications.show(title, body, { silent?, command? })` | `notifications`  | 音の抑制とクリック時の自Appletコマンドを任意指定                            |
 
-WAVは既存の絶対パス・Applet別登録名、またはWebアカウントが返す`@library/@assigned/<SHA256>.wav`を受け付ける。16 MiB以下のRIFF/WAVE。待機は32件まで、1回の再生は30秒で打ち切ります。再生時だけsandbox/contextIsolation有効の非表示Electronウィンドウを作り、終了時に破棄します。停止・再起動したAppletの音は中止し、待機分は破棄します。再生失敗はホストログに記録します。外部URLやシェルによる再生は行いません。WAVの選択は[音ライブラリー](asset-libraries.md)の共通ダイアログを使い、確定時は保管コピーの絶対パスを返します。取消時null、呼出元の停止・再起動時は選択を取り消します。
+音声は既存の絶対パス・Applet別登録名、またはWebアカウントが返す`@library/@assigned/<SHA256>.<拡張子>`を受け付ける。WAV/MP3/AAC/M4A/FLAC/OGG/OGA/OPUS/WEBMに対応し、ファイルの容量上限は設けない。コーデックの範囲と検証は[共通音声API](audio-playback.md#ファイルからの読み込み)を参照する。待機は32件まで、1回の再生は30秒で打ち切ります。再生時だけsandbox/contextIsolation有効の非表示Electronウィンドウを作り、終了時に破棄します。停止・再起動したAppletの音は中止し、待機分は破棄します。再生失敗はホストログに記録します。外部URLやシェルによる再生は行いません。音声の選択は[音ライブラリー](asset-libraries.md)の共通ダイアログを使い、確定時は保管コピーの絶対パスを返します。取消時null、呼出元の停止・再起動時は選択を取り消します。
 
 通知の`command`は登録済みの自Appletコマンドのみ受け付け、クリック時にも同じプロセスが稼働中であることを確認します。`silent`を省略した既存通知の動作は維持します。トレイのattentionは停止・異常終了で解除し、トレイメニューへのコマンド表示やクリック割当は変更しません。同じattention値の再送は受け付けますが、状態が変わらなければコマンド一覧・ショートカット・画面全体の更新を通知しません。
 

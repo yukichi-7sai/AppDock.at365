@@ -3,11 +3,27 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { audioPlayback } from './audio-service';
 import { NotificationSounds } from './notification-sounds';
+import { audioExtension } from '../../shared/audio-formats';
+import { inspectSoundFile } from './sound-file';
+import { fileHash } from './file-content';
 export const notificationSounds = new NotificationSounds({
-  read: readWave,
+  read: readSound,
   play: (bytes, signal, beforePlay) =>
-    audioPlayback.play({ bytes, signal, beforePlay, playbackTimeoutMs: 30000 }),
+    audioPlayback.play({
+      ...(Buffer.isBuffer(bytes) ? { bytes } : bytes),
+      signal,
+      beforePlay,
+      playbackTimeoutMs: 30000,
+    }),
 });
+export async function readSound(file: string) {
+  if (!path.isAbsolute(file) || !audioExtension(file))
+    throw Error(hostText('services.sounds.absoluteWavPath'));
+  const hash = await fileHash(file);
+  await inspectSoundFile(file);
+  if ((await fileHash(file)) !== hash) throw Error(hostText('services.registeredImages.changed'));
+  return { file, hash };
+}
 export async function readWave(file: string): Promise<Buffer> {
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
     throw new Error(hostText('services.sounds.absoluteWavPath'));
@@ -15,7 +31,7 @@ export async function readWave(file: string): Promise<Buffer> {
   let bytes: Buffer;
   try {
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new Error('WAV too large');
+    if (!stat.isFile()) throw new Error('Invalid audio file');
     bytes = await handle.readFile();
   } finally {
     await handle.close();
@@ -32,7 +48,7 @@ export function queueSound(
   signal?: AbortSignal,
 ): void {
   if (!file) return;
-  if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
+  if (!path.isAbsolute(file) || !audioExtension(file))
     throw new Error(hostText('services.sounds.absoluteWavPath'));
   notificationSounds.enqueue(file, alive, failed, signal);
 }

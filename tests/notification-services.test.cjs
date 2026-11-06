@@ -26,7 +26,7 @@ test('attention and file/audio APIs require capability and validate parameters',
   await assert.rejects(api(e, 'host.ui.pickFile', { kind: 'exe' }), /JSON/);
   await assert.rejects(
     api(e, 'host.audio.play', { file: 'https://example.test/a.wav' }),
-    /WAVファイル名/,
+    /音声ファイル名/,
   );
   await api(e, 'host.tray.attention', { active: true });
   assert.equal(e.attention, true);
@@ -53,7 +53,7 @@ test('stopped and crashed extensions cannot leave attention active', async () =>
   await manager.stop(e);
   assert.equal(e.attention, false);
 });
-test('sound rejects non-WAV paths and drops work for inactive extensions', async () => {
+test('sound rejects unsupported paths and drops work for inactive extensions', async () => {
   queueSound(
     '',
     () => true,
@@ -68,7 +68,7 @@ test('sound rejects non-WAV paths and drops work for inactive extensions', async
   );
   assert.throws(() =>
     queueSound(
-      'C:\\fixture.mp3',
+      'C:\\fixture.exe',
       () => true,
       () => {},
     ),

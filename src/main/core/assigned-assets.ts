@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import { fileHash, sameFileHash } from './file-content';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import type { RegisteredImageRef } from '../../shared/registered-images';
@@ -29,7 +31,7 @@ export class AssignedAssets {
       !before.isFile() ||
       before.isSymbolicLink() ||
       !before.size ||
-      before.size > (this.media === 'image' ? 5 : 16) * 1024 * 1024 ||
+      (this.media === 'image' && before.size > 5 * 1024 * 1024) ||
       fs.realpathSync(source).toLowerCase() !== source.toLowerCase()
     )
       throw Error('Unsafe image source');
@@ -80,5 +82,34 @@ export class AssignedAssets {
       }
     }
     return { file: `@assigned/${name}` };
+  }
+  async retainFile(ref: RegisteredImageRef, hash: string, writable: () => void) {
+    if (!libraryReference(ref, this.media)) throw Error('Invalid sound reference');
+    if (assignedImage(ref.file)) return ref;
+    safeDirectory(this.library, imageParent(ref.file));
+    const source = assetFile(this.library, ref.file, this.media);
+    if (!(await sameFileHash(source, hash))) throw Error('Sound changed before saving');
+    safeDirectory(this.directory, '', true);
+    const name = hash + path.extname(ref.file).toLowerCase();
+    const target = path.join(this.directory, name),
+      temp = path.join(this.directory, `.${randomUUID()}.tmp`);
+    try {
+      await fsp.copyFile(source, temp, fs.constants.COPYFILE_EXCL);
+      if ((await fileHash(temp)) !== hash || !(await sameFileHash(source, hash)))
+        throw Error('Sound changed before saving');
+      writable();
+      try {
+        await fsp.link(temp, target);
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
+          !(await sameFileHash(target, hash))
+        )
+          throw error;
+      }
+      return { file: `@assigned/${name}` };
+    } finally {
+      await fsp.unlink(temp).catch(() => {});
+    }
   }
 }

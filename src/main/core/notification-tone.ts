@@ -8,6 +8,7 @@ import type { NotificationPublication } from './typed-notifications';
 import type { NotificationService } from './notification-service';
 import type { NotificationAvailability } from './notification-availability';
 import type { AudioPlaybackRequest } from './audio-playback';
+import type { PreparedSound } from './notification-sounds';
 
 type Tone = NotificationPublication & {
   file: string;
@@ -35,7 +36,7 @@ export class NotificationToneService {
       ready(): boolean;
       service: NotificationService;
       availability: NotificationAvailability;
-      read(file: string): Promise<Buffer>;
+      read(file: string): Promise<PreparedSound>;
       play(request: AudioPlaybackRequest): Promise<void>;
       failed(id: string, code: string): void;
       startMs?: number;
@@ -159,7 +160,7 @@ export class NotificationToneService {
       const bytes = await this.options.read(tone.file);
       if (!live()) return;
       const playback = this.options.play({
-        bytes,
+        ...(Buffer.isBuffer(bytes) ? { bytes } : bytes),
         signal: tone.controller.signal,
         playbackTimeoutMs: 30000,
         beforePlay: () => {

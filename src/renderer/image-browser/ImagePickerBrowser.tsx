@@ -144,7 +144,7 @@ export function ImagePickerBrowser({
         title: ref.file,
         detail:
           media === 'sound'
-            ? soundDuration(entry.durationMs)
+            ? soundDuration(entry.durationMs, entry.ref.file)
             : entry.width > 0
               ? `${entry.width} × ${entry.height}`
               : t('services.imageLibraryPage.dimensionsUnavailable'),

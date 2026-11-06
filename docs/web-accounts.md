@@ -96,11 +96,11 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 `openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
 
-アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（無音）。`setSound(id,sound)`で保存し、`pickSound(id)`は本体の共通音選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず共通再生キューで試聴します（WAV未選択は無音）。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
+アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（無音）。`setSound(id,sound)`で保存し、`pickSound(id)`は本体の共通音選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず共通再生キューで試聴します（音声未選択は無音）。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
 
-新規選択は[音ライブラリー](asset-libraries.md)のフォルダー/グループ/検索/試聴を使い、RIFF/WAVE・16MiB以下の音を`data/assets/assigned-sounds`へ内容hashで保管します。`file`は`@library/@assigned/<SHA256>.wav`、`name`は表示用の元ファイル名です。元ファイルの移動・変更で設定済みの音は変わりません。選択中の別編集・削除・呼出元終了が優先され、取消でON/OFFやファイルを変更しません。既存のApplet別登録名・絶対パス設定は従来どおり読み、`setSound`へ絶対パスを渡したときのApplet別登録も保ちます。保管ファイルは未参照キャッシュとして削除しません。
+新規選択は[音ライブラリー](asset-libraries.md)のフォルダー/グループ/検索/試聴を使い、対応する音声を容量上限なしで`data/assets/assigned-sounds`へ内容hashで保管します。`file`は`@library/@assigned/<SHA256>.<拡張子>`、`name`は表示用の元ファイル名です。元ファイルの移動・変更で設定済みの音は変わりません。選択中の別編集・削除・呼出元終了が優先され、取消でON/OFFやファイルを変更しません。既存のApplet別登録名・絶対パス設定は従来どおり読み、`setSound`へ絶対パスを渡したときのApplet別登録も保ちます。保管ファイルは未参照キャッシュとして削除しません。
 
-通知音の一覧は、開始時に1回取得し、通常のファイル監視と[共通補助確認](file-watch-assistance-design.md)で更新します。補助確認は一般設定のON/OFF・待機時間に従い、独立した2秒タイマーは持ちません。繰り返しのWorker readで初期走査を再実行せず、登録・選択時は明示的に再確認します。一覧はファイル名だけを読み、WAV内容の検証・再生は従来の操作時に行います。停止は監視登録だけを解放し、登録済みファイルと選択値は保持します。
+通知音の一覧は、開始時に1回取得し、通常のファイル監視と[共通補助確認](file-watch-assistance-design.md)で更新します。補助確認は一般設定のON/OFF・待機時間に従い、独立した2秒タイマーは持ちません。繰り返しのWorker readで初期走査を再実行せず、登録・選択時は明示的に再確認します。一覧はファイル名だけを読み、音声内容の検証・再生は従来の操作時に行います。停止は監視登録だけを解放し、登録済みファイルと選択値は保持します。
 
 snapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 

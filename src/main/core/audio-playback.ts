@@ -1,11 +1,12 @@
 import { hostText } from '../../shared/i18n';
 /** One host-wide FIFO for prepared audio. Generation stays outside this queue. */
-export interface AudioPlaybackRequest {
-  bytes: Buffer;
+export type AudioPlaybackRequest = (
+  { file: string; hash?: string; bytes?: never } | { bytes: Buffer; file?: never; hash?: never }
+) & {
   signal?: AbortSignal;
   playbackTimeoutMs: number;
   beforePlay?: () => void;
-}
+};
 type Entry = {
   request: AudioPlaybackRequest;
   controller: AbortController;

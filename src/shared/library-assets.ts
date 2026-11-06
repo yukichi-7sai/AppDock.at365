@@ -1,4 +1,5 @@
 import { assetFilename } from './asset-names';
+import { audioExtensionPattern } from './audio-formats';
 
 export type LibraryMedia = 'image' | 'sound' | 'text';
 // The colon keeps this identity outside the namespace of user-created group IDs.
@@ -35,7 +36,8 @@ export function libraryFolder(value: unknown): value is string {
 }
 export function libraryPath(value: unknown, media: LibraryMedia): value is string {
   if (typeof value !== 'string') return false;
-  const extensions = media === 'image' ? '(png|jpe?g|webp|svg)' : media === 'sound' ? 'wav' : 'txt';
+  const extensions =
+    media === 'image' ? '(png|jpe?g|webp|svg)' : media === 'sound' ? audioExtensionPattern : 'txt';
   if (media === 'text' && assignedAsset(value)) return false;
   return assignedAsset(value)
     ? new RegExp('^@assigned/[a-f0-9]{64}\\.' + extensions + '$').test(value)
@@ -54,6 +56,8 @@ export function soundLibraryReference(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     value.startsWith('@library/') &&
-    /^@assigned\/[a-f0-9]{64}\.wav$/.test(value.slice('@library/'.length))
+    new RegExp('^@assigned/[a-f0-9]{64}\\.' + audioExtensionPattern + '$').test(
+      value.slice('@library/'.length),
+    )
   );
 }

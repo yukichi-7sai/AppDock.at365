@@ -4760,12 +4760,7 @@ async function initialize() {
     },
     service: notificationService,
     availability: notificationAvailability,
-    read: async (file) =>
-      (
-        await soundLibrary.files.read({ file: file.slice('@library/'.length) }, undefined, {
-          cachePreview: false,
-        })
-      ).bytes,
+    read: (file) => soundLibrary.files.readFile({ file: file.slice('@library/'.length) }),
     play: (request) => audioPlayback.play(request),
     failed: (id, code) =>
       log.write('error', 'notifications', '[Sound] notificationId=' + id + ' code=' + code),

@@ -38,13 +38,14 @@ export class LibrarySoundPreview {
     this.changed();
     const live = () => this.active === current && !current.controller.signal.aborted;
     try {
-      const saved = await this.files.read(ref, generation, { active: live, cachePreview: false });
+      const saved = await this.files.readFile(ref, generation, { active: live });
       if (!live()) return;
       current.status.state = 'waiting';
       this.changed();
-      const duration = this.files.entry(ref)?.durationMs ?? 30000;
+      const duration = this.files.entry(ref)?.durationMs ?? 2147483647;
       void this.playAudio({
-        bytes: saved.bytes,
+        file: saved.file,
+        hash: saved.hash,
         signal: current.controller.signal,
         playbackTimeoutMs: Math.min(2147483647, Math.max(30000, Math.ceil(duration) + 5000)),
         beforePlay: () => {
@@ -99,7 +100,7 @@ export class SoundGallery {
     let live = true;
     const get = async (ref: LibraryRef, generation?: string) => {
       if (!live) throw new LibraryReadCancelled('Closed sound view');
-      await this.files.read(ref, generation, { active: () => live, cachePreview: false });
+      await this.files.readFile(ref, generation, { active: () => live });
       const source = await thumbnail();
       if (!live) throw new LibraryReadCancelled('Closed sound view');
       return source;

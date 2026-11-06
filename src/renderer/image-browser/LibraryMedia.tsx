@@ -20,8 +20,9 @@ export function useLibraryTranslation() {
   const t: HostTranslator = (key, values) => translation.t(libraryTextKey(media, key), values);
   return { ...translation, t };
 }
-export function soundDuration(value?: number) {
-  if (value === undefined) return 'WAV';
+export function soundDuration(value?: number, file = '') {
+  const format = file.split('.').at(-1)?.toUpperCase() || 'WAV';
+  if (value === undefined) return format;
   const seconds = Math.round(value / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} · WAV`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} · ${format}`;
 }

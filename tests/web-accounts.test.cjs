@@ -60,7 +60,7 @@ test('Web account navigation requires exact declared HTTPS origins and excludes 
   ])
     assert.equal(allowedWebNavigation(url, origins), false);
 });
-test('Web item keys cannot inject source, and sound settings accept only local WAV files', () => {
+test('Web item keys cannot inject source, and sound settings accept only local audio files', () => {
   const key = 'x"); globalThis.injection = true; //';
   const argument = serializeWebItemKey(key);
   assert.equal(require('node:vm').runInNewContext(`((value) => value)(${argument})`), key);
@@ -84,7 +84,11 @@ test('Web item keys cannot inject source, and sound settings accept only local W
     { enabled: true, file: 'C:\\' + 'x'.repeat(4096) + '.wav' },
     { enabled: true, file: 'C:\\fixture\\bad\u0000.wav' },
   ])
-    assert.throws(() => parseWebAccountSound(sound), /WAV/);
+    assert.throws(() => parseWebAccountSound(sound), /音声ファイル/);
+  for (const ext of ['mp3', 'aac', 'm4a', 'flac', 'ogg', 'oga', 'opus', 'webm']) {
+    const sound = { enabled: true, file: `C:\\fixture\\sound.${ext}` };
+    assert.deepEqual(parseWebAccountSound(sound), sound);
+  }
   assert.deepEqual(parseWebAccountSound({ enabled: true, file: 'ベル.wav' }), {
     enabled: true,
     file: 'ベル.wav',

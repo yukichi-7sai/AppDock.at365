@@ -71,7 +71,7 @@ async function start() {
     const original = queue.player;
     globalThis.notificationToneEvents = [];
     queue.player = async (request) => {
-      const kind = request.bytes.length === 44 + 1500 * 16 ? 'chime' : 'speech';
+      const kind = request.file ? 'chime' : 'speech';
       globalThis.notificationToneEvents.push('start:' + kind);
       request.signal.addEventListener(
         'abort',

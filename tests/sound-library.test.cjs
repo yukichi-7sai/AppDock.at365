@@ -87,7 +87,7 @@ test('library paths reject traversal and reserved originals while shared setting
     'C:/a.wav',
     'a\\b.wav',
     '@assigned/a.wav',
-    'a.mp3',
+    'a.exe',
     'a.png',
   ])
     assert.equal(libraryPath(p, 'sound'), false, p);
@@ -234,7 +234,7 @@ test('manual previews wait for notification audio and stop only their own job', 
     releases = [];
   const queue = new AudioPlaybackQueue(async (r) => {
     r.beforePlay?.();
-    events.push(r.bytes.length);
+    events.push(r.file ? path.basename(r.file) : r.bytes.length);
     await new Promise((resolve) => {
       releases.push(resolve);
       r.signal.addEventListener('abort', resolve, { once: true });
@@ -262,6 +262,7 @@ test('manual previews wait for notification audio and stop only their own job', 
   await turn();
   assert.equal(preview.snapshot(), undefined);
   assert.equal(events.length, 2);
+  assert.equal(events[1], 'a.wav');
 });
 test('OFF never reports playback and replaced preview completion cannot erase the next selection', async (t) => {
   const f = await fixture(t),

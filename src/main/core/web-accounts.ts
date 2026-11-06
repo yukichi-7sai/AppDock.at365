@@ -1,5 +1,6 @@
 import { soundLibraryReference } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
+import { audioExtension, audioExtensions } from '../../shared/audio-formats';
 import { safePageShortcut } from '../../shared/keybindings';
 import {
   BrowserWindow,
@@ -116,7 +117,7 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
     (sound.file &&
       !soundFilename(sound.file) &&
       !soundLibraryReference(sound.file) &&
-      (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
+      (!path.isAbsolute(sound.file) || !audioExtension(sound.file)))
   )
     throw Error(hostText('services.webAccounts.soundPath'));
   return {
@@ -1193,7 +1194,12 @@ export class WebAccountController {
         const result = await dialog.showOpenDialog(this.window!, {
           title: hostText('services.webAccounts.soundTitle'),
           properties: ['openFile'],
-          filters: [{ name: 'WAV', extensions: ['wav'] }],
+          filters: [
+            {
+              name: hostText('soundLibrary.services.imageLibraryHost.imageFilter'),
+              extensions: audioExtensions,
+            },
+          ],
         });
         if (!this.disposed && !this.deleting.has(a.id) && !result.canceled && result.filePaths[0])
           await this.sound(a.id, {

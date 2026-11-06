@@ -16,6 +16,7 @@ import { assetFile, safeDirectory, scanAssetTree } from './library-files';
 import { orderedReads } from './ordered-io';
 import { libraryText } from '../../shared/library-text';
 import { atomicWrite, SettingsConflictError } from './settings';
+import { fileHash, sameFileHash } from './file-content';
 export interface AssetPolicy {
   media: LibraryMedia;
   assignedDirectory: string;
@@ -23,6 +24,7 @@ export interface AssetPolicy {
   allowEmpty?: boolean;
   format(bytes: Buffer): string;
   validate(bytes: Buffer, name: string): Promise<DecodedAsset>;
+  validateFile?(file: string, name: string): Promise<DecodedAsset>;
 }
 export interface DecodedAsset {
   width: number;
@@ -256,7 +258,15 @@ export class RegisteredAssets {
           };
         else {
           decoding = true;
-          image = await this.validate(bytes, record.entry.ref.file);
+          image = this.policy.validateFile
+            ? await this.policy.validateFile(this.file(ref.file), ref.file)
+            : await this.validate(bytes, record.entry.ref.file);
+          if (
+            this.policy.validateFile &&
+            assignedImage(ref.file) &&
+            path.basename(ref.file, path.extname(ref.file)) !== hash
+          )
+            throw Error(this.text('services.registeredImages.changed'));
           decoding = false;
         }
         if ((await this.fileSignature(record.entry.ref.file)).signature !== record.signature) {
@@ -312,6 +322,121 @@ export class RegisteredAssets {
     if (bytes.length > this.policy.maxBytes)
       throw Error(this.text('services.registeredImages.sizeLimit'));
     return bytes;
+  }
+  /** Validate file-backed media without materializing its complete contents. */
+  async readFile(ref: unknown, generation?: string, options: { active?(): boolean } = {}) {
+    if (!this.policy.validateFile) {
+      const saved = await this.read(ref, generation, options);
+      return { ...saved, file: this.file(saved.ref.file) };
+    }
+    if (!this.reference(ref)) throw Error(this.text('services.registeredImages.invalidReference'));
+    const active = options.active ?? (() => true);
+    const check = () => {
+      if (!active()) throw new LibraryReadCancelled(this.text('services.registeredImages.changed'));
+    };
+    check();
+    await this.refresh(false, [ref.file]);
+    check();
+    const record = this.entries.get(imageKey(ref));
+    if (!record || !this.current(record))
+      throw Error(this.text('services.registeredImages.missing'));
+    if (generation !== undefined && record.entry.generation !== generation)
+      throw Error(this.text('services.registeredImages.changed'));
+    try {
+      const before = await this.fileSignature(ref.file);
+      const file = this.file(ref.file),
+        hash = await fileHash(file, active);
+      check();
+      if (
+        before.signature !== record.signature ||
+        (record.hash && record.hash !== hash) ||
+        (assignedImage(ref.file) && path.basename(ref.file, path.extname(ref.file)) !== hash)
+      )
+        throw Error(this.text('services.registeredImages.changed'));
+      const decoded = record.decoded
+        ? { ...record.entry, circle: record.circle }
+        : await this.policy.validateFile(file, ref.file);
+      check();
+      if (
+        !this.current(record) ||
+        (await this.fileSignature(ref.file)).signature !== before.signature
+      )
+        throw Error(this.text('services.registeredImages.changed'));
+      this.publish(record, decoded, hash);
+      return {
+        ref: { ...ref },
+        file,
+        hash,
+        generation: record.entry.generation!,
+        thumbnail: decoded.thumbnail,
+      };
+    } catch (error) {
+      check();
+      if (this.current(record)) {
+        record.entry.available = false;
+        record.entry.state = 'error';
+        record.signature = '';
+        this.notify();
+      }
+      throw error;
+    }
+  }
+  /** Copy to a private stage, validate it, then publish exclusively in the destination. */
+  addFile(source: string, filename: string, writable: () => void = () => {}) {
+    const run = async () => {
+      writable();
+      if (!this.validName(filename) || assignedImage(filename) || !this.policy.validateFile)
+        throw Error(this.text('services.registeredImages.invalidFilename'));
+      await this.root(true);
+      const parent = imageParent(filename);
+      safeDirectory(this.directory, parent, true);
+      const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
+      try {
+        const original = await fileHash(source);
+        await fs.copyFile(source, temp, fs.constants.COPYFILE_EXCL);
+        if ((await fileHash(temp)) !== original || (await fileHash(source)) !== original)
+          throw Error(this.text('services.registeredImages.changed'));
+        const decoded = await this.policy.validateFile(temp, filename);
+        const names = await fs.readdir(path.dirname(this.file(filename)));
+        const existing = names.find(
+          (n) => n.toLowerCase() === path.basename(filename).toLowerCase(),
+        );
+        const name = existing ? (parent ? parent + '/' : '') + existing : filename;
+        let reused = !!existing;
+        const duplicate = async () => {
+          await this.fileSignature(name);
+          if (!(await sameFileHash(this.file(name), original)))
+            throw Error(this.text('services.registeredImages.duplicateName', { name }));
+          reused = true;
+        };
+        writable();
+        if (existing) await duplicate();
+        else
+          try {
+            await fs.link(temp, this.file(name));
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+            await duplicate();
+          }
+        await fs.unlink(temp);
+        if (this.refreshing) await this.refreshing;
+        const stat = await this.fileSignature(name);
+        if (!(await sameFileHash(this.file(name), original)))
+          throw Error(this.text('services.registeredImages.changed'));
+        const old = this.entries.get(imageKey({ file: name }));
+        const record =
+          old?.signature === stat.signature
+            ? old
+            : this.replace(name, stat.signature, stat.bytes, old, stat.modifiedAt);
+        this.publish(record, decoded, original);
+        return { ref: { file: name }, reused, generation: record.entry.generation! };
+      } finally {
+        await fs.unlink(temp).catch(() => {});
+      }
+    };
+    const task = this.queue.then(run, run);
+    this.queue = task.catch(() => {});
+    return task;
   }
   async add(bytes: Buffer, filename: string): Promise<RegisteredImageRef> {
     return (await this.addWithResult(bytes, filename)).ref;

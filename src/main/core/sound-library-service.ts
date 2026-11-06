@@ -86,7 +86,7 @@ export class SoundLibraryService implements SoundLibraryAccess {
   async resolve(file: string) {
     if (!soundLibraryReference(file)) throw Error(hostText('sounds.invalidWave'));
     const ref = { file: file.slice('@library/'.length) };
-    await this.files.read(ref, undefined, { cachePreview: false });
+    await this.files.readFile(ref);
     return this.files.file(ref.file);
   }
   close() {

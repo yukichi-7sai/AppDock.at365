@@ -2,7 +2,9 @@ import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
-import { readWave } from './sounds';
+import { readSound } from './sounds';
+import { audioExtension } from '../../shared/audio-formats';
+import { RegisteredSoundLibrary } from './registered-sound-library';
 import type { FileWatchAssistance } from './file-watch-assistance';
 
 export function soundFilename(value: unknown): value is string {
@@ -13,7 +15,7 @@ export function soundFilename(value: unknown): value is string {
     !/[\\/:*?"<>|\x00-\x1f\x7f]/.test(value) &&
     !/[. ]$/.test(value) &&
     !/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(value) &&
-    path.extname(value).toLowerCase() === '.wav'
+    !!audioExtension(value)
   );
 }
 
@@ -134,39 +136,16 @@ export class RegisteredSounds {
     const file = path.join(this.directory, canonical);
     if ((await fs.lstat(file)).isSymbolicLink())
       throw Error(hostText('services.registeredSounds.link'));
-    await readWave(file);
+    await readSound(file);
     return file;
   }
   async add(source: string, filename = path.basename(source)) {
     if (!soundFilename(filename)) throw Error(hostText('services.registeredSounds.invalidName'));
-    const bytes = await readWave(source);
-    await this.safe();
-    const existing = (await this.list()).find((n) => n.toLowerCase() === filename.toLowerCase());
-    const name = existing ?? filename;
-    const file = path.join(this.directory, name);
-    const duplicate = async () => {
-      const saved = await readWave(await this.resolve(name));
-      if (!saved.equals(bytes))
-        throw Error(hostText('services.registeredSounds.duplicateName', { name: String(name) }));
-      return name;
-    };
-    if (existing) return duplicate();
-    let handle;
+    const library = new RegisteredSoundLibrary(this.directory);
     try {
-      handle = await fs.open(file, 'wx');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return duplicate();
-      throw error;
+      return (await library.addFile(source, filename)).ref.file;
+    } finally {
+      library.stop();
     }
-    try {
-      await handle.writeFile(bytes);
-      await handle.sync();
-    } catch (error) {
-      await handle.close();
-      await fs.unlink(file);
-      throw error;
-    }
-    await handle.close();
-    return name;
   }
 }

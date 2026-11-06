@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+export type PreparedSound = Buffer | { file: string; hash?: string };
 type SoundJob = {
   file: string;
   alive(): boolean;
@@ -20,8 +21,8 @@ export class NotificationSounds {
   };
   constructor(
     private options: {
-      read(file: string): Promise<Buffer>;
-      play(bytes: Buffer, signal: AbortSignal, beforePlay: () => void): Promise<void>;
+      read(file: string): Promise<PreparedSound>;
+      play(sound: PreparedSound, signal: AbortSignal, beforePlay: () => void): Promise<void>;
     },
   ) {}
   setEnabled(enabled: boolean) {

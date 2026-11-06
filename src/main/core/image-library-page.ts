@@ -290,8 +290,8 @@ export class ImageLibraryPageSession implements HostPageController {
             : hostText('texts.details', { characters: e.characters, lines: e.lines ?? 1 })
           : this.options.host.media === 'sound'
             ? e.durationMs === undefined
-              ? 'WAV'
-              : `${Math.floor(Math.round(e.durationMs / 1000) / 60)}:${String(Math.round(e.durationMs / 1000) % 60).padStart(2, '0')} · WAV`
+              ? e.ref.file.split('.').at(-1)!.toUpperCase()
+              : `${Math.floor(Math.round(e.durationMs / 1000) / 60)}:${String(Math.round(e.durationMs / 1000) % 60).padStart(2, '0')} · ${e.ref.file.split('.').at(-1)!.toUpperCase()}`
             : e.width
               ? `${e.width} × ${e.height} · ${e.ref.file.split('.').at(-1)!.toUpperCase()}`
               : this.text('services.imageLibraryPage.dimensionsUnavailable'),

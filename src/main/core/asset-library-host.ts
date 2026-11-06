@@ -2,6 +2,7 @@ import { clipboard, ClipboardItem, dialog, shell, type BrowserWindow } from 'ele
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { orderedReads } from './ordered-io';
+import { audioExtensions } from '../../shared/audio-formats';
 import { AssignedAssets } from './assigned-assets';
 import { imageBasename, imageFolder, imageParent } from '../../shared/image-paths';
 import { safeDirectory } from './library-files';
@@ -69,6 +70,16 @@ export class AssetLibraryHost {
   async retain(ref: RegisteredImageRef) {
     if (this.media === 'text') throw Error('Text settings copies are not supported');
     this.options.writable();
+    if (this.images.policy.validateFile) {
+      const saved = await this.images.readFile(ref);
+      const result = await new AssignedAssets(this.images.directory, this.media).retainFile(
+        ref,
+        saved.hash,
+        this.options.writable,
+      );
+      await this.images.refresh(false, [result.file]);
+      return result;
+    }
     const saved = await this.images.read(ref);
     this.options.writable();
     const result = new AssignedAssets(this.images.directory, this.media).retain(ref, saved.bytes);
@@ -195,7 +206,8 @@ export class AssetLibraryHost {
       filters: [
         {
           name: this.text('services.imageLibraryHost.imageFilter'),
-          extensions: this.media === 'image' ? ['png', 'jpg', 'jpeg', 'webp', 'svg'] : ['wav'],
+          extensions:
+            this.media === 'image' ? ['png', 'jpg', 'jpeg', 'webp', 'svg'] : audioExtensions,
         },
       ],
     });
@@ -205,6 +217,8 @@ export class AssetLibraryHost {
     if (!stat.isFile() || stat.size > this.images.policy.maxBytes)
       throw Error(this.text('services.imageLibraryHost.sizeLimit'));
     this.options.writable();
+    if (this.images.policy.validateFile)
+      return (await this.images.addFile(source, path.basename(source), this.options.writable)).ref;
     return this.images.add(await fs.readFile(source), path.basename(source));
   }
   async edit(operation: ImageLibraryEdit, orderGroups?: readonly { id: string; name: string }[]) {
@@ -246,7 +260,7 @@ export class AssetLibraryHost {
     // Preflight the whole confirmation before moving the first file to the recycle bin.
     for (const entry of entries) {
       if (this.inUse(entry.ref)) throw Error(this.text('services.imageLibraryHost.inUse'));
-      await this.images.read(entry.ref, entry.generation ?? '');
+      await this.images.readFile(entry.ref, entry.generation ?? '');
     }
     let removed = 0;
     try {
@@ -320,7 +334,7 @@ export class AssetLibraryHost {
       throw Error(this.text('images.copyImageSingle'));
     const files: string[] = [];
     for (const entry of entries) {
-      if (operation !== 'copy-paths') await this.images.read(entry.ref, entry.generation ?? '');
+      if (operation !== 'copy-paths') await this.images.readFile(entry.ref, entry.generation ?? '');
       files.push(this.images.file(entry.ref.file));
     }
     if (operation === 'copy-paths') await clipboard.writeText(files.join('\r\n'));
@@ -384,7 +398,7 @@ export class AssetLibraryHost {
             this.media === 'image'
               ? ['png', 'jpg', 'jpeg', 'webp', 'svg']
               : this.media === 'sound'
-                ? ['wav']
+                ? audioExtensions
                 : ['txt'],
         },
       ],
@@ -398,17 +412,23 @@ export class AssetLibraryHost {
     if (selected.canceled) return results;
     let index = 0;
     for await (const prepared of orderedReads(selected.filePaths, 2, (source) =>
-      this.readImport(source, true),
+      this.images.policy.validateFile ? Promise.resolve(undefined) : this.readImport(source, true),
     )) {
       const source = selected.filePaths[index++];
       const name = path.basename(source);
       try {
         this.options.writable();
         if (prepared.status === 'rejected') throw prepared.reason;
-        const { ref: image, reused } = await this.images.addWithResult(
-          prepared.value ?? (await this.readImport(source)),
-          folder ? `${folder}/${name}` : name,
-        );
+        const { ref: image, reused } = this.images.policy.validateFile
+          ? await this.images.addFile(
+              source,
+              folder ? `${folder}/${name}` : name,
+              this.options.writable,
+            )
+          : await this.images.addWithResult(
+              prepared.value ?? (await this.readImport(source)),
+              folder ? `${folder}/${name}` : name,
+            );
         results.push({ name, image, reused });
       } catch (e) {
         results.push({

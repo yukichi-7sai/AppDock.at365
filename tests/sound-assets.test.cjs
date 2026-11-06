@@ -35,6 +35,6 @@ test('bad WAV cannot replace an imported notification sound', async (t) => {
   const source = path.join(base, 'bad.wav');
   await fs.writeFile(source, 'not a wave');
   await assert.rejects(importSound(base, source), /WAV/);
-  await assert.rejects(importSound(base, 'https://evil.test/remote.wav'), /WAV/);
+  await assert.rejects(importSound(base, 'https://evil.test/remote.wav'), /音声ファイル/);
   await assert.rejects(fs.stat(path.join(base, 'sounds')));
 });
