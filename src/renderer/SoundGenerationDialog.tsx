@@ -26,32 +26,34 @@ export function SoundGenerationDialog({
   const [useDefault, setUseDefault] = useState(true);
   const [instructions, setInstructions] = useState('');
   const [error, setError] = useState('');
-  const [pending, setPending] = useState(false);
-  const running = useRef(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const running = useRef(new Set<string>());
   const [edit, setEdit] = useState<{ kind: 'rename' | 'delete'; item: GeneratedSound } | null>(
     null,
   );
   const [name, setName] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const server = model.servers.find((s) => s.id === serverId);
-  const busy = pending || model.phase !== 'idle';
+  const busy = model.closing;
   const act = async (action: SoundGenerationAction) => {
     setError('');
     await window.dock.soundGeneration.act(model.id, action);
   };
   const run = (action: SoundGenerationAction) => {
-    if (running.current) return;
-    running.current = true;
-    setPending(true);
+    const key = 'itemId' in action ? action.itemId : action.kind;
+    if (running.current.has(key)) return;
+    running.current.add(key);
+    setPending(new Set(running.current));
     void act(action)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => {
-        running.current = false;
-        setPending(false);
+        running.current.delete(key);
+        setPending(new Set(running.current));
       });
   };
   const close = () => {
-    if (busy || model.items.some((item) => item.state === 'unsaved')) setConfirmClose(true);
+    if (pending.size || model.items.some((item) => item.busy || item.state === 'unsaved'))
+      setConfirmClose(true);
     else void act({ kind: 'close' }).catch((e) => setError(String(e)));
   };
   const heading = `sound-generation-${model.id}`;
@@ -63,7 +65,7 @@ export function SoundGenerationDialog({
         labelledBy={heading}
         returnFocus={returnFocus}
         onClose={close}
-        closeDisabled={model.phase === 'saving' || model.phase === 'editing'}
+        closeDisabled={busy}
         collapseStatusWhenEmpty
         error={error || model.error}
         header={
@@ -77,10 +79,7 @@ export function SoundGenerationDialog({
             <span className="sound-generation-footer-note">
               {t('soundGeneration.keepAfterClose')}
             </span>
-            <SettingsButton
-              disabled={model.phase === 'saving' || model.phase === 'editing'}
-              onClick={close}
-            >
+            <SettingsButton disabled={busy} onClick={close}>
               {t('common.close')}
             </SettingsButton>
           </footer>
@@ -167,20 +166,17 @@ export function SoundGenerationDialog({
               onChange={(e) => setInstructions(e.target.value)}
             />
           </SettingsField>
-          <SettingsField
-            title={t('soundGeneration.generate')}
-            description={
-              model.phase === 'generating'
-                ? t('soundGeneration.generating')
-                : model.phase === 'saving'
-                  ? t('soundGeneration.saving')
-                  : undefined
-            }
-          >
+          <SettingsField title={t('soundGeneration.generate')}>
             <SettingsActions>
               <SettingsButton
                 appearance="filled"
-                disabled={busy || !server?.ready || !text.trim() || !model.folders.includes(folder)}
+                disabled={
+                  busy ||
+                  pending.has('generate') ||
+                  !server?.ready ||
+                  !text.trim() ||
+                  !model.folders.includes(folder)
+                }
                 onClick={() =>
                   run({
                     kind: 'generate',
@@ -193,13 +189,6 @@ export function SoundGenerationDialog({
               >
                 {t('soundGeneration.generate')}
               </SettingsButton>
-              {model.phase === 'generating' && (
-                <SettingsButton
-                  onClick={() => void act({ kind: 'cancel' }).catch((e) => setError(String(e)))}
-                >
-                  {t('soundGeneration.cancelGeneration')}
-                </SettingsButton>
-              )}
             </SettingsActions>
           </SettingsField>
         </div>
@@ -211,48 +200,112 @@ export function SoundGenerationDialog({
           {!model.items.length && <p>{t('soundGeneration.empty')}</p>}
           {model.items.map((item) => {
             const playback = model.playback?.file === item.file ? model.playback : undefined;
+            const itemBusy = busy || item.busy || pending.has(item.id);
+            const cancellable = item.state === 'queued' || item.state === 'generating';
+            const statusKey = (
+              {
+                queued: 'soundGeneration.queued',
+                generating: 'soundGeneration.generating',
+                saving: 'soundGeneration.saving',
+                saved: 'soundGeneration.saved',
+                unsaved: 'soundGeneration.unsaved',
+                changed: 'soundGeneration.changed',
+                failed: 'soundGeneration.failed',
+                canceled: 'soundGeneration.canceled',
+              } as const
+            )[item.state];
             return (
-              <div className="sound-generation-item" key={item.id} data-generated-sound={item.id}>
+              <div
+                className="sound-generation-item"
+                key={item.id}
+                data-generated-sound={item.id}
+                aria-busy={itemBusy}
+              >
                 <SettingsField
-                  title={item.file ? libraryBasename(item.file) : t('soundGeneration.unsaved')}
+                  title={
+                    item.file
+                      ? libraryBasename(item.file)
+                      : item.text.slice(0, 60) + (item.text.length > 60 ? '…' : '')
+                  }
                   error={item.error}
-                  description={`${t(item.state === 'changed' ? 'soundGeneration.changed' : item.state === 'saved' ? 'soundGeneration.saved' : 'soundGeneration.unsaved')} · WAV · ${t('soundGeneration.seconds', { seconds: item.seconds.toFixed(1) })}`}
                 >
+                  <div role="status" className="sound-generation-status">
+                    {item.busy && item.state !== 'queued' && (
+                      <span
+                        className="settings-action-spinner"
+                        data-pending="true"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>
+                      {t(statusKey)}
+                      {item.seconds !== undefined &&
+                        ` · WAV · ${t('soundGeneration.seconds', { seconds: item.seconds.toFixed(1) })}`}
+                    </span>
+                  </div>
                   <div className="sound-generation-note">
                     {item.folder || t('soundGeneration.rootFolder')}
                   </div>
                   <SettingsActions>
-                    <SettingsButton
-                      disabled={!playback && (busy || item.state !== 'saved')}
-                      onClick={() =>
-                        playback
-                          ? void act({ kind: 'stop' }).catch((e) => setError(String(e)))
-                          : run({ kind: 'play', itemId: item.id })
-                      }
-                    >
-                      {playback ? t('sounds.stop') : t('sounds.play')}
-                    </SettingsButton>
-                    <SettingsButton
-                      disabled={busy || item.state !== 'saved'}
-                      onClick={() => {
-                        setName(libraryBasename(item.file!).replace(/\.wav$/i, ''));
-                        setEdit({ kind: 'rename', item });
-                      }}
-                    >
-                      {t('soundGeneration.rename')}
-                    </SettingsButton>
-                    <SettingsButton
-                      disabled={busy || item.state !== 'saved'}
-                      onClick={() => setEdit({ kind: 'delete', item })}
-                    >
-                      {t('common.delete')}
-                    </SettingsButton>
+                    {cancellable && (
+                      <SettingsButton
+                        disabled={busy || pending.has(item.id)}
+                        onClick={() => run({ kind: 'cancel', itemId: item.id })}
+                      >
+                        {t(
+                          item.state === 'queued'
+                            ? 'common.cancel'
+                            : 'soundGeneration.cancelGeneration',
+                        )}
+                      </SettingsButton>
+                    )}
+                    {item.state === 'saved' && (
+                      <>
+                        <SettingsButton
+                          disabled={!playback && itemBusy}
+                          onClick={() =>
+                            playback
+                              ? void act({ kind: 'stop' }).catch((e) => setError(String(e)))
+                              : run({ kind: 'play', itemId: item.id })
+                          }
+                        >
+                          {playback ? t('sounds.stop') : t('sounds.play')}
+                        </SettingsButton>
+                        <SettingsButton
+                          disabled={itemBusy}
+                          onClick={() => {
+                            setName(libraryBasename(item.file!).replace(/\.wav$/i, ''));
+                            setEdit({ kind: 'rename', item });
+                          }}
+                        >
+                          {t('soundGeneration.rename')}
+                        </SettingsButton>
+                        <SettingsButton
+                          disabled={itemBusy}
+                          onClick={() => setEdit({ kind: 'delete', item })}
+                        >
+                          {t('common.delete')}
+                        </SettingsButton>
+                      </>
+                    )}
                     {item.canRetry && (
                       <SettingsButton
-                        disabled={busy || item.state === 'changed'}
+                        disabled={itemBusy || item.state === 'changed'}
                         onClick={() => run({ kind: 'retry', itemId: item.id })}
                       >
-                        {t('common.retry')}
+                        {t(
+                          ['failed', 'canceled'].includes(item.state)
+                            ? 'soundGeneration.regenerate'
+                            : 'soundGeneration.retrySave',
+                        )}
+                      </SettingsButton>
+                    )}
+                    {['failed', 'canceled'].includes(item.state) && (
+                      <SettingsButton
+                        disabled={itemBusy}
+                        onClick={() => run({ kind: 'dismiss', itemId: item.id })}
+                      >
+                        {t('soundGeneration.dismiss')}
                       </SettingsButton>
                     )}
                   </SettingsActions>

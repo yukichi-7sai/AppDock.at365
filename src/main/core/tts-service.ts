@@ -240,6 +240,7 @@ export class TtsService {
     input: Record<string, unknown>,
     signal: AbortSignal,
     maximumBytes: number,
+    progress?: (state: 'queued' | 'generating') => void,
   ) {
     return new Promise<{ bytes: Buffer; seconds: number }>((resolve, reject) => {
       if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
@@ -249,12 +250,9 @@ export class TtsService {
         if (id) void this.stop(owner, id).catch(() => {});
       };
       const unsubscribe = this.subscribe((jobOwner, job) => {
-        if (
-          jobOwner !== owner ||
-          job.jobId !== id ||
-          !['completed', 'failed', 'canceled'].includes(job.state)
-        )
-          return;
+        if (jobOwner !== owner || job.jobId !== id) return;
+        if (job.state === 'queued' || job.state === 'generating') progress?.(job.state);
+        if (!['completed', 'failed', 'canceled'].includes(job.state)) return;
         unsubscribe();
         signal.removeEventListener('abort', abort);
         if (job.state === 'completed' && audio) resolve(audio);
@@ -281,6 +279,7 @@ export class TtsService {
           },
         );
         id = accepted.jobId as string;
+        progress?.('queued');
         signal.addEventListener('abort', abort, { once: true });
         if (signal.aborted) abort();
       } catch (error) {

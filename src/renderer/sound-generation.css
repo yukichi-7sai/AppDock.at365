@@ -1,5 +1,6 @@
 .settings-modal.sound-generation-dialog[open] {
   width: min(900px, calc(100% - 32px));
+  height: min(760px, calc(100dvh - 32px));
 }
 .settings-modal.sound-generation-dialog > header {
   display: block;
@@ -59,11 +60,30 @@
   overflow-wrap: anywhere;
   padding-top: 8px;
 }
+.sound-generation-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
 .sound-generation-item details {
   margin-top: 8px;
 }
 .sound-generation-footer-note {
   margin-right: auto;
+}
+@media (min-width: 1051px) {
+  .sound-generation-dialog > .sound-generation-body {
+    flex: 1;
+    overflow: hidden;
+    align-items: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .sound-generation-form,
+  .sound-generation-results {
+    min-height: 0;
+    overflow: auto;
+  }
 }
 @media (max-width: 1050px) {
   .sound-generation-body {

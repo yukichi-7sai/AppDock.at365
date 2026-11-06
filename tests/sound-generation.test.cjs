@@ -107,13 +107,23 @@ async function fixture(t, fetcher) {
   });
   const closed = generation.open('page', '通知', 'notice');
   const id = generation.current().id;
-  const generate = () =>
-    generation.act(id, {
+  const enqueue = async (change = {}) => {
+    await generation.act(id, {
       kind: 'generate',
       folder: '通知',
       connectionId: 'one',
       text: '完了しました。',
+      ...change,
     });
+    return generation.current().items[0].id;
+  };
+  const item = (itemId) => generation.current()?.items.find((value) => value.id === itemId);
+  const settle = (itemId) => wait(() => !item(itemId)?.busy);
+  const generate = async (change) => {
+    const itemId = await enqueue(change);
+    await settle(itemId);
+    return itemId;
+  };
   return {
     directory,
     settings,
@@ -124,6 +134,9 @@ async function fixture(t, fetcher) {
     requests,
     id,
     generate,
+    enqueue,
+    item,
+    settle,
     closed,
     write: (value) => (writable = value),
     failSettings: (value) => (savesFail = value),
@@ -234,17 +247,15 @@ test('cancelling generation or leaving the page creates no asset and reports no 
         ),
       ),
   );
-  let task = f.generate();
+  let itemId = await f.enqueue();
   await wait(() => f.requests.length === 1);
-  await f.generation.act(f.id, { kind: 'cancel' });
-  await task;
-  assert.equal(f.generation.current().phase, 'idle');
-  assert.equal(f.generation.current().items.length, 0);
+  await f.generation.act(f.id, { kind: 'cancel', itemId });
+  assert.equal(f.item(itemId).state, 'canceled');
+  assert.equal(f.item(itemId).busy, false);
   assert.equal(f.failures(), 0);
-  task = f.generate();
+  itemId = await f.enqueue();
   await wait(() => f.requests.length === 2);
   f.generation.cancel('page');
-  await task;
   await f.closed;
   assert.equal((await fs.readdir(path.join(f.directory, '通知'))).length, 0);
   assert.equal(f.failures(), 0);
@@ -255,8 +266,9 @@ test('invalid WAVs, invalid targets and stale session requests do not register f
     async () => new Response('not a wav', { headers: { 'Content-Type': 'audio/wav' } }),
   );
   await f.generate();
-  assert.equal(f.generation.current().items.length, 0);
-  assert(f.generation.current().error);
+  assert.equal(f.generation.current().items.length, 1);
+  assert.equal(f.generation.current().items[0].state, 'failed');
+  assert(f.generation.current().items[0].error);
   await assert.rejects(
     f.generation.act(f.id, {
       kind: 'generate',
@@ -314,4 +326,163 @@ test('each internal generation returns fresh audio even when the input request I
   }
   assert.equal(f.requests.length, 2);
   assert.equal(f.played(), 0);
+});
+
+function delayedAudio() {
+  const responses = [];
+  return {
+    responses,
+    fetcher: (_url, init) =>
+      new Promise((resolve, reject) => {
+        responses.push(() =>
+          resolve(new Response(wave(1000), { headers: { 'Content-Type': 'audio/wav' } })),
+        );
+        init.signal.addEventListener(
+          'abort',
+          () => reject(new DOMException('Cancelled', 'AbortError')),
+          { once: true },
+        );
+      }),
+  };
+}
+test('requests add cards immediately and preserve per-card inputs in the shared FIFO', async (t) => {
+  const delayed = delayedAudio(),
+    f = await fixture(t, delayed.fetcher);
+  const first = await f.enqueue({ text: '一番目', instructions: '静かに' });
+  await wait(() => delayed.responses.length === 1);
+  const second = await f.enqueue({ text: '二番目', instructions: '明るく', folder: '' });
+  const third = await f.enqueue({ text: '三番目' });
+  assert.equal(f.item(first).state, 'generating');
+  assert.equal(f.item(second).state, 'queued');
+  assert.equal(f.item(third).state, 'queued');
+  assert.equal(delayed.responses.length, 1);
+  delayed.responses[0]();
+  await wait(() => delayed.responses.length === 2);
+  assert.equal(f.requests[1].input, '二番目');
+  assert.equal(f.requests[1].instructions, '日本語\n明るく');
+  delayed.responses[1]();
+  await wait(() => delayed.responses.length === 3);
+  delayed.responses[2]();
+  await Promise.all([first, second, third].map(f.settle));
+  assert.equal(f.item(second).file, '二番目-001.wav');
+  assert.equal(f.item(first).file, '通知/一番目-001.wav');
+  assert.deepEqual(
+    f.requests.map((r) => r.input),
+    ['一番目', '二番目', '三番目'],
+  );
+});
+test('canceling one queued or generating card leaves other requests intact', async (t) => {
+  const delayed = delayedAudio(),
+    f = await fixture(t, delayed.fetcher);
+  const first = await f.enqueue({ text: '一番目' });
+  await wait(() => delayed.responses.length === 1);
+  const second = await f.enqueue({ text: '二番目' });
+  const third = await f.enqueue({ text: '三番目' });
+  await f.generation.act(f.id, { kind: 'cancel', itemId: second });
+  assert.equal(f.item(second).state, 'canceled');
+  assert.equal(f.item(first).state, 'generating');
+  await f.generation.act(f.id, { kind: 'cancel', itemId: first });
+  await wait(() => delayed.responses.length === 2);
+  assert.equal(f.requests[1].input, '三番目');
+  delayed.responses[1]();
+  await f.settle(third);
+  assert.equal(f.item(third).state, 'saved');
+  assert.equal(f.failures(), 0);
+});
+test('saved cards can be renamed and deleted while later generation is pending', async (t) => {
+  let pending = false;
+  const delayed = delayedAudio();
+  const f = await fixture(t, (url, init) =>
+    pending
+      ? delayed.fetcher(url, init)
+      : new Response(wave(1000), { headers: { 'Content-Type': 'audio/wav' } }),
+  );
+  const saved = await f.generate();
+  pending = true;
+  const next = await f.enqueue();
+  await wait(() => delayed.responses.length === 1);
+  await f.generation.act(f.id, { kind: 'rename', itemId: saved, name: '変更.wav' });
+  assert.equal(f.item(saved).file, '通知/変更.wav');
+  assert.equal(f.item(next).state, 'generating');
+  await f.generation.act(f.id, { kind: 'delete', itemId: saved });
+  assert.equal(f.item(saved), undefined);
+  delayed.responses[0]();
+  await f.settle(next);
+  assert.equal(f.item(next).state, 'saved');
+});
+test('a failed card does not stop the queue and regeneration reuses its captured input', async (t) => {
+  let invalid = true;
+  const f = await fixture(t, async () => {
+    const bytes = invalid ? Buffer.from('bad') : wave(1000);
+    invalid = false;
+    return new Response(bytes, { headers: { 'Content-Type': 'audio/wav' } });
+  });
+  const first = await f.enqueue({ text: '再生成の本文' });
+  const second = await f.enqueue({ text: '次の本文' });
+  await Promise.all([first, second].map(f.settle));
+  assert.equal(f.item(first).state, 'failed');
+  assert.equal(f.item(second).state, 'saved');
+  await f.generation.act(f.id, { kind: 'retry', itemId: first });
+  await f.settle(first);
+  assert.equal(f.item(first).state, 'saved');
+  assert.equal(f.requests[2].input, '再生成の本文');
+  assert.equal(f.generation.current().items.length, 2);
+});
+test('closing cancels every dialog request while keeping saved audio and unrelated speech', async (t) => {
+  const delayed = delayedAudio();
+  let pending = false;
+  const f = await fixture(t, (url, init) =>
+    pending
+      ? delayed.fetcher(url, init)
+      : new Response(wave(1000), { headers: { 'Content-Type': 'audio/wav' } }),
+  );
+  const saved = await f.generate(),
+    file = f.item(saved).file;
+  pending = true;
+  await f.enqueue();
+  await wait(() => delayed.responses.length === 1);
+  await f.enqueue();
+  const foreign = f.tts.speak('other', { text: '別の読み上げ', requestId: randomUUID() });
+  await assert.rejects(f.generation.act(f.id, { kind: 'close' }));
+  await f.generation.act(f.id, { kind: 'close', discard: true });
+  await f.closed;
+  await wait(() => delayed.responses.length === 2);
+  assert.equal(f.requests.at(-1).input, '別の読み上げ');
+  delayed.responses[1]();
+  await wait(() => f.tts.get('other', foreign.jobId).state === 'completed');
+  assert.deepEqual(await fs.readFile(path.join(f.directory, file)), wave(1000));
+});
+test('filenames use up to twenty complete characters with a safe, collision-free serial', async (t) => {
+  const f = await fixture(t);
+  const text = 'これは音声ファイル名に使う文章です。ここから先も続きます。';
+  const first = await f.generate({ text }),
+    second = await f.generate({ text });
+  const prefix = Array.from(text).slice(0, 20).join('');
+  assert.equal(f.item(first).file, `通知/${prefix}-001.wav`);
+  assert.equal(f.item(second).file, `通知/${prefix}-002.wav`);
+  for (const text of ['CON', 'a/b:c*?<>|"\nend', '...']) {
+    const id = await f.generate({ text });
+    assert.equal(f.item(id).state, 'saved');
+    if (text === 'CON') assert.equal(path.basename(f.item(id).file), '_CON-001.wav');
+    if (text === '...') assert.equal(path.basename(f.item(id).file), '音声-001.wav');
+    assert(!/[\\:*?<>|"\r\n]/.test(path.basename(f.item(id).file)));
+  }
+  const emoji = '👨‍👩‍👧‍👦';
+  const id = await f.generate({ text: emoji.repeat(25) });
+  const stem = path.basename(f.item(id).file).replace(/-001\.wav$/, '');
+  assert(stem.length <= 150);
+  assert.equal(stem, emoji.repeat(stem.length / emoji.length));
+});
+test('page disposal prevents an accepted preview from starting after the session ends', async (t) => {
+  const f = await fixture(t);
+  const itemId = await f.generate();
+  let previews = 0;
+  f.library.preview.play = async () => {
+    previews++;
+  };
+  const preview = f.generation.act(f.id, { kind: 'play', itemId });
+  f.generation.cancel('page');
+  await assert.rejects(preview, { name: 'AbortError' });
+  assert.equal(previews, 0);
+  assert.equal(f.failures(), 0);
 });

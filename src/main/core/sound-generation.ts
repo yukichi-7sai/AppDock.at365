@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { libraryFolder, libraryPath, libraryParent } from '../../shared/library-assets';
 import type { LibraryEntry } from '../../shared/library-assets';
+import { assetFilename } from '../../shared/asset-names';
 import type { TtsConfiguration } from '../../shared/tts';
 import type {
   GeneratedSound,
@@ -13,9 +14,12 @@ import type { TtsService } from './tts-service';
 
 interface Item {
   view: GeneratedSound;
+  request: { text: string; connectionId: string; instructions: string };
   bytes?: Buffer;
   entry?: LibraryEntry;
   groupPending: boolean;
+  abort?: AbortController;
+  task?: Promise<void>;
 }
 interface Session {
   id: string;
@@ -23,11 +27,25 @@ interface Session {
   folder: string;
   group?: string;
   items: Item[];
-  phase: SoundGenerationModel['phase'];
-  error: string;
-  abort?: AbortController;
-  task?: Promise<void>;
+  closing: boolean;
   resolve(): void;
+}
+const filenameSegments = new Intl.Segmenter('ja', { granularity: 'grapheme' });
+function filenameStem(text: string) {
+  let prefix = '',
+    count = 0;
+  for (const { segment } of filenameSegments.segment(text)) {
+    // Leave room for the serial and extension within the library filename contract.
+    if (count++ === 20 || prefix.length + segment.length > 150) break;
+    prefix += segment;
+  }
+  const stem =
+    prefix
+      .replace(/\s+/g, ' ')
+      .replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, '_')
+      .replace(/[. ]+$/g, '')
+      .trim() || hostText('soundGeneration.fileStem');
+  return assetFilename(stem + '.wav') ? stem : '_' + stem;
 }
 /** Only this dialog's drafts and playback are disposed; committed library files are permanent. */
 export class SoundGeneration {
@@ -55,8 +73,7 @@ export class SoundGeneration {
         folder,
         group,
         items: [],
-        phase: 'idle',
-        error: '',
+        closing: false,
         resolve,
       };
       this.signature = '';
@@ -90,13 +107,15 @@ export class SoundGeneration {
           item.entry && (!current?.available || current.generation !== item.entry.generation);
         return {
           ...item.view,
-          state: changed ? 'changed' : item.entry ? 'saved' : 'unsaved',
-          canRetry: !!item.bytes || item.groupPending,
+          state: changed ? 'changed' : item.view.state,
+          canRetry:
+            !item.view.busy &&
+            (!!item.bytes || item.groupPending || ['failed', 'canceled'].includes(item.view.state)),
         };
       }),
-      phase: s.phase,
+      closing: s.closing,
       playback: this.options.library.preview.snapshot(s.id),
-      error: s.error || this.options.library.preview.errorFor(s.id),
+      error: this.options.library.preview.errorFor(s.id),
     };
   }
   refresh() {
@@ -108,29 +127,27 @@ export class SoundGeneration {
     model.revision = ++this.revision;
     this.options.send(model);
   }
-  private active(s: Session) {
-    if (s !== this.session || s.abort?.signal.aborted)
+  private active(s: Session, item: Item) {
+    if (s !== this.session || s.closing || item.abort?.signal.aborted)
       throw new DOMException('Cancelled', 'AbortError');
   }
-  private writable(s: Session) {
-    this.active(s);
+  private writable(s: Session, item: Item) {
+    this.active(s, item);
     this.options.library.host.assertWritable();
   }
   private async save(s: Session, item: Item) {
-    s.phase = 'saving';
+    item.view.state = 'saving';
     this.refresh();
     try {
-      this.writable(s);
+      this.writable(s, item);
       if (!item.entry) {
         this.checkFolder(item.view.folder);
         if (!item.bytes) throw Error(hostText('soundGeneration.missing'));
         const filename =
-          (item.view.folder ? item.view.folder + '/' : '') +
-          hostText('soundGeneration.fileStem') +
-          '.wav';
+          (item.view.folder ? item.view.folder + '/' : '') + filenameStem(item.view.text) + '.wav';
         const saved = await this.options.library.files.addVerified(item.bytes, filename, {
           unique: true,
-          writable: () => this.writable(s),
+          writable: () => this.writable(s, item),
         });
         item.entry = {
           ...this.options.library.files.entry(saved.ref)!,
@@ -142,7 +159,7 @@ export class SoundGeneration {
         item.bytes = undefined;
       }
       if (item.groupPending && s.group) {
-        this.writable(s);
+        this.writable(s, item);
         const groups = this.options.library.host.configuration.snapshot().groups;
         const before = groups
           .filter((g) =>
@@ -166,8 +183,64 @@ export class SoundGeneration {
         this.options.failed();
       }
     } finally {
+      item.view.state = item.entry ? 'saved' : item.bytes ? 'unsaved' : 'canceled';
       this.options.changed();
     }
+  }
+  private generate(s: Session, item: Item) {
+    const server = this.options
+      .configuration()
+      .connections.find((value) => value.id === item.request.connectionId);
+    if (server) {
+      item.view.server = server.name;
+      item.view.instructions =
+        server.instructionsMode === 'none'
+          ? ''
+          : [server.alwaysInstructions, item.request.instructions]
+              .filter((value) => value.trim())
+              .join('\n');
+    }
+    item.abort = new AbortController();
+    item.view.state = 'queued';
+    item.view.busy = true;
+    item.view.error = undefined;
+    this.refresh();
+    // TtsService captures connection/authentication now and owns the shared FIFO.
+    item.task = this.options.tts
+      .generate(
+        'host',
+        item.request,
+        item.abort.signal,
+        this.options.library.files.policy.maxBytes,
+        (state) => {
+          if (s !== this.session || s.closing) return;
+          item.view.state = state;
+          this.refresh();
+        },
+      )
+      .then(async (audio) => {
+        this.active(s, item);
+        item.bytes = audio.bytes;
+        item.view.seconds = audio.seconds;
+        await this.save(s, item);
+      })
+      .catch((error: Error) => {
+        if (error.name === 'AbortError') item.view.state = 'canceled';
+        else {
+          item.view.state = 'failed';
+          item.view.error = error.message;
+          this.options.failed();
+        }
+      })
+      .finally(() => this.finished(s, item));
+  }
+  private finished(s: Session, item: Item) {
+    item.view.busy = false;
+    item.abort = undefined;
+    item.task = undefined;
+    if (s !== this.session) item.bytes = undefined;
+    this.options.changed();
+    this.refresh();
   }
   async act(id: string, action: SoundGenerationAction) {
     const s = this.session;
@@ -178,21 +251,17 @@ export class SoundGeneration {
       this.refresh();
       return;
     }
-    if (action.kind === 'cancel') {
-      s.abort?.abort();
-      await s.task?.catch(() => {});
-      return;
-    }
+    if (s.closing) throw Error(hostText('soundGeneration.closed'));
     if (action.kind === 'close') {
-      if ((s.phase !== 'idle' || s.items.some((item) => !!item.bytes)) && action.discard !== true)
+      if (s.items.some((item) => item.view.busy || !!item.bytes) && action.discard !== true)
         throw Error(hostText('soundGeneration.confirmClose'));
-      s.abort?.abort();
-      await s.task?.catch(() => {});
+      s.closing = true;
+      this.refresh();
+      for (const item of s.items) item.abort?.abort();
+      await Promise.allSettled(s.items.map((item) => item.task));
       this.cancel(s.owner);
       return;
     }
-    if (s.phase !== 'idle') throw Error(hostText('soundGeneration.busy'));
-    s.error = '';
     if (action.kind === 'generate') {
       this.checkFolder(action.folder);
       if (
@@ -209,66 +278,61 @@ export class SoundGeneration {
       if (!server) throw Error(hostText('settings.ttsServers.missingServer'));
       this.options.library.host.assertWritable();
       s.folder = action.folder;
-      s.abort = new AbortController();
-      s.phase = 'generating';
-      this.refresh();
-      s.task = (async () => {
-        try {
-          const audio = await this.options.tts.generate(
-            'host',
-            {
-              text: action.text,
-              connectionId: action.connectionId,
-              instructions: action.instructions,
-            },
-            s.abort!.signal,
-            this.options.library.files.policy.maxBytes,
-          );
-          this.active(s);
-          const item: Item = {
-            view: {
-              id: randomUUID(),
-              folder: action.folder,
-              seconds: audio.seconds,
-              text: action.text,
-              server: server.name,
-              instructions:
-                server.instructionsMode === 'none'
-                  ? ''
-                  : [server.alwaysInstructions, action.instructions ?? server.defaultInstructions]
-                      .filter((value) => value.trim())
-                      .join('\n'),
-              state: 'unsaved',
-            },
-            bytes: audio.bytes,
-            groupPending: !!s.group,
-          };
-          s.items.unshift(item);
-          await this.save(s, item);
-        } catch (error) {
-          if ((error as Error).name !== 'AbortError') {
-            s.error = (error as Error).message;
-            this.options.failed();
-          }
-        } finally {
-          s.phase = 'idle';
-          s.abort = undefined;
-          this.refresh();
-        }
-      })();
-      await s.task;
+      const instructions = action.instructions ?? server.defaultInstructions;
+      const item: Item = {
+        view: {
+          id: randomUUID(),
+          folder: action.folder,
+          text: action.text,
+          server: server.name,
+          instructions:
+            server.instructionsMode === 'none'
+              ? ''
+              : [server.alwaysInstructions, instructions]
+                  .filter((value) => value.trim())
+                  .join('\n'),
+          state: 'queued',
+          busy: true,
+        },
+        request: { text: action.text, connectionId: action.connectionId, instructions },
+        groupPending: !!s.group,
+      };
+      s.items.unshift(item);
+      this.generate(s, item);
       return;
     }
-    if (!['retry', 'play', 'rename', 'delete'].includes(action.kind) || !('itemId' in action))
+    if (
+      !['cancel', 'retry', 'play', 'rename', 'delete', 'dismiss'].includes(action.kind) ||
+      !('itemId' in action)
+    )
       throw Error(hostText('soundGeneration.missing'));
     const item = s.items.find((item) => item.view.id === action.itemId);
     if (!item) throw Error(hostText('soundGeneration.missing'));
-    s.phase = action.kind === 'retry' ? 'saving' : 'editing';
+    if (action.kind === 'cancel') {
+      if (!['queued', 'generating'].includes(item.view.state)) return;
+      item.abort?.abort();
+      await item.task;
+      return;
+    }
+    if (item.view.busy) throw Error(hostText('soundGeneration.busy'));
+    if (action.kind === 'dismiss') {
+      if (item.entry || item.bytes) throw Error(hostText('soundGeneration.busy'));
+      s.items = s.items.filter((value) => value !== item);
+      this.refresh();
+      return;
+    }
+    if (action.kind === 'retry' && !item.entry && !item.bytes) {
+      this.generate(s, item);
+      return;
+    }
+    item.view.busy = true;
+    item.view.error = undefined;
     this.refresh();
-    s.task = (async () => {
+    item.task = Promise.resolve().then(async () => {
       try {
+        this.active(s, item);
         if (action.kind === 'retry') {
-          s.abort = new AbortController();
+          item.abort = new AbortController();
           if (item.entry)
             await this.options.library.files.read(item.entry.ref, item.entry.generation);
           await this.save(s, item);
@@ -278,8 +342,9 @@ export class SoundGeneration {
           if (action.kind === 'play')
             await this.options.library.preview.play(entry.ref, s.id, entry.generation);
           else {
-            this.options.library.preview.stop(s.id);
-            this.writable(s);
+            if (this.options.library.preview.snapshot(s.id)?.file === entry.ref.file)
+              this.options.library.preview.stop(s.id);
+            this.writable(s, item);
             if (action.kind === 'rename') {
               if (
                 typeof action.name !== 'string' ||
@@ -305,24 +370,22 @@ export class SoundGeneration {
         }
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-          s.error = (error as Error).message;
+          item.view.error = (error as Error).message;
           this.options.failed();
         }
         throw error;
       } finally {
-        s.phase = 'idle';
-        s.abort = undefined;
-        this.options.changed();
-        this.refresh();
+        this.finished(s, item);
       }
-    })();
-    await s.task;
+    });
+    await item.task;
   }
   cancel(owner?: string) {
     const s = this.session;
     if (!s || (owner !== undefined && s.owner !== owner)) return;
     this.session = undefined;
-    s.abort?.abort();
+    s.closing = true;
+    for (const item of s.items) item.abort?.abort();
     this.options.library.preview.stop(s.id);
     for (const item of s.items) item.bytes = undefined;
     this.options.send(null);

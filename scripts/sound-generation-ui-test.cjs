@@ -21,7 +21,8 @@ settings.updates.checkHostOnStartup =
 settings.soundLibrary = { groups: [{ id: 'notice', name: '通知', files: [] }] };
 const requests = [],
   checks = [],
-  errors = [];
+  errors = [],
+  held = [];
 let mode = 'success',
   app,
   host;
@@ -30,7 +31,10 @@ const server = http.createServer(async (req, res) => {
   let raw = '';
   for await (const part of req) raw += part;
   requests.push({ path: req.url, body: JSON.parse(raw), mode });
-  if (mode === 'wait') return;
+  if (mode === 'wait') {
+    held.push(res);
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'audio/wav' });
   res.end(mode === 'invalid' ? Buffer.from('invalid') : bytes);
 });
@@ -48,12 +52,22 @@ async function open() {
   await until(async () => !!(await model()), 'generation model');
 }
 async function generate(count, text = '処理が完了しました。') {
-  await dialog().getByRole('textbox', { name: '読み上げる文章', exact: true }).fill(text);
-  await dialog().getByRole('button', { name: '生成して保存', exact: true }).click();
+  const item = await submit(text);
   await until(async () => {
     const m = await model();
-    return m?.phase === 'idle' && m.items.length === count && m.items[0].state === 'saved';
+    return (
+      m.items.length === count &&
+      m.items.find((value) => value.id === item.id)?.state === 'saved' &&
+      !m.items.find((value) => value.id === item.id)?.busy
+    );
   }, 'saved WAV');
+  return (await model()).items.find((value) => value.id === item.id);
+}
+async function submit(text) {
+  const count = (await model()).items.length;
+  await dialog().getByRole('textbox', { name: '読み上げる文章', exact: true }).fill(text);
+  await dialog().getByRole('button', { name: '生成して保存', exact: true }).click();
+  await until(async () => (await model()).items.length === count + 1, 'immediate card');
   return (await model()).items[0];
 }
 async function closeDialog() {
@@ -124,6 +138,7 @@ async function closeDialog() {
       '通知',
     );
     const first = await generate(1);
+    assert.equal(first.file, '通知/処理が完了しました。-001.wav');
     assert.deepEqual(fs.readFileSync(path.join(directory, first.file)), bytes);
     assert.equal(requests.length, 1);
     assert.equal(requests[0].body.instructions, '日本語\nやさしく');
@@ -131,6 +146,7 @@ async function closeDialog() {
     await dialog().getByRole('checkbox', { name: 'サーバーの設定を使う' }).uncheck();
     await dialog().getByRole('textbox', { name: 'ニュアンス', exact: true }).fill('明るく');
     const second = await generate(2);
+    assert.equal(second.file, '通知/処理が完了しました。-002.wav');
     assert.notEqual(first.file, second.file);
     assert.equal(requests[1].body.model, 'alternate');
     assert.equal(requests[1].body.instructions, '日本語\n明るく');
@@ -185,29 +201,84 @@ async function closeDialog() {
     checks.push(
       'wide/light and minimum-window/dark layouts, visible footer and no horizontal overflow',
     );
+    await app.resize(1720, 1000);
+    await app.save({ host: { theme: 'light' } });
+    const state = async (id) => (await model()).items.find((value) => value.id === id);
+    const card = (id) => dialog().locator(`[data-generated-sound="${id}"]`);
     mode = 'wait';
-    await row.getByRole('button', { name: '試聴', exact: true }).click();
-    await until(async () => !!(await model()).playback, 'preview before generation');
-    await dialog().getByRole('button', { name: '生成して保存', exact: true }).click();
+    const generating = await submit('先に生成する音');
     await until(() => requests.length === 3, 'pending request');
+    assert.equal((await state(generating.id)).state, 'generating');
+    const queued = await submit('次に生成する音');
+    const canceled = await submit('中止する音');
+    assert.equal((await state(queued.id)).state, 'queued');
+    assert.equal(requests.length, 3);
+    assert.equal(
+      await dialog().getByRole('textbox', { name: '読み上げる文章', exact: true }).isEnabled(),
+      true,
+    );
+    await row.getByRole('button', { name: '試聴', exact: true }).click();
+    await until(async () => !!(await model()).playback, 'preview during generation');
     await row.getByRole('button', { name: '停止', exact: true }).click();
     await until(async () => !(await model()).playback, 'preview stopped during generation');
-    assert.equal((await model()).phase, 'generating');
-    await dialog().getByRole('button', { name: '生成を中止', exact: true }).click();
-    await until(async () => (await model()).phase === 'idle', 'cancelled');
-    assert.equal((await model()).items.length, 1);
-    assert.equal((await model()).error, '');
-    mode = 'invalid';
-    await dialog().getByRole('button', { name: '生成して保存', exact: true }).click();
-    await until(async () => !!(await model()).error, 'invalid WAV failure');
-    assert.equal((await model()).items.length, 1);
+    await row.getByRole('button', { name: '名前変更', exact: true }).click();
+    await rename.getByRole('textbox', { name: '新しい名前（.wav）' }).fill('生成中に変更');
+    await rename.getByRole('button', { name: '適用', exact: true }).click();
+    await rename.waitFor({ state: 'hidden' });
+    assert(fs.existsSync(path.join(directory, '通知/生成中に変更.wav')));
+    await card(canceled.id).getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await until(
+      async () => (await state(canceled.id)).state === 'canceled',
+      'queued card canceled',
+    );
+    await host.screenshot({ path: path.join(profile, 'queued-cards.png') });
     mode = 'success';
-    await generate(2, '次の音声です。');
-    checks.push('cancel/invalid WAV preserve prior assets and allow subsequent generation');
+    held[0].writeHead(200, { 'Content-Type': 'audio/wav' });
+    held[0].end(bytes);
+    await until(
+      async () =>
+        (await state(queued.id)).state === 'saved' &&
+        !(await state(queued.id)).busy &&
+        (await state(generating.id)).state === 'saved',
+      'FIFO saved',
+    );
+    assert.deepEqual(
+      requests.slice(2).map((value) => value.body.input),
+      ['先に生成する音', '次に生成する音'],
+    );
+    checks.push(
+      'immediate cards, sequential shared queue, per-card cancellation, editable form, preview and rename while generating',
+    );
+    mode = 'wait';
+    const interrupted = await submit('生成を中止する音');
+    await until(async () => (await state(interrupted.id)).state === 'generating', 'active card');
+    await card(interrupted.id).getByRole('button', { name: '生成を中止', exact: true }).click();
+    await until(
+      async () =>
+        (await state(interrupted.id)).state === 'canceled' && !(await state(interrupted.id)).busy,
+      'active card canceled',
+    );
+    mode = 'invalid';
+    const failed = await submit('再生成する音');
+    await until(
+      async () => (await state(failed.id)).state === 'failed' && !(await state(failed.id)).busy,
+      'invalid WAV card failure',
+    );
+    mode = 'success';
+    await card(failed.id).getByRole('button', { name: '再生成', exact: true }).click();
+    await until(
+      async () => (await state(failed.id)).state === 'saved' && !(await state(failed.id)).busy,
+      'same card regenerated',
+    );
+    await card(interrupted.id).getByRole('button', { name: '一覧から削除', exact: true }).click();
+    await until(async () => !(await state(interrupted.id)), 'canceled card removed');
+    checks.push(
+      'text-derived serial filenames, active cancellation, card-local failure and regeneration without adding another card',
+    );
     await closeDialog();
     assert.equal(
       fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length,
-      2,
+      4,
     );
     await until(
       () =>
@@ -216,6 +287,24 @@ async function closeDialog() {
           .evaluate((el) => el === document.activeElement),
       'opener focus restored',
     );
+    await open();
+    mode = 'wait';
+    await submit('閉じると中止');
+    await submit('待機も中止');
+    await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
+    const closing = host.getByRole('dialog', { name: 'ダイアログを閉じる', exact: true });
+    await closing.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.equal((await model()).items.length, 2);
+    await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
+    await closing.getByRole('button', { name: '破棄して閉じる', exact: true }).click();
+    await dialog().waitFor({ state: 'hidden' });
+    assert.equal(
+      fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length,
+      4,
+    );
+    checks.push(
+      'close confirmation can be canceled; confirmed closure cancels queued and active cards and preserves saved files',
+    );
     await app.close();
     app = null;
     await start();
@@ -223,7 +312,7 @@ async function closeDialog() {
     assert.equal((await model()).items.length, 0);
     assert.equal(
       fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length,
-      2,
+      4,
     );
     await closeDialog();
     checks.push(

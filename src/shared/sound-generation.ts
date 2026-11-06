@@ -4,11 +4,13 @@ export interface GeneratedSound {
   id: string;
   file?: string;
   folder: string;
-  seconds: number;
+  seconds?: number;
   text: string;
   server: string;
   instructions: string;
-  state: 'saved' | 'unsaved' | 'changed';
+  state:
+    'queued' | 'generating' | 'saving' | 'saved' | 'unsaved' | 'changed' | 'failed' | 'canceled';
+  busy: boolean;
   error?: string;
   canRetry?: boolean;
 }
@@ -26,15 +28,15 @@ export interface SoundGenerationModel {
   }[];
   defaultConnectionId?: string;
   items: GeneratedSound[];
-  phase: 'idle' | 'generating' | 'saving' | 'editing';
+  closing: boolean;
   playback?: LibraryPlayback;
   error: string;
 }
 export type SoundGenerationAction =
   | { kind: 'generate'; folder: string; connectionId: string; text: string; instructions?: string }
-  | { kind: 'cancel' | 'stop' }
+  | { kind: 'stop' }
   | { kind: 'close'; discard?: boolean }
-  | { kind: 'retry' | 'play' | 'delete'; itemId: string }
+  | { kind: 'cancel' | 'retry' | 'play' | 'delete' | 'dismiss'; itemId: string }
   | { kind: 'rename'; itemId: string; name: string };
 /** Private trusted-renderer bridge. It never exposes WAV bytes or credentials. */
 export interface SoundGenerationApi {
