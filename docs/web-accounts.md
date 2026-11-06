@@ -12,7 +12,7 @@ UI snapshotの`group?: {id,title}`で共有範囲を表示できます。既存�
 
 ## 専用アカウントの基本契約
 
-PC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。Gmail等の枠はPC専用rootのweb-accountsに保存し、共有WebApplet枠とは分離します。ローカルUIのsnapshot.registeredSoundsに登録済みのファイル名を渡します。setSoundは登録済みファイル名、pickSoundはファイル登録、testSoundは試聴です。sound.fileは枠に紐づくローカル設定としてファイル名だけを保存し、ホストが自身のAppletの素材rootへ解決します。
+PC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。グループを宣言しないサービスの枠はPC専用rootのweb-accountsに保存します。ローカルUIのsnapshot.registeredSoundsに登録済みのファイル名を渡します。setSoundは登録済みファイル名、pickSoundはファイル登録、testSoundは試聴です。sound.fileは枠に紐づくローカル設定としてファイル名だけを保存し、ホストが自身のAppletの素材rootへ解決します。
 
 [Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の「操作Window」はローカルUIと選択アカウントを表示するWindowを指し、本体ページ表示では本体Windowです。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。
 
@@ -140,15 +140,11 @@ snapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。�
 
 Webアカウントのsession/表示WebContentsView/背景Windowは、ChromiumがWindowsから取得する優先言語を使います。ホストでAccept-Languageやnavigator.languageの独自上書きを行いません。サイト側のアカウント設定やURLによる表示言語は別です。隔離セッションでの実測は[検証記録](../VERIFICATION.md)を参照してください。
 
-## 任意URL向けのWebプロフィール
+## 登録サイトごとのアカウント枠
 
-web-profiles capabilityとcontext.webProfiles.list/add/rename/clear/deleteは、Applet自身のログイン保存枠を管理します。任意URLのページ表示にはpageCollectionsのsource:remoteを使います。Cookieやsession、任意保存パスはAppletへ渡しません。上記webAccountsのサービス観測・専用UIとは別契約です。Gmail等の既存APIと保存先を維持します。
+pageCollectionsのsource:remoteは、提供元グループ内で登録ごとにログイン枠を割り当てます。保存・自動回収は[WebApplet](web-applets.md#保存と回収)を参照してください。
 
-新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。宣言と操作の詳細は[動的ページ設計](applet-pages.md)を参照してください。
-
-MCPは[共通設定APIの名簿対象](settings-api.md#webアカウント名簿)から、提供元ごとのID/名前を取得し、枠の追加・名前変更を行います。UIと同じ所有サービスで競合を確認して名簿だけを保存し、Cookie/sessionと削除待ち記録を維持します。削除・ログイン情報のクリアはローカル操作です。
-
-サービス観測用の`webAccounts/accountGroup`にも[専用の名簿対象](settings-api.md#サービス専用webアカウント名簿)を提供します。`web-profiles`へ移し替えず、既存のUUID・保存先と専用/共有の区分を維持します。公開はID/名前と追加・名前変更に限り、ローカルUIの名前変更も同じ変更計画を使います。選択、監視、音声、観測データ、認証にはこのAPIから触れません。無効・停止中でも名簿を編集できますが、読取りやdryRunによる初期化・移行・復旧は行いません。
+観測付きサービスの `webAccounts` / `accountGroup` は、[サービス専用Webアカウント名簿](settings-api.md#サービス専用webアカウント名簿)を提供します。公開操作はIDと名前の読取り、枠の追加、名前変更です。
 
 ## 宣言と公開契約
 

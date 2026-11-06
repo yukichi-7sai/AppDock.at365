@@ -214,7 +214,7 @@ export class SettingsCommands {
   private fieldOptions(owner: Owner, field: SettingDefinition): SettingOption[] {
     if (owner.id === 'appdock' && field.key === 'startPage')
       return startPageOptions(this.options.settings.value, this.options.applets());
-    if (field.type === 'registered-image' || field.optionSource) {
+    if (field.type === 'registered-image') {
       try {
         return this.options.settingOptions?.(owner.collection?.owner ?? owner.id, field) ?? [];
       } catch {

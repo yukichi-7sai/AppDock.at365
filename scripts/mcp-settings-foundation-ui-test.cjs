@@ -150,7 +150,6 @@ fs.writeFileSync(
 require('./settings-applet-common-gateway-checks.cjs').install(profile);
 require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
-require('./settings-web-profile-gateway-checks.cjs').install(profile);
 require('./settings-web-account-gateway-checks.cjs').install(profile, local);
 require('./settings-shortcut-list-gateway-checks.cjs').install(profile);
 require('./settings-image-group-gateway-checks.cjs').install(profile);
@@ -531,16 +530,9 @@ async function main() {
     fixtureId,
   });
   await require('./settings-stack-mcp-lock-checks.cjs').check({ page, profile, checks });
-  await require('./settings-web-profile-gateway-checks.cjs').check({
-    page,
-    profile,
-    local,
-    client,
-    checks,
-    tool,
-    value,
-    until,
-  });
+  const targets = await value('appdock_settings_list_targets');
+  assert(!targets.items.some((target) => target.targetId.startsWith('service.web-profiles.')));
+  checks.push('retired shared Web profile settings are absent from MCP discovery');
   await require('./settings-web-account-gateway-checks.cjs').check({
     page,
     profile,

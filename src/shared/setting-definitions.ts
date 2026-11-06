@@ -96,9 +96,7 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
     (typeof value !== 'string' ||
       !value ||
       value.length > 256 ||
-      (!definition.dynamic &&
-        !definition.optionSource &&
-        !definition.options?.some((o) => o.value === value)))
+      (!definition.dynamic && !definition.options?.some((o) => o.value === value)))
   )
     fail();
 }
@@ -241,10 +239,7 @@ export function parseSettingDefinitions(
         !s.propertyPath.every(safeKey))
     )
       throw Error(hostText('settings.setting-definitions.fieldPath'));
-    if (
-      s.optionSource !== undefined &&
-      (depth !== 1 || s.type !== 'select' || s.optionSource !== 'web-profiles')
-    )
+    if (s.optionSource !== undefined)
       throw Error(hostText('settings.setting-definitions.optionSource'));
     if (s.list !== undefined) {
       const list = s.list,

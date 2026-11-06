@@ -245,7 +245,7 @@ export function initializeCollectionDefaults(
         return Array.isArray(rows)
           ? rows
               .filter((row) => typeof row?.id === 'string')
-              .map((row) => collectionIdentity(previous, parent.id, definition.key, row.id))
+              .map((row) => collectionIdentity(parent.id, definition.key, row.id))
           : [];
       }),
     ),

@@ -190,6 +190,12 @@ export class DeviceSettingsStore extends SettingsStore {
       : this.shared.storedValue().extensions?.[owner];
     return entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
   }
+  confirmedAppletSources() {
+    if (!this.loaded || this.mutating || this.writesBlocked || fs.existsSync(this.journal)) return;
+    const shared = this.shared.confirmedValue();
+    const device = this.device.confirmedValue();
+    if (shared && device) return { shared: shared.extensions, device: device.extensions };
+  }
   override storedSettingOverrides(owner: string, collection?: CollectionBinding) {
     if (owner === 'appdock') return storedSettingRecord(this.storedValue(), owner);
     const shared = this.shared.storedValue(),

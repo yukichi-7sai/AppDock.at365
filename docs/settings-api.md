@@ -40,7 +40,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 | Applet共通設定              | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成                                                                                           |
 | Applet管理順序              | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない                                                                                         |
 | ジェスチャー共通設定        | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成                                                                                        |
-| Webアカウント名簿           | web-profilesを宣言した提供元ごとのID/名前の取得、枠の追加と名前変更。認証情報の消去と削除はローカル操作                                                                           |
+| Webアカウント名簿           | 観測付きサービスのID/名前の取得、枠の追加と名前変更。認証情報の消去と削除はローカル操作                                                                           |
 | 画像グループ                | グループの追加・名前変更・削除・並べ替えと、登録画像の所属編集。原画像と使用先は保持                                                                                              |
 
 その他の専用サービスと原画像の取込み/削除は後続範囲。登録済み画像の参照は下記の共通設定から選択・解除する。未宣言JSON全体の変更入口へ置き換えない。
@@ -76,7 +76,7 @@ catalogRevisionは公開対象の構成、schemaRevisionは対象の公開定義
 
 schemaのitemsはkey/title/type/inputSchema/default/writable/applies、operationSchemasは操作の構造を返す。valuesのfieldsはkey/value/hasValue/default/inherited/writable/appliesを返す。既定値や値が存在しなければ該当プロパティを省略する。inheritedは保存上書きがなければtrue、あればfalse。保存ファイルを読めない場合はnullとし、値は最後の有効なスナップショットを返す。読取りだけで再読込・復旧・書込みを行わない。Applet固有のmanifest設定対象は停止・無効ならavailable/writable=falseであり、applyはUNAVAILABLEを返す。所有サービスが公開する共通設定・更新元などは各節の可用性に従う。
 
-動的selectはAppletの既存settings.setOptionsが公開した現在の候補を使用する。一覧のoptionSource:web-profilesは提供元自身のWeb名簿のIDと名前だけを既存parserで読み取り、候補取得や検証のためにRemotePageServiceの初期化・session整理・接続・ページ表示を行わない。現在の候補をSchemaと保存前の検証へ反映する。候補変更でschemaRevisionも変わる。候補を取得できない場合は空とし、未知候補への変更は拒否する。保存済みで候補から消えた値は、未編集なら保持できる。itemRefは存在する行、draftValuesは公開列のキーだけを受け付ける。現在のproviderの候補はdraftValuesに依存しない。
+動的selectはAppletの既存settings.setOptionsが公開した現在の候補を使用する。現在の候補をSchemaと保存前の検証に反映し、候補変更でschemaRevisionも変わる。候補を取得できない場合は空とし、未知候補への変更は拒否する。保存済みで候補から消えた値は、未編集なら保持できる。
 
 ## 一覧の行操作
 
@@ -221,21 +221,9 @@ MCPツールコマンドはtitle/description/category/enabled/automation/serverI
 
 管理はread + write、探索は既存read + execute + useMcpで分離する。管理更新・dryRunは接続・stdio起動・ツール実行をしない。複数行を検証後に1回保存し、expectedRevision/schemaRevision・再送・無変更・原子的保存を共通基盤で扱う。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=false。Appletが本体所有の定義を管理する権限は追加しない。詳細は[端末別MCP設定](mcp-device-settings-design.md)と[通信・ジョブ](mcp-client-design.md)を参照する。
 
-## Webアカウント名簿
+## サービス専用Webアカウント名簿
 
-`web-profiles` capabilityを宣言したAppletごとに、`category: web-accounts`のlist対象を自動生成する。無効・停止中の提供元も名簿を編集でき、操作のために有効化・Applet起動・RemotePageService初期化・ページ表示を行わない。提供元が増減しても固定6入口と外側のツールSchemaを変更しない。対象IDは探索結果を使い、`ownerId`で提供元を区別する。
-
-公開する列は読取り専用のidと編集可能なnameだけ。対応操作は`add`と`update`で、枠の追加時は`account.<UUID>`を生成する。addのbeforeItemRefで既存行の前へ挿入できるが、既存IDと既存行同士の順序は保持する。件数上限はなく、名前は制御文字なしの1～80文字で、前後の空白を除く。同名の枠はitemRefで区別する。行削除、並べ替え、reset、ログイン情報のクリア、Cookieやsessionの取得・編集は提供しない。
-
-保存はUIの追加・名前変更と同じWebProfileStoreの変更計画・parser・atomicWriteを使う。共有名簿の既存の未知属性と未編集値を保持し、設定JSONのbytes/revision、PC専用の削除待ち記録、session、暗号化情報を変更しない。既存の移行マーカーが指定する保存先もそのまま使う。候補のid/名前は既存のweb-profiles providerから取得し、名簿変更はそのselectのschemaRevisionへ反映する。
-
-名簿の元bytesを内部の競合判定に含め、未知属性だけが外部で変わった場合も古い要求・itemRef・cursorを拒否する。名簿の破損・形式不備・読取り拒否、稼働中サービスの終了・クリア処理中はavailable=false。生のI/O例外や保存パスを返さない。読取りとdryRunでは名簿を新規作成せず、空の名簿への明示的なaddだけが初期化する。保存後のappliesはwebProfilesChanged、effectVerifiedはfalse。
-
-設定画面は名前列のMCP公開を同じownerから判定し、非公開の削除・クリアの操作列は南京錠を表示する。ローカルUIの入力確定・取消・参照中の削除ガードは維持する。
-
-### サービス専用Webアカウント名簿
-
-`web-accounts` capabilityと`webAccounts`を宣言したAppletにも、同じ固定6入口で`category: web-accounts`のlist対象を提供する。`web-profiles`の名簿とは別の対象であり、提供元ごとのPC専用名簿、または明示した`accountGroup`の共有名簿を既存の保存先から扱う。同じグループの変更は、そのグループを宣言した他の提供元の対象にも反映される。
+`web-accounts` capabilityと`webAccounts`を宣言したAppletには、同じ固定6入口で`category: web-accounts`のlist対象を提供する。提供元ごとのPC専用名簿、または明示した`accountGroup`の共有名簿を既存の保存先から扱う。同じグループの変更は、そのグループを宣言した他の提供元の対象にも反映される。登録サイトの枠は[本体の自動管理](web-applets.md#保存と回収)を使う。
 
 公開列は読取り専用の`id`と編集可能な`name`、操作は`add`と`update`だけ。既存と同じUUIDを新しい枠へ生成し、名前は制御文字なしの1～60文字で前後の空白を除く。固定件数上限は設けない。`beforeItemRef`で新しい枠を挿入できるが、既存IDと既存行同士の順序を維持する。監視・音声・選択・一時名の内部フラグ・観測データ・URL・Cookie/sessionは公開せず、削除・並べ替え・reset・認証消去も受け付けない。
 

@@ -5,6 +5,7 @@ import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { observeFile } from './file-observer';
 import type { FileWatchAssistance } from './file-watch-assistance';
 import { SettingsHealth, settingsIssueMessages } from './settings-health';
@@ -216,6 +217,14 @@ class SettingsStore<T = Settings> extends EventEmitter {
   private readDisk() {
     this.observer?.invalidate();
     return this.parse(this.readBytes(this.file));
+  }
+  confirmedValue() {
+    if (this.recovered) return;
+    try {
+      if (isDeepStrictEqual(this.parse(this.readBytes(this.file)), this.value)) return this.value;
+    } catch {
+      // Unavailable or invalid data cannot confirm that a reference was removed.
+    }
   }
   private readFailure(error: unknown, immediate = true) {
     this.recovered = true;

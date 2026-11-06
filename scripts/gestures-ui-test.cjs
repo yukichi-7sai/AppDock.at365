@@ -8,8 +8,8 @@ const { spawn } = require('node:child_process');
 const http = require('node:http');
 const { randomUUID, createHash } = require('node:crypto');
 const net = require('node:net');
-const webId = 'web.' + randomUUID(),
-  accountId = 'account.' + randomUUID();
+const siteId = randomUUID();
+const webId = 'at365.web-applet.sites.' + siteId;
 const server = http.createServer((req, res) =>
   res.end('<h1>Gesture web fixture</h1><input aria-label="Web入力">'),
 );
@@ -107,12 +107,11 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
   settings.extensions['at365.web-applet'] = {
     enabled: true,
     settings: {
-      items: [
+      sites: [
         {
-          id: webId,
+          id: siteId,
           name: 'Webジェスチャー',
           url: `http://127.0.0.1:${server.address().port}/`,
-          accountId,
           enabled: true,
           display: 'page',
           navigation: 'none',
@@ -122,15 +121,6 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
       ],
     },
   };
-  settings.migrations = { webApplet: { version: 1, owner: 'at365.web-applet', ids: [webId] } };
-  fs.mkdirSync(path.join(profile, 'data/web-applets'), { recursive: true });
-  fs.writeFileSync(
-    path.join(profile, 'data/web-applets/accounts.json'),
-    JSON.stringify({
-      schemaVersion: 1,
-      accounts: [{ id: accountId, name: 'Test' }],
-    }),
-  );
   fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -393,14 +383,14 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
       await wait(500);
       await expect(['a', 'c']);
       checks.push('WebApplet scope without leaking provider condition');
-      await dock.evaluate(async (id) => {
+      await dock.evaluate(async ({ siteId, webId }) => {
         const s = await window.dock.snapshot();
-        s.settings.value.extensions['at365.web-applet'].settings.items.find(
-          (i) => i.id === id,
+        s.settings.value.extensions['at365.web-applet'].settings.sites.find(
+          (i) => i.id === siteId,
         ).display = 'window';
         await window.dock.saveSettings(s.settings.value, s.settings.revision);
-        await window.dock.executeCommand(id + '.open');
-      }, webId);
+        await window.dock.executeCommand(webId + '.open');
+      }, { siteId, webId });
       await wait(400);
       await expect(['a', 'c']);
       checks.push('detached WebApplet conditions');

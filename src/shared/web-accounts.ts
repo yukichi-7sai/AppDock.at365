@@ -15,6 +15,11 @@ export const webAccountId = (id: unknown): id is string =>
   typeof id === 'string' &&
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
 
+export const webAccountGroupId = (id: unknown): id is string =>
+  typeof id === 'string' &&
+  /^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){1,4}$/.test(id) &&
+  !/^(con|prn|aux|nul|com[0-9]|lpt[0-9])\./i.test(id);
+
 export function webAccountName(value: unknown): string {
   if (
     typeof value !== 'string' ||

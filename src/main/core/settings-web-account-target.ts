@@ -20,7 +20,7 @@ const safeError = (error: unknown): never => {
   );
 };
 
-/** Service accounts stay separate from web-profiles and publish only identities. */
+/** Publish only the identities of manually managed service accounts. */
 export function webAccountSettingsTargets(options: {
   applets: ExtensionSnapshot[];
   localRoot: string;

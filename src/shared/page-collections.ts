@@ -8,7 +8,9 @@ import type {
 import { validPageId } from './applet-pages';
 import { imageReference, type RegisteredImageRef } from './registered-images';
 import { parseSettingDefinitions } from './setting-definitions';
-import { webUrl, profileId } from './web-content';
+import { webUrl } from './web-content';
+import { assetFilename } from './asset-names';
+import { webAccountGroupId, webAccountId } from './web-accounts';
 
 export interface PageCollectionDefinition {
   key: string;
@@ -30,7 +32,6 @@ export interface CollectionRecord {
   enabled: boolean;
   display: 'page' | 'window';
   url?: string;
-  accountId?: string;
   navigation?: 'none' | 'same-origin' | 'any';
   allowedOrigins?: string[];
   icon?: string;
@@ -65,7 +66,7 @@ export function parsePageCollections(manifest: ExtensionManifest): PageCollectio
       !manifest.settings?.some(
         (setting) => setting.key === raw.key && setting.type === 'object-list',
       ) ||
-      (raw.source === 'remote' && !manifest.capabilities?.includes('web-profiles')) ||
+      (raw.source === 'remote' && (!webAccountGroupId(manifest.id) || !assetFilename(raw.key))) ||
       (raw.source === 'local' && (typeof raw.ui !== 'string' || !/\.html$/i.test(raw.ui))) ||
       (raw.shortcutDefaultsKey !== undefined &&
         !manifest.settings?.some(
@@ -95,11 +96,8 @@ export function collectionRecord(settings: Settings, binding: CollectionBinding)
   if (!item) throw Error(hostText('services.sharedPageCollections.settingMissing'));
   return item;
 }
-export function collectionIdentity(settings: Settings, owner: string, key: string, id: string) {
-  const legacy = settings.migrations?.webApplet;
-  return legacy?.owner === owner && key === 'items' && legacy.ids.includes(id)
-    ? id
-    : `${owner}.${key}.${id}`;
+export function collectionIdentity(owner: string, key: string, id: string) {
+  return `${owner}.${key}.${id}`;
 }
 export function validateCollectionRecords(
   definition: PageCollectionDefinition,
@@ -124,7 +122,7 @@ export function validateCollectionRecords(
     if (definition.source === 'remote') {
       webUrl(item.url);
       if (
-        !profileId(item.accountId) ||
+        !webAccountId(item.id) ||
         !['none', 'same-origin', 'any'].includes(item.navigation) ||
         !Array.isArray(item.allowedOrigins)
       )
@@ -157,7 +155,7 @@ export function collectionPages(
     return (parent.pageCollections ?? []).flatMap((definition) => {
       const rows = settings.extensions[parent.id]?.settings[definition.key] ?? [];
       return validateCollectionRecords(definition, rows).map((item) => {
-        const id = collectionIdentity(settings, parent.id, definition.key, item.id);
+        const id = collectionIdentity(parent.id, definition.key, item.id);
         if (id.length > 100 || ids.has(id))
           throw Error(hostText('services.sharedPageCollections.invalidIds'));
         ids.add(id);

@@ -9,12 +9,10 @@ const { validateCollectionRecords } = require('../out/main/shared/page-collectio
 const definition = require('../../Applet.WebApplet.at365/extension.json').pageCollections[0];
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ribbonItems } = require('../out/main/shared/applet-pages');
-const account = { id: `account.${randomUUID()}`, name: '仕事用' };
 const item = {
-  id: `web.${randomUUID()}`,
+  id: randomUUID(),
   name: 'ページ',
   url: 'https://app.example.com/start',
-  accountId: account.id,
   enabled: true,
   display: 'page',
   navigation: 'same-origin',
@@ -23,17 +21,16 @@ const item = {
 };
 test('legacy settings no longer import or alter other applets', () => {
   const s = createDefaultSettings();
-  s.webApplets = { items: [item], accounts: [account] };
+  s.webApplets = { items: [item], accounts: [] };
   s.extensions['at365.gmail'] = { enabled: true, settings: { monitoring: true } };
   const next = parseSettings(s);
   assert.equal(next.webApplets, undefined);
   assert.deepEqual(next.extensions, s.extensions);
 });
-test('Web account references, identity, limits, protocols and icon formats are validated', () => {
-  const good = { accounts: [account], items: [item] };
-  assert.deepEqual(validateCollectionRecords(definition, good.items), good.items);
+test('site UUIDs, protocols and icon formats are validated', () => {
+  assert.deepEqual(validateCollectionRecords(definition, [item]), [item]);
   for (const patch of [
-    { accountId: 'at365.gmail' },
+    { id: 'at365.gmail' },
     { url: 'file:///A:/private' },
     { url: 'https://user:password@example.com/' },
     { icon: 'data:image/svg+xml;base64,PHN2Zz4=' },
@@ -85,12 +82,11 @@ test('Navigation compares complete origins, not sibling subdomains or prefixes',
     false,
   );
 });
-test('saved WebApplet identities retain ribbon preferences', () => {
+test('site identities and ribbon preferences survive settings round trips', () => {
   const s = createDefaultSettings();
-  s.extensions['at365.web-applet'] = { enabled: true, settings: { items: [item] } };
-  s.migrations = { webApplet: { version: 1, owner: 'at365.web-applet', ids: [item.id] } };
-  s.ribbon.order = ['page:' + item.id + ':main'];
+  s.extensions['at365.web-applet'] = { enabled: true, settings: { sites: [item] } };
+  s.ribbon.order = ['page:at365.web-applet.sites.' + item.id + ':main'];
   const next = parseSettings(s);
   assert.deepEqual(next.ribbon, s.ribbon);
-  assert.equal(next.extensions['at365.web-applet'].settings.items[0].id, item.id);
+  assert.equal(next.extensions['at365.web-applet'].settings.sites[0].id, item.id);
 });

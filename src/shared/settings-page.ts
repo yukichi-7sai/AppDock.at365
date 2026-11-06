@@ -139,10 +139,6 @@ export interface SettingsPageAuxiliary {
   hostStartupTiming?: import('./host-startup-timing').HostStartupTiming;
   version?: string;
   updates?: HostSnapshot['updates'];
-  accounts?: HostSnapshot['webAccounts'];
-  accountReferences?: {
-    saved: { id: string; name: string; accountId: string }[];
-  };
   permissions?: HostSnapshot['appletApi'];
 }
 /** Display-only index; contains no setting values, edit session or action handles. */

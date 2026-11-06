@@ -14,7 +14,7 @@ const {
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { SettingsCommands } = require('../out/main/main/core/settings-commands');
 const manifest = require('../../Applet.WebApplet.at365/extension.json');
-test('declarative lists validate columns, nested paths and option sources', () => {
+test('declarative lists validate columns and nested paths', () => {
   const fields = parseSettingDefinitions(manifest.settings);
   assert.equal(fields[0].list.titleKey, 'name');
   assert.throws(() => validateSettingValue(fields[0], [{ id: 'same' }, { id: 'same' }]));
@@ -94,7 +94,7 @@ test('grouped list saves preserve other settings and reject stale or undeclared 
   const settings = structuredClone(store.value);
   settings.extensions[manifest.id] = {
     enabled: true,
-    settings: { shortcutDefaults: before, private: 'retained' },
+    settings: { [definition.key]: before, private: 'retained' },
   };
   store.save(settings, store.revision);
   const commands = new SettingsCommands({
@@ -104,12 +104,12 @@ test('grouped list saves preserve other settings and reject stale or undeclared 
   });
   const next = structuredClone(before);
   next[0].key = 'Ctrl+F5';
-  commands.replaceOwnList(manifest, 'shortcutDefaults', next, before);
+  commands.replaceOwnList(manifest, definition.key, next, before);
   assert.equal(store.value.extensions[manifest.id].settings.private, 'retained');
   assert.throws(
-    () => commands.replaceOwnList(manifest, 'shortcutDefaults', before, before),
+    () => commands.replaceOwnList(manifest, definition.key, before, before),
     /変更/,
   );
   assert.throws(() => commands.replaceOwnList(manifest, 'private', [], []), /宣言/);
-  assert.equal(store.value.extensions[manifest.id].settings.shortcutDefaults[0].key, 'Ctrl+F5');
+  assert.equal(store.value.extensions[manifest.id].settings[definition.key][0].key, 'Ctrl+F5');
 });

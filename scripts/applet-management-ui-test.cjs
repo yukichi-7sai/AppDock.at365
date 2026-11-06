@@ -49,7 +49,7 @@ Object.assign(settings.host, {
 settings.gestures.enabled = false;
 settings.keybindings = [];
 settings.globalShortcutCommands = [];
-const siteId = 'at365.web-applet.items.site';
+const siteId = 'at365.web-applet.sites.11111111-2222-4333-8444-555555555555';
 settings.appletOrder = ['test.a', siteId, 'missing', 'test.b', 'at365.web-applet'];
 function fixture(id, enabled = true) {
   const folder = path.join(profile, 'extensions', id);
@@ -84,7 +84,7 @@ fs.writeFileSync(path.join(profile, 'extensions/broken/extension.json'), '{');
 const webFolder = path.join(profile, 'extensions/at365.web-applet');
 fs.mkdirSync(webFolder);
 const webFields = [
-  ...['id', 'name', 'url', 'accountId', 'icon'].map((key) => ({
+  ...['id', 'name', 'url', 'icon'].map((key) => ({
     key,
     title: key,
     type: 'string',
@@ -118,10 +118,10 @@ const web = {
   minimumHostVersion: '0.45.0',
   runtime: 'node',
   entry: 'index.js',
-  capabilities: ['pages', 'dynamic-pages', 'web-profiles'],
+  capabilities: ['pages', 'dynamic-pages'],
   settings: [
     {
-      key: 'items',
+      key: 'sites',
       title: 'サイト',
       type: 'object-list',
       default: [],
@@ -129,7 +129,7 @@ const web = {
       list: { columns: ['name'], titleKey: 'name', idKey: 'id' },
     },
   ],
-  pageCollections: [{ key: 'items', source: 'remote', fields: [] }],
+  pageCollections: [{ key: 'sites', source: 'remote', fields: [] }],
   commands: [],
 };
 fs.writeFileSync(path.join(webFolder, 'extension.json'), JSON.stringify(web));
@@ -138,12 +138,11 @@ require('../out/main/main/core/extensions').readManifest(webFolder);
 settings.extensions[web.id] = {
   enabled: false,
   settings: {
-    items: [
+    sites: [
       {
-        id: 'site',
+        id: '11111111-2222-4333-8444-555555555555',
         name: '除外するWebサイト',
         url: 'https://example.invalid/',
-        accountId: 'account.11111111-1111-1111-1111-111111111111',
         enabled: false,
         display: 'page',
         navigation: 'none',

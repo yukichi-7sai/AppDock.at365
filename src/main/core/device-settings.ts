@@ -336,6 +336,7 @@ export function readDeviceManifests(roots: string[]): ExtensionManifest[] {
         if (fs.statSync(file).size > 1024 * 1024) continue;
         const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as ExtensionManifest;
         if (!id(manifest.id) || result.some((item) => item.id === manifest.id)) continue;
+        if (manifest.capabilities?.includes('web-profiles')) continue;
         validateAppletCommonValues(manifest as unknown as Record<string, unknown>, true);
         manifest.settings = parseSettingDefinitions(manifest.settings);
         manifest.pages = parseAppletPages(manifest);

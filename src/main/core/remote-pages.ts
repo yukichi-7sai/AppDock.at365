@@ -1,150 +1,35 @@
 import { hostText } from '../../shared/i18n';
-import { session, nativeImage, dialog, net, type WebContents } from 'electron';
-import path from 'node:path';
+import type { WebContents } from 'electron';
 import { AppletSurface, pageHostShortcut } from './applet-pages';
-import type { SettingsStore } from './settings';
-import { WebProfileStore } from './web-profiles';
-import type { ExtensionSnapshot } from '../../shared/contracts';
+import type { CollectionBinding } from '../../shared/page-collections';
 import {
   allowedWebNavigation,
   type RemotePageDefinition,
   type WebPageState,
-  type WebProfile,
 } from '../../shared/web-content';
+import type { WebSiteAccounts } from './web-site-accounts';
+
+type RemotePage = RemotePageDefinition & { binding: CollectionBinding };
 
 export class RemotePageService {
   private views = new Map<
     string,
-    { surface: AppletSurface; item: RemotePageDefinition; state: WebPageState }
+    { surface: AppletSurface; item: RemotePage; state: WebPageState }
   >();
-  private clearing = new Set<string>();
-  private sessions = new Map<string, Electron.Session>();
   private closed = false;
-  private profiles: WebProfileStore;
   constructor(
-    private items: () => RemotePageDefinition[],
-    private localDirectory: string,
+    private items: () => RemotePage[],
+    private accounts: WebSiteAccounts,
     private changed: () => void,
-    sharedFile: string,
-    failed: (error: Error) => void = () => {},
     private windowState?: (id: string) => import('./state-storage').StateStorage,
-    assistance?: import('./file-watch-assistance').FileWatchAssistance,
-  ) {
-    this.profiles = new WebProfileStore(sharedFile, localDirectory);
-    this.profiles.loadStandalone(() => this.items().length > 0);
-    try {
-      this.profiles.cleanupSessions(this.items().map((a) => a.accountId));
-    } catch {
-      queueMicrotask(() => failed(Error(hostText('services.remotePages.cleanupDeferred'))));
-    }
-    this.profiles.watch(
-      () => {
-        this.reconcile();
-        this.changed();
-      },
-      failed,
-      assistance,
-    );
-  }
-  accounts() {
-    return this.profiles.snapshot();
-  }
-  settingsProfiles() {
-    if (this.closed || this.clearing.size)
-      throw Error(hostText('services.remotePages.accountBusy'));
-    return this.profiles;
-  }
-  validateAccounts(items: RemotePageDefinition[]) {
-    for (const item of items) {
-      this.profiles.get(item.accountId);
-      if (this.clearing.has(item.accountId))
-        throw Error(hostText('services.remotePages.accountBusySave'));
-    }
-  }
-  addAccount(name: unknown) {
-    if (this.closed) throw Error(hostText('services.remotePages.closed'));
-    const account = this.profiles.add(name);
-    this.changed();
-    return account;
-  }
-  renameAccount(id: string, name: unknown) {
-    if (this.closed || this.clearing.has(id))
-      throw Error(hostText('services.remotePages.accountBusy'));
-    this.profiles.rename(id, name);
-    this.changed();
-  }
-  private checkConfirmation(id: string, confirmed: WebProfile) {
-    // Re-read the roster before any destructive work, including before its watcher fires.
-    this.profiles.publicConfiguration();
-    const current = this.profiles.get(id);
-    if (!confirmed || confirmed.id !== id || confirmed.name !== current.name)
-      throw Error(hostText('services.webProfiles.changed'));
-  }
-  async deleteAccount(id: string, confirmed?: WebProfile) {
-    const account = this.profiles.get(id);
-    const used = () => this.items().some((a) => a.accountId === id);
-    if (this.closed || this.clearing.has(id))
-      throw Error(hostText('services.remotePages.accountBusy'));
-    if (used()) throw Error(hostText('services.remotePages.accountInUse'));
-    this.clearing.add(id);
-    try {
-      if (confirmed === undefined) {
-        const answer = await dialog.showMessageBox({
-          type: 'warning',
-          message: hostText('services.remotePages.deleteAccount', { name: String(account.name) }),
-          detail: hostText('services.remotePages.deleteDetails'),
-          buttons: [
-            hostText('services.remotePages.cancel'),
-            hostText('services.remotePages.delete'),
-          ],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        if (answer.response !== 1) return false;
-      }
-      if (this.closed) return false;
-      this.checkConfirmation(id, confirmed ?? account);
-      if (used()) throw Error(hostText('services.remotePages.accountAssigned'));
-      const ses = this.sessions.get(id);
-      if (ses) await this.eraseSession(ses);
-      if (this.closed) return false;
-      if (used()) throw Error(hostText('services.remotePages.accountAssigned'));
-      this.profiles.remove(id);
-      this.changed();
-      const remaining = this.profiles.cleanupSessions(
-        this.items().map((a) => a.accountId),
-        this.sessions.keys(),
-      );
-      this.changed();
-      return remaining.includes(id) ? ('deferred' as const) : ('deleted' as const);
-    } finally {
-      this.clearing.delete(id);
-    }
-  }
-  private account(id: string) {
-    this.profiles.get(id);
-    const cached = this.sessions.get(id);
-    if (cached) return cached;
-    const ses = session.fromPath(path.join(this.localDirectory, 'sessions', id));
-    ses.setSpellCheckerEnabled(false);
-    ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-    ses.setPermissionCheckHandler(() => false);
-    this.sessions.set(id, ses);
-    return ses;
-  }
+  ) {}
   states() {
     return Object.fromEntries([...this.views].map(([id, v]) => [id, v.state]));
   }
   reconcile() {
     for (const [id, v] of this.views) {
       const a = this.items().find((a) => a.id === id);
-      if (
-        !a ||
-        !a.enabled ||
-        !this.accounts().some((p) => p.id === a.accountId) ||
-        a.url !== v.item.url ||
-        a.accountId !== v.item.accountId
-      ) {
+      if (!a?.enabled || a.url !== v.item.url) {
         v.surface.close();
         this.views.delete(id);
       } else {
@@ -158,8 +43,7 @@ export class RemotePageService {
   async open(id: string, presentation?: import('./applet-pages').PageOpenOptions) {
     if (this.closed) throw Error(hostText('services.remotePages.pageMissing'));
     const a = this.items().find((a) => a.id === id);
-    if (!a?.enabled || this.clearing.has(a.accountId))
-      throw Error(hostText('services.remotePages.unavailable'));
+    if (!a?.enabled) throw Error(hostText('services.remotePages.unavailable'));
     let v = this.views.get(id);
     if (!v) {
       const state: WebPageState = {
@@ -175,8 +59,8 @@ export class RemotePageService {
         key: `page:${id}:main`,
         title: a.name,
         url: a.url,
-        partition: `web-applet-${a.accountId}`,
-        session: this.account(a.accountId),
+        partition: `web-applet-${a.id}`,
+        session: this.accounts.session(a.binding),
         remote: true,
         stateFile: this.windowState?.(id),
         defaultDisplay: a.display,
@@ -285,72 +169,9 @@ export class RemotePageService {
     this.views.delete(id);
     return this.open(id);
   }
-  async clearAccount(id: string, confirmed?: WebProfile) {
-    if (this.closed) throw Error(hostText('services.remotePages.closed'));
-    const account = this.profiles.get(id);
-    if (this.clearing.has(id)) throw Error(hostText('services.remotePages.processing'));
-    this.clearing.add(id);
-    try {
-      if (confirmed === undefined) {
-        const answer = await dialog.showMessageBox({
-          type: 'warning',
-          message: hostText('services.remotePages.clearAccount', { name: String(account.name) }),
-          detail: hostText('services.remotePages.clearDetails'),
-          buttons: [
-            hostText('services.remotePages.cancel'),
-            hostText('services.remotePages.clear'),
-          ],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        if (answer.response !== 1) return false;
-      }
-      if (this.closed) return false;
-      this.checkConfirmation(id, confirmed ?? account);
-      const ses = this.account(id);
-      for (const [key, v] of this.views)
-        if (v.item.accountId === id) {
-          v.surface.close();
-          this.views.delete(key);
-        }
-      await this.eraseSession(ses);
-      this.changed();
-      return true;
-    } finally {
-      this.clearing.delete(id);
-    }
-  }
-  private async eraseSession(ses: Electron.Session) {
-    await ses.clearStorageData();
-    await ses.clearCache();
-    await ses.clearAuthCache();
-    await ses.closeAllConnections();
-    await ses.cookies.flushStore();
-  }
-  async close() {
+  close() {
     this.closed = true;
-    this.profiles.close();
     for (const v of this.views.values()) v.surface.close();
     this.views.clear();
-    const deleted = new Set(this.profiles.pendingDeletion());
-    let cleanupFailed = false;
-    try {
-      this.profiles.cleanupSessions(
-        this.items().map((a) => a.accountId),
-        this.sessions.keys(),
-      );
-    } catch {
-      cleanupFailed = true;
-    }
-    const results = await Promise.allSettled(
-      [...this.sessions]
-        .filter(([id]) => !deleted.has(id))
-        .map(async ([, ses]) => {
-          ses.flushStorageData();
-          await ses.cookies.flushStore();
-        }),
-    );
-    if (cleanupFailed || results.some((r) => r.status === 'rejected'))
-      throw Error(hostText('services.remotePages.saveFailed'));
   }
 }

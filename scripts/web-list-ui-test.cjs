@@ -22,26 +22,20 @@ settings.host.notifications = false;
 settings.keybindings = [];
 settings.gestures.enabled = false;
 const owner = 'at365.web-applet',
-  account = 'account.11111111-2222-3333-4444-555555555555';
+  siteId = '11111111-2222-4333-8444-555555555555';
 const site = {
-  id: 'site.one',
+  id: siteId,
   name: '登録サイト',
   url: 'https://example.test/',
   enabled: true,
   display: 'page',
   navigation: 'same-origin',
   allowedOrigins: [],
-  accountId: account,
   icon: '',
   imported: { name: 'Keep' },
 };
-settings.extensions[owner] = { enabled: true, settings: { items: [site] } };
+settings.extensions[owner] = { enabled: true, settings: { sites: [site] } };
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-fs.mkdirSync(path.join(profile, 'data/web-profiles', owner), { recursive: true });
-fs.writeFileSync(
-  path.join(profile, 'data/web-profiles', owner, 'accounts.json'),
-  JSON.stringify({ schemaVersion: 1, accounts: [{ id: account, name: '個人用' }] }),
-);
 let app, host, browser, child, executableSha256;
 const pages = () =>
   browser ? browser.contexts().flatMap((c) => c.pages()) : app.context().pages();
@@ -131,96 +125,95 @@ async function closeDialog(page) {
       );
     const dialog = page.getByTestId('settings-dialog');
     const confirm = () => page.getByTestId('settings-dialog-confirm').click();
-    await field('items', 'list:row:site.one').waitFor();
-    await field('items', 'list:toggle:site.one').click();
-    await until(async () => !(await own()).items[0].enabled, 'settings disables site');
-    await field('items', 'list:edit:site.one').click();
-    await field('items', 'name', 'input').fill('破棄する名前');
+    await field('sites', 'list:row:11111111-2222-4333-8444-555555555555').waitFor();
+    await field('sites', 'list:toggle:11111111-2222-4333-8444-555555555555').click();
+    await until(async () => !(await own()).sites[0].enabled, 'settings disables site');
+    await field('sites', 'list:edit:11111111-2222-4333-8444-555555555555').click();
+    await field('sites', 'name', 'input').fill('破棄する名前');
     await closeDialog(page);
-    assert.equal((await own()).items[0].name, '登録サイト');
-    await field('shortcutDefaults', 'add').click();
-    assert.equal((await own()).shortcutDefaults?.length ?? 3, 3);
-    await field('shortcutDefaults', 'key', 'input').fill('Ctrl+F6');
+    assert.equal((await own()).sites[0].name, '登録サイト');
+    await field('siteShortcutDefaults', 'add').click();
+    assert.equal((await own()).siteShortcutDefaults?.length ?? 3, 3);
+    await field('siteShortcutDefaults', 'key', 'input').fill('Ctrl+F6');
     await confirm();
-    await until(async () => (await own()).shortcutDefaults?.length === 4, 'settings adds shortcut');
-    assert.equal((await own()).shortcutDefaults[3].key, 'Ctrl+F6');
+    await until(async () => (await own()).siteShortcutDefaults?.length === 4, 'settings adds shortcut');
+    assert.equal((await own()).siteShortcutDefaults[3].key, 'Ctrl+F6');
     checks.push(
       'settings-only entry; no manager page or command; toggle, cancellation and shortcut addition',
     );
-    await field('items', 'list:edit:site.one').click();
-    await field('items', 'name', 'input').fill('設定から編集');
-    assert.equal((await own()).items[0].name, '登録サイト');
+    await field('sites', 'list:edit:11111111-2222-4333-8444-555555555555').click();
+    await field('sites', 'name', 'input').fill('設定から編集');
+    assert.equal((await own()).sites[0].name, '登録サイト');
     await confirm();
-    await until(async () => (await own()).items[0].name === '設定から編集', 'host edits site');
-    assert.deepEqual((await own()).items[0].imported, { name: 'Keep' });
-    assert.equal((await own()).items[0].accountId, account);
-    await field('items', 'list:toggle:site.one').click();
-    await until(async () => (await own()).items[0].enabled, 'host enables site');
-    await field('items', 'add').click();
-    await field('items', 'name', 'input').fill('追加サイト');
-    await field('items', 'url', 'input').fill('file:///private');
+    await until(async () => (await own()).sites[0].name === '設定から編集', 'host edits site');
+    assert.deepEqual((await own()).sites[0].imported, { name: 'Keep' });
+    await field('sites', 'list:toggle:11111111-2222-4333-8444-555555555555').click();
+    await until(async () => (await own()).sites[0].enabled, 'host enables site');
+    await field('sites', 'add').click();
+    await field('sites', 'name', 'input').fill('追加サイト');
+    await field('sites', 'url', 'input').fill('file:///private');
     await confirm();
     await dialog.getByRole('alert').waitFor();
-    assert.equal((await own()).items.length, 1);
-    assert.equal(await field('items', 'name', 'input').inputValue(), '追加サイト');
-    await field('items', 'url', 'input').fill('https://second.test/');
+    assert.equal((await own()).sites.length, 1);
+    assert.equal(await field('sites', 'name', 'input').inputValue(), '追加サイト');
+    await field('sites', 'url', 'input').fill('https://second.test/');
     await confirm();
-    await until(async () => (await own()).items.length === 2, 'host adds valid site');
-    const addedId = (await own()).items.find((entry) => entry.name === '追加サイト').id;
-    await field('items', 'list:order').click();
+    await until(async () => (await own()).sites.length === 2, 'host adds valid site');
+    const addedId = (await own()).sites.find((entry) => entry.name === '追加サイト').id;
+    await field('sites', 'list:order').click();
     await page.getByTestId('settings-order-handle:0').press('ArrowDown');
-    assert.equal((await own()).items[0].id, 'site.one');
+    assert.equal((await own()).sites[0].id, '11111111-2222-4333-8444-555555555555');
     await dialog.press('Escape');
     assert.equal(
-      await field('items', 'list:order').evaluate((el) => el === document.activeElement),
+      await field('sites', 'list:order').evaluate((el) => el === document.activeElement),
       true,
     );
-    await field('items', 'list:order').click();
+    await field('sites', 'list:order').click();
     await page.getByTestId('settings-order-handle:1').press('ArrowUp');
     await confirm();
-    await until(async () => (await own()).items[0].id === addedId, 'host saves order');
-    await field('items', `list:delete:${addedId}`).click();
+    await until(async () => (await own()).sites[0].id === addedId, 'host saves order');
+    await field('sites', `list:delete:${addedId}`).click();
     await closeDialog(page);
-    assert.equal((await own()).items.length, 2);
-    await field('items', `list:delete:${addedId}`).click();
+    assert.equal((await own()).sites.length, 2);
+    await field('sites', `list:delete:${addedId}`).click();
     await confirm();
-    await until(async () => (await own()).items.length === 1, 'host confirms delete');
-    await field('shortcutDefaults', 'list:edit:0').click();
-    await chooseOption(field('shortcutDefaults', 'scope', 'select'), 'global');
+    await until(async () => (await own()).sites.length === 1, 'host confirms delete');
+    await field('siteShortcutDefaults', 'list:edit:0').click();
+    await chooseOption(field('siteShortcutDefaults', 'scope', 'select'), 'global');
     await confirm();
     await until(
-      async () => (await own()).shortcutDefaults[0].when.scope === 'global',
+      async () => (await own()).siteShortcutDefaults[0].when.scope === 'global',
       'host saves nested scope',
     );
     checks.push(
       'host shared controls: grouped edits, validation, private fields, add/delete/order, focus return, nested select',
     );
 
-    await field('items', 'list:edit:site.one').click();
-    await field('items', 'name', 'input').fill('上書き禁止');
+    await field('sites', 'list:edit:11111111-2222-4333-8444-555555555555').click();
+    await field('sites', 'name', 'input').fill('上書き禁止');
     await host.evaluate(async (owner) => {
       const s = await window.dock.snapshot();
-      s.settings.value.extensions[owner].settings.items[0].name = '外部更新';
+      s.settings.value.extensions[owner].settings.sites[0].name = '外部更新';
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, owner);
     await confirm();
     await dialog.getByRole('alert').waitFor();
-    assert.equal((await own()).items[0].name, '外部更新');
-    assert.equal(await field('items', 'name', 'input').inputValue(), '上書き禁止');
+    assert.equal((await own()).sites[0].name, '外部更新');
+    assert.equal(await field('sites', 'name', 'input').inputValue(), '上書き禁止');
     await closeDialog(page);
     checks.push('conflicting record update rejected; local input and external value retained');
 
-    const shortcutsBeforeConflict = structuredClone((await own()).shortcutDefaults);
-    await field('shortcutDefaults', 'list:order').click();
+    const shortcutsBeforeConflict = structuredClone((await own()).siteShortcutDefaults);
+    await field('siteShortcutDefaults', 'list:order').click();
     await page.getByTestId('settings-order-handle:0').press('ArrowDown');
     assert.equal(
       await dialog.locator('.shortcut-order-row').nth(1).getAttribute('data-order-id'),
       '0',
     );
-    assert.deepEqual((await own()).shortcutDefaults, shortcutsBeforeConflict);
+    assert.deepEqual((await own()).siteShortcutDefaults, shortcutsBeforeConflict);
     await host.evaluate(async (owner) => {
       const s = await window.dock.snapshot();
-      s.settings.value.extensions[owner].settings.shortcutDefaults.reverse();
+      s.settings.value.extensions[owner].settings.siteShortcutDefaults.reverse();
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, owner);
     await confirm();
@@ -230,18 +223,18 @@ async function closeDialog(page) {
       '0',
     );
     assert.equal(await page.getByTestId('settings-order-handle:0').isEnabled(), true);
-    assert.deepEqual((await own()).shortcutDefaults, [...shortcutsBeforeConflict].reverse());
+    assert.deepEqual((await own()).siteShortcutDefaults, [...shortcutsBeforeConflict].reverse());
     await closeDialog(page);
     checks.push('conflicting order update rejected; local order and cancellation remain available');
 
     await page.getByTestId('settings-nav:general').click();
     await page.getByTestId(`settings-nav:applet:${owner}`).click();
-    await field('items', 'list:edit:site.one').click();
-    assert.equal(await field('items', 'name', 'input').inputValue(), '外部更新');
+    await field('sites', 'list:edit:11111111-2222-4333-8444-555555555555').click();
+    assert.equal(await field('sites', 'name', 'input').inputValue(), '外部更新');
     await closeDialog(page);
-    await field('items', 'list:delete:site.one').click();
+    await field('sites', 'list:delete:11111111-2222-4333-8444-555555555555').click();
     await confirm();
-    await until(async () => (await own()).items.length === 0, 'settings confirms delete');
+    await until(async () => (await own()).sites.length === 0, 'settings confirms delete');
     checks.push('reopening settings retains external changes; deletion uses the shared dialog');
     assert.deepEqual(errors, []);
     fs.writeFileSync(
