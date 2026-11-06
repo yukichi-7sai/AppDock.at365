@@ -130,7 +130,7 @@ const check = (name) => {
     }, 'fixture applet');
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.image-ai.open'));
     await settingsPage(page);
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await page.getByRole('button', { name: '画像生成サーバーを追加', exact: true }).click();
     let dialog = page.getByRole('dialog');
     await dialog.getByLabel('登録名', { exact: true }).fill('Discard preset');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -139,7 +139,7 @@ const check = (name) => {
       1,
     );
     check('cancel leaves registrations and credentials untouched');
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await page.getByRole('button', { name: '画像生成サーバーを追加', exact: true }).click();
     dialog = page.getByRole('dialog');
     await dialog.getByLabel('登録名', { exact: true }).fill('Preview preset');
     await dialog.getByLabel('APIのURL', { exact: true }).fill(url);

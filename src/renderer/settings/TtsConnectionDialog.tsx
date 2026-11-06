@@ -1,5 +1,6 @@
 import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
+import { GenerationServerId } from './GenerationServerId';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -129,29 +130,26 @@ export function TtsConnectionDialog({
         hidden={tab !== 'connection'}
       >
         <div className="server-editor-grid">
-          <GenerationMcpPermission
-            enabled={draft.mcpEnabled}
-            onChange={(mcpEnabled) => change({ mcpEnabled })}
-          />
-          <SettingsField settingKey="name" title={t('settings.ttsServers.name')}>
+          <SettingsField settingKey="name" title={t('settings.aiConnectionDialog.name')}>
             <SettingsInput
               data-initial-focus
-              aria-label={t('settings.ttsServers.name')}
+              aria-label={t('settings.aiConnectionDialog.name')}
               maxLength={200}
               value={draft.name}
               onChange={(e) => change({ name: e.target.value })}
             />
           </SettingsField>
+          <GenerationServerId id={draft.id} invoke={invoke} />
           <SettingsField
             settingKey="preset"
-            title={t('settings.ttsEditor.preset')}
+            title={t('settings.aiConnectionDialog.kind')}
             hint={t('settings.ttsSettings.presetHint')}
             description={
               isTtsPresetCustomized(draft) ? t('settings.ttsSettings.customized') : undefined
             }
           >
             <select
-              aria-label={t('settings.ttsEditor.preset')}
+              aria-label={t('settings.aiConnectionDialog.kind')}
               value={draft.preset}
               onChange={(e) => change(applyTtsPreset(draft, e.target.value as TtsPresetId))}
             >
@@ -165,11 +163,11 @@ export function TtsConnectionDialog({
           <SettingsField
             className="server-editor-full"
             settingKey="baseUrl"
-            title={t('settings.ttsEditor.url')}
+            title={t('settings.aiConnectionDialog.url')}
             hint={t('settings.ttsSettings.urlHint')}
           >
             <SettingsUrlInput
-              aria-label={t('settings.ttsEditor.url')}
+              aria-label={t('settings.aiConnectionDialog.url')}
               value={draft.baseUrl}
               spellCheck={false}
               placeholder="http://server:8001/v1"
@@ -190,6 +188,10 @@ export function TtsConnectionDialog({
             apiKey={apiKey}
             savedKey={savedKey}
             onKeyChange={setApiKey}
+          />
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => change({ mcpEnabled })}
           />
         </div>
       </SettingsSection>

@@ -295,7 +295,7 @@ const generationDisk = () => {
     checks.push('page JSON uses the same confirmation/cancellation without exposing partial input');
 
     await select('文章生成AI');
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await page.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
     const prompt = dialog.getByLabel('いつも加えるプロンプト', { exact: true });
@@ -318,7 +318,7 @@ const generationDisk = () => {
       'multiline text uses Shift+Enter for a line, Enter for local confirmation, Escape for field cancellation, and survives tab switches',
     );
     await dialog.getByRole('tab', { name: '接続', exact: true }).click();
-    const connection = page.getByLabel('AI接続の名前', { exact: true });
+    const connection = page.getByLabel('登録名', { exact: true });
     const originalName = await connection.inputValue();
     await connection.fill('Cancelled local name');
     await connection.press('Escape');
@@ -348,7 +348,7 @@ const generationDisk = () => {
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
     });
     await page.getByLabel('認証方式').selectOption('none');
-    const aiUrl = page.getByLabel('AIのAPIのURL', { exact: true });
+    const aiUrl = page.getByLabel('APIのURL', { exact: true });
     await aiUrl.fill('http://127.0.0.1:1/v1');
     await aiUrl.press('Control+Enter');
     await dialog.waitFor({ state: 'hidden' });

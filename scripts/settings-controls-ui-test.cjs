@@ -271,7 +271,10 @@ let app,
     await host.screenshot({ path: path.join(profile, 'banner-bottom-left.png') });
     await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.end'));
     const sharedFile = require('./test-settings.cjs').file(profile);
-    assert.equal(JSON.parse(fs.readFileSync(sharedFile)).host.notificationBannerPosition, 'bottom-left');
+    assert.equal(
+      JSON.parse(fs.readFileSync(sharedFile)).host.notificationBannerPosition,
+      'bottom-left',
+    );
     await host.reload();
     await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
     await open('notifications');
@@ -436,11 +439,11 @@ let app,
 
     await host.setViewportSize({ width: 1280, height: 840 });
     await open('ai');
-    await host.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await host.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
     const dialog = host.getByRole('dialog');
     const before = (await saved()).ai;
-    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('Control probe');
-    await dialog.getByLabel('AIのAPIのURL', { exact: true }).fill('http://127.0.0.1:1/v1');
+    await dialog.getByLabel('登録名', { exact: true }).fill('Control probe');
+    await dialog.getByLabel('APIのURL', { exact: true }).fill('http://127.0.0.1:1/v1');
     await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('16384');
     await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
     assert.deepEqual((await saved()).ai, before, 'dialog edits remain local before OK');

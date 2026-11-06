@@ -56,7 +56,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await added.getByRole('button').first().click();
   let dialog = page.getByRole('dialog');
   await dialog
-    .getByLabel(text['settings.aiConnectionDialog.nameLabel'], { exact: true })
+    .getByLabel(text['settings.aiConnectionDialog.name'], { exact: true })
     .fill('UI edited connection');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(async () => (await page.getByRole('dialog').count()) === 0, 'AI UI connection saved');
@@ -76,7 +76,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   ]);
   await value('appdock_settings_apply', update);
   await until(
-    async () => (await added.locator('.ai-model-name').textContent()) === 'List model',
+    async () => (await added.getByRole('cell', { name: 'List model', exact: true }).count()) === 1,
     'AI UI received list partial edit',
   );
   assert.equal(
@@ -156,13 +156,15 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     'AI list reorder updates UI with stable IDs and removing a default clears it without choosing another',
   );
 
-  await table.getByRole('button', { name: text['settings.aiSettings.add'], exact: true }).click();
+  await table
+    .getByRole('button', { name: text['settings.aiConnectionDialog.add'], exact: true })
+    .click();
   dialog = page.getByRole('dialog');
   await dialog
-    .getByLabel(text['settings.aiConnectionDialog.nameLabel'], { exact: true })
+    .getByLabel(text['settings.aiConnectionDialog.name'], { exact: true })
     .fill('Local lifecycle');
   await dialog
-    .getByLabel(text['settings.aiConnectionDialog.urlLabel'], { exact: true })
+    .getByLabel(text['settings.aiConnectionDialog.url'], { exact: true })
     .fill('http://127.0.0.1:9/local');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(

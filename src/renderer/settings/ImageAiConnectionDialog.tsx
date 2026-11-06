@@ -1,5 +1,6 @@
 import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
+import { GenerationServerId } from './GenerationServerId';
 import { useId, useState } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -52,9 +53,7 @@ export function ImageAiConnectionDialog({
   return (
     <SettingsDialog
       className="server-connection-dialog"
-      title={
-        original ? t('settings.aiConnectionDialog.edit') : t('settings.aiConnectionDialog.add')
-      }
+      title={t(original ? 'imageAi.edit' : 'imageAi.add')}
       onClose={onClose}
       valid={!!draft.name.trim() && !!draft.baseUrl.trim()}
       onApply={async () => {
@@ -122,11 +121,6 @@ export function ImageAiConnectionDialog({
         hidden={tab !== 0}
       >
         <div className="server-editor-grid">
-          <GenerationMcpPermission
-            enabled={draft.mcpEnabled}
-            onChange={(mcpEnabled) => patch({ mcpEnabled })}
-            future
-          />
           <SettingsField settingKey="name" title={t('settings.aiConnectionDialog.name')}>
             <SettingsInput
               aria-label={t('settings.aiConnectionDialog.name')}
@@ -134,6 +128,7 @@ export function ImageAiConnectionDialog({
               onChange={(e) => patch({ name: e.target.value })}
             />
           </SettingsField>
+          <GenerationServerId id={draft.id} invoke={invoke} />
           <SettingsField settingKey="protocol" title={t('settings.aiConnectionDialog.kind')}>
             <select
               aria-label={t('settings.aiConnectionDialog.kind')}
@@ -143,10 +138,11 @@ export function ImageAiConnectionDialog({
               <option value="openai-images">OpenAI Images API</option>
             </select>
           </SettingsField>
-          <SettingsField settingKey="id" title={t('imageAi.id')}>
-            <SettingsInput aria-label={t('imageAi.id')} value={draft.id} readOnly />
-          </SettingsField>
-          <SettingsField settingKey="baseUrl" title={t('settings.aiConnectionDialog.url')}>
+          <SettingsField
+            className="server-editor-full"
+            settingKey="baseUrl"
+            title={t('settings.aiConnectionDialog.url')}
+          >
             <SettingsUrlInput
               aria-label={t('settings.aiConnectionDialog.url')}
               value={draft.baseUrl}
@@ -160,6 +156,11 @@ export function ImageAiConnectionDialog({
             savedKey={status?.apiKeyConfigured && original?.baseUrl === draft.baseUrl}
             onKeyChange={setKey}
           />
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => patch({ mcpEnabled })}
+            description={t('settings.generation.mcpImageUnavailable')}
+          />
         </div>
       </SettingsSection>
       <SettingsSection
@@ -171,11 +172,7 @@ export function ImageAiConnectionDialog({
         hidden={tab !== 1}
       >
         <div className="server-editor-grid">
-          <SettingsField
-            settingKey="defaultModel"
-            title={t('settings.aiConnectionDialog.model')}
-            description={t('imageAi.modelHint')}
-          >
+          <SettingsField settingKey="defaultModel" title={t('settings.aiConnectionDialog.model')}>
             <SettingsInput
               aria-label={t('settings.aiConnectionDialog.model')}
               value={draft.defaultModel}

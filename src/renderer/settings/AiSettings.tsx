@@ -11,13 +11,7 @@ import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
-import {
-  ListIcon,
-  SettingsListToolbar,
-  SettingsListToolbarActions,
-  SettingsListLayout,
-} from '../settings-ui/SettingsListTable';
-import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
+import { GenerationServerList } from './GenerationServerList';
 import {
   AiConnectionDialog,
   AiConnectionOrderDialog,
@@ -89,104 +83,20 @@ export function AiSettingsForm({
         data-testid="ai-connections"
         {...settingAnchor('ai', 'connections')}
       >
-        <SettingsListLayout
-          title={translate('settings.aiSettings.registered')}
-          actionsAlign="start"
-          toolbar={
-            <SettingsListToolbar
-              actions={
-                <SettingsListToolbarActions
-                  addLabel={translate('settings.aiSettings.add')}
-                  addDisabled={busy}
-                  onAdd={() => open('edit', null)}
-                  orderLabel={translate('settings.aiSettings.order')}
-                  orderDisabled={busy || value.connections.length < 2}
-                  onOrder={() =>
-                    setDialog({
-                      kind: 'order',
-                      connections: structuredClone(value.connections),
-                    })
-                  }
-                />
-              }
-            >
-              {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
-            </SettingsListToolbar>
+        <GenerationServerList
+          kind="ai"
+          servers={value.connections}
+          defaultId={value.defaultConnectionId}
+          statuses={auxiliary?.connections}
+          busy={busy}
+          presetName={(server) => aiPresetNames[server.preset]}
+          model={(server) => server.defaultModel}
+          onEdit={(server) => open('edit', server)}
+          onDelete={(server) => open('delete', server)}
+          onOrder={() =>
+            setDialog({ kind: 'order', connections: structuredClone(value.connections) })
           }
-        >
-          <thead>
-            <tr>
-              <th>{translate('settings.aiSettings.server')}</th>
-              <th>{translate('settings.aiSettings.model')}</th>
-              <th className="settings-list-actions-heading">
-                {translate('settings.aiSettings.actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {value.connections.map((server) => (
-              <tr key={server.id} data-ai-connection={server.id}>
-                <td className="settings-list-wrap">
-                  <div className="ai-server-heading">
-                    <strong>{server.name || server.id}</strong>
-                    {server.id === value.defaultConnectionId && (
-                      <span className="ai-default-badge">
-                        {translate('settings.aiSettings.default')}
-                      </span>
-                    )}
-                  </div>
-                  <small>{aiPresetNames[server.preset]}</small>
-                  <small className="ai-server-url">
-                    {server.baseUrl || translate('settings.aiSettings.unsetUrl')}
-                  </small>
-                </td>
-                <td className="settings-list-wrap">
-                  <span className="ai-model-name">
-                    {server.defaultModel || translate('settings.aiSettings.perCall')}
-                  </span>
-                  {auxiliary?.connections.find((v) => v.id === server.id)?.error && (
-                    <small className="error-text">
-                      {translate('settings.aiSettings.checkKey')}
-                    </small>
-                  )}
-                </td>
-                <td className="settings-list-actions-cell">
-                  <div className="settings-list-actions ai-row-actions">
-                    <button
-                      className="settings-list-icon ai-icon-button"
-                      aria-label={translate('settings.aiSettings.serverSettings', {
-                        name: server.name,
-                      })}
-                      title={translate('settings.aiSettings.settings')}
-                      disabled={busy}
-                      onClick={() => open('edit', server)}
-                    >
-                      <ListIcon kind="edit" />
-                    </button>
-                    <button
-                      className="settings-list-icon settings-list-delete ai-icon-button ai-delete-button"
-                      aria-label={translate('settings.aiSettings.deleteServerLabel', {
-                        name: server.name,
-                      })}
-                      title={translate('settings.aiSettings.delete')}
-                      disabled={busy}
-                      onClick={() => open('delete', server)}
-                    >
-                      <ListIcon kind="delete" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!value.connections.length && (
-              <SettingsTableEmptyRow
-                colSpan={3}
-                title={translate('settings.aiSettings.empty')}
-                description={translate('settings.aiSettings.emptyHint')}
-              />
-            )}
-          </tbody>
-        </SettingsListLayout>
+        />
       </SettingsContent>
       <SettingsSection>
         <SettingsField

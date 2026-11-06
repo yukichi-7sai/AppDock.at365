@@ -28,7 +28,7 @@ module.exports = async function ({
     .getByRole('alert')
     .filter({ hasText: 'AIサーバーの認証を確認してください。' })
     .waitFor();
-  assert.equal(await editor.getByLabel('AI接続の名前', { exact: true }).inputValue(), name);
+  assert.equal(await editor.getByLabel('登録名', { exact: true }).inputValue(), name);
   assert(!(await editor.innerText()).includes('private server detail'));
   await host.screenshot({ path: path.join(profile, 'service-ai-authentication.png') });
   await editor.getByRole('button', { name: 'キャンセル', exact: true }).click();

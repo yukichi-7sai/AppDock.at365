@@ -37,7 +37,7 @@ module.exports = async function ({
   };
   const field = async (scope, name, value) => {
     const speech = ['モデル', '声', 'いつも加える話し方', '指定がないときの話し方'];
-    const connection = ['登録名', 'サーバーURL', 'APIキー'];
+    const connection = ['登録名', 'APIのURL', 'APIキー'];
     await scope
       .getByRole('tab', {
         name: speech.includes(name)
@@ -127,10 +127,10 @@ module.exports = async function ({
     'main page selects only the default server; speech defaults belong to the dialog and cancel preserves settings and credentials',
   );
 
-  await page.getByRole('button', { name: '音声サーバーを追加', exact: true }).click();
+  await page.getByRole('button', { name: '音声生成サーバーを追加', exact: true }).click();
   dialog = page.getByRole('dialog');
   await field(dialog, '登録名', 'Secondary');
-  await field(dialog, 'サーバーURL', settings.tts.connections[0].baseUrl);
+  await field(dialog, 'APIのURL', settings.tts.connections[0].baseUrl);
   await field(dialog, 'APIキー', 'secondary-secret');
   await field(dialog, 'モデル', 'second-model');
   await field(dialog, '声', 'second-voice');

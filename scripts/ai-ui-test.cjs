@@ -248,7 +248,7 @@ async function errorNoticeFor(caller) {
     const settingsFile = path.join(local, 'generation-ai.json');
     const before = fs.readFileSync(settingsFile, 'utf8');
     assert.equal(await page.getByLabel('このPCでAI接続を使用', { exact: true }).count(), 0);
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await page.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
     let dialog = page.getByRole('dialog');
     assert.equal(await dialog.getByRole('tab', { selected: true }).innerText(), '接続');
     await dialog.getByRole('tab', { name: '接続', exact: true }).press('ArrowRight');
@@ -274,17 +274,17 @@ async function errorNoticeFor(caller) {
     await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('100000');
     await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
     await dialog.getByRole('tab', { name: '接続', exact: true }).click();
-    await dialog.getByLabel('AIのAPIのURL', { exact: true }).fill('http:');
-    assert.equal(await dialog.getByLabel('AIのAPIのURL', { exact: true }).inputValue(), 'http:');
-    await dialog.getByLabel('AIのAPIのURL', { exact: true }).fill('http://');
-    assert.equal(await dialog.getByLabel('AIのAPIのURL', { exact: true }).inputValue(), 'http://');
+    await dialog.getByLabel('APIのURL', { exact: true }).fill('http:');
+    assert.equal(await dialog.getByLabel('APIのURL', { exact: true }).inputValue(), 'http:');
+    await dialog.getByLabel('APIのURL', { exact: true }).fill('http://');
+    assert.equal(await dialog.getByLabel('APIのURL', { exact: true }).inputValue(), 'http://');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
     assert(!fs.existsSync(path.join(local, 'ai-keys.json')));
     await until(
       () =>
         page
-          .getByRole('button', { name: 'AIサーバーを追加', exact: true })
+          .getByRole('button', { name: '文章生成サーバーを追加', exact: true })
           .evaluate((el) => el === document.activeElement),
       'focus restored',
     );
@@ -299,7 +299,7 @@ async function errorNoticeFor(caller) {
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
     assert(!fs.existsSync(path.join(local, 'ai-keys.json')));
     const count = modelRequests.length;
-    const url = dialog.getByLabel('AIのAPIのURL', { exact: true });
+    const url = dialog.getByLabel('APIのURL', { exact: true });
     await url.fill(settings.ai.connections[0].baseUrl + '///');
     await url.dispatchEvent('compositionstart');
     await url.dispatchEvent('keydown', {
@@ -371,12 +371,10 @@ async function errorNoticeFor(caller) {
       'URL/key Enter and model button discover from local draft, IME ignored, one OK saves encrypted key/config',
     );
 
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
+    await page.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('追加したサーバー');
-    await dialog
-      .getByLabel('AIのAPIのURL', { exact: true })
-      .fill(settings.ai.connections[0].baseUrl);
+    await dialog.getByLabel('登録名', { exact: true }).fill('追加したサーバー');
+    await dialog.getByLabel('APIのURL', { exact: true }).fill(settings.ai.connections[0].baseUrl);
     await dialog.getByRole('tab', { name: 'モデル・プロンプト', exact: true }).click();
     await dialog
       .getByRole('combobox', { name: 'AIの既定モデル', exact: true })
@@ -384,7 +382,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).waitFor();
     await page.getByRole('button', { name: '追加したサーバーの設定', exact: true }).click();
-    await page.getByRole('dialog').getByLabel('AI接続の名前', { exact: true }).fill('編集中の名前');
+    await page.getByRole('dialog').getByLabel('登録名', { exact: true }).fill('編集中の名前');
     assert.equal((await snapshot()).settings.value.ai.connections.at(-1).name, '追加したサーバー');
     await page.getByRole('dialog').press('Escape');
     await page.getByRole('button', { name: '追加したサーバーを削除', exact: true }).click();
@@ -665,16 +663,16 @@ async function errorNoticeFor(caller) {
     await page.getByRole('button', { name: 'previewの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
     await dialog
-      .getByLabel('AIのAPIのURL', { exact: true })
+      .getByLabel('APIのURL', { exact: true })
       .fill(settings.ai.connections[0].baseUrl.replace('/v1', '/changed/v1'));
-    await dialog.getByLabel('AIのAPIのURL', { exact: true }).press('Enter');
+    await dialog.getByLabel('APIのURL', { exact: true }).press('Enter');
     await dialog.getByRole('alert').filter({ hasText: '再入力が必要' }).waitFor();
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push('a changed endpoint cannot reuse the saved key during discovery');
 
     await page.getByRole('button', { name: 'sdkの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
-    const draftUrl = dialog.getByLabel('AIのAPIのURL', { exact: true });
+    const draftUrl = dialog.getByLabel('APIのURL', { exact: true });
     await draftUrl.fill(settings.ai.connections[0].baseUrl.replace('/v1', '/invalid/v1'));
     await draftUrl.press('Enter');
     await dialog.getByRole('alert').filter({ hasText: 'モデル一覧に対応していません' }).waitFor();
@@ -692,7 +690,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByRole('tab', { name: '接続', exact: true }).click();
     await draftUrl.press('Enter');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
-    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('local-draft');
+    await dialog.getByLabel('登録名', { exact: true }).fill('local-draft');
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.ai.connections.find((c) => c.id === 'sdk').name = 'sdk-external';
@@ -700,10 +698,7 @@ async function errorNoticeFor(caller) {
     });
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await dialog.getByRole('alert').filter({ hasText: '別の場所で変更されました' }).waitFor();
-    assert.equal(
-      await dialog.getByLabel('AI接続の名前', { exact: true }).inputValue(),
-      'local-draft',
-    );
+    assert.equal(await dialog.getByLabel('登録名', { exact: true }).inputValue(), 'local-draft');
     assert.equal(
       (await snapshot()).settings.value.ai.connections.find((c) => c.id === 'sdk').name,
       'sdk-external',
@@ -711,7 +706,7 @@ async function errorNoticeFor(caller) {
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await page.getByRole('button', { name: 'sdk-externalの設定', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('AI接続の名前', { exact: true }).fill('sdk');
+    await dialog.getByLabel('登録名', { exact: true }).fill('sdk');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
     await until(
       () =>

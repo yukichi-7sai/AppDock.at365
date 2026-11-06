@@ -614,8 +614,33 @@ pre.ai-preview-result {
 .ai-connection-table {
   margin-bottom: 4px;
 }
-.ai-connection-table th:last-child {
-  width: 108px;
+.generation-server-table {
+  min-width: 440px;
+  table-layout: fixed;
+}
+.generation-server-mcp-column {
+  width: 104px;
+}
+.generation-server-actions-column {
+  width: 114px;
+}
+.settings-list .generation-server-table :is(th, td.generation-server-mcp-state) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@container settings-page (max-width: 600px) {
+  .generation-server-table {
+    min-width: 340px;
+  }
+  .generation-server-mcp-column {
+    width: 72px;
+  }
+  .generation-server-actions-column {
+    width: 96px;
+  }
+  .generation-server-table :is(th, td) {
+    padding-inline: 10px;
+  }
 }
 .ai-server-heading {
   display: flex;
@@ -633,9 +658,6 @@ pre.ai-preview-result {
   border: 1px solid var(--border);
   border-radius: 20px;
   white-space: nowrap;
-}
-.ai-model-name {
-  font-size: 12px;
 }
 .applet-catalog {
   margin-top: 24px;

@@ -82,10 +82,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     fs.writeFileSync(path.join(fixture, 'index.cjs'), 'module.exports={};');
     require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
     settings.extensions['fixture.url'] = { enabled: false, settings: {} };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(settings),
-    );
+    require('./test-settings.cjs').write(profile, settings, path.join(profile, 'local'));
     const port = await freePort(),
       env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
@@ -170,8 +167,8 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       );
     }
     await select('文章生成AI');
-    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
-    const ai = page.getByLabel('AIのAPIのURL', { exact: true });
+    await page.getByRole('button', { name: '文章生成サーバーを追加', exact: true }).click();
+    const ai = page.getByLabel('APIのURL', { exact: true });
     await ai.fill(base + '/v1///');
     assert.equal(await ai.inputValue(), base + '/v1///');
     const aiRevision = (await snapshot()).settings.revision;
@@ -189,7 +186,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await select('音声生成AI');
     await page.getByRole('button', { name: 'Fixtureの設定', exact: true }).click();
     const ttsDialog = page.getByRole('dialog'),
-      ttsUrl = ttsDialog.getByLabel('サーバーURL', { exact: true });
+      ttsUrl = ttsDialog.getByLabel('APIのURL', { exact: true });
     const ttsRevision = (await snapshot()).settings.revision;
     await ttsUrl.fill(base + '/speech/');
     assert.equal(await ttsUrl.inputValue(), base + '/speech/');

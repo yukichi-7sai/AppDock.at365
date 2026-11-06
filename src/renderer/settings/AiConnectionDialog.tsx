@@ -1,5 +1,6 @@
 import { GenerationAuthentication } from './GenerationAuthentication';
 import { GenerationMcpPermission } from './GenerationMcpPermission';
+import { GenerationServerId } from './GenerationServerId';
 import { localizedMetadata } from '../../shared/translation-metadata';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
@@ -244,22 +245,19 @@ export function AiConnectionDialog({
         hidden={tab !== 'connection'}
       >
         <div className="server-editor-grid">
-          <GenerationMcpPermission
-            enabled={draft.mcpEnabled}
-            onChange={(mcpEnabled) => patch({ mcpEnabled })}
-          />
           <SettingsField settingKey="name" title={translate('settings.aiConnectionDialog.name')}>
             <SettingsInput
               data-initial-focus
-              aria-label={translate('settings.aiConnectionDialog.nameLabel')}
+              aria-label={translate('settings.aiConnectionDialog.name')}
               maxLength={160}
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </SettingsField>
+          <GenerationServerId id={draft.id} invoke={invoke} />
           <SettingsField settingKey="preset" title={translate('settings.aiConnectionDialog.kind')}>
             <select
-              aria-label={translate('settings.aiConnectionDialog.kindLabel')}
+              aria-label={translate('settings.aiConnectionDialog.kind')}
               value={draft.preset}
               onChange={(e) => {
                 const preset = e.target.value as AiConnectionSettings['preset'];
@@ -291,7 +289,7 @@ export function AiConnectionDialog({
             hint={translate('settings.aiConnectionDialog.urlHint')}
           >
             <SettingsUrlInput
-              aria-label={translate('settings.aiConnectionDialog.urlLabel')}
+              aria-label={translate('settings.aiConnectionDialog.url')}
               confirmation={urlConfirmation}
               value={draft.baseUrl}
               spellCheck={false}
@@ -329,6 +327,10 @@ export function AiConnectionDialog({
             }}
             onKeyDown={(e) => enter(e, 'key')}
             hint={translate('settings.aiConnectionDialog.keyHint')}
+          />
+          <GenerationMcpPermission
+            enabled={draft.mcpEnabled}
+            onChange={(mcpEnabled) => patch({ mcpEnabled })}
           />
         </div>
       </SettingsSection>

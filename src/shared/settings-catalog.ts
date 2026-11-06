@@ -65,6 +65,14 @@ export interface SettingsPageDefinition {
 }
 export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
+const generationConnectionTerms = () =>
+  [
+    hostText('settings.generation.serverId'),
+    hostText('settings.aiConnectionDialog.kind'),
+    hostText('settings.aiConnectionDialog.url'),
+    hostText('settings.generation.mcp'),
+    hostText('settings.generation.mcpPublication'),
+  ].join(' ');
 const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>(() => ({
   'command-triggers': [
     [
@@ -95,7 +103,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
     ],
   ],
   'image-ai': [
-    ['connections', hostText('imageAi.connections'), hostText('settings.generation.mcp')],
+    ['connections', hostText('imageAi.connections'), generationConnectionTerms()],
     ['defaultConnectionId', hostText('settings.aiSettings.defaultConnection')],
     ['preview', hostText('imageAi.test')],
   ],
@@ -108,7 +116,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
     [
       'connections',
       hostText('settings.settings-catalog.aiConnections'),
-      hostText('settings.settings-catalog.aiKeywords') + ' ' + hostText('settings.generation.mcp'),
+      hostText('settings.settings-catalog.aiKeywords') + ' ' + generationConnectionTerms(),
     ],
     [
       'preview',
@@ -119,11 +127,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
 
   tts: [
     ['authentication', hostText('settings.aiConnectionDialog.auth')],
-    [
-      'connections',
-      hostText('settings.ttsServers.registered'),
-      hostText('settings.generation.mcp'),
-    ],
+    ['connections', hostText('settings.ttsServers.registered'), generationConnectionTerms()],
     ['defaultConnectionId', hostText('settings.ttsServers.defaultServer')],
     ['preset', hostText('settings.ttsSettings.preset')],
     ['speechPath', hostText('settings.ttsSettings.speechPath')],

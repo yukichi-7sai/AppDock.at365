@@ -51,7 +51,7 @@ export function GenerationAuthentication({
             onChange={(e) => onKeyChange(e.target.value || undefined)}
             onKeyDown={onKeyDown}
           />
-          <small className="muted">{hint ?? t('imageAi.keyHint')}</small>
+          <small className="muted">{hint ?? t('settings.generation.keyHint')}</small>
         </>
       )}
     </SettingsField>

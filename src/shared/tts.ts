@@ -40,14 +40,16 @@ export const newTtsServer = (id: string): TtsServer => ({
   name: '',
   authentication: 'none',
 });
+export const ttsServerId = (value: unknown): value is string =>
+  typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(value);
+
 export function parseTtsServer(value: unknown): TtsServer {
   if (!object(value)) throw Error(hostText('settings.tts.object'));
   const { id, name, mcpEnabled, authentication, ...speech } = value;
   if (
     (authentication !== undefined && authentication !== 'none' && authentication !== 'bearer') ||
     (mcpEnabled !== undefined && typeof mcpEnabled !== 'boolean') ||
-    typeof id !== 'string' ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(id) ||
+    !ttsServerId(id) ||
     typeof name !== 'string' ||
     !name.trim() ||
     name.length > 200

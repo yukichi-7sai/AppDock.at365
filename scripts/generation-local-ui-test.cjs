@@ -20,6 +20,7 @@ const check = (name) => {
 (async () => {
   try {
     const value = createDefaultSettings();
+    value.host.theme = 'light';
     value.keybindings = [];
     value.gestures.enabled = false;
     value.updates = {
@@ -63,11 +64,27 @@ const check = (name) => {
     };
     fixture.write(profile, value);
     host = await launch(profile, process.argv[2]);
+    await host.app.evaluate(({ clipboard }) => {
+      globalThis.copiedServerId = undefined;
+      clipboard.writeText = (text) => {
+        globalThis.copiedServerId = text;
+      };
+    });
     const page = host.main;
-    for (const [id, key, name] of [
-      ['ai', 'ai', 'Text fixture'],
-      ['tts', 'tts', 'Voice fixture'],
-      ['image-ai', 'imageAi', 'Image fixture'],
+    const checkCopy = async (dialog, id) => {
+      const revision = (await snapshot()).settings.revision;
+      await dialog.getByRole('button', { name: 'サーバーIDをコピー', exact: true }).click();
+      await dialog
+        .getByRole('status')
+        .filter({ hasText: 'サーバーIDをコピーしました。' })
+        .waitFor();
+      assert.equal(await host.app.evaluate(() => globalThis.copiedServerId), id);
+      assert.equal((await snapshot()).settings.revision, revision);
+    };
+    for (const [id, key, name, serverType] of [
+      ['ai', 'ai', 'Text fixture', '文章生成サーバー'],
+      ['tts', 'tts', 'Voice fixture', '音声生成サーバー'],
+      ['image-ai', 'imageAi', 'Image fixture', '画像生成サーバー'],
     ]) {
       await page.evaluate(
         (id) => window.dock.executeCommand('appdock.settings.' + id + '.open'),
@@ -83,13 +100,60 @@ const check = (name) => {
         await page.getByRole('switch', { name: 'このPCで設定を保存する', exact: true }).count(),
         0,
       );
+      const table = page.getByRole('table').filter({
+        has: page.getByRole('columnheader', { name: 'MCP公開', exact: true }),
+      });
+      const row = table.getByRole('row').filter({ hasText: name });
+      const publication = (name) => row.getByRole('cell', { name, exact: true });
+      await publication('非公開').waitFor();
+      const savedId = value[key].connections[0].id;
+      const serverId = async (dialog) => {
+        const fields = await dialog
+          .getByRole('tabpanel')
+          .locator('input[aria-label], select[aria-label]')
+          .evaluateAll((elements) => elements.map((element) => element.getAttribute('aria-label')));
+        assert.deepEqual(fields.slice(0, 4), [
+          '登録名',
+          'サーバーID',
+          'サーバーの種類',
+          'APIのURL',
+        ]);
+        const idInput = dialog.getByRole('textbox', { name: 'サーバーID', exact: true });
+        assert.equal(await idInput.isEditable(), false);
+        return idInput.inputValue();
+      };
+      const add = page.getByRole('button', { name: serverType + 'を追加', exact: true });
+      await add.click();
+      const addDialog = page.getByRole('dialog', { name: serverType + 'を追加', exact: true });
+      await addDialog.waitFor();
+      const newId = await serverId(addDialog);
+      assert.ok(newId && newId !== savedId);
+      if (id === 'image-ai')
+        await addDialog.screenshot({ path: path.join(profile, 'image-ai-copy-id.png') });
+      await checkCopy(addDialog, newId);
+      await addDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       const open = async () => {
         await page.getByRole('button', { name: name + 'の設定', exact: true }).click();
-        const dialog = page.getByRole('dialog');
+        const dialog = page.getByRole('dialog', { name: serverType + 'を編集', exact: true });
         await dialog.waitFor();
         return dialog;
       };
       let dialog = await open();
+      assert.equal(await serverId(dialog), savedId);
+      check(id + ': add and edit show the server ID in the shared connection field order');
+      await checkCopy(dialog, savedId);
+      check(id + ': copy writes the draft or saved ID without committing settings');
+      if (id === 'image-ai') {
+        await dialog.getByRole('tab', { name: '生成設定', exact: true }).click();
+        const model = dialog.getByRole('textbox', { name: '指定がないときのモデル', exact: true });
+        assert.equal(await model.isEditable(), true);
+        assert.equal(
+          await dialog.getByText(/利用する画像生成モデルのIDを入力してください/).count(),
+          0,
+        );
+        await dialog.getByRole('tab', { name: '接続', exact: true }).click();
+        check('image-ai: default model remains editable without the removed explanation');
+      }
       const authentication = dialog.getByLabel('認証方式', { exact: true });
       assert.equal(await authentication.inputValue(), 'none');
       assert.equal(await dialog.getByLabel('APIキー', { exact: true }).count(), 0);
@@ -108,6 +172,7 @@ const check = (name) => {
       await toggle.click();
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       assert.notEqual((await snapshot()).settings.value[key].connections[0].mcpEnabled, true);
+      await publication('非公開').waitFor();
       assert.equal((await snapshot()).settings.value[key].connections[0].authentication, 'none');
       dialog = await open();
       toggle = dialog.getByRole('switch', { name: 'MCPからの利用を許可', exact: true });
@@ -118,6 +183,9 @@ const check = (name) => {
         async () => (await snapshot()).settings.value[key].connections[0].mcpEnabled === true,
         'saved ' + id,
       );
+      await publication('公開').waitFor();
+      await table.screenshot({ path: path.join(profile, id + '-servers.png') });
+      check(id + ': server list shows the saved MCP publication state');
       assert.equal(
         JSON.parse(fs.readFileSync(path.join(profile, 'data/generation-ai.json')))[key]
           .connections[0].mcpEnabled,
@@ -130,9 +198,11 @@ const check = (name) => {
           ': authentication toggle preserves the draft and cancel leaves the saved mode unchanged',
       );
     }
-    // The image permission remains editable before the image MCP API is published.
-    await page.getByRole('button', { name: 'Image fixtureの設定', exact: true }).click();
+    await host.save({ host: { theme: 'dark' } });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     await host.resize(736, 720);
+    await page.screenshot({ path: path.join(profile, 'image-ai-servers-narrow.png') });
+    await page.getByRole('button', { name: 'Image fixtureの設定', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog
       .getByRole('switch', { name: 'MCPからの利用を許可', exact: true })

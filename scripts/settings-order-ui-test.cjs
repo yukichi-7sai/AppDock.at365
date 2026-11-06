@@ -125,10 +125,7 @@ for (const media of ['image', 'sound', 'text']) {
     })),
   };
 }
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(initial),
-);
+require('./test-settings.cjs').write(profile, initial, local);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const source = process.argv[2] && path.resolve(process.argv[2]);
 const portable = source && testHostPath(profile);
@@ -213,7 +210,7 @@ const cases = [
   },
   {
     page: 'ai',
-    add: 'AIサーバーを追加',
+    add: '文章生成サーバーを追加',
     button: 'AIサーバーを並べ替え',
     ids: initial.ai.connections.map((c) => c.id),
     values: (s) => s.ai.connections.map((c) => c.id),

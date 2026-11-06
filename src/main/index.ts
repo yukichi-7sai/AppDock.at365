@@ -261,7 +261,7 @@ import { NativeNotificationState } from './core/native-notification-state';
 import { NotificationSpeechService } from './core/notification-speech';
 import { NotificationToneService } from './core/notification-tone';
 import { resolveNotificationSpeech } from '../shared/notification-types';
-import { defaultTtsSettings, selectedTtsServer, ttsServerSpeech } from '../shared/tts';
+import { defaultTtsSettings, selectedTtsServer, ttsServerId, ttsServerSpeech } from '../shared/tts';
 import { TtsSettingsController } from './core/tts-settings';
 import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
 import { automationApplets, automationCommands } from './core/automation-commands';
@@ -3306,6 +3306,11 @@ function settingsPageActions(
       if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
+    };
+  if (['ai', 'image-ai', 'tts'].includes(page.id))
+    actions.generationCopyServerId = async ([id]) => {
+      if (!ttsServerId(id)) throw Error(hostText('settings.index.invalidAction'));
+      clipboard.writeText(id);
     };
   if (page.id === 'image-ai') {
     actions.imageAiSaveConnection = async ([draft, original, key, keyRevision]) => {

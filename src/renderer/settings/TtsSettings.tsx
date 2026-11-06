@@ -8,13 +8,7 @@ import { defaultTtsConfiguration, selectedTtsServer, type TtsServer } from '../.
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField, SettingsContent } from '../settings-ui/SettingsSections';
-import {
-  ListIcon,
-  SettingsListLayout,
-  SettingsListToolbar,
-  SettingsListToolbarActions,
-} from '../settings-ui/SettingsListTable';
-import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
+import { GenerationServerList } from './GenerationServerList';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
@@ -92,93 +86,22 @@ export function TtsSettingsForm({
       className="settings-sections tts-settings"
       aria-label={translate('settings.ttsSettings.title')}
     >
-      <SettingsContent {...settingAnchor('tts', 'connections')}>
-        <SettingsListLayout
-          title={translate('settings.ttsServers.registered')}
-          actionsAlign="start"
-          toolbar={
-            <SettingsListToolbar
-              actions={
-                <SettingsListToolbarActions
-                  addLabel={translate('settings.ttsServers.add')}
-                  addDisabled={busy}
-                  onAdd={() => open('edit', null)}
-                  orderLabel={translate('settings.ttsServers.order')}
-                  orderDisabled={busy || config.connections.length < 2}
-                  onOrder={() =>
-                    setDialog({ kind: 'order', connections: structuredClone(config.connections) })
-                  }
-                />
-              }
-            >
-              {translate('settings.ttsServers.serverCount', { count: config.connections.length })}
-            </SettingsListToolbar>
+      <SettingsContent className="ai-connection-table" {...settingAnchor('tts', 'connections')}>
+        <GenerationServerList
+          kind="tts"
+          servers={config.connections}
+          defaultId={config.defaultConnectionId}
+          statuses={auxiliary?.connections}
+          busy={busy}
+          presetName={(server) => translate(`settings.ttsSettings.preset.${server.preset}`)}
+          model={(server) => server.model}
+          voice={(server) => server.defaultVoice}
+          onEdit={(server) => open('edit', server)}
+          onDelete={(server) => open('delete', server)}
+          onOrder={() =>
+            setDialog({ kind: 'order', connections: structuredClone(config.connections) })
           }
-        >
-          <thead>
-            <tr>
-              <th>{translate('settings.aiSettings.server')}</th>
-              <th>{translate('settings.ttsSettings.modelsAndVoices')}</th>
-              <th className="settings-list-actions-heading">
-                {translate('settings.aiSettings.actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {config.connections.map((c) => (
-              <tr key={c.id}>
-                <td className="settings-list-wrap">
-                  <div className="ai-server-heading">
-                    <strong>{c.name}</strong>
-                    {c.id === config.defaultConnectionId && (
-                      <span className="ai-default-badge">
-                        {translate('settings.aiSettings.default')}
-                      </span>
-                    )}
-                  </div>
-                  <small>{translate(`settings.ttsSettings.preset.${c.preset}`)}</small>
-                  <small className="ai-server-url">{c.baseUrl}</small>
-                </td>
-                <td className="settings-list-wrap">
-                  <span>{c.model}</span>
-                  <small>{c.defaultVoice}</small>
-                  {auxiliary?.connections.find((s) => s.id === c.id)?.error && (
-                    <small className="error-text">
-                      {translate('settings.aiSettings.checkKey')}
-                    </small>
-                  )}
-                </td>
-                <td className="settings-list-actions-cell">
-                  <div className="settings-list-actions">
-                    <button
-                      className="settings-list-icon"
-                      disabled={busy}
-                      aria-label={translate('settings.aiSettings.serverSettings', { name: c.name })}
-                      title={translate('settings.aiSettings.settings')}
-                      onClick={() => open('edit', c)}
-                    >
-                      <ListIcon kind="edit" />
-                    </button>
-                    <button
-                      className="settings-list-icon settings-list-delete"
-                      disabled={busy}
-                      aria-label={translate('settings.aiSettings.deleteServerLabel', {
-                        name: c.name,
-                      })}
-                      title={translate('settings.aiSettings.delete')}
-                      onClick={() => open('delete', c)}
-                    >
-                      <ListIcon kind="delete" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!config.connections.length && (
-              <SettingsTableEmptyRow colSpan={3} title={translate('settings.ttsServers.empty')} />
-            )}
-          </tbody>
-        </SettingsListLayout>
+        />
       </SettingsContent>
       <SettingsSection>
         <SettingsField

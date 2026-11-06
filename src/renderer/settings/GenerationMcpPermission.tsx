@@ -5,18 +5,18 @@ import { Toggle } from '../settings-ui/Toggle';
 export function GenerationMcpPermission({
   enabled,
   onChange,
-  future = false,
+  description,
 }: {
   enabled?: boolean;
   onChange(value: boolean): void;
-  future?: boolean;
+  description?: string;
 }) {
   const { t } = useHostTranslation();
   return (
     <SettingsField
       className="server-editor-full"
       title={t('settings.generation.mcp')}
-      description={t(future ? 'settings.generation.mcpFuture' : 'settings.generation.mcpHint')}
+      description={description ?? t('settings.generation.mcpHint')}
     >
       <Toggle label={t('settings.generation.mcp')} checked={enabled === true} onChange={onChange} />
     </SettingsField>

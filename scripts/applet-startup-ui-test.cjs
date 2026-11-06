@@ -82,7 +82,10 @@ async function phase(name) {
     fixture(profile, settings, 'test.delayed', { delay: 60, wait: 100 });
     fixture(profile, settings, 'test.failed', { wait: 25, fail: true });
   }
-  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(
+    require('./test-settings.cjs').file(profile, 'settings.json'),
+    JSON.stringify(settings),
+  );
   const executable = source ? testHostPath(profile) : require('electron');
   if (source) {
     require('./copy-host.cjs').copyHost(source, executable);
@@ -222,7 +225,10 @@ async function phase(name) {
           assert.equal(state.settings.syncError, undefined);
           const saved = JSON.parse(
             fs.readFileSync(
-              require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
+              require('./test-settings.cjs').file(
+                profile,
+                `settings-${require('node:os').hostname()}.json`,
+              ),
               'utf8',
             ),
           );
@@ -286,16 +292,13 @@ async function phase(name) {
       );
       await capture('empty-light.png');
       checks.push('no-installed-applets-has-in-table-add-guidance');
-      await page
-        .locator('.settings-categories button')
-        .filter({ has: page.locator('span[title="AI"]') })
-        .click();
+      await page.getByRole('button', { name: '文章生成AI', exact: true }).click();
       await page.getByText('AIサーバーを追加しましょう', { exact: true }).waitFor();
       assert.equal(
         await page
           .getByText('AIサーバーを追加しましょう', { exact: true })
           .evaluate((e) => e.closest('td').colSpan),
-        3,
+        4,
       );
       await capture('ai-empty-light.png');
       checks.push('ai-empty-keeps-common-table-row');
@@ -327,7 +330,11 @@ async function phase(name) {
         ),
       true,
     );
-    assert(!fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8').includes('startupTiming'));
+    assert(
+      !fs
+        .readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')
+        .includes('startupTiming'),
+    );
     checks.push(`${name}-themes-narrow-width-and-no-persisted-timing`);
   } catch (error) {
     if (page) {

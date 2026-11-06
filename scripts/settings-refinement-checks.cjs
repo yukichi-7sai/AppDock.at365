@@ -66,7 +66,7 @@ module.exports = async function ({
         `${electronExpression}.BrowserWindow.getAllWindows()[0].setSize(${width},1000)`,
       );
       for (const [title, label, dialogTitle, field] of [
-        ['文章生成AI', 'AIサーバーを追加', 'AIサーバーの追加', 'AI接続の名前'],
+        ['文章生成AI', '文章生成サーバーを追加', '文章生成サーバーを追加', '登録名'],
         ['カスタムコマンド', 'コマンドを追加', 'カスタムコマンドの追加', '名前'],
         ['MCPクライアント', '接続先を追加', 'MCP接続先の追加', '名前'],
       ]) {
@@ -96,7 +96,7 @@ module.exports = async function ({
         // Assert the actual add dialog opened, independent of whether it says server or connection.
         assert.match(
           await dialog.innerText(),
-          title === '文章生成AI' ? /AI.*追加/ : new RegExp(dialogTitle),
+          title === '文章生成AI' ? /文章生成サーバーを追加/ : new RegExp(dialogTitle),
         );
         const name = dialog.getByLabel(field, { exact: true });
         await name.fill('Temporary draft');
