@@ -80,10 +80,8 @@ settings.notificationPreferences.overrides.push({
   typeId: 'available',
   targets: ['banner'],
 });
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(settings),
-);
+settings.operationPermissions = { applet: { read: true, execute: true } };
+require('./test-settings.cjs').write(profile, settings, path.join(profile, 'local'));
 const checks = [],
   failures = [];
 let host,

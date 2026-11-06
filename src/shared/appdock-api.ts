@@ -504,17 +504,6 @@ export const appletApiPermissionLabels = localizedMetadata(
       write: hostText('settings.appdock-api.write'),
     }) as const,
 );
-// Accepted only while reading existing permission files; never independent grants.
-export const retiredAppletApiPermissions = [
-  'manageCustomCommands',
-  'manageMcpServers',
-  'manageApplets',
-  'editShortcuts',
-  'editGestures',
-  'editTouchpadGestures',
-  'editRibbon',
-  'editTray',
-] as const;
 export type AppletApiPermission = keyof typeof appletApiPermissionLabels;
 export type AppletApiPermissions = Partial<Record<AppletApiPermission, boolean>>;
 export type AppDockReply =

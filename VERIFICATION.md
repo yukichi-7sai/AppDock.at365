@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-11-07 操作許可の端末別保存（0.170.0）
+
+- `origin/main`と一致した`63e9b98`を起点に、専用worktreeの`codex/device-operation-permissions`で検証した。自端末の`data/settings-<端末名>.json`の`operationPermissions.applet`と`operationPermissions.mcp`を許可の正本にした。両列の切り替え項目は既定OFFで、旧ファイルの許可を読み継がない。MCPサーバーの接続・認証・登録はPC専用ファイルで扱う。
+- 発行前に端末識別、共有設定・公開APIからの分離、両列の独立保存、即時反映、外部更新との競合、設定復旧、前提許可と元callerの判定をレビューした。画面の古いApplet許可一式による上書きを防ぐため、保存時に表示時点の値と照合する。端末ファイルの読取障害中は正常バックアップがあっても切り替え項目を拒否する。保存形式・既定値変更による本体マイナー更新。
+- 依存を独立したworktreeへ導入し、固定lockfile・供給網検査、型検査、TypeScript/renderer・.NETホスト・試験用Appletのビルド、変更CJSの構文と差分空白を確認した。Windows x64、Node 26.13.0、pnpm 12.15.0、Electron 45.1.0、.NET SDK 10.0.403。
+- 標準Node回帰は最終ビルドで1,799/1,799件成功、失敗・skip 0。初回の失敗を受け、兄弟Applet manifestと非RIDの.NET試験用ホストをworktreeに用意した。廃止済みShellを参照する検査は現行rendererの検査へ整理して別コミットにした。兄弟Appletの入力版とSHA256は`.artifacts/commit-validation-device-permissions/cleanup.json`に記録した。
+- 固定EXEの初期値、Node/.NET Applet API、MCP起動・再起動、MCP設定基盤、画像・文章・音声生成AI、MCPハブ、smokeが成功した。MCP設定基盤では受信した端末ファイルの許可が画面と実際の要求に反映され、破損時に書き込みが拒否され、正常化で編集が復帰することを確認した。MCPハブの初回は旧ファイルを参照する検査を特定し、端末ファイルへの保存と接続ファイルの独立を同じEXEで再検証した。
+- `publish.bat`のパッケージ作成と封印後、更新ヘルパーがジャンクション先への配置を拒否した。並行作業の共用発行先とは分け、同じ封印済みビルドを既存の配置・更新ZIP作成処理で`A:\40.ARTIFACT\AppDock.at365\device-operation-permissions-0.170.0`に発行した。package・manifest・feed・PE版は0.170.0。ビルド出力・発行先・共用試験runtime・ZIPの101ファイルがSHA256一致。EXE=`dbc8b99f8d49916ede75723c031aefaa8bb7f8a24e0b4b344e35d7f07b12af3f`、ZIP=`0db4b75ea510adae8c5d7ea2d0172daf95215889f128cf002358605e074c3e50`、175,185,849 bytes。
+- `.artifacts/commit-validation-device-permissions/`に完全なログ、試験入力と成果物のSHA256、stage/commit照合を保存した。終了を確認した専用の試験実行ファイル145件を削除し、残した結果・ログ等26件を照合した。固定EXEの入力・通知・ページ管理の専用試験は対象外とした。端末ファイルの受信は隔離プロファイルへの外部書き込みで検証した。
+
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 
 - `5c26091`の設計に基づき、MCP接続と独立したMCPツールコマンドを`data/settings-<端末名>.json`へ固定保存した。Bearerとstdio環境変数の名前・値は配置別LocalAppDataの`mcp-client-secrets.json`へsafeStorageで暗号化する。旧名簿・旧秘密ファイル・旧カスタム種類を引き継がず、他の設定と割り当て参照は保持する。

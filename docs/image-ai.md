@@ -24,7 +24,7 @@ Applet向けには `ai.image.connections.list` を提供する。`appdock-api` c
 
 `ai.image.generate`と、256KiBずつ生成画像を取得する`ai.image.results.read`はAppletへ公開しない。Node/.NETの汎用Callでも実行できず、公開操作の一覧にも含めない。MCPには接続一覧・ジョブ操作を含む画像生成操作をまだ公開しない。生成・接続一覧・状態取得・取消・一時結果取得の内部機能は維持し、本体の設定試験で使用する。
 
-「操作の許可」の画像生成AI（`useImageAi`）は項目と保存値を維持する。現在の接続一覧と、後続の「生成してライブラリーに登録するAPI」で使い、公開終了を理由に廃止・移行しない。既存保存値に項目がない場合は拒否し、新規環境のApplet既定値は従来どおり許可する。MCP列は引き続き未対応と表示する。許可がONでも非公開の操作は呼び出せない。
+「操作の許可」の画像生成AI（`useImageAi`）は、現在の接続一覧と後続の「生成してライブラリーに登録するAPI」で使う。Applet列は[端末別の操作許可](settings-sync.md#端末別の操作許可)に保存し、既定OFF。MCP列は未対応と表示する。許可がONでも非公開の操作は呼び出せない。
 
 本体内部ではImageAiServiceが要求を受け付ける。引数は `{requestId, connectionId?, additionalPrompt?, input?, model?, options?}`。connectionIdを省略すると既定IDを使い、明示した不明IDはNOT_FOUND。既定未設定はIMAGE_AI_NOT_CONFIGURED。optionsのsize/count/formatとproviderOptions（現在はquality/background/compression）を登録の既定値へ部分適用する。変更はこの要求だけに作用する。未対応・不正な項目は拒否する。
 

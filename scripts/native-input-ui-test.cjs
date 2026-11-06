@@ -289,7 +289,6 @@ async function execute(id) {
       await window.dock.automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });

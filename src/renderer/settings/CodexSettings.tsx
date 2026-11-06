@@ -88,11 +88,8 @@ export function CodexSettings({
         </button>
       </div>
     ) : null;
-  const configure = (
-    enabled = state.enabled,
-    allowWrite = state.allowWrite,
-    nextPort = state.port,
-  ) => void run({ kind: 'configure', enabled, allowWrite, port: nextPort });
+  const configure = (enabled = state.enabled, nextPort = state.port) =>
+    void run({ kind: 'configure', enabled, port: nextPort });
   const registration =
     state.registration === 'registered'
       ? translate('settings.codexSettings.registered')
@@ -323,7 +320,7 @@ export function CodexSettings({
               disabled={
                 busy || !/^\d+$/.test(port) || Number(port) > 65535 || Number(port) === state.port
               }
-              onClick={() => configure(state.enabled, state.allowWrite, Number(port))}
+              onClick={() => configure(state.enabled, Number(port))}
             >
               {translate('settings.codexSettings.applyPort')}
             </button>

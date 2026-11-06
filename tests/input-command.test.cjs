@@ -3,6 +3,7 @@ const { test } = require('node:test'),
 const { normalizeInputKeys, inputKeysFromEvent } = require('../out/main/shared/input-command');
 const { executionAuthorized } = require('../out/main/main/core/execution-permissions');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const fs = require('node:fs'),
   path = require('node:path');
 
@@ -10,9 +11,11 @@ test('new MCP execution grants persist independently, require execution and defa
   const base = path.resolve('.artifacts/input-permission-unit');
   fs.mkdirSync(base, { recursive: true });
   const dir = fs.mkdtempSync(path.join(base, 'case-'));
+  const settings = openOperationPermissions(t, dir);
   const options = {
     localDirectory: dir,
     baseDirectory: dir,
+    settings,
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,
@@ -29,11 +32,21 @@ test('new MCP execution grants persist independently, require execution and defa
   await service.action({ kind: 'setProcessLaunching', allowed: true });
   assert.equal(service.state().allowExecute, false);
   assert.equal(service.state().allowWrite, false);
-  const file = path.join(dir, 'automation.json'),
-    saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  service.close();
-  fs.writeFileSync(file, JSON.stringify({ ...saved, enabled: true }));
-  service = new AutomationService(options);
+  const file = path.join(dir, 'automation.json');
+  assert.equal(fs.existsSync(file), false);
+  await service.close();
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      version: 1,
+      enabled: true,
+      port: 0,
+      token: 'a'.repeat(64),
+      configFile: path.join(dir, 'config.toml'),
+      owned: {},
+    }),
+  );
+  service = new AutomationService({ ...options, settings: openOperationPermissions(t, dir) });
   assert.equal(service.state().allowSendInput, true);
   assert.equal(service.state().allowRunProcesses, true);
   assert.equal(service.allowed('allowSendInput'), false);
@@ -43,11 +56,11 @@ test('new MCP execution grants persist independently, require execution and defa
   assert.equal(service.allowed('allowRunProcesses'), true);
   await service.action({ kind: 'setInputSending', allowed: false });
   assert.equal(service.state().allowRunProcesses, true);
-  service.close();
-  delete saved.allowSendInput;
-  delete saved.allowRunProcesses;
-  fs.writeFileSync(file, JSON.stringify(saved));
-  service = new AutomationService(options);
+  await service.close();
+  service = new AutomationService({
+    ...options,
+    settings: openOperationPermissions(t, dir, 'OtherDevice'),
+  });
   assert.equal(service.state().allowSendInput, false);
   assert.equal(service.state().allowRunProcesses, false);
 });

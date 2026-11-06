@@ -16,6 +16,7 @@ const {
   validMcpHeaders,
 } = require('../out/main/main/core/automation-network');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const { AutomationMcp } = require('../out/main/main/core/automation-mcp');
 const { AutomationError } = require('../out/main/main/core/automation-api');
 const root = path.resolve(__dirname, '../.artifacts/automation-network-unit');
@@ -151,6 +152,7 @@ function fixture(t) {
   const options = {
     localDirectory: path.join(base, 'local'),
     baseDirectory: base,
+    settings: openOperationPermissions(t, base),
     version: 'test',
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
@@ -238,7 +240,8 @@ async function connect(endpoint, authorization) {
 test('scope switching preserves credentials, permission state and exact Codex registration; shared SDK API', async (t) => {
   const f = fixture(t),
     service = f.service;
-  await service.action({ kind: 'configure', enabled: true, allowWrite: true, port: 0 });
+  await service.action({ kind: 'setWrite', allowed: true });
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
   await service.action({ kind: 'selectConfig', file: path.join(f.base, 'codex', 'config.toml') });
   await service.action({ kind: 'register' });
   const configFile = service.state().configFile;
@@ -260,7 +263,8 @@ test('scope switching preserves credentials, permission state and exact Codex re
   assert.deepEqual(fs.readFileSync(configFile), original);
   assert.deepEqual(f.read().owned, before.owned);
   assert.equal(f.read().token, before.token);
-  assert.equal(f.read().allowWrite, true);
+  assert.equal(Object.hasOwn(f.read(), 'allowWrite'), false);
+  assert.equal(service.state().allowWrite, true);
   assert.equal(
     (await request(endpoint, auth, { Host: `dock.example:${before.port}` })).status,
     200,
@@ -293,7 +297,7 @@ test('scope switching preserves credentials, permission state and exact Codex re
   assert.equal(f.copied(), token);
   assert(!JSON.stringify(reply).includes(token));
   await assert.rejects(service.action({ kind: 'copyEndpoint', endpoint: 'http://evil.test/' }));
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: before.port });
+  await service.action({ kind: 'setWrite', allowed: false });
   assert.equal(service.state().connectionScope, 'network');
   await service.action({ kind: 'setConnectionScope', scope: 'local' });
   await client.close();
@@ -317,7 +321,7 @@ test('scope switching preserves credentials, permission state and exact Codex re
 test('restored enabled server reports startup progress and publishes readiness without settings edits', async (t) => {
   const f = fixture(t);
   assert.equal(f.service.state().starting, false);
-  await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await f.service.action({ kind: 'configure', enabled: true, port: 0 });
   await f.service.close();
   const changes = [];
   const restarted = new AutomationService({
@@ -336,7 +340,7 @@ test('restored enabled server reports startup progress and publishes readiness w
   assert(changes.some((state) => state.starting && !state.running));
   assert(changes.some((state) => !state.starting && state.running));
   assert.equal(f.read().enabled, true);
-  assert.equal(f.read().allowWrite, false);
+  assert.equal(Object.hasOwn(f.read(), 'allowWrite'), false);
 });
 
 test('legacy migration and invalid scope/hostnames fail closed without rewriting files', async (t) => {
@@ -374,7 +378,7 @@ test('legacy migration and invalid scope/hostnames fail closed without rewriting
 
 test('startup preparation failure clears progress and permits recovery without leaking its cause', async (t) => {
   const f = fixture(t);
-  await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await f.service.action({ kind: 'configure', enabled: true, port: 0 });
   await f.service.close();
   let fail = true;
   const restarted = new AutomationService({
@@ -404,7 +408,7 @@ test('save failure retains existing network listener; bind failure persists scop
   const f = fixture(t),
     service = f.service;
   await service.action({ kind: 'setConnectionScope', scope: 'network' });
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
   const endpoint = service.state().endpoint,
     saved = f.read(),
     auth = `Bearer ${f.options.decrypt(saved.token)}`;
@@ -416,14 +420,14 @@ test('save failure retains existing network listener; bind failure persists scop
   fs.rmdirSync(f.file);
   fs.renameSync(f.file + '.saved', f.file);
   assert.equal(f.failures.length, 1);
-  await service.action({ kind: 'configure', enabled: false, allowWrite: false, port: saved.port });
+  await service.action({ kind: 'configure', enabled: false, port: saved.port });
   const blocker = net.createServer();
   await new Promise((resolve, reject) =>
     blocker.once('error', reject).listen(saved.port, '127.0.0.1', resolve),
   );
   t.after(() => blocker.close());
   await service.action({ kind: 'setConnectionScope', scope: 'local' });
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: saved.port });
+  await service.action({ kind: 'configure', enabled: true, port: saved.port });
   assert.equal(service.state().running, false);
   assert.equal(service.state().starting, false);
   assert(service.state().error);
@@ -516,7 +520,6 @@ test('wildcard startup fails closed if another listener owns the loopback endpoi
   await f.service.action({
     kind: 'configure',
     enabled: true,
-    allowWrite: false,
     port: blocker.address().port,
   });
   assert.equal(f.service.state().running, false);
@@ -534,7 +537,7 @@ test('port zero persistence failure closes the provisional listener and retains 
     fs.mkdirSync(f.file);
     return result;
   };
-  await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await f.service.action({ kind: 'configure', enabled: true, port: 0 });
   assert.equal(f.service.state().running, false);
   assert.equal(f.service.state().port, 0);
   assert.equal(f.service.state().enabled, true);

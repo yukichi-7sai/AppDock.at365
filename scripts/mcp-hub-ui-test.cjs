@@ -125,10 +125,8 @@ delete watchManifest.defaultKeybindings;
 delete watchManifest.defaultGestures;
 fs.writeFileSync(path.join(watchFolder, 'extension.json'), JSON.stringify(watchManifest));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
-fs.writeFileSync(
-  require('./test-settings.cjs').file(profile, 'settings.json'),
-  JSON.stringify(settings),
-);
+settings.operationPermissions = { applet: { read: true, execute: true, useMcp: true } };
+require('./test-settings.cjs').write(profile, settings, local);
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
@@ -316,8 +314,12 @@ async function mcpPermissionControl(page, management = false) {
 async function setMcpPermission(page, allowed, management = false) {
   const { panel, control } = await mcpPermissionControl(page, management);
   const permission = management ? 'allowWrite' : 'allowUseMcp';
-  const file = path.join(local, 'automation.json');
-  const before = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+  const file = require('./test-settings.cjs').deviceFile(profile);
+  const saved = () => JSON.parse(fs.readFileSync(file, 'utf8')).operationPermissions?.mcp ?? {};
+  const connectionFile = path.join(local, 'automation.json');
+  const connection = () => (fs.existsSync(connectionFile) ? fs.readFileSync(connectionFile) : null);
+  const before = saved();
+  const connectionBefore = connection();
   const stateBefore = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.notEqual(await control.isChecked(), allowed);
   await control.click();
@@ -327,12 +329,8 @@ async function setMcpPermission(page, allowed, management = false) {
   }, 'MCP permission UI save');
   assert.equal(await panel.getByRole('alert').count(), 0, await panel.innerText());
   assert.equal(await control.isChecked(), allowed);
-  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.equal(after[permission], allowed);
-  if (before) {
-    const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-    assert.equal(digest({ ...after, [permission]: before[permission] }), digest(before));
-  }
+  assert.deepEqual(saved(), { ...before, [permission]: allowed });
+  assert.deepEqual(connection(), connectionBefore);
   const stateAfter = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.equal(stateAfter[permission], allowed);
   for (const key of Object.keys(stateBefore).filter(
@@ -436,7 +434,6 @@ async function assertMcpWriteDenied() {
       await window.dock.automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
@@ -797,8 +794,9 @@ async function assertMcpWriteDenied() {
       );
       const expected =
         label === 'Windowsへのキー・操作メッセージ送信' ? 'allowSendInput' : 'allowRunProcesses';
+      const deviceFile = require('./test-settings.cjs').deviceFile(profile);
       assert.equal(
-        JSON.parse(fs.readFileSync(path.join(local, 'automation.json'), 'utf8'))[expected],
+        JSON.parse(fs.readFileSync(deviceFile, 'utf8')).operationPermissions.mcp[expected],
         allowed,
       );
     };

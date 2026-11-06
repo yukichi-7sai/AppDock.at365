@@ -310,7 +310,6 @@ async function configure(patch) {
       await window.dock.automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });

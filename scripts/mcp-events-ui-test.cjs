@@ -157,7 +157,7 @@ async function rpc(method, args = {}) {
     await dialog.getByTestId('settings-dialog-cancel').click();
     await dialog.waitFor({ state: 'hidden' });
     await action({ kind: 'selectConfig', file: config });
-    await action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+    await action({ kind: 'configure', enabled: true, port: 0 });
     await action({ kind: 'register' });
     assert.deepEqual((await rpc('events/list')).result.events, []);
     checks.push('fresh profile defaults OFF and exposes no notification events');
