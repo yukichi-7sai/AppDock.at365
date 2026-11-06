@@ -1,4 +1,6 @@
 {
+  "gallery.groupMemberships": "所属グループ（{{count}}件）",
+  "gallery.groupsFor": "{{title}}の所属グループ（{{count}}件）",
   "library.view": "表示形式",
   "library.cards": "カード",
   "library.list": "リスト",

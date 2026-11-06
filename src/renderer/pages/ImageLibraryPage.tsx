@@ -306,6 +306,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             : undefined;
       },
       expandLabels: true,
+      groupHints: true,
       size: libraryGallerySize,
       scrollElement: scroll.current!,
       clickSelect: select,

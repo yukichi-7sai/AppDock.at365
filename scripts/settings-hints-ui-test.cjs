@@ -15,6 +15,7 @@ const source =
   process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 const titlesOnly =
   process.argv.includes('--sections-only') || process.argv.includes('--titles-only');
+const popoversOnly = process.argv.includes('--popovers-only');
 const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
@@ -945,6 +946,12 @@ async function checkSectionTitles() {
       success = true;
       return;
     }
+    if (popoversOnly) {
+      await require('./hint-popover-ui-checks.cjs')({ host, select, hints, checks, profile });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (titlesOnly) {
       assert.equal((await snapshot()).version, require('../package.json').version);
       await checkSectionTitles();
@@ -1513,6 +1520,7 @@ async function checkSectionTitles() {
       layoutSampleCount: layoutSamples.length,
       success,
       titlesOnly,
+      popoversOnly,
       refinementsOnly,
       assignmentSpeechOnly,
       accentLayoutOnly,

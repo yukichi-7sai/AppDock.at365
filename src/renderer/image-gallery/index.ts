@@ -9,11 +9,13 @@ import {
 } from '../../shared/image-gallery';
 export * from '../../shared/image-gallery';
 import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
+import { mountGalleryGroupHint } from './group-hint';
 
 export interface GalleryOptions {
   errorText?: string;
   /** Show the complete group list; the owning surface provides wrapping/scrolling. */
   expandLabels?: boolean;
+  groupHints?: boolean;
   size?: GallerySize;
   /** Library selection and context menus are opt-in; picker activation stays unchanged. */
   clickSelect?(id: string, event: MouseEvent): void;
@@ -40,6 +42,9 @@ type Card = {
   checkArea: HTMLLabelElement;
   title: HTMLElement;
   detail: HTMLElement;
+  detailText: HTMLElement;
+  cardSize: HTMLElement;
+  metadata: HTMLElement;
   listText: HTMLElement;
   labels: HTMLElement;
   status: HTMLElement;
@@ -71,6 +76,20 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     ? mountGalleryInteractions(container, options.scrollElement, () => model, options.interactions)
     : undefined;
   const empty = element('p', 'ad-gallery-empty');
+  const groupHint = options.groupHints
+    ? mountGalleryGroupHint(
+        container,
+        (anchor) =>
+          cards.get(anchor.closest<HTMLElement>('[data-image-id]')?.dataset.imageId ?? '')?.item
+            .labels ?? [],
+        () =>
+          !disposed &&
+          !container.closest('[inert]') &&
+          (!options.interactions ||
+            (options.interactions.enabled() &&
+              !options.interactions.root.classList.contains('ad-gallery-gesturing'))),
+      )
+    : undefined;
   const wantedEdge = (card: Card) => {
     const width = card.button.getBoundingClientRect().width || model.cardWidth;
     const edges =
@@ -190,8 +209,15 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     const body = element('div', 'ad-gallery-body');
     const title = element('h3', 'ad-gallery-title'),
       detail = element('p', 'ad-gallery-detail');
-    const labels = element('div', 'ad-gallery-labels'),
+    const detailText = element('span', 'ad-gallery-detail-text'),
+      cardSize = element('span', 'ad-gallery-card-size'),
+      metadata = element('span', 'ad-gallery-metadata');
+    detail.append(detailText, cardSize, metadata);
+    const labels = options.groupHints
+        ? element('button', 'ad-gallery-labels ad-gallery-group-hint')
+        : element('div', 'ad-gallery-labels'),
       actions = element('div', 'ad-gallery-actions');
+    if (labels instanceof HTMLButtonElement) labels.type = 'button';
     const listText = element('p', 'ad-gallery-list-text');
     body.append(title, listText, detail, labels);
     node.append(button, checkArea, body, actions);
@@ -205,6 +231,9 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       checkArea,
       title,
       detail,
+      detailText,
+      cardSize,
+      metadata,
       listText,
       labels,
       actions,
@@ -264,6 +293,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     cancelInteraction: () => interactions?.cancel(),
     setModel(next: GalleryModel) {
       if (disposed) return;
+      if (next.view !== model.view || next.cardWidth !== model.cardWidth) groupHint?.close();
       const focused =
         document.activeElement instanceof HTMLElement && container.contains(document.activeElement)
           ? document.activeElement
@@ -279,6 +309,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       );
       container.dataset.fit = next.fit;
       container.dataset.view = next.view ?? 'cards';
+      container.dataset.cardSize = String(next.cardWidth >= 240);
       container.dataset.compact = String(next.view !== 'list' && next.cardWidth < 180);
       container.dataset.icons = String(
         next.view !== 'list' && !!options.clickSelect && next.cardWidth < 120,
@@ -331,22 +362,51 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.title.textContent = item.title;
         card.title.title = item.title;
         card.listText.textContent = item.textPreview?.replace(/\s+/g, ' ') ?? '';
-        card.detail.textContent =
-          next.view === 'list' ? (item.listDetail ?? item.detail) : item.detail;
+        card.detailText.textContent = item.detail;
+        card.detailText.title = item.detail;
+        card.cardSize.textContent = item.cardSize ? ` · ${item.cardSize}` : '';
+        card.detail.dataset.metadata = String(!!item.metadata);
+        if (item.metadata) {
+          const values = Object.entries(item.metadata);
+          const signature = JSON.stringify(values);
+          if (card.metadata.dataset.signature !== signature) {
+            card.metadata.replaceChildren(
+              ...values.map(([key, value]) => {
+                const part = element('span', `ad-gallery-meta-${key}`, value);
+                part.title = value;
+                return part;
+              }),
+            );
+            card.metadata.dataset.signature = signature;
+          }
+        } else {
+          card.metadata.replaceChildren();
+          delete card.metadata.dataset.signature;
+        }
         const limit = next.view === 'list' ? 1 : options.expandLabels ? item.labels.length : 2;
         const tags = item.labels.slice(0, limit);
         if (item.labels.length > limit)
           tags.push(hostText('gallery.moreLabels', { count: item.labels.length - limit }));
-        card.labels.title = item.labels.join('\n');
-        if (card.labels.dataset.signature !== JSON.stringify(tags)) {
+        card.labels.title = options.groupHints ? '' : item.labels.join('\n');
+        if (options.groupHints) {
+          card.labels.setAttribute(
+            'aria-label',
+            hostText('gallery.groupsFor', { title: item.title, count: item.labels.length }),
+          );
+          (card.labels as HTMLButtonElement).disabled =
+            !item.labels.length || item.selectable === false;
+        }
+        const labelsSignature = JSON.stringify([tags, item.labels]);
+        if (card.labels.dataset.signature !== labelsSignature) {
           card.labels.replaceChildren(
-            ...tags.map((v) => {
+            ...tags.map((v, index) => {
               const label = element('span', 'ad-gallery-tag', v);
-              label.title = v;
+              if (!options.groupHints)
+                label.title = index === limit ? item.labels.slice(limit).join('\n') : v;
               return label;
             }),
           );
-          card.labels.dataset.signature = JSON.stringify(tags);
+          card.labels.dataset.signature = labelsSignature;
         }
         if (item.state === 'error' || item.state === 'missing') {
           card.generation++;
@@ -407,11 +467,13 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       )
         focused.focus({ preventScroll: true });
       interactions?.update();
+      groupHint?.update();
       pump();
     },
     dispose() {
       disposed = true;
       interactions?.dispose();
+      groupHint?.dispose();
       cancelAnimationFrame(frame);
       observer.disconnect();
       resize.disconnect();

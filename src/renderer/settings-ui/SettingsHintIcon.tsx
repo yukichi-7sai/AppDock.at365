@@ -4,7 +4,7 @@ import { useSettingsHints } from './SettingsHints';
 import { parseDescriptionText } from '../../shared/description-text';
 import { DescriptionText } from './DescriptionText';
 import { useOptionalSettingsControls } from './api';
-import { settingsPopoverScroll } from './settings-popover-scroll';
+import { openHintPopover } from './hint-popover';
 import './settings-hint-icon.css';
 
 type TextMode = 'links' | 'plain' | 'literal';
@@ -113,47 +113,16 @@ function HintPopover({
     const tooltip = popup.current;
     const button = trigger.current;
     if (!open || !tooltip || !button) return;
-    // A native popover stays above modal dialogs and outside scrolling card clips.
-    tooltip.style.maxHeight = 'calc(100dvh - 16px)';
-    tooltip.showPopover();
-    const rect = button.getBoundingClientRect();
-    const margin = 8;
-    const gap = 6;
-    const below = window.innerHeight - rect.bottom - gap - margin;
-    const above = rect.top - gap - margin;
-    const upward = below < tooltip.getBoundingClientRect().height && above > below;
-    tooltip.style.maxHeight = `${Math.max(0, upward ? above : below)}px`;
-    const size = tooltip.getBoundingClientRect();
-    tooltip.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - size.width - margin))}px`;
-    tooltip.style.top = `${Math.max(margin, upward ? rect.top - gap - size.height : rect.bottom + gap)}px`;
-    const outside = (event: PointerEvent) => {
-      if (!button.contains(event.target as Node) && !tooltip.contains(event.target as Node))
-        setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen(false);
-      if (tooltip.contains(document.activeElement)) {
+    return openHintPopover(
+      button,
+      tooltip,
+      () => setOpen(false),
+      () => {
         suppressFocus.current = true;
         button.focus({ preventScroll: true });
         suppressFocus.current = false;
-      }
-    };
-    const scroll = settingsPopoverScroll(button, tooltip, () => setOpen(false));
-    const resize = () => setOpen(false);
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape, true);
-    window.addEventListener('scroll', scroll, true);
-    window.addEventListener('resize', resize);
-    return () => {
-      if (tooltip.isConnected && tooltip.matches(':popover-open')) tooltip.hidePopover();
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape, true);
-      window.removeEventListener('scroll', scroll, true);
-      window.removeEventListener('resize', resize);
-    };
+      },
+    );
   }, [open, hint, buttonLabel]);
   return (
     <span

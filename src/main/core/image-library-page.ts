@@ -36,9 +36,9 @@ import { libraryGallerySize, validGalleryWidth } from '../../shared/image-galler
 import type { ImageLibraryHost } from './image-library-host';
 import type { GalleryImages } from './gallery-images';
 import { LibraryReadCancelled } from './registered-assets';
+import { libraryFileSize } from '../../shared/library-metadata';
 import type { GalleryViewStateStore } from './gallery-view-state';
 import type { ImageLibraryDialogs } from './image-library-dialogs';
-const fileSizeNumber = new Intl.NumberFormat('ja', { maximumFractionDigits: 1 });
 
 /** Window-owned state survives navigation and provider recovery. Import jobs also live here. */
 export class ImageLibraryPageState {
@@ -265,9 +265,24 @@ export class ImageLibraryPageSession implements HostPageController {
         assetId: this.options.texts ? '' : assetId,
         textPreview: this.options.texts ? e.textPreview || hostText('texts.emptyBody') : undefined,
         title: e.ref.file,
-        listDetail:
-          this.options.host.media === 'image'
-            ? `${e.ref.file.split('.').at(-1)!.toUpperCase()} · ${fileSizeNumber.format(e.bytes / 1024)} KB`
+        metadata: {
+          format: e.ref.file.split('.').at(-1)!.toUpperCase(),
+          measurement: this.options.texts
+            ? e.characters === undefined
+              ? '—'
+              : hostText('texts.details', { characters: e.characters, lines: e.lines ?? 1 })
+            : this.options.host.media === 'sound'
+              ? e.durationMs === undefined
+                ? '—'
+                : `${Math.floor(Math.round(e.durationMs / 1000) / 60)}:${String(Math.round(e.durationMs / 1000) % 60).padStart(2, '0')}`
+              : e.width && e.height
+                ? `${e.width} × ${e.height}`
+                : '—',
+          size: libraryFileSize(e.available ? e.bytes : undefined),
+        },
+        cardSize:
+          this.options.host.media !== 'image'
+            ? libraryFileSize(e.available ? e.bytes : undefined)
             : undefined,
         detail: this.options.texts
           ? e.characters === undefined

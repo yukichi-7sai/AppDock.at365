@@ -23,7 +23,9 @@ export interface GalleryItem {
   /** Optional plain text preview; never interpreted as HTML or an image URL. */
   textPreview?: string;
   detail: string;
-  listDetail?: string;
+  metadata?: { format: string; measurement: string; size: string };
+  /** Extra card information is shown only when the card has enough room. */
+  cardSize?: string;
   labels: string[];
   state: GalleryImageState;
   selected?: boolean;
