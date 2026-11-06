@@ -113,7 +113,7 @@ function sameLayout(actual, expected) {
       })),
       defaultConnectionId: 'default',
     };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(settings));
+    require('./test-settings.cjs').write(profile, settings);
     const start = async () => {
       app = await launch(profile, portable);
       host = app.main;
@@ -172,8 +172,7 @@ function sameLayout(actual, expected) {
     assert.equal(requests[1].body.model, 'alternate');
     assert.equal(requests[1].body.instructions, '日本語\n明るく');
     assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile))).tts
-        .defaultConnectionId,
+      require('./test-settings.cjs').read(profile).tts.defaultConnectionId,
       'default',
     );
     checks.push(

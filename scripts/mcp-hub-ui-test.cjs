@@ -126,7 +126,7 @@ delete watchManifest.defaultGestures;
 fs.writeFileSync(path.join(watchFolder, 'extension.json'), JSON.stringify(watchManifest));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
 settings.operationPermissions = { applet: { read: true, execute: true, useMcp: true } };
-require('./test-settings.cjs').write(profile, settings, local);
+require('./test-settings.cjs').write(profile, settings);
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');

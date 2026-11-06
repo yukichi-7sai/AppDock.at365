@@ -93,9 +93,7 @@ notificationPreferences.overridesはsettings.jsonの任意フィールドです�
 
 通知センターの既読・履歴削除は起動中のメモリーだけへ反映します。notifications/update-receipt.jsonの受付済み記録はPC専用rootへ保存します。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。
 
-TTSの通常設定はPC専用rootのgeneration-ai.jsonのtts、APIキーは同rootのtts-keys.json（safeStorage暗号化）へ保存する。生成音声・ジョブはメモリー上で保持する。[生成AIのPC専用設定](generation-settings.md)を参照する。
-
-文章・画像生成AIの接続設定・プロンプト・生成設定はPC専用rootのgeneration-ai.jsonのai/imageAiへ保存する。各APIキーは種類別の暗号化ファイルで管理する。3種類のプリセット別MCP許可と通知の読み上げ先IDもPC専用で、共有/端末別JSONから継承しない。共通ストアの原子的保存・競合検出・復旧を使用する。詳細は[生成AIのPC専用設定](generation-settings.md)を参照する。
+音声・文章・画像生成AIの接続・生成設定、プリセット別MCP許可、通知の読み上げ先IDは端末別`settings-<端末名>.json`の`generationAi`へ保存する。各APIキーはPC専用rootの種類別ファイルでsafeStorage暗号化する。生成結果・ジョブはメモリーで保持する。共通ストアの原子的保存・競合検出・復旧を使う。詳細は[生成AIの端末別設定](generation-settings.md)を参照する。
 
 ## ファイル配置と端末の識別
 

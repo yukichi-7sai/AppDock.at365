@@ -1,9 +1,9 @@
 import type { Settings } from '../../shared/contracts';
-import { parseAiSettings } from '../../shared/ai';
-import { parseTtsConfiguration } from '../../shared/tts';
+import { aiObject, parseAiSettings } from '../../shared/ai';
+import { parseTtsConfiguration, ttsServerId } from '../../shared/tts';
 import { parseImageAiSettings } from '../../shared/image-ai';
 
-/** The local file owns generator configuration and the notification's server selection. */
+/** The device file owns generator configuration and the notification's server selection. */
 export interface GenerationSettings {
   version: 1;
   ai: NonNullable<Settings['ai']>;
@@ -11,20 +11,16 @@ export interface GenerationSettings {
   imageAi: NonNullable<Settings['imageAi']>;
   notificationConnectionId?: string;
 }
-export function parseGenerationSettings(raw: any): GenerationSettings {
+export function parseGenerationSettings(raw: unknown): GenerationSettings {
   if (
-    !raw ||
-    typeof raw !== 'object' ||
-    Array.isArray(raw) ||
+    !aiObject(raw) ||
     raw.version !== 1 ||
     Object.keys(raw).some(
       (key) => !['version', 'ai', 'tts', 'imageAi', 'notificationConnectionId'].includes(key),
     ) ||
-    (raw.notificationConnectionId !== undefined &&
-      (typeof raw.notificationConnectionId !== 'string' ||
-        !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(raw.notificationConnectionId)))
+    (raw.notificationConnectionId !== undefined && !ttsServerId(raw.notificationConnectionId))
   )
-    throw Error('Invalid local generation settings');
+    throw Error('Invalid device generation settings');
   return {
     version: 1,
     ai: parseAiSettings(raw.ai),
@@ -62,13 +58,15 @@ export function withoutGenerationSettings<T>(value: T): T {
     );
   return next;
 }
-export function withGenerationSettings<T>(value: T, local: GenerationSettings): T {
+export function withGenerationSettings<T>(value: T, generation?: GenerationSettings): T {
   const next: any = withoutGenerationSettings(value);
-  for (const key of ['ai', 'tts', 'imageAi'] as const) next[key] = structuredClone(local[key]);
-  if (local.notificationConnectionId !== undefined) {
+  delete next.generationAi;
+  if (!generation) return next;
+  for (const key of ['ai', 'tts', 'imageAi'] as const) next[key] = structuredClone(generation[key]);
+  if (generation.notificationConnectionId !== undefined) {
     next.notificationPreferences ??= { overrides: [] };
     next.notificationPreferences.speech ??= {};
-    next.notificationPreferences.speech.connectionId = local.notificationConnectionId;
+    next.notificationPreferences.speech.connectionId = generation.notificationConnectionId;
   }
   return next;
 }

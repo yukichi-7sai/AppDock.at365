@@ -131,7 +131,7 @@ for (const media of ['image', 'sound', 'text']) {
     })),
   };
 }
-require('./test-settings.cjs').write(profile, initial, local);
+require('./test-settings.cjs').write(profile, initial);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const source = process.argv[2] && path.resolve(process.argv[2]);
 const portable = source && testHostPath(profile);

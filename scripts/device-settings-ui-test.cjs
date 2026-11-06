@@ -246,6 +246,8 @@ const checks = [];
           document.querySelector('.settings-surface').dataset.settingsConnection,
         ),
       );
+    const sharedHostFiles = (pageId) =>
+      pageId === 'notifications' ? ['device', 'shared'] : ['shared'];
     for (const [pageId, title, configuration] of hostPages) {
       await page.getByRole('button', { name: title, exact: true }).click();
       await page.getByTestId(`settings-page:${pageId}`).waitFor();
@@ -283,7 +285,7 @@ const checks = [];
       assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        ['shared'],
+        sharedHostFiles(pageId),
       );
       await toggle().check();
       await until(
@@ -352,7 +354,7 @@ const checks = [];
       assert.equal(await toggle().isChecked(), local);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        local ? ['device'] : ['shared'],
+        local ? ['device'] : sharedHostFiles(pageId),
       );
     }
     checks.push(

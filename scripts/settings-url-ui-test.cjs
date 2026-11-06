@@ -82,7 +82,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     fs.writeFileSync(path.join(fixture, 'index.cjs'), 'module.exports={};');
     require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
     settings.extensions['fixture.url'] = { enabled: false, settings: {} };
-    require('./test-settings.cjs').write(profile, settings, path.join(profile, 'local'));
+    require('./test-settings.cjs').write(profile, settings);
     const port = await freePort(),
       env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;

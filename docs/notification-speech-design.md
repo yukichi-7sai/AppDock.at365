@@ -33,7 +33,7 @@ interface NotificationPreference extends NotificationOwner {
 | 各overrideの`speak` | 任意boolean。省略時false | 通知方針が有効かつtrueの場合だけ対象 |
 | 接続先・モデル・APIキー | 通知設定へ複製しない | 選択した音声サーバー設定とPC専用秘密領域 |
 
-新規項目の`null`や不明なプロパティは拒否する。廃止済みの音声上書きは読み込み時に除外し、ほかの通知設定を保持する。選択した登録が削除済みでもIDを保持し、画面で未存在を表示する。読み上げでは別の登録へ自動切替しない。既存`durationSeconds:null`の契約は維持する。`speech.connectionId`はPC専用rootの`generation-ai.json`へ保存し、共有／端末別の切り替えでも保持する。ほかの通知設定は通知ページで選択した保存区分に従う。詳細は[生成AIのPC専用設定](generation-settings.md)を参照する。未導入・停止中の通知種類の設定を保持する。
+新規項目の`null`や不明なプロパティは拒否する。廃止済みの音声上書きは読み込み時に除外し、ほかの通知設定を保持する。選択した登録が削除済みでもIDを保持し、画面で未存在を表示する。読み上げでは別の登録へ自動切替しない。既存`durationSeconds:null`の契約は維持する。`speech.connectionId`は`data/settings-<端末名>.json`の`generationAi.notificationConnectionId`へ保存する。ほかの通知設定は通知ページで選択した保存区分に従う。詳細は[生成AIの端末別設定](generation-settings.md)を参照する。未導入・停止中の通知種類の設定を保持する。
 
 通知種類編集で`notificationPreferences`を再構築するとき、`speech`と共通の`sound`を保持する。逆にサーバー・通知用の話し方の編集で`overrides`や共通の`sound`を置換しない。ページ投影・部分JSON・外部設定変更にも同じ検証を適用する。
 

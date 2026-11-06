@@ -10,7 +10,7 @@
 - 生成設定: モデルID、画像サイズ、枚数、PNG/JPEG/WebP、品質、背景、圧縮品質、待ち時間。モデルIDは利用する画像生成モデルを入力する。モデルの自動列挙は行わない。
 - プロンプト: 「いつも加えるプロンプト」と「指定がないときのプロンプト」。alwaysPrompt、今回のadditionalPrompt（省略時はdefaultPrompt）、入力データinputの順で、空白だけの部分を除いて改行で結合し、送信先のpromptへ渡す。明示した空文字のadditionalPromptは既定プロンプトを抑制する。合成結果が空なら送信しない。
 
-通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。PC専用rootのgeneration-ai.jsonへ保存する。各ダイアログのMCP利用許可も同じファイルで管理する。現在のMCP API公開範囲は変更しない。[生成AIのPC専用設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
+通常設定は `imageAi.connections` と `imageAi.defaultConnectionId`。ダイアログのMCP利用許可とともに`data/settings-<端末名>.json`の`generationAi.imageAi`へ保存する。[生成AIの端末別設定](generation-settings.md)を参照する。APIキーはPC専用rootの `image-ai-keys.json` にOS暗号化して保存し、登録IDと正規化したURLへ結び付ける。秘密のある接続先を変更する場合はキーを入力し直す。通常設定、API応答、ログへ秘密値を含めない。
 
 設定ページの「画像生成の試験」は選択したサーバー登録のモデルで生成し、生成画像を表示する。空欄の追加プロンプトは省略として扱う。画像ライブラリーへの保存は行わない。画像は完了から15分間の一時結果で、本体を終了すると消える。
 

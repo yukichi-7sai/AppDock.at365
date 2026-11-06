@@ -81,7 +81,7 @@ settings.notificationPreferences.overrides.push({
   targets: ['banner'],
 });
 settings.operationPermissions = { applet: { read: true, execute: true } };
-require('./test-settings.cjs').write(profile, settings, path.join(profile, 'local'));
+require('./test-settings.cjs').write(profile, settings);
 const checks = [],
   failures = [];
 let host,

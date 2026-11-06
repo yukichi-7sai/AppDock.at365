@@ -29,7 +29,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     keyFile = path.join(local, 'tts-keys.json'),
     cipher = fs.readFileSync(keyFile),
     before = fs.readFileSync(sharedFile),
-    ttsBefore = require('./test-settings.cjs').read(profile, local).tts.connections[0];
+    ttsBefore = require('./test-settings.cjs').read(profile).tts.connections[0];
   const operation = { kind: 'add', values: { id: 'Voice-A😀' } };
   const preview = await apply([operation], true);
   assert.deepEqual(preview.changes[0].values, { id: 'Voice-A😀', name: 'Voice-A😀' });
@@ -45,7 +45,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     const dialog = page.getByRole('dialog');
     if (await dialog.count())
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
-    const name = require('./test-settings.cjs').read(profile, local).tts.connections[0].name;
+    const name = require('./test-settings.cjs').read(profile).tts.connections[0].name;
     await page.getByRole('button', { name: name + 'の設定', exact: true }).click();
     await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
     await dialog.getByLabel('ボイス一覧の取得方式', { exact: true }).selectOption('manual');
@@ -129,7 +129,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     async () => JSON.parse(await manual.inputValue()).length === 1,
     'TTS UI received candidate removal',
   );
-  let current = require('./test-settings.cjs').read(profile, local).tts.connections[0];
+  let current = require('./test-settings.cjs').read(profile).tts.connections[0];
   assert.equal(current.defaultVoice, ttsBefore.defaultVoice);
   assert.equal(current.voicesSource, ttsBefore.voicesSource);
   assert.equal(current.baseUrl, ttsBefore.baseUrl);
@@ -145,7 +145,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await saveManual();
   await until(
     async () =>
-      require('./test-settings.cjs').read(profile, local).tts.connections[0].manualVoices
+      require('./test-settings.cjs').read(profile).tts.connections[0].manualVoices
         ?.length === 1000,
     'TTS UI saved 1000 manual voices',
   );
@@ -184,7 +184,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   );
   assert.equal((await apply([{ kind: 'add', values: { id: 'v1000' } }])).changed, true);
   assert.equal(
-    require('./test-settings.cjs').read(profile, local).tts.connections[0].manualVoices.length,
+    require('./test-settings.cjs').read(profile).tts.connections[0].manualVoices.length,
     1001,
   );
   await refresh();
@@ -194,7 +194,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await until(async () => (await items()).items.length === 0, 'TTS JSON UI cleared candidates');
   await apply([{ kind: 'add', values: { id: 'last' } }]);
   await apply([{ kind: 'remove', itemRef: (await items()).items[0].itemRef }]);
-  current = require('./test-settings.cjs').read(profile, local).tts.connections[0];
+  current = require('./test-settings.cjs').read(profile).tts.connections[0];
   assert.deepEqual(current.manualVoices, []);
   assert.equal(current.defaultVoice, ttsBefore.defaultVoice);
   assert.equal(current.voicesSource, ttsBefore.voicesSource);

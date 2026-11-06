@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-11-07 生成AIとWebAppletの統合（0.173.0）
+
+- 生成AIの作業ブランチ `49b11a8` に、サイト別ログイン枠を含むmain `c6c9285` を取り込んだ。競合はこの検証記録の1件で、両方の履歴を保持した。main 0.172.0に生成AIの保存形式変更を加える統合版を0.173.0とした。
+- 固定lockfileの照合、型検査、ビルド、CJS構文と差分検査に成功した。直列の標準回帰は1,782/1,782件成功し、失敗・取消・skipは0件だった。
+- 固定EXEの6試験で、生成AI設定、WebApplet配布物、動的ページ、MCP設定、MCP設定基盤、Applet APIを確認した。3種の生成AI設定と通知の読み上げ先IDは端末JSONで再起動後も保持され、APIキーは別ファイルに暗号化されていた。WebApplet 0.6.0ではローカルHTTP fixtureを使い、同じURLのサイト別Cookie分離と再起動後の保持、削除後の回収を確認した。
+- `publish.bat`は終了0で`A:\40.ARTIFACT\AppDock.at365-device-generation-settings`へ発行した。ビルド出力・発行先・更新ZIP・固定試験runtimeの管理対象101ファイルはSHA256が一致した。EXEは`5cbd5c47ef200074d671844188ed168e58f20497de17eb1bd130145c13b02784`、更新ZIPは`0abf1011ebfdab3c7fb22868c251bdb12f9a92dc244247b353746f8905a04eac`（175,179,430 bytes）。
+- 試験プロセス終了後に専用fixtureのDLL1件を整理し、結果・画像・ログ52件のSHA256を照合した。試験入力tree、ログ、WebApplet fixtureと配布物のハッシュ、最終treeは`.artifacts/integration-device-generation-settings-web-20261107/`に記録した。
+
 ## 2026-11-07 WebApplet作業ブランチへのmain取り込み（0.172.0）
 
 - 作業ブランチの `ffbc1dd` に、取得した `origin/main` の `180f53d` を含むローカルmain `c221556` を取り込んだ。競合4件を解消し、両方の検証履歴、mainのMCP設定のJSONタブ、現行rendererの外観検査、Webアカウント画面の廃止を反映した。片親だけが変更したファイルは、最低本体版を揃えた文書を除き一致を確認した。
@@ -17,6 +25,14 @@
 - ローカルHTTP fixtureで同じURLのCookie分離と再起動後の保持、登録削除後の回収、未導入の状態での同期削除を確認した。Gmail用の保存領域の分離とサービス専用グループの維持は隔離fixtureで確認した。実サイトへのログインと実PC間の同期は検証対象外。
 - 配布物は `A:\40.ARTIFACT\AppDock.at365\worktrees\web-applet-site-accounts`。隔離先の103ファイルを発行元とSHA256照合した。EXEは `354e68385e1fef285404d0b7606def952ab98b81cf3ba4d402d179a2942dd624`。更新ZIPはfeedのハッシュと一致。
 - ログ、ツール版、試験入力tree、最終tree、配布物ハッシュは `.artifacts/commit-validation-web-applet-site-accounts/`。
+
+## 2026-11-07 生成AIのworktreeへのmain取り込み（0.172.0）
+
+- 追跡先を`pull --ff-only`で確認し、ローカルmainの`c221556`を`codex/device-generation-settings`の`676b82d`へマージした。6ファイルの競合を解消し、両方の検証履歴を保持した。mainの0.171.0に生成AIの保存形式変更を合わせた統合版を0.172.0とした。
+- 端末JSONで`generationAi`と`operationPermissions`を独立させ、互いの保存で値が残ることと別端末の分離を回帰で確認した。MCPのタブ別リセットと、端末設定・暗号化済み認証ファイルを開く経路を揃えた。標準回帰の.NET試験ホストはmainの共用出力を使う。
+- 固定lockfileの照合、型検査、TypeScript・renderer・.NETのビルド、CJS構文と差分検査に成功した。標準の直列回帰は1,804/1,804件成功、失敗・取消・skipは0。固定EXEでは生成AI設定、文章・画像・音声の生成、通知読み上げ、MCP設定、MCP設定基盤、Applet操作許可の8試験が成功した。隔離profileで登録モデル、APIキー、通知先、設定の再起動と操作許可の保存・失効を確認した。
+- `publish.bat`終了0で`A:\40.ARTIFACT\AppDock.at365-device-generation-settings`へ発行した。package・feed・manifest・PE FileVersionは0.172.0。ビルド出力・発行先・更新ZIP・固定試験runtimeの101ファイルがSHA256一致した。EXEは`7d5ed272e85ee7622a2343d91b6ae2872e53e109c07f7d4dfd968a85809f5309`、更新ZIPは`ca8acb085816a8cd751e352202fc49327cc0838e4bd605243c887c49264bd27d`（175,186,961 bytes）。既存のViteチャンクサイズ警告は継続した。
+- 専用fixtureのDLL4件をプロセス終了後に整理し、結果・画像・ログ56件のSHA256を確認した。入力tree、ログと配布物のハッシュ、マージコミットの両親と最終treeは`.artifacts/integration-device-generation-settings-20261107/`に記録した。
 
 ## 2026-11-07 操作許可のmain統合（0.171.0）
 
@@ -62,6 +78,16 @@
 - 固定EXEの初期値、Node/.NET Applet API、MCP起動・再起動、MCP設定基盤、画像・文章・音声生成AI、MCPハブ、smokeが成功した。MCP設定基盤では受信した端末ファイルの許可が画面と実際の要求に反映され、破損時に書き込みが拒否され、正常化で編集が復帰することを確認した。MCPハブの初回は旧ファイルを参照する検査を特定し、端末ファイルへの保存と接続ファイルの独立を同じEXEで再検証した。
 - `publish.bat`のパッケージ作成と封印後、更新ヘルパーがジャンクション先への配置を拒否した。並行作業の共用発行先とは分け、同じ封印済みビルドを既存の配置・更新ZIP作成処理で`A:\40.ARTIFACT\AppDock.at365\device-operation-permissions-0.170.0`に発行した。package・manifest・feed・PE版は0.170.0。ビルド出力・発行先・共用試験runtime・ZIPの101ファイルがSHA256一致。EXE=`dbc8b99f8d49916ede75723c031aefaa8bb7f8a24e0b4b344e35d7f07b12af3f`、ZIP=`0db4b75ea510adae8c5d7ea2d0172daf95215889f128cf002358605e074c3e50`、175,185,849 bytes。
 - `.artifacts/commit-validation-device-permissions/`に完全なログ、試験入力と成果物のSHA256、stage/commit照合を保存した。終了を確認した専用の試験実行ファイル145件を削除し、残した結果・ログ等26件を照合した。固定EXEの入力・通知・ページ管理の専用試験は対象外とした。端末ファイルの受信は隔離プロファイルへの外部書き込みで検証した。
+
+## 2026-11-07 生成AI設定の端末別保存（0.170.0）
+
+- 音声・文章・画像生成AIのプリセットと個別MCP許可、通知の読み上げ先IDを、`data/settings-<端末名>.json`の`generationAi`へ固定保存した。旧値は読み継がず、3種類のAPIキーは登録ID・正規化URLで照合する配置別LocalAppDataのsafeStorage暗号化ファイルを使う。3ページは共通の「このPC専用」表示を使う。
+- 発行前レビューで端末分離、通知ページの保存区分、設定APIの秘密・許可保護、外部更新、復旧を確認した。読み上げ先は既存TTSのID検証を再利用し、大文字を含む登録IDを回帰で確認した。設定と鍵の保存は共通ジャーナルへ接続し、保存失敗・中断・古い鍵の書込競合で設定や鍵だけが更新されないことを確認した。保存形式の変更により0.169.1からマイナー更新した。
+- 型検査・ビルド・固定依存照合は終了0。関連回帰の初回ではTTSの旧保存先を仮定した2件を、端末別の対象項目だけが更新される検査へ改めた。クリーンなworktreeの全回帰で見つかった廃止済みDefault Shellへの走査と.NET ExtensionHostの試験入力不足を修正した。最終の直列全回帰は1,801/1,801件成功、失敗・取消・skipは0。
+- 固定EXEで関連16スクリプトが成功。生成設定21項目では3種類の暗号文の実復号、端末JSONへの平文・暗号文の不在、通知先と個別許可の再起動後の保持を確認した。文章・音声・画像の生成、通知設定・読み上げ・通知音・模擬ロック、音声ライブラリ、端末切替と復旧、MCP設定連携、入力確定・順序・URLは隔離profileと模擬サーバーで検証した。狭幅・暗色の生成AIページで保存先表示を目視確認した。
+- 補助の旧情報通知スクリプトは本体画面への合成キー入力で停止した。現行の本体画面ではそのイベント入口をモーダル操作に使うため、旧スクリプトへの差分は取り消した。今回の通知先・読み上げ・APIキー操作は現行の通知設定・通知読み上げ・音声生成の固定EXE試験で確認した。
+- `publish.bat`終了0。worktreeのフォルダー名に従い`A:\40.ARTIFACT\AppDock.at365-device-generation-settings`へ発行した。package/feed/manifest/PE FileVersionは0.170.0。build・発行先・更新ZIP・共用試験runtimeで101ファイルのSHA256が一致した。EXEは`47da47f46b7b382bac49bc7f44bf833b958244a48d4fd8d3b71634315db05e96`、更新ZIPは`fce0b9660627a71cce78df49557ca7330eb13b36d8a49ab72e1f74b26051bdfb`（175,185,455 bytes）。Windows x64、Node 26.13.0／pnpm 12.15.0／Electron 45.1.0／.NET SDK 10.0.403。既存のViteチャンクサイズ警告が出た。
+- 証跡は`.artifacts/commit-validation-device-generation-settings/`。単体回帰の入力treeと最終版の差はGUI試験fixtureと本記録に限る。試験プロセス終了後に専用バイナリ12件を整理し、結果・画像・ログ54件のハッシュを照合した。試験準備の修正と機能・仕様・版の変更を別々のローカルコミットにまとめた。
 
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 

@@ -46,7 +46,7 @@ import {
   getCommandTriggerOptions,
   parseCommandTriggerOptions,
 } from '../../shared/command-trigger-options';
-import type { SettingsStore } from './settings';
+import type { SettingsScope, SettingsStore } from './settings';
 import {
   SettingsTargetError,
   type SettingsFieldTarget,
@@ -91,7 +91,7 @@ interface Target {
   values(settings: Settings): RecordValue;
   overrides(raw: RecordValue): RecordValue;
   stored?(): RecordValue;
-  rewriteScope?: 'shared' | 'device' | 'local' | (() => 'shared' | 'device' | 'local');
+  rewriteScope?: SettingsScope | (() => SettingsScope);
   replace(settings: Settings, changes: RecordValue, reset: string[]): Settings;
   guard?(next: Settings): void;
   normalize?(changes: RecordValue): RecordValue;
@@ -147,7 +147,7 @@ export class SettingsServiceTargets {
       revision(): string;
       checkRevision(revision: string): void;
       validate(value: Settings): Settings;
-      save(value: Settings, revision: number, rewrite: ('shared' | 'device' | 'local')[]): unknown;
+      save(value: Settings, revision: number, rewrite: SettingsScope[]): unknown;
       ai: AiSettingsController;
       imageAi?: ImageAiSettingsController;
       tts: TtsSecrets;
@@ -322,7 +322,7 @@ export class SettingsServiceTargets {
                         (['ai', 'tts', 'imageAi'].some((key) =>
                           spec.id.startsWith('service.' + key),
                         )
-                          ? 'local'
+                          ? 'device'
                           : 'shared')),
                   ]
                 : [],

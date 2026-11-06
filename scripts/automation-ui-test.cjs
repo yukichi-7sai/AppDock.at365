@@ -102,7 +102,7 @@ exports.activate=async(context)=>{
 );
 settings.extensions[fixtureId] = { enabled: true, settings: {} };
 settings.operationPermissions = { applet: { read: true, execute: true, write: true } };
-require('./test-settings.cjs').write(profile, settings, local);
+require('./test-settings.cjs').write(profile, settings);
 const local = path.join(profile, 'local'),
   configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });

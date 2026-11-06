@@ -151,7 +151,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   const current = await value('appdock_settings_get_values', { targetId: 'service.ai' });
   assert.equal(current.fields.find((field) => field.key === 'defaultConnectionId').hasValue, false);
   assert.equal(
-    require('./test-settings.cjs').read(profile, local).ai.defaultConnectionId,
+    require('./test-settings.cjs').read(profile).ai.defaultConnectionId,
     undefined,
   );
   assert.deepEqual(fs.readFileSync(keyFile), cipher);

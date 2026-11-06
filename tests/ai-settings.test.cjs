@@ -12,11 +12,11 @@ fs.mkdirSync(root, { recursive: true });
 function fixture(adapter) {
   const dir = fs.mkdtempSync(path.join(root, 'case-')),
     file = path.join(dir, 'settings.json'),
-    keys = path.join(dir, 'keys.json');
+    keys = path.join(dir, 'ai-keys.json');
   fs.writeFileSync(file, JSON.stringify(createDefaultSettings()));
   const settings = new SettingsStore(file);
   settings.load();
-  const secrets = new AiSecrets(keys, {
+  const secrets = new AiSecrets(dir, 'ai-keys', {
     encrypt: (v) => Buffer.from(v).toString('base64'),
     decrypt: (v) => Buffer.from(v, 'base64').toString(),
   });
@@ -191,7 +191,7 @@ test('a closed dialog cannot cancel discovery started by a newer dialog', async 
 test('an undecryptable saved key can be replaced through the dialog transaction', () => {
   const f = fixture();
   f.controller.save(f.c, null, 'old-key');
-  const secrets = new AiSecrets(f.keys, {
+  const secrets = new AiSecrets(f.dir, 'ai-keys', {
     encrypt: (value) => 'repaired-' + value,
     decrypt: (value) => {
       if (!value.startsWith('repaired-')) throw Error('cannot decrypt');

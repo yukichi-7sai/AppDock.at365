@@ -161,7 +161,7 @@ async function start() {
       path.join(folder, 'index.cjs'),
       `exports.activate=async c=>{let notification; c.commands.register('${id}.publish','Publish',async()=>{notification=(await c.notifications.publish({typeId:'message',title:'Tone notice',body:'Local fixture',dedupeKey:'one'})).notificationId;}); c.commands.register('${id}.end','End',async()=>{if(notification)await c.notifications.end(notification);});};`,
     );
-    fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(settings));
+    require('./test-settings.cjs').write(profile, settings);
     await start();
     await openNotifications();
     await expand();

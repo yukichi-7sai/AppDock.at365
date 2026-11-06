@@ -4,6 +4,13 @@ import { mcpPermissionKeys, type McpPermissions } from '../../shared/automation'
 import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
 import { parseMcpRoster } from '../../shared/mcp-client';
 import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
+import {
+  generationSettings,
+  parseGenerationSettings,
+  withGenerationSettings,
+  withoutGenerationSettings,
+  type GenerationSettings,
+} from './generation-settings';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import {
   appletCommonKeys,
@@ -57,6 +64,7 @@ export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
   mcpClient?: McpDeviceSettings;
+  generationAi?: GenerationSettings;
   operationPermissions?: OperationPermissions;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
@@ -159,6 +167,7 @@ function validateOperationPermissions(value: unknown) {
 }
 
 export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings {
+  raw = withoutGenerationSettings(raw);
   if (object(raw) && raw.schemaVersion === 1 && typeof raw.machineName === 'string')
     raw = fillSettingDefaults(raw, initialDeviceSettings(name));
   if (
@@ -186,6 +195,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'uiState',
           'mcpClient',
           'mcpServers',
+          'generationAi',
           'operationPermissions',
         ].includes(key),
     )
@@ -269,6 +279,9 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   return {
     ...structuredClone(current),
     ...(raw.mcpClient === undefined ? {} : { mcpClient: parseMcpDeviceSettings(raw.mcpClient) }),
+    ...(raw.generationAi === undefined
+      ? {}
+      : { generationAi: parseGenerationSettings(raw.generationAi) }),
     hostPages,
     host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;
@@ -382,7 +395,7 @@ export function combineSettings(
         row.enabled =
           device.collectionEnabled[owner]?.[definition.key]?.[row.id] ?? defaultAppletEnabled;
   }
-  return parseSettings(result);
+  return parseSettings(withGenerationSettings(result, device.generationAi));
 }
 /** Selectable pages start shared; fixed local pages never inherit shared configuration. */
 export function initializeHostPageSettings(
@@ -437,6 +450,10 @@ export function splitSettings(
   delete shared.mcpClient;
   if (!equal(before.mcpClient, next.mcpClient))
     device.mcpClient = parseMcpDeviceSettings(next.mcpClient);
+  const generation = generationSettings(next);
+  if (!equal(generationSettings(before), generation)) device.generationAi = generation;
+  next = withoutGenerationSettings(next);
+  before = withoutGenerationSettings(before);
   const copyChanges = (
     target: Record<string, any>,
     previous: Record<string, any>,
