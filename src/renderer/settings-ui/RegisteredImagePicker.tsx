@@ -44,7 +44,7 @@ export function RegisteredImagesProvider({
 }
 export const useRegisteredImages = () => useContext(ImagesContext);
 /** Each mounted image surface releases only its own host cache ownership. */
-function useImageSession(api: ImageLibraryApi | undefined) {
+export function useImageSession(api: ImageLibraryApi | undefined) {
   const owner = useRef<{ live: boolean; pending?: Promise<string> }>({ live: true });
   useEffect(() => {
     if (!owner.current.live) owner.current = { live: true };

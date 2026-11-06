@@ -71,6 +71,8 @@ import { startPageOptions, startPageState } from '../shared/start-page';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
 import { SoundGeneration } from './core/sound-generation';
+import { ImageGeneration } from './core/image-generation';
+import { ImageRegistration } from './core/image-registration';
 import { GalleryViewStateStore } from './core/gallery-view-state';
 import { GalleryImages } from './core/gallery-images';
 import { originalImageSources } from './core/image-file-source';
@@ -476,6 +478,7 @@ let hostModalLayer: HostModalLayer | undefined;
 let hostPages: HostPages | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
 let soundGeneration: SoundGeneration | undefined;
+let imageGeneration: ImageGeneration | undefined;
 let galleryViewState: GalleryViewStateStore;
 let soundGalleryViewState: GalleryViewStateStore;
 const rendererSoundSessions = new Map<string, ReturnType<SoundGallery['session']>>();
@@ -1155,16 +1158,25 @@ const ai = new AiService({
     }),
 });
 const imageAi = new ImageAiService({
+  registration: new ImageRegistration(registeredImages, imageLibraryHost),
   validateImage: (bytes) => decodeRegisteredImage(bytes),
   settings: () => settings.value.imageAi ?? defaultImageAiSettings(),
   key: (c) => imageAiSecrets.key(c),
   canUse: (owner, kind) => {
     if (quitting) return false;
     if (owner === 'host') return startupReady;
-    const indirect = owner.includes('|mcp:');
-    if (indirect) return false;
+    const mcpPermission = () =>
+      kind === 'read' ||
+      (kind === 'cancel'
+        ? mcpAllowed('allowExecute')
+        : mcpAllowed('allowUseImageAi') &&
+          (!['generate', 'register'].includes(kind) || mcpAllowed('allowExecute')) &&
+          (kind !== 'register' || mcpAllowed('allowWrite')));
+    if (owner.startsWith('mcp:')) return mcpJobAuthorized(owner) && mcpPermission();
+    const [appletOwner, mcpOwner] = owner.split('|', 2);
+    if (mcpOwner && (!mcpJobAuthorized(mcpOwner) || !mcpPermission())) return false;
     const item = [...(manager?.items.values() ?? [])].find(
-      (e) => owner === appletJobOwner(e.manifest.id),
+      (e) => appletOwner === appletJobOwner(e.manifest.id),
     );
     const grants =
       item && ['starting', 'running'].includes(item.state)
@@ -1175,7 +1187,9 @@ const imageAi = new ImageAiService({
       (kind === 'read' ||
         (kind === 'cancel'
           ? !!grants.execute
-          : !!grants.useImageAi && (kind !== 'generate' || !!grants.execute)))
+          : !!grants.useImageAi &&
+            (!['generate', 'register'].includes(kind) || !!grants.execute) &&
+            (kind !== 'register' || !!grants.write)))
     );
   },
   fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
@@ -1579,6 +1593,12 @@ const operationApi = new AppDockApi({
     'ai.image.connections.list': async (_params, id, context) => ({
       ...imageAi.connections(apiJobOwner(id, context)),
     }),
+    'ai.image.generateAndRegister': async (params, id, context) => ({
+      ...imageAi.generateAndRegister(apiJobOwner(id, context), params),
+    }),
+    'ai.image.jobs.retrySave': async (params, id, context) => ({
+      ...imageAi.retrySave(apiJobOwner(id, context), params.jobId),
+    }),
     'ai.image.jobs.get': async (params, id, context) => ({
       ...imageAi.get(apiJobOwner(id, context), params.jobId),
     }),
@@ -1683,6 +1703,7 @@ const operationApi = new AppDockApi({
   },
   ttsAllowed: () => mcpAllowed('allowUseTts'),
   aiAllowed: () => mcpAllowed('allowUseAi'),
+  imageAiAllowed: () => mcpAllowed('allowUseImageAi'),
   writable: () => mcpAllowed('allowWrite'),
   executable: () => mcpAllowed('allowExecute'),
   touchpadBridge: {
@@ -1740,6 +1761,7 @@ const changed = () => {
     windowBarHost?.refresh();
     hostPages?.refresh();
     soundGeneration?.refresh();
+    imageGeneration?.refresh();
     settingsPageHost?.refresh();
     overlayHost?.refresh();
     const historyAvailability = JSON.stringify(navigation.history.availability);
@@ -3723,6 +3745,7 @@ function settingsPageActions(
               'setRibbonEditing',
               'setTts',
               'setAi',
+              'setImageAi',
               'setMcpClient',
               'setInputSending',
               'setProcessLaunching',
@@ -3838,6 +3861,11 @@ function registerIpc() {
   handle('dock:imageLibrary:snapshot', () => imageLibraryHost.snapshot());
   handle('dock:imageLibraryDialog:pending', () => imageLibraryDialogs?.current() ?? null);
   handle('dock:soundGeneration:pending', () => soundGeneration?.current() ?? null);
+  handle('dock:imageGeneration:pending', () => imageGeneration?.current() ?? null);
+  handle('dock:imageGeneration:act', (id, action) => {
+    if (!imageGeneration) throw Error(hostText('imageGeneration.closed'));
+    return imageGeneration.act(id, action);
+  });
   handle('dock:soundGeneration:act', (id, action) => {
     if (!soundGeneration) throw Error(hostText('soundGeneration.closed'));
     return soundGeneration.act(id, action);
@@ -5361,6 +5389,22 @@ async function initialize() {
     changed,
   });
   soundGeneration = generation;
+  imageGeneration?.cancel();
+  const imagesGeneration = new ImageGeneration({
+    ai: imageAi,
+    library: imageLibraryHost,
+    configuration: () => settings.value.imageAi ?? defaultImageAiSettings(),
+    send: (model) => {
+      if (window && !window.isDestroyed())
+        window.webContents.send('dock:imageGeneration:changed', model);
+    },
+    changed,
+    failed: () => galleryFailed(hostText('services.index.imageOperationBody')),
+  });
+  imageGeneration = imagesGeneration;
+  window.webContents.on('did-start-loading', () => imagesGeneration.cancel());
+  window.webContents.on('render-process-gone', () => imagesGeneration.cancel());
+  window.on('closed', () => imagesGeneration.cancel());
   window.webContents.on('did-start-loading', () => generation.cancel());
   window.webContents.on('render-process-gone', () => generation.cancel());
   window.on('closed', () => generation.cancel());
@@ -5405,8 +5449,16 @@ async function initialize() {
               request.kind === 'sound-library'
                 ? (folder, group) => generation.open(request.id, folder, group)
                 : undefined,
+            generateImages:
+              request.kind === 'image-library'
+                ? (folder, group) => imagesGeneration.open(request.id, folder, group)
+                : undefined,
             cancelGeneration:
-              request.kind === 'sound-library' ? () => generation.cancel(request.id) : undefined,
+              request.kind === 'sound-library'
+                ? () => generation.cancel(request.id)
+                : request.kind === 'image-library'
+                  ? () => imagesGeneration.cancel(request.id)
+                  : undefined,
             state:
               request.kind === 'text-library'
                 ? textState

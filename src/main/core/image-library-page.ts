@@ -129,6 +129,7 @@ export class ImageLibraryPageSession implements HostPageController {
       texts?: TextLibraryService;
       preview?: LibrarySoundPreview;
       generateSounds?(folder: string, group?: string): Promise<void>;
+      generateImages?(folder: string, group?: string): Promise<void>;
       cancelGeneration?(): void;
       state: ImageLibraryPageState;
       groups(): import('../../shared/registered-images').ImageGroup[];
@@ -346,13 +347,18 @@ export class ImageLibraryPageSession implements HostPageController {
     if (this.closed || !action || action.id !== this.id || action.type !== 'gallery')
       throw Error('Stale gallery action');
     const s = this.options.state;
-    if (action.command === 'sound-generation') {
-      if (this.options.host.media !== 'sound' || !this.options.generateSounds || s.busy)
-        throw Error('Unsupported library action');
+    if (action.command === 'sound-generation' || action.command === 'image-generation') {
+      const generate =
+        action.command === 'sound-generation' && this.options.host.media === 'sound'
+          ? this.options.generateSounds
+          : action.command === 'image-generation' && this.options.host.media === 'image'
+            ? this.options.generateImages
+            : undefined;
+      if (!generate || s.busy) throw Error('Unsupported library action');
       s.busy = true;
       this.options.changed();
       try {
-        await this.options.generateSounds(
+        await generate(
           s.folder === '*' ? '' : s.folder,
           s.group.startsWith('group:') ? s.group.slice(6) : undefined,
         );

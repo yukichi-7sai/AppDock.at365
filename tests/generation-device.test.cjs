@@ -330,7 +330,7 @@ test('speech MCP lists only permitted presets and denies default, indirect and r
     code: 'API_DISABLED',
   });
 });
-test('future image MCP permission is saved and enforced internally without publishing a generation API', (t) => {
+test('image MCP presets are filtered while generation plus registration is published', (t) => {
   const c = {
     ...newImageAiConnection('one'),
     name: 'One',
@@ -351,5 +351,7 @@ test('future image MCP permission is saved and enforced internally without publi
   assert.equal(s.connections('mcp:0').connections.length, 1);
   const { appDockOperations } = require('../out/main/shared/appdock-api');
   assert.equal(appDockOperations['ai.image.generate'], undefined);
-  assert.equal(appDockOperations['ai.image.connections.list'].callers.includes('mcp'), false);
+  assert.equal(appDockOperations['ai.image.connections.list'].callers.includes('mcp'), true);
+  assert.deepEqual(appDockOperations['ai.image.generateAndRegister'].callers, ['mcp', 'applet']);
+  assert.equal(appDockOperations['ai.image.results.read'], undefined);
 });

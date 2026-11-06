@@ -107,6 +107,7 @@ export class AppDockApi {
       execute(id: string, context?: InputInvocation): Promise<unknown>;
       ttsAllowed?(): boolean;
       aiAllowed?(): boolean;
+      imageAiAllowed?(): boolean;
       executable(): boolean;
       version: string;
       instanceId: string;
@@ -228,7 +229,7 @@ export class AppDockApi {
     return {
       useTts: this.options.ttsAllowed?.() ?? false,
       useAi: this.options.aiAllowed?.() ?? false,
-      useImageAi: false,
+      useImageAi: this.options.imageAiAllowed?.() ?? false,
       useMcp: this.options.mcpClientAllowed?.() ?? false,
       sendInput: (this.options.inputAllowed?.() ?? false) && this.options.executable(),
       runProcesses: this.options.processesAllowed?.() ?? false,

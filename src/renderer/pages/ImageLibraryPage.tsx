@@ -120,7 +120,8 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     const opensDialog =
       action.command === 'dialog' ||
       action.command === 'retry-import' ||
-      action.command === 'sound-generation';
+      action.command === 'sound-generation' ||
+      action.command === 'image-generation';
     const focusTarget =
       opener ??
       (document.activeElement instanceof HTMLElement ? document.activeElement : undefined);
@@ -132,7 +133,8 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         )
       : undefined;
     if (opensDialog) {
-      if (action.command === 'sound-generation') generationOpener.current = focusTarget;
+      if (action.command === 'sound-generation' || action.command === 'image-generation')
+        generationOpener.current = focusTarget;
       openingDialog.current = true;
       setDialogPending(true);
       setDrawer(false);
@@ -722,6 +724,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             <SettingsButton disabled={c.busy} onClick={() => run({ command: 'sound-generation' })}>
               <Icon name="volume" size={15} />
               {t('soundGeneration.open')}
+            </SettingsButton>
+          )}
+          {media === 'image' && (
+            <SettingsButton disabled={c.busy} onClick={() => run({ command: 'image-generation' })}>
+              <Icon name="image" size={15} />
+              {t('imageGeneration.open')}
             </SettingsButton>
           )}
           {media === 'image' && (

@@ -159,7 +159,7 @@ export function ImageAiConnectionDialog({
           <GenerationMcpPermission
             enabled={draft.mcpEnabled}
             onChange={(mcpEnabled) => patch({ mcpEnabled })}
-            description={t('settings.generation.mcpImageUnavailable')}
+            description={t('settings.generation.mcpImageAccess')}
           />
         </div>
       </SettingsSection>

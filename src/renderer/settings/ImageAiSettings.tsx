@@ -234,6 +234,8 @@ export function ImageAiSettingsForm({
               {
                 queued: translate('settings.aiSettings.queued'),
                 running: translate('settings.aiSettings.generating'),
+                saving: translate('imageGeneration.state.saving'),
+                unsaved: translate('imageGeneration.state.unsaved'),
                 completed: translate('settings.aiSettings.completed'),
                 failed: translate('settings.aiSettings.failed'),
                 canceled: translate('settings.aiSettings.canceled'),

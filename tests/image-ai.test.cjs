@@ -276,9 +276,18 @@ test('empty explicit prompt differs from omission; credentials and prompts stay 
     operationsFor('applet')
       .filter(([k]) => k.startsWith('ai.image.'))
       .map(([k]) => k),
-    ['ai.image.connections.list', 'ai.image.jobs.get', 'ai.image.jobs.cancel'],
+    [
+      'ai.image.generateAndRegister',
+      'ai.image.jobs.retrySave',
+      'ai.image.connections.list',
+      'ai.image.jobs.get',
+      'ai.image.jobs.cancel',
+    ],
   );
-  assert(!operationsFor('mcp').some(([k]) => k.startsWith('ai.image.')));
+  assert.deepEqual(
+    operationsFor('mcp').filter(([k]) => k.startsWith('ai.image.')),
+    operationsFor('applet').filter(([k]) => k.startsWith('ai.image.')),
+  );
 });
 function settingsFixture(t) {
   const root = path.resolve(__dirname, '../.artifacts/image-ai-unit');

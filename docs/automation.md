@@ -436,6 +436,10 @@ input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しませ�
 
 設定ページIDは一般側が `mcp-server`、Codex側が `codex` です。Codex連携は「Codex → AppDock」の受信設定を提供します。
 
+## 画像生成とライブラリー登録
+
+画像を生成してライブラリーへ登録する操作は`appdock_image_generate_and_register`、保存再試行は`appdock_image_retry_save`を使います。両受信機で同じAPIを公開し、画像生成AI・write・executeの許可と接続ごとのMCP公開を確認します。バイナリを返さず、ジョブ状態と保存済みrefを返します。状態取得・取消・所有者の詳細は[画像生成AI](image-ai.md)を参照してください。
+
 ## タッチパッドジェスチャー
 
 MCP appdock_get_touchpad_gestures（touchpadGestures.get）でrevision・割り当て・接続状態を取得します。変更はcommands.executeのappdock.touchpadGestures.update / set-enabled / reconnect / clearを使用します。変更にはread + writeを必要とし、旧allowEditTouchpadGesturesは使用しません。updateには既存ジェスチャーと同じadd/update/remove/configure/reorder操作、明示接続にはenabledまたはgestureを渡します。Windows反映や入力状態は返却stateと再取得で確認し、effectVerifiedは実機入力を検証していないためfalseです。

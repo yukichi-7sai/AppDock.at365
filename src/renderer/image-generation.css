@@ -1,0 +1,32 @@
+.image-generation-options {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.image-generation-options input {
+  width: 100%;
+  min-width: 0;
+}
+.image-generation-result {
+  padding: 8px 0;
+}
+.image-generation-dialog .sound-generation-item > strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.image-generation-thumbnail {
+  display: block;
+  width: 100%;
+  height: 200px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.image-generation-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

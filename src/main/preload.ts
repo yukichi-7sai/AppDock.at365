@@ -66,6 +66,28 @@ const api: DockApi = {
     },
     act: (id, action) => ipcRenderer.invoke('dock:soundGeneration:act', id, action),
   },
+  imageGeneration: {
+    onChanged: (callback) => {
+      let live = true,
+        received = false;
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        model: import('../shared/image-generation').ImageGenerationModel | null,
+      ) => {
+        received = true;
+        if (live) callback(model);
+      };
+      ipcRenderer.on('dock:imageGeneration:changed', listener);
+      void ipcRenderer.invoke('dock:imageGeneration:pending').then((model) => {
+        if (live && !received) callback(model);
+      });
+      return () => {
+        live = false;
+        ipcRenderer.removeListener('dock:imageGeneration:changed', listener);
+      };
+    },
+    act: (id, action) => ipcRenderer.invoke('dock:imageGeneration:act', id, action),
+  },
   imageLibraryDialog: {
     onRequest: (callback) => {
       let live = true;

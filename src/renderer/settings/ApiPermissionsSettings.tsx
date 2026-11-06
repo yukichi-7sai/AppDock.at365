@@ -76,7 +76,13 @@ const rows = localizedMetadata<
     label: hostText('settings.apiPermissionsSettings.ai'),
     mcpWarning: hostText('settings.apiPermissionsSettings.aiWarning'),
   },
-  { key: 'useImageAi', description: hostSettingItem('permissions', 'useImageAi').description },
+  {
+    key: 'useImageAi',
+    description: hostSettingItem('permissions', 'useImageAi').description,
+    mcp: 'allowUseImageAi',
+    action: 'setImageAi',
+    mcpWarning: hostText('settings.apiPermissionsSettings.aiWarning'),
+  },
   {
     key: 'useTts',
     description: hostSettingItem('permissions', 'useTts').description,
@@ -203,9 +209,7 @@ export function ApiPermissionsSettings({
                   )}
                 </td>
                 <td data-caller="MCP">
-                  {row.key === 'useImageAi' ? (
-                    <span>{translate('imageAi.mcpLater')}</span>
-                  ) : row.key === 'read' ? (
+                  {row.key === 'read' ? (
                     <span
                       className="permission-fixed"
                       title={translate('settings.apiPermissionsSettings.alwaysAllowed')}

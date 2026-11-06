@@ -1,4 +1,6 @@
 import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
+import type { ImageRegistrar, RegistrationImage } from './image-registration';
+import type { ImageRegistrationDestination } from '../../shared/image-ai';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { aiObject } from '../../shared/ai';
@@ -21,7 +23,7 @@ import {
   type ImageAdapterRequest,
 } from './image-ai-adapter';
 
-type Kind = 'generate' | 'read' | 'result' | 'cancel';
+type Kind = 'generate' | 'register' | 'read' | 'result' | 'cancel';
 type Job = {
   owner: string;
   requestId: string;
@@ -32,13 +34,15 @@ type Job = {
   abort: AbortController;
   request?: ImageAdapterRequest;
   key?: string;
-  images?: { id: string; mimeType: string; bytes: Buffer }[];
+  images?: RegistrationImage[];
+  destination?: ImageRegistrationDestination;
+  saving?: Promise<void>;
   deadline: number;
   timer?: ReturnType<typeof setTimeout>;
   resultTimer?: ReturnType<typeof setTimeout>;
   retentionTimer?: ReturnType<typeof setTimeout>;
 };
-const terminal = (j: Job) => !['queued', 'running'].includes(j.view.state);
+const terminal = (j: Job) => !['queued', 'running', 'saving'].includes(j.view.state);
 const stable = (value: unknown): unknown =>
   Array.isArray(value)
     ? value.map(stable)
@@ -66,6 +70,7 @@ export class ImageAiService {
       adapters?: ImageAdapter[];
       resultMs?: number;
       retentionMs?: number;
+      registration?: ImageRegistrar;
     },
   ) {
     this.adapters = new Map(
@@ -97,11 +102,30 @@ export class ImageAiService {
     };
   }
   generate(owner: string, value: unknown): ImageAiJob & { completion: 'accepted' } {
+    return this.start(owner, value, false);
+  }
+  generateAndRegister(owner: string, value: unknown): ImageAiJob & { completion: 'accepted' } {
+    this.authorize(owner, 'register');
+    return this.start(owner, value, true);
+  }
+  private start(
+    owner: string,
+    value: unknown,
+    register: boolean,
+  ): ImageAiJob & { completion: 'accepted' } {
     this.authorize(owner, 'generate');
     if (
       !aiObject(value) ||
       Object.keys(value).some(
-        (k) => !['requestId', 'connectionId', 'additionalPrompt', 'input', 'options'].includes(k),
+        (k) =>
+          ![
+            'requestId',
+            'connectionId',
+            'additionalPrompt',
+            'input',
+            'options',
+            ...(register ? ['destination'] : []),
+          ].includes(k),
       ) ||
       typeof value.requestId !== 'string' ||
       !value.requestId ||
@@ -116,7 +140,7 @@ export class ImageAiService {
       return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     const input = value as unknown as ImageGenerateInput;
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify(stable(input)))
+      .update(JSON.stringify(stable({ register, input })))
       .digest('hex');
     const prior = [...this.jobs.values()].find(
       (j) => j.owner === owner && j.requestId === input.requestId,
@@ -132,6 +156,10 @@ export class ImageAiService {
       if (prior.fingerprint !== fingerprint) imageFail('IMAGE_AI_REQUEST_CONFLICT', 'conflict');
       return { ...this.get(owner, prior.view.jobId), completion: 'accepted' };
     }
+    const destination = register
+      ? this.options.registration?.validate(value.destination)
+      : undefined;
+    if (register && !destination) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     const settings = parseImageAiSettings(this.options.settings());
     const c = settings.connections.find(
       (c) => c.id === (input.connectionId ?? settings.defaultConnectionId),
@@ -171,6 +199,7 @@ export class ImageAiService {
       owner,
       requestId: input.requestId,
       fingerprint,
+      destination,
       connection: c,
       signature: generationConfigurationSignature(c),
       key,
@@ -221,7 +250,8 @@ export class ImageAiService {
     )
       return imageFail('IMAGE_AI_RESULT_EXPIRED', 'expired');
     const img = j.images?.find((i) => i.id === value.imageId);
-    if (!img || j.view.state !== 'completed') return imageFail('NOT_FOUND', 'missing');
+    if (!img?.bytes || j.destination || j.view.state !== 'completed')
+      return imageFail('NOT_FOUND', 'missing');
     const offset = value.offset ?? 0;
     if (!Number.isSafeInteger(offset) || Number(offset) < 0 || Number(offset) > img.bytes.length)
       return imageFail('INVALID_ARGUMENT', 'invalidRequest');
@@ -239,15 +269,103 @@ export class ImageAiService {
   cancel(owner: string, id: unknown): ImageAiJob {
     this.authorize(owner, 'cancel');
     const j = this.owned(owner, id);
-    if (!terminal(j)) {
+    if (!terminal(j) || j.view.state === 'unsaved') {
       this.finish(j, 'canceled');
       j.abort.abort();
     }
     return structuredClone(j.view);
   }
+  retrySave(owner: string, id: unknown): ImageAiJob {
+    this.authorize(owner, 'register');
+    const j = this.owned(owner, id);
+    if (!j.destination) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
+    if (j.view.state === 'saving' || j.view.state === 'completed') return structuredClone(j.view);
+    if (j.view.state !== 'unsaved') return imageFail('INVALID_ARGUMENT', 'invalidRequest');
+    if (j.view.resultExpired || !j.images?.every((image) => image.ref || image.bytes))
+      return imageFail('IMAGE_AI_RESULT_EXPIRED', 'expired');
+    if (!this.valid(j)) return imageFail('API_DISABLED', 'permission');
+    clearTimeout(j.retentionTimer);
+    clearTimeout(j.resultTimer);
+    void this.save(j);
+    return structuredClone(j.view);
+  }
+  /** Internal surface disposal. Library files and public callers' jobs are untouched. */
+  discard(owner: string, id: string) {
+    const j = this.jobs.get(id);
+    if (!j || j.owner !== owner) return;
+    this.finish(j, 'canceled');
+    j.abort.abort();
+    this.expire(j);
+  }
+  private imageViews(j: Job) {
+    j.view.images = j.images?.map((image) => ({
+      id: image.id,
+      mimeType: image.mimeType,
+      byteLength: image.byteLength,
+      ...(j.destination
+        ? {
+            ref: image.ref,
+            registration: !image.ref
+              ? ('pending' as const)
+              : image.grouped
+                ? ('saved' as const)
+                : ('group-pending' as const),
+          }
+        : {}),
+    }));
+    j.view.updatedAt = new Date().toISOString();
+  }
+  private save(j: Job): Promise<void> {
+    if (j.saving) return j.saving;
+    j.view.state = 'saving';
+    j.view.error = undefined;
+    j.view.resultExpiresAt = undefined;
+    this.options.changed?.();
+    const writable = () => {
+      if (j.abort.signal.aborted || this.closed || !this.valid(j))
+        throw new DOMException('Cancelled', 'AbortError');
+    };
+    const task = Promise.resolve()
+      .then(async () => {
+        let failed = false;
+        for (const image of j.images ?? []) {
+          if (j.abort.signal.aborted || terminal(j)) break;
+          if (image.ref && image.grouped) continue;
+          try {
+            await this.options.registration!.save(image, j.destination!, writable);
+          } catch (error) {
+            if ((error as Error).name === 'AbortError') {
+              this.finish(j, 'canceled');
+              break;
+            }
+            failed = true;
+          } finally {
+            this.imageViews(j);
+            this.options.changed?.();
+          }
+        }
+        // Release the attempt before publishing its terminal state. A changed observer may
+        // immediately request a retry, which must not attach to the completed attempt.
+        j.saving = undefined;
+        if (!terminal(j))
+          this.finish(
+            j,
+            failed ? 'unsaved' : 'completed',
+            failed
+              ? new ImageAiError('IMAGE_AI_SAVE_FAILED', hostText('imageAi.saveFailed'))
+              : undefined,
+          );
+      })
+      .finally(() => {
+        if (j.saving === task) j.saving = undefined;
+      });
+    j.saving = task;
+    return task;
+  }
   private valid(j: Job) {
     return (
       this.options.canUse(j.owner, 'generate') &&
+      (!j.destination || this.options.canUse(j.owner, 'register')) &&
       generationConnectionAllowed(
         j.owner,
         this.options.settings().connections.find((c) => c.id === j.connection.id),
@@ -258,18 +376,26 @@ export class ImageAiService {
     );
   }
   private expire(j: Job) {
-    j.images = undefined;
-    if (j.view.state === 'completed') j.view.resultExpired = true;
+    for (const image of j.images ?? []) image.bytes = undefined;
+    if (j.view.state === 'completed' || j.view.state === 'unsaved') j.view.resultExpired = true;
   }
-  private finish(j: Job, state: 'completed' | 'failed' | 'canceled', error?: ImageAiError) {
-    if (terminal(j)) return;
+  private finish(
+    j: Job,
+    state: 'completed' | 'unsaved' | 'failed' | 'canceled',
+    error?: ImageAiError,
+  ) {
+    if (terminal(j) && !(j.view.state === 'unsaved' && state === 'canceled')) return;
     clearTimeout(j.timer);
+    clearTimeout(j.resultTimer);
+    clearTimeout(j.retentionTimer);
     j.view.state = state;
     j.view.updatedAt = new Date().toISOString();
     j.request = undefined;
     j.key = undefined;
+    j.view.resultExpiresAt = undefined;
+    j.view.resultExpired = undefined;
     if (error) j.view.error = { code: error.code, message: error.message };
-    if (state === 'completed') {
+    if (state === 'unsaved' || (state === 'completed' && !j.destination)) {
       const resultMs = this.options.resultMs ?? 15 * 60 * 1000;
       j.view.resultExpiresAt = new Date(Date.now() + resultMs).toISOString();
       j.resultTimer = setTimeout(() => {
@@ -277,6 +403,8 @@ export class ImageAiService {
         this.options.changed?.();
       }, resultMs);
       j.resultTimer.unref();
+    } else if (j.destination) {
+      for (const image of j.images ?? []) image.bytes = undefined;
     } else j.images = undefined;
     j.retentionTimer = setTimeout(
       () => {
@@ -337,13 +465,12 @@ export class ImageAiService {
             this.finish(j, 'failed', new ImageAiError('IMAGE_AI_TIMEOUT', this.timeoutMessage()));
             return;
           }
-          j.images = images.map((i) => ({ ...i, id: randomUUID() }));
-          j.view.images = j.images.map((i) => ({
-            id: i.id,
-            mimeType: i.mimeType,
-            byteLength: i.bytes.length,
-          }));
-          this.finish(j, 'completed');
+          j.images = images.map((i) => ({ ...i, id: randomUUID(), byteLength: i.bytes.length }));
+          this.imageViews(j);
+          if (j.destination) {
+            clearTimeout(j.timer);
+            await this.save(j);
+          } else this.finish(j, 'completed');
         })
         .catch((error) => {
           if (!terminal(j)) {

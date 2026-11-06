@@ -338,6 +338,7 @@ export class AutomationService {
       allowExecute = false,
       allowUseTts = false,
       allowUseAi = false,
+      allowUseImageAi = false,
       allowUseMcp = false,
       allowSendInput = false,
       allowRunProcesses = false,
@@ -367,6 +368,7 @@ export class AutomationService {
       allowEditRibbon: allowWrite,
       allowUseTts,
       allowUseAi,
+      allowUseImageAi,
       allowUseMcp,
       allowSendInput,
       allowRunProcesses,
@@ -738,6 +740,13 @@ export class AutomationService {
           'services.automation.invalidAiPermission',
           'services.automation.aiPermissionSaved',
         );
+      case 'setImageAi':
+        return this.setPermission(
+          'allowUseImageAi',
+          action.allowed,
+          'services.automation.invalidAiPermission',
+          'services.automation.aiPermissionSaved',
+        );
       case 'setExecution':
         return this.setPermission(
           'allowExecute',
@@ -805,6 +814,7 @@ export class AutomationService {
     this.appliedPermissions = after;
     if (
       (before.allowUseAi && !after.allowUseAi) ||
+      (before.allowUseImageAi && !after.allowUseImageAi) ||
       (['allowUseMcp', 'allowSendInput', 'allowRunProcesses'] as const).some(
         (key) => (before[key] === true) !== (after[key] === true),
       )

@@ -19,7 +19,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 ## 画像生成AI
 
-Appletへは`ai.image.connections.list`（read + useImageAi）、`ai.image.jobs.get`（read）、`ai.image.jobs.cancel`（read + execute）を提供します。生成単体の`ai.image.generate`と、256KiB分割取得の`ai.image.results.read`は公開しません。MCPは付随APIを含め未対応です。本体の画像生成設定・試験・内部サービスと「操作の許可」の画像生成AI（`useImageAi`）は維持します。将来はサーバーとプロンプトを指定してライブラリーへ登録するAPIをApplet/MCP共通で提供し、付随APIも接続します。生成結果専用の取得APIは設けません。[アセットの実装方針](applet-assets.md)と[画像生成AI](image-ai.md)を参照してください。
+最低ホスト版0.175.0。AppletとMCPへ`ai.image.generateAndRegister`と`ai.image.jobs.retrySave`（read + write + execute + useImageAi）、`ai.image.connections.list`（read + useImageAi）、`ai.image.jobs.get`（read）、`ai.image.jobs.cancel`（read + execute）を提供します。生成からライブラリー登録までを一つのジョブとして扱い、保存済みの`ref: {file}`を返します。生成単体の`ai.image.generate`や生成結果専用の取得APIは公開しません。引数・保存の再試行・所有者・保持期間は[画像生成AI](image-ai.md)、将来の共通アセット取得は[アセットの実装方針](applet-assets.md)を参照してください。
 
 ## 構造と公開範囲
 
@@ -140,7 +140,7 @@ await context.AppDock.CallAsync("commands.execute", new {
 
 ## 操作許可の画面
 
-ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCPの情報取得は連携中許可の固定表示、画像生成AIは未対応の固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsで操作します。
+ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCPの情報取得は連携中許可の固定表示です。画像生成AIを含む許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsで操作します。
 
 本体画面専用の操作で自端末のJSONへ即時保存し、保存前に端末ファイルのrevisionを照合します。この画面にはJSON切替を出しません。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。
 

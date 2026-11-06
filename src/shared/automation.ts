@@ -32,6 +32,7 @@ export const mcpPermissionKeys = [
   'allowExecute',
   'allowUseTts',
   'allowUseAi',
+  'allowUseImageAi',
   'allowUseMcp',
   'allowSendInput',
   'allowRunProcesses',
@@ -77,6 +78,7 @@ export interface AutomationState extends ReceiverState {
   allowEditRibbon: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
+  allowUseImageAi: boolean;
   allowUseMcp: boolean;
   allowSendInput: boolean;
   allowRunProcesses: boolean;
@@ -100,6 +102,7 @@ export type AutomationAction =
   | { kind: 'setWrite'; allowed: boolean }
   | { kind: 'setTts'; allowed: boolean }
   | { kind: 'setAi'; allowed: boolean }
+  | { kind: 'setImageAi'; allowed: boolean }
   | { kind: 'setMcpClient'; allowed: boolean }
   | { kind: 'setInputSending'; allowed: boolean }
   | { kind: 'setProcessLaunching'; allowed: boolean }

@@ -72,7 +72,7 @@ function setup(t) {
     grant: (p) => access.set(p),
   };
 }
-test('image generation stays private even with every Applet grant and a registered handler', async (t) => {
+test('raw image generation stays private; shared image jobs preserve read and cancel permissions', async (t) => {
   const f = setup(t);
   f.grant(Object.fromEntries(Object.keys(appletApiPermissionLabels).map((key) => [key, true])));
   const methods = ['ai.image.generate', 'ai.image.results.read'];
@@ -92,11 +92,15 @@ test('image generation stays private even with every Applet grant and a register
   for (const method of ['ai.image.jobs.get', 'ai.image.jobs.cancel']) {
     f.options.handlers[method] = async (params, owner) => {
       assert.deepEqual(params, { jobId: 'owned' });
-      assert.equal(owner, f.manifest.id);
+      assert(owner === undefined || owner === f.manifest.id);
       return job;
     };
     assert.equal((await f.call(method, { jobId: 'owned' })).value, job);
-    await assert.rejects(async () => f.api.call(method, { jobId: 'owned' }), { code: 'NOT_FOUND' });
+    if (method.endsWith('.get')) assert.equal(await f.api.call(method, { jobId: 'owned' }), job);
+    else
+      await assert.rejects(async () => f.api.call(method, { jobId: 'owned' }), {
+        code: 'API_DISABLED',
+      });
   }
   assert.equal(f.access.get().useImageAi, true);
   const info = await f.call('system.getInfo');
@@ -111,7 +115,9 @@ test('image generation stays private even with every Applet grant and a register
   assert(info.value.methods.includes('ai.text.generate'));
   assert(info.value.methods.includes('tts.speak'));
   assert(info.value.methods.includes('ai.image.connections.list'));
-  await assert.rejects(async () => f.api.call('ai.image.connections.list'), { code: 'NOT_FOUND' });
+  await assert.rejects(async () => f.api.call('ai.image.connections.list'), {
+    code: 'API_DISABLED',
+  });
   for (const useImageAi of [false, true]) {
     f.grant({ read: true, execute: true, useImageAi });
     const reloaded = new AppletApiAccess(openOperationPermissions(t, f.dir));
@@ -130,6 +136,46 @@ test('image generation stays private even with every Applet grant and a register
   );
   f.grant({ read: false, execute: true, useImageAi: true });
   assert.equal((await f.call('ai.image.jobs.get', { jobId: 'owned' })).error.code, 'API_DISABLED');
+});
+
+test('image registration requires independent write, execute and image grants across Applet and MCP', async (t) => {
+  const f = setup(t);
+  const method = 'ai.image.generateAndRegister';
+  const params = { requestId: 'one', destination: { folder: '' }, input: 'fixture' };
+  let calls = 0;
+  f.options.handlers = {
+    [method]: async () => {
+      calls++;
+      return { completion: 'accepted', jobId: 'one' };
+    },
+  };
+  const all = { read: true, write: true, execute: true, useImageAi: true };
+  for (const key of Object.keys(all)) {
+    f.grant({ ...all, [key]: false });
+    assert.equal((await f.call(method, params)).error.code, 'API_DISABLED');
+  }
+  assert.equal(calls, 0);
+  f.grant(all);
+  assert.equal((await f.call(method, params)).value.completion, 'accepted');
+  let mcp = { ...all };
+  f.options.executable = () => mcp.execute;
+  f.options.writable = () => mcp.write;
+  f.options.imageAiAllowed = () => mcp.useImageAi;
+  for (const key of ['write', 'execute', 'useImageAi']) {
+    mcp = { ...all, [key]: false };
+    await assert.rejects(async () => f.api.call(method, params), { code: 'API_DISABLED' });
+    await assert.rejects(
+      async () =>
+        f.api.call(method, params, f.manifest.id, { origin: { kind: 'mcp', lease: 'fixture' } }),
+      { code: 'API_DISABLED' },
+    );
+  }
+  mcp = { ...all };
+  assert.equal((await f.api.call(method, params)).completion, 'accepted');
+  assert.equal(calls, 2);
+  await assert.rejects(async () => f.api.call(method, { ...params, model: 'override' }), {
+    code: 'INVALID_ARGUMENT',
+  });
 });
 
 test('internal publication IDs share the external catalog without granting execution', async (t) => {

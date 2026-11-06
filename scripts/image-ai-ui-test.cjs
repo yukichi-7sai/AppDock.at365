@@ -220,7 +220,13 @@ const check = (name) => {
         );
       }, 'image permission saved');
     }
-    assert.equal(await permission.locator('[data-caller="MCP"]').innerText(), '未対応');
+    const mcpToggle = permission.locator('[data-caller="MCP"]').getByRole('switch');
+    assert.equal(await mcpToggle.getAttribute('aria-checked'), 'false');
+    await mcpToggle.click();
+    await until(
+      async () => (await mcpToggle.getAttribute('aria-checked')) === 'true',
+      'MCP image permission saved',
+    );
     await page.screenshot({ path: path.join(profile, 'image-ai-permission.png') });
     check('image generation permission remains visible and can persist OFF and ON');
     const before = requests.length;

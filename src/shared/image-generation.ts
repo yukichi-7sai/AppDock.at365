@@ -1,0 +1,30 @@
+import type { ImageAiJob, ImageGenerateInput, ImageGenerationOptions } from './image-ai';
+import type { LibraryEntry } from './library-assets';
+
+export interface ImageGenerationItem {
+  job: ImageAiJob;
+  input: string;
+  prompt: string;
+  server: string;
+  folder: string;
+  options: ImageGenerationOptions;
+  entries: { id: string; entry: LibraryEntry; changed: boolean }[];
+}
+export interface ImageGenerationModel {
+  id: string;
+  revision: number;
+  folder: string;
+  folders: string[];
+  defaultConnectionId?: string;
+  servers: { id: string; name: string; defaults: ImageGenerationOptions; defaultPrompt: string }[];
+  items: ImageGenerationItem[];
+}
+export type ImageGenerationAction =
+  | { kind: 'generate'; folder: string; name?: string; input: ImageGenerateInput }
+  | { kind: 'cancel' | 'retrySave'; jobId: string }
+  | { kind: 'rename' | 'delete'; jobId: string; imageId: string; name?: string }
+  | { kind: 'close'; discard?: boolean };
+export interface ImageGenerationApi {
+  onChanged(callback: (model: ImageGenerationModel | null) => void): () => void;
+  act(id: string, action: ImageGenerationAction): Promise<void>;
+}

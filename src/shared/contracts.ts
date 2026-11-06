@@ -311,6 +311,7 @@ export interface DockApi {
   soundLibrary: import('./registered-images').ImageLibraryApi;
   imageLibraryDialog: import('./image-library-page').ImageLibraryDialogApi;
   soundGeneration: import('./sound-generation').SoundGenerationApi;
+  imageGeneration: import('./image-generation').ImageGenerationApi;
   settingsPage: import('./settings-page').SettingsPageApi;
   settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;
   flushSettings(): Promise<void>;
