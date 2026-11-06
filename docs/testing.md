@@ -57,6 +57,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 固定配布物の共通実行場所
 
+`scripts/update-host-first-ui-test.cjs [固定EXE]`は、Applet管理の本体版不足表示から一括更新を実行し、本体だけの確認・取消・承認・更新不可時の案内を検査する。ローカルHTTP fixtureと標準ダイアログの応答fixtureを使い、確認前と取消後のpayload取得0件、承認後の本体だけの取得、Applet保持を確認する。共有EXEへ適用しないよう本体payloadを意図的なハッシュ不一致で止め、正常なhandoffと復旧は`portable-updates.test.cjs`・`folder-host.test.cjs`で検証する。Windows標準ダイアログ自体の描画や、実配布サーバーへの接続を証明する試験ではない。
+
 `scripts/applet-information-ui-test.cjs [固定EXE]`の`applet-information-action-checks.cjs`は、提供コマンド数・利用可能数、提供元で絞った一覧への移動と解除、0件・停止中の閲覧、開始・停止のPC専用保存、処理中の排他、遅延起動の即時開始、エラーからの明示再試行を確認する。本体を実際に終了して同じ隔離profileで再起動し、有効・無効と設定値の保持を確認する。Appletはローカルfixtureで、実アカウントや外部サービスを使わない。
 
 新規・修正するテストでも、以下の共通ヘルパーと固定ランタイムを必ず使います。具体的な追加手順、準備コード、`.artifacts`の初回・削除後の再作成、専用コピーが必要な場合の記録は[共通テストモジュールの利用手順](test-runtime.md)を参照してください。

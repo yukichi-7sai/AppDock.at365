@@ -50,6 +50,11 @@ class UnpublishedRelease extends Error {
     super(hostText('services.portableUpdates.releaseUnpublished'));
   }
 }
+class HostUpdateRequired extends Error {
+  constructor(readonly minimumHostVersion: string) {
+    super(hostText('services.portableUpdates.hostUpdateRequired'));
+  }
+}
 export function safeRelative(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -339,7 +344,7 @@ export class PortableUpdates {
       fetcher?: Fetcher;
       changed(): void;
       notified?(notice: NonNullable<UpdateState['notice']>, safeMessage: string): void;
-      confirm(names: string[]): Promise<boolean>;
+      confirm(names: string[], mode?: 'host-first'): Promise<boolean>;
       shutdown(): void;
       processIds(): number[];
       log(message: string): void;
@@ -381,7 +386,7 @@ export class PortableUpdates {
         manifest.minimumHostVersion &&
         compareVersions(manifest.minimumHostVersion, hostVersion) > 0
       )
-        throw Error(hostText('services.portableUpdates.hostUpdateRequired'));
+        throw new HostUpdateRequired(manifest.minimumHostVersion);
       return { target, directory: source, version: manifest.version };
     }
     const candidate = await resolveFeedSource(
@@ -394,13 +399,13 @@ export class PortableUpdates {
       candidate.feed.minimumHostVersion &&
       compareVersions(candidate.feed.minimumHostVersion, hostVersion) > 0
     )
-      throw Error(hostText('services.portableUpdates.hostUpdateRequired'));
+      throw new HostUpdateRequired(candidate.feed.minimumHostVersion);
     return { target, ...candidate };
   }
   private async checkTarget(
     target: UpdateTarget,
     hostVersion = this.options.hostVersion,
-  ): Promise<{ result: UpdateResult; candidate?: Candidate }> {
+  ): Promise<{ result: UpdateResult; candidate?: Candidate; requiredHostVersion?: string }> {
     if (target.kind === 'host') this.lastCheckedHostSource = target.source;
     const github =
       target.source.match(/^github:(.+)$/i) ??
@@ -435,11 +440,13 @@ export class PortableUpdates {
           status:
             error instanceof UnpublishedRelease
               ? 'unpublished'
-              : /先に本体/.test(String(error))
+              : error instanceof HostUpdateRequired
                 ? 'incompatible'
                 : 'error',
           message: String(error).replace(/^Error: /, ''),
         },
+        requiredHostVersion:
+          error instanceof HostUpdateRequired ? error.minimumHostVersion : undefined,
       };
     }
   }
@@ -606,7 +613,7 @@ export class PortableUpdates {
         .filter(
           (t) => scope === 'all' || (scope === 'applets' ? t.kind === 'applet' : t.id === scope),
         );
-      // Check the host first so Applets can use the version installed in this same transaction.
+      // Keep confirmation order stable; Applet validation runs in the currently running host.
       if (scope === 'all')
         targets.sort((a, b) => Number(b.kind === 'host') - Number(a.kind === 'host'));
       if (!targets.length) throw Error(hostText('services.portableUpdates.noTargetsForApply'));
@@ -614,16 +621,33 @@ export class PortableUpdates {
         throw Error(hostText('services.portableUpdates.portableRequired'));
       const candidates: Candidate[] = [];
       const results: UpdateResult[] = [];
-      let hostVersion = this.options.hostVersion;
+      const hostVersion = this.options.hostVersion;
+      const requiredHostVersions: string[] = [];
       for (const target of targets) {
         signal.throwIfAborted();
         const checked = await this.checkTarget(target, hostVersion);
         results.push(checked.result);
         this.update(checked.result);
+        if (target.kind === 'applet' && checked.requiredHostVersion)
+          requiredHostVersions.push(checked.requiredHostVersion);
         if (checked.candidate && checked.result.installable) {
           candidates.push(checked.candidate);
-          if (target.kind === 'host') hostVersion = checked.candidate.version;
         }
+      }
+      const hostFirst = scope === 'all' && requiredHostVersions.length > 0;
+      if (hostFirst) {
+        const host = candidates.find((candidate) => candidate.target.kind === 'host');
+        if (
+          !host ||
+          requiredHostVersions.some((minimum) => compareVersions(host.version, minimum) < 0)
+        ) {
+          this.checkedNotice(results.filter((result) => result.status === 'error'));
+          this.state.phase = hostText('services.portableUpdates.hostUpdateFirstInstructions');
+          this.notice('info', this.state.phase);
+          return { ...structuredClone(this.state), busy: false, cancellable: false };
+        }
+        // Reuse the checked host package and the normal validation/handoff after one approval.
+        candidates.splice(0, candidates.length, host);
       }
       if (!candidates.length) {
         this.state.phase = hostText('services.portableUpdates.noApplicableUpdates');
@@ -637,10 +661,16 @@ export class PortableUpdates {
       if (
         !(await this.options.confirm(
           candidates.map((c) => `${c.target.name} ${c.target.version} → ${c.version}`),
+          hostFirst ? 'host-first' : undefined,
         ))
       ) {
         this.state.phase = hostText('services.portableUpdates.cancelled');
-        this.notice('info', this.state.phase);
+        this.notice(
+          'info',
+          hostFirst
+            ? hostText('services.portableUpdates.hostUpdateFirstInstructions')
+            : this.state.phase,
+        );
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
       signal.throwIfAborted();

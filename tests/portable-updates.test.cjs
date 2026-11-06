@@ -449,14 +449,16 @@ function combinedFixture(t, minimumHostVersion, packaged = false) {
   fs.mkdirSync(f.target.destination, { recursive: true });
   fs.writeFileSync(path.join(f.target.destination, 'preserved.txt'), 'installed-applet');
   let approvals = [],
+    confirmationModes = [],
     shutdowns = 0;
   const updater = new PortableUpdates({
     ...f.updater.options,
-    // Deliberately put the Applet first: compatibility must use the host in this job.
+    // Feed order must not affect host-first selection or current-host compatibility.
     targets: () => [f.target, host],
     executable: host.destination,
-    confirm: async (names) => {
+    confirm: async (names, mode) => {
       approvals.push(names);
+      confirmationModes.push(mode);
       return false;
     },
     shutdown: () => {
@@ -472,21 +474,143 @@ function combinedFixture(t, minimumHostVersion, packaged = false) {
     assert.equal(shutdowns, 0);
     assert.equal(updater.state.busy, false);
   };
-  return { ...f, updater, host, feed, hostSource, saveFeed, approvals, preserved };
+  return {
+    ...f,
+    updater,
+    host,
+    feed,
+    hostSource,
+    saveFeed,
+    approvals,
+    confirmationModes,
+    preserved,
+  };
 }
-test('combined update confirms host and Applet against the new host version before preparation', async (t) => {
+test('combined update offers only the host when an Applet requires a newer running host', async (t) => {
   for (const packaged of [false, true]) {
     await t.test(packaged ? 'feed and extracted manifest' : 'local manifest', async (t) => {
       const f = combinedFixture(t, '0.23.0', packaged);
-      await f.updater.check();
-      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').status, 'incompatible');
       await f.updater.install('all');
-      assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0', 'Fixture 1.0.0 → 2.0.0']]);
-      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').installable, true);
+      assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0']]);
+      assert.deepEqual(f.confirmationModes, ['host-first']);
+      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').status, 'incompatible');
+      assert.equal(f.updater.state.notice.kind, 'info');
+      assert.match(f.updater.state.notice.message, /再起動後.*もう一度/);
+      assert(!f.notices.some(({ notice }) => notice.kind === 'error'));
       f.preserved();
     });
   }
 });
+test('host-first approval downloads and hands off only the checked host, including mixed Applets', async (t) => {
+  for (const approved of [false, true]) {
+    await t.test(approved ? 'approve' : 'cancel', async (t) => {
+      const f = combinedFixture(t, '0.23.0');
+      const appletFeed = {
+        schemaVersion: 1,
+        kind: 'applet',
+        id: 'fixture',
+        version: '2.0.0',
+        minimumHostVersion: '0.23.0',
+        payload: { file: 'applet.zip', format: 'zip', sha256: 'a'.repeat(64), size: 1 },
+      };
+      const compatible = {
+        ...f.target,
+        id: 'compatible',
+        source: 'https://fixture.test/compatible.json',
+      };
+      f.target.source = 'https://fixture.test/applet.json';
+      f.host.source = 'https://fixture.test/host.json';
+      f.updater.options.targets = () => [f.target, compatible, f.host];
+      const requests = [];
+      f.updater.options.fetcher = async (url) => {
+        requests.push(url);
+        if (url.endsWith('/applet.json')) return new Response(JSON.stringify(appletFeed));
+        if (url.endsWith('/compatible.json'))
+          return new Response(
+            JSON.stringify({ ...appletFeed, id: compatible.id, minimumHostVersion: '0.22.0' }),
+          );
+        if (url.endsWith('/host.json')) return new Response(JSON.stringify(f.feed));
+        assert.equal(url, 'https://fixture.test/AppDock.exe');
+        assert.equal(approved, true);
+        assert.equal(f.approvals.length, 1);
+        return new Response(fs.readFileSync(path.join(f.hostSource, 'AppDock.exe')));
+      };
+      let handoff;
+      let shutdowns = 0;
+      f.updater.options.shutdown = () => shutdowns++;
+      f.updater.handoff = async (temporary, items) => {
+        handoff = items;
+        assert.equal(path.dirname(temporary), os.tmpdir());
+        assert(path.basename(temporary).startsWith('AppDock-update-'));
+        t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+      };
+      f.updater.options.confirm = async (names, mode) => {
+        f.approvals.push(names);
+        assert.equal(mode, 'host-first');
+        assert.equal(requests.length, 3, 'Only metadata is fetched before confirmation');
+        assert.equal(f.updater.state.cancellable, false);
+        await assert.rejects(f.updater.install('host'), /進行中/);
+        return approved;
+      };
+      await f.updater.install('all');
+      assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0']]);
+      assert.equal(requests.length, approved ? 4 : 3);
+      assert.equal(shutdowns, approved ? 1 : 0);
+      assert.deepEqual(
+        handoff?.map((item) => item.id),
+        approved ? ['host'] : undefined,
+      );
+      assert.equal(fs.readFileSync(f.host.destination, 'utf8'), 'installed-host');
+      assert.equal(
+        fs.readFileSync(path.join(f.target.destination, 'preserved.txt'), 'utf8'),
+        'installed-applet',
+      );
+      assert(!f.notices.some(({ notice }) => notice.kind === 'error'));
+    });
+  }
+});
+
+test('a fresh check after updating the host allows the deferred Applet with normal confirmation', async (t) => {
+  const f = combinedFixture(t, '0.23.0');
+  await f.updater.install('all');
+  f.host.version = '0.23.0';
+  f.updater.options.hostVersion = '0.23.0';
+  await f.updater.install('all');
+  assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0'], ['Fixture 1.0.0 → 2.0.0']]);
+  assert.deepEqual(f.confirmationModes, ['host-first', undefined]);
+  assert.equal(
+    f.updater.state.results.find((result) => result.id === 'fixture').status,
+    'available',
+  );
+  f.preserved();
+});
+
+test('host-first detection uses the latest metadata and works with translated compatibility messages', async (t) => {
+  const f = combinedFixture(t, '0.22.0');
+  await f.updater.check();
+  assert.equal(
+    f.updater.state.results.find((result) => result.id === 'fixture').status,
+    'available',
+  );
+  f.manifest.minimumHostVersion = '0.23.0';
+  fs.writeFileSync(path.join(f.source, 'extension.json'), JSON.stringify(f.manifest));
+  const { hostI18n, hostText } = require('../out/main/shared/i18n');
+  const key = 'services.portableUpdates.hostUpdateRequired';
+  const original = hostText(key);
+  try {
+    hostI18n.addResource('ja', 'host', key, 'Update AppDock first.');
+    await f.updater.install('all');
+    assert.deepEqual(f.confirmationModes, ['host-first']);
+    assert.equal(
+      f.updater.state.results.find((result) => result.id === 'fixture').status,
+      'incompatible',
+    );
+  } finally {
+    hostI18n.addResource('ja', 'host', key, original);
+  }
+  f.preserved();
+});
+
 test('combined updates never assume an unavailable or insufficient host upgrade', async (t) => {
   for (const scenario of ['disabled', 'error', 'same', 'older', 'insufficient']) {
     await t.test(scenario, async (t) => {
@@ -498,8 +622,13 @@ test('combined updates never assume an unavailable or insufficient host upgrade'
       f.saveFeed();
       await f.updater.install('all');
       assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').status, 'incompatible');
-      assert.equal(f.approvals.length, scenario === 'insufficient' ? 1 : 0);
-      if (f.approvals.length) assert.deepEqual(f.approvals[0], ['AppDock 0.22.0 → 0.23.0']);
+      assert.equal(f.approvals.length, 0);
+      assert.equal(f.updater.state.notice.kind, 'info');
+      assert.match(f.updater.state.notice.message, /AppDockだけを更新/);
+      assert.equal(
+        f.notices.some(({ notice }) => notice.kind === 'error'),
+        scenario === 'error',
+      );
       f.preserved();
     });
   }
@@ -507,7 +636,7 @@ test('combined updates never assume an unavailable or insufficient host upgrade'
 test('combined preparation failure leaves both host and Applet installed files intact', async (t) => {
   for (const corrupt of ['host', 'applet']) {
     await t.test(corrupt, async (t) => {
-      const f = combinedFixture(t, '0.23.0', true);
+      const f = combinedFixture(t, '0.22.0', true);
       fs.appendFileSync(
         path.join(
           corrupt === 'host' ? f.hostSource : f.target.source,

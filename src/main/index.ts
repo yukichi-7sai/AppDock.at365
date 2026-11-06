@@ -4417,13 +4417,27 @@ async function initialize() {
         ]);
       }
     },
-    confirm: async (names) => {
+    confirm: async (names, mode) => {
+      const hostFirst = mode === 'host-first';
       const response = await dialog.showMessageBox(window!, {
         type: 'question',
-        title: hostText('services.index.updateRestartTitle'),
-        message: hostText('services.index.updateRestartMessage'),
+        title: hostText(
+          hostFirst ? 'services.index.updateHostFirstTitle' : 'services.index.updateRestartTitle',
+        ),
+        message: hostText(
+          hostFirst
+            ? 'services.index.updateHostFirstMessage'
+            : 'services.index.updateRestartMessage',
+        ),
         detail: names.join('\n'),
-        buttons: [hostText('services.index.updateRestartTitle'), hostText('services.index.cancel')],
+        buttons: [
+          hostText(
+            hostFirst
+              ? 'services.index.updateHostFirstButton'
+              : 'services.index.updateRestartTitle',
+          ),
+          hostText('services.index.cancel'),
+        ],
         defaultId: 0,
         cancelId: 1,
         noLink: true,
