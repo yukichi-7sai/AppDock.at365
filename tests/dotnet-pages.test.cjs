@@ -12,7 +12,7 @@ for (const mode of ['native', 'dotnet']) test(`.NET pages ${mode}: JSON, typed s
   const dll = path.join(root, 'tests/fixtures/dotnet/AppDock.PageProbe/bin/Release/net10.0/AppDock.PageProbe.dll');
   const args = mode === 'native'
     ? [path.join(root, 'tests/fixtures/dotnet/AppDock.PageProbe.Native/bin/Release/net10.0/AppDock.PageProbe.Native.dll')]
-    : [path.join(root, 'dotnet/AppDock.ExtensionHost/bin/Release/net10.0/AppDock.ExtensionHost.dll'), dll, 'AppDock.Tests.PageProbe'];
+    : [path.join(root, '.artifacts/dotnet-host/AppDock.ExtensionHost.dll'), dll, 'AppDock.Tests.PageProbe'];
   const child = spawn('dotnet', args, { cwd: root, windowsHide: true, stdio: ['pipe','pipe','pipe'] });
   t.after(() => { if (child.exitCode === null) child.kill(); });
   let stderr = ''; child.stderr.on('data', (b) => stderr += b);
