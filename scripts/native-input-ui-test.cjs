@@ -288,14 +288,15 @@ async function execute(id) {
       await window.dock.automation({ kind: 'selectConfig', file });
       await window.dock.automation({
         kind: 'configure',
+        receiver: 'codex',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
       await window.dock.automation({ kind: 'register' });
     }, cfg);
-    const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+    const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state
+      .codex;
     client = new Client({ name: 'input-regression', version: '1' });
     await client.connect(
       new StreamableHTTPClientTransport(new URL(state.endpoint), {

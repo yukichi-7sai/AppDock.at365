@@ -4,10 +4,23 @@ const fs = require('node:fs'),
   path = require('node:path');
 const readline = require('node:readline');
 const assert = require('node:assert/strict');
-module.exports = async function checkCodex({ executable, configFile, server, output }) {
+module.exports = async function checkCodex({
+  executable,
+  configFile,
+  server,
+  output,
+  expectedTools,
+}) {
+  expectedTools ??= require('../out/main/shared/appdock-api')
+    .operationsFor('mcp')
+    .map(([, tool]) => tool.name);
+  const env = { ...process.env, CODEX_HOME: path.dirname(configFile) };
+  delete env.OPENAI_API_KEY;
+  delete env.CODEX_API_KEY;
+  delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(executable, ['app-server'], {
     cwd: path.dirname(configFile),
-    env: { ...process.env, CODEX_HOME: path.dirname(configFile) },
+    env,
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -68,10 +81,14 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       const status = await rpc('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly' });
       const entry = status.data?.find((x) => x.name === server);
       tools = Object.keys(entry?.tools ?? {});
-      if (tools.length === 14) break;
+      if (tools.length === expectedTools.length) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 14, 'Codex discovers all fourteen MCP tools');
+    assert.deepEqual(
+      [...tools].sort(),
+      [...expectedTools].sort(),
+      'Codex discovers the current MCP catalog',
+    );
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
@@ -198,7 +215,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers fourteen MCP tools; reads shortcuts, gestures, ribbon and tray with dry-run editing; lists commands and executes appdock.open',
+        'discovers the MCP catalog; reads shortcuts, gestures, ribbon and tray with dry-run editing; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,

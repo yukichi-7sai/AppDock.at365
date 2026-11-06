@@ -309,15 +309,15 @@ async function configure(patch) {
       await window.dock.automation({ kind: 'selectConfig', file: configFile });
       await window.dock.automation({
         kind: 'configure',
+        receiver: 'codex',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
       await window.dock.automation({ kind: 'setTts', allowed: true });
       await window.dock.automation({ kind: 'register' });
     }, configFile);
-    const mcp = (await host.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+    const mcp = (await host.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex;
     const headers = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[mcp.serverId]
       .http_headers;
     client = new Client({ name: 'TTS integration', version: '1' });

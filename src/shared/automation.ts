@@ -1,4 +1,31 @@
 export type ConnectionScope = 'local' | 'network';
+export type AutomationReceiver = 'mcp' | 'codex';
+
+export interface ReceiverSettings {
+  enabled: boolean;
+  port: number;
+}
+
+export interface McpServerSettings extends ReceiverSettings {
+  connectionScope: ConnectionScope;
+  networkHostnames: string[];
+}
+
+interface ReceiverState extends ReceiverSettings {
+  starting: boolean;
+  running: boolean;
+  endpoint: string;
+  error?: string;
+  lastClientAt?: string;
+  hasToken: boolean;
+}
+
+export interface CodexIntegrationState extends ReceiverState {
+  serverId: string;
+  configFile: string;
+  registration: 'absent' | 'registered' | 'conflict';
+  registrationError?: string;
+}
 
 export const retiredMcpPermissionKeys = [
   'allowManageApplets',
@@ -21,7 +48,7 @@ export const retiredPermissionActions = [
   'setCustomCommandManagement',
 ] as const;
 
-export interface AutomationState {
+export interface AutomationState extends ReceiverState {
   connectionScope: ConnectionScope;
   activeConnectionScope: ConnectionScope | null;
   networkHostnames: string[];
@@ -29,7 +56,6 @@ export interface AutomationState {
   canCopyToken: boolean;
   lastLocalClientAt?: string;
   lastNetworkClientAt?: string;
-  enabled: boolean;
   allowWrite: boolean;
   allowExecute: boolean;
   allowManageApplets: boolean;
@@ -45,29 +71,21 @@ export interface AutomationState {
   allowManageMcpServers: boolean;
   allowEditTray: boolean;
   allowManageCustomCommands: boolean;
-  port: number;
-  starting: boolean;
-  running: boolean;
-  endpoint: string;
-  serverId: string;
-  error?: string;
-  lastClientAt?: string;
-  configFile: string;
-  registration: 'absent' | 'registered' | 'conflict';
-  registrationError?: string;
+  codex: CodexIntegrationState;
 }
 
 export type AutomationAction =
   | { kind: 'setConnectionScope'; scope: ConnectionScope }
   | { kind: 'setNetworkHostnames'; hostnames: string[] }
-  | { kind: 'copyToken' | 'retryStart' }
+  | { kind: 'copyToken' }
+  | { kind: 'retryStart' | 'test' | 'rotateToken'; receiver?: AutomationReceiver }
   | { kind: 'copyEndpoint'; endpoint: string }
   | { kind: 'status' }
-  | { kind: 'configure'; enabled: boolean; allowWrite: boolean; port: number }
+  | { kind: 'configure'; receiver?: AutomationReceiver; enabled: boolean; port: number }
   | { kind: 'register' | 'unregister'; confirmationId?: string }
-  | { kind: 'test' | 'rotateToken' }
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
+  | { kind: 'setWrite'; allowed: boolean }
   | { kind: 'setTts'; allowed: boolean }
   | { kind: 'setAi'; allowed: boolean }
   | { kind: 'setMcpClient'; allowed: boolean }

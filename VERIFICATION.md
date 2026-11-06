@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-11-07 MCPサーバーとCodex連携の受信分離（0.171.1）
+
+- 専用worktreeで実装した。発行前にmainの`180f53d`を土台へ取り込み、既存の生成プリセットとMCPクライアントのタブ・リセットを保持した。worktreeの発行先と兄弟Appletの回帰fixtureの解決は`f428ab6`へ分離した。廃止済みShellのCSS参照と.NETホストのビルド出力の検査には、mainの`7eb3dc2`を採用した。
+- 受信を一般向けとCodex専用ループバックに分け、同じAppDockApi・操作許可・要求上限につないだ。旧ポートと旧トークン、登録の所有情報を引き継ぐ。一般向けの非秘密設定は端末別`mcpServer`、Codex設定と両入口の認証情報・共通許可は配置別LocalAppDataに保存する。既存のCodex登録は明示的な「登録を修復」で切り替える。
+- 発行前レビューで、端末別の変更検出と原子的保存、途中失敗後の移行再試行、双方のHost・Origin・トークン検査、入口単位のジョブと購読の認可、TOML確認・所有範囲、画面の操作対象と検索を確認した。端末側の状態が共通設定の編集revisionを進めないように分け、同時要求上限を共有し、汎用MCPの許可変更で無関係な直接読み上げジョブが失効しないようにした。
+- 設定項目・保存形式の追加で0.171.0へ更新した。初回発行の実プロセス検査で、ポート0から実ポートを保存する際に新規Codexトークンの暗号文を空へ戻す不具合を発見した。保存対象を有効・ポートの2項目に限定し、登録した資格情報と永続化した資格情報の一致を単体回帰へ追加した。発行済み版への修正として最終版を0.171.1とした。
+- 0.171.1で`dev.bat install --frozen-lockfile`、`dev.bat run typecheck`、`dev.bat run build`と`dev.bat exec node --test --test-concurrency=1 tests/*.test.cjs`が成功した。標準回帰は1805/1805件、失敗・取消・skipは0件。Node 26.13.0、pnpm 12.15.0、Electron 45.1.0の固定ツールで実行した。初回の兄弟Applet・.NETのfixtureパスと廃止済みShell参照による失敗は現行構成で再検証した。
+- `publish.bat`は終了0。package、feed、manifest、EXEの版は0.171.1。ビルド出力・発行先・更新ZIPの102ファイルはSHA256一致。EXEは`298303f01dccf573b97291c644fb47844be4a1564f41eecadbb17bdf012db68e`、ZIPは`917ad4ea477d8059832deeda1777f7497280948867d80a937c0d5d0ab8a02060`（175,190,036 bytes）。証跡は`.artifacts/mcp-receivers-verification/`に保存した。
+- 固定EXEの隔離profileで、MCP起動・移行（17項目）、MCP Events、MCP Hub、Codex登録、MCP設定基盤、MCP設定、設定操作、Node/.NET Applet API、文章生成、音声生成、翻訳、通知の設定リンクを確認した。旧ポート・旧トークン、Hostと異なる入口のトークンの拒否、片側停止、端末ファイル受信と再起動を確認した。インストール済みCodex CLIは隔離TOMLの専用ポートでツールを呼び出した。別PCからのLAN・Tailnet接続は未確認。
+- 再検査でMCP HubのJSONキー順に依存する比較、TTS端末fixture、空の通知設定、文章生成ダイアログの詳細タブ、Applet操作許可の旧行数に依存する検査を現行契約に揃え、同じEXEで成功した。旧通知総合の独立試行は、端末別キー設定を共有側に置くfixtureが冒頭で失敗した。受信に関係する通知リンクとエラー状態は専用試験で確認した。標準回帰以降に変えたのはGUI試験・検証記録だけ。対象スクリプトの構文、文書リンク、差分形式を検査した。
+- コミットの入力・ログ・配布物およびstage/commit treeの照合は`.artifacts/commit-validation-mcp-receivers/`。
+
 ## 2026-11-07 登録モデル固定のmain統合（0.170.1）
 
 - `pull --ff-only`で追跡先と一致したmain `8e10ff3`に`codex/generation-preset-models`の`7eb3dc2`と`70c767f`をマージした。競合した版番号と検証記録を解決し、両方の検証履歴を保持した。各親だけが変更した20ファイルずつと、統合した翻訳4,146キーを照合した。

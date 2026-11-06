@@ -41,7 +41,7 @@ export interface McpActor {
   /** Host-created scope for catalog inspection only; never accepted from API parameters. */
   management?: boolean;
   appletId?: string;
-  origin?: { kind: 'mcp' } | { kind: 'applet'; appletId: string };
+  origin?: import('./command-contexts').McpInvocationOrigin | { kind: 'applet'; appletId: string };
 }
 type Session = {
   id: string;

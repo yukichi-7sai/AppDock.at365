@@ -23,6 +23,7 @@ export const hostSettingsPages = localizedMetadata(
       ['tts', hostText('pages.tts.title')],
       ['ai', hostText('pages.ai.title')],
       ['image-ai', hostText('imageAi.title')],
+      ['mcp-server', hostText('settings.mcpServerSettings.title')],
       ['codex', hostText('settings.settings-navigation.codex')],
       ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
       ['about', hostText('settings.settings-navigation.about')],

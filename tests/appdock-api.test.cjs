@@ -540,7 +540,7 @@ test('host execution context isolates identities, expires on return, and cancels
 test('MCP effective permission reporting retains execution and write prerequisites', (t) => {
   const f = setup(t);
   const config = {
-    version: 1,
+    version: 2,
     enabled: true,
     allowWrite: false,
     allowExecute: false,
@@ -556,7 +556,14 @@ test('MCP effective permission reporting retains execution and write prerequisit
     owned: {},
   };
   const service = () => {
-    fs.writeFileSync(path.join(f.dir, 'automation.json'), JSON.stringify(config));
+    const { enabled, port, configFile, serverName, owned, ...permissions } = config;
+    fs.writeFileSync(
+      path.join(f.dir, 'automation.json'),
+      JSON.stringify({
+        ...permissions,
+        codex: { enabled, port, configFile, serverName, owned, token: '' },
+      }),
+    );
     return new AutomationService({
       localDirectory: f.dir,
       baseDirectory: f.dir,
@@ -564,6 +571,7 @@ test('MCP effective permission reporting retains execution and write prerequisit
       encrypt: (v) => v,
       decrypt: (v) => v,
       changed: () => {},
+      mcpServer: require('./fixtures/mcp-receiver-settings.cjs').mcpReceiverSettings(),
       createApi: () => f.api,
     });
   };
@@ -628,7 +636,7 @@ test('legacy Applet grants load without writeback, never enable write, and compa
   );
 });
 
-test('legacy MCP flags cannot broaden write and are removed only by local permission save', async (t) => {
+test('legacy MCP flags cannot broaden write and are removed when the legacy configuration is migrated', async (t) => {
   const f = setup(t),
     file = path.join(f.dir, 'automation.json');
   const saved = JSON.stringify({
@@ -652,6 +660,7 @@ test('legacy MCP flags cannot broaden write and are removed only by local permis
     encrypt: (v) => v,
     decrypt: (v) => v,
     changed: () => {},
+    mcpServer: require('./fixtures/mcp-receiver-settings.cjs').mcpReceiverSettings(),
     createApi: () => f.api,
   });
   t.after(() => service.close());

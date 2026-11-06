@@ -28,7 +28,7 @@ module.exports = async function ({
         },
       })
     ).structuredContent;
-  const grant = () => togglePermission('Codexからのタスクトレイ編集を許可する');
+  const grant = () => togglePermission('MCPからのタスクトレイ編集を許可する');
   const configure = (changes) => ({ kind: 'configure', changes });
   assert.equal((await read()).trayEditingAllowed, false);
   assert.equal(

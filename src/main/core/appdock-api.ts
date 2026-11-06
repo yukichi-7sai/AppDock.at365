@@ -82,6 +82,7 @@ export class AppDockApi {
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
       settingsPrincipal?(): string;
+      mcpAuthorized?(lease: string): boolean;
       serviceSettingsTargets?(): SettingsTarget[];
       settingsAccessRevision?(page: SettingsPageDefinition): string;
       customCommands?: CustomCommandService;
@@ -118,7 +119,14 @@ export class AppDockApi {
     this.settingsTargets = new SettingsTargets({
       targets: () => this.allSettingsTargets(),
       revision: () => this.settingsCommands.revision(),
-      principal: () => this.options.settingsPrincipal?.() ?? this.options.instanceId,
+      principal: () => {
+        const origin = this.callContext.getStore()?.origin;
+        return (
+          (origin?.kind === 'mcp' ? origin.principal : undefined) ??
+          this.options.settingsPrincipal?.() ??
+          this.options.instanceId
+        );
+      },
     });
     this.tray = new TrayEditingCommands({
       ...options,
@@ -229,10 +237,19 @@ export class AppDockApi {
       write: this.options.writable(),
     };
   }
-  private effectivePermissions(appletId: string | undefined, context: InputInvocation) {
+  private effectivePermissions(
+    appletId: string | undefined,
+    context: InputInvocation,
+  ): AppletApiPermissions {
     const own = this.permissions(appletId);
     const origin = context.origin;
     if (!origin || origin.kind === 'local') return own;
+    if (
+      origin.kind === 'mcp' &&
+      origin.lease &&
+      this.options.mcpAuthorized?.(origin.lease) === false
+    )
+      return {};
     const root = this.permissions(origin.kind === 'applet' ? origin.appletId : undefined);
     return Object.fromEntries(
       Object.entries(own).map(([key, value]) => [

@@ -12,6 +12,7 @@ const { appDockOperations } = require('../out/main/shared/appdock-api');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { mcpReceiverSettings } = require('./fixtures/mcp-receiver-settings.cjs');
 const root = path.join(__dirname, '../.artifacts/ai-unit');
 fs.mkdirSync(root, { recursive: true });
 const temp = () => fs.mkdtempSync(path.join(root, 'case-'));
@@ -734,9 +735,8 @@ test('MCP AI permission is stored independently and absent legacy values remain 
       encrypt: (v) => v,
       decrypt: (v) => v,
       changed: () => {},
-      createApi: () => {
-        throw Error('unused');
-      },
+      mcpServer: mcpReceiverSettings(),
+      createApi: () => ({ auditTarget: () => undefined, call: () => ({}) }),
     });
   t.after(() => s.close());
   assert.equal(s.state().allowUseAi, false);
@@ -753,9 +753,8 @@ test('MCP AI permission is stored independently and absent legacy values remain 
     encrypt: (v) => v,
     decrypt: (v) => v,
     changed: () => {},
-    createApi: () => {
-      throw Error('unused');
-    },
+    mcpServer: mcpReceiverSettings(),
+    createApi: () => ({ auditTarget: () => undefined, call: () => ({}) }),
   });
   t.after(() => legacy.close());
   assert.equal(legacy.state().allowUseAi, false);
@@ -771,15 +770,15 @@ test('MCP authorization changes invalidate jobs synchronously before action comp
     decrypt: (v) => v,
     changed: () => {},
     authorizationChanged: () => invalidations++,
-    createApi: () => {
-      throw Error('unused');
-    },
+    mcpServer: mcpReceiverSettings(),
+    createApi: () => ({ auditTarget: () => undefined, call: () => ({}) }),
   });
   t.after(() => service.close());
   await service.action({ kind: 'setAi', allowed: true });
   assert.equal(invalidations, 0);
   await service.action({ kind: 'setAi', allowed: false });
   assert.equal(invalidations, 1);
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
   await service.action({ kind: 'rotateToken' });
   assert.equal(invalidations, 2);
 });

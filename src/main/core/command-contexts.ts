@@ -1,6 +1,12 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 
+export interface McpInvocationOrigin {
+  kind: 'mcp';
+  principal?: string;
+  lease?: string;
+}
+
 export interface InputInvocation {
   /** Captured by trusted host entry points, never accepted as an API argument. */
   triggerContext?: import('../../shared/command-conditions').TriggerContext;
@@ -10,7 +16,7 @@ export interface InputInvocation {
   commandApplets?: readonly string[];
   session?: string;
   process?: string;
-  origin?: { kind: 'local' | 'mcp' } | { kind: 'applet'; appletId: string };
+  origin?: { kind: 'local' } | McpInvocationOrigin | { kind: 'applet'; appletId: string };
   /** Set by the host API, independently of the root invocation origin. */
   apiCaller?: { kind: 'mcp' } | { kind: 'applet'; appletId: string };
   signal?: AbortSignal;

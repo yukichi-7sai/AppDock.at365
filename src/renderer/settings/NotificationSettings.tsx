@@ -394,7 +394,7 @@ export function NotificationSettings({
           description={translate('settings.notificationSettings.mcpHint')}
         >
           <SettingsActions>
-            <button onClick={() => select('codex')}>
+            <button onClick={() => select('mcp-server')}>
               {translate('settings.notificationSettings.openSettings')}
             </button>
           </SettingsActions>

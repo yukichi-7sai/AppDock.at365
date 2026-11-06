@@ -100,7 +100,7 @@ module.exports = async function ({
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.equal(saved.extensions[webId], undefined);
   assert.equal(saved.webApplets.items.find((a) => a.id === webId).url, url);
-  await togglePermission('Codexからの設定変更を許可する');
+  await togglePermission('MCPからの設定変更を許可する');
   const blocked = await client.callTool({
     name: 'appdock_execute_command',
     arguments: {
@@ -123,5 +123,5 @@ module.exports = async function ({
   await page.evaluate(() => window.dock.setAppletApiPermissions({}));
   assert.equal((await sdk('settings.get', { appletId: webId })).code, 'API_DISABLED');
   await page.evaluate((p) => window.dock.setAppletApiPermissions(p), grants);
-  await togglePermission('Codexからの設定変更を許可する');
+  await togglePermission('MCPからの設定変更を許可する');
 };

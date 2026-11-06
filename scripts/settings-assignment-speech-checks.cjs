@@ -74,11 +74,11 @@ module.exports = async function ({
   await instructions.press('Enter');
   await settleSettings(host);
   assert.equal(
-    (await snapshot()).settings.value.notificationPreferences.speech?.connectionId,
+    (await snapshot()).settings.value.notificationPreferences?.speech?.connectionId,
     undefined,
   );
   assert.equal(
-    (await snapshot()).settings.value.notificationPreferences.speech?.instructions,
+    (await snapshot()).settings.value.notificationPreferences?.speech?.instructions,
     undefined,
   );
   assert.equal(await host.getByLabel('通知用のボイスID', { exact: true }).count(), 0);

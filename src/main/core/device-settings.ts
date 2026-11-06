@@ -1,6 +1,8 @@
 import { hostText } from '../../shared/i18n';
 import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
 import { parseMcpRoster } from '../../shared/mcp-client';
+import type { McpServerSettings } from '../../shared/automation';
+import { parseMcpServerSettings } from './automation-network';
 import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import {
@@ -51,6 +53,7 @@ export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
   mcpClient?: McpDeviceSettings;
+  mcpServer?: McpServerSettings;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
   hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
@@ -162,6 +165,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'touchpadGestures',
           'uiState',
           'mcpClient',
+          'mcpServer',
           'mcpServers',
         ].includes(key),
     )
@@ -243,6 +247,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   return {
     ...structuredClone(current),
     ...(raw.mcpClient === undefined ? {} : { mcpClient: parseMcpDeviceSettings(raw.mcpClient) }),
+    ...(raw.mcpServer === undefined ? {} : { mcpServer: parseMcpServerSettings(raw.mcpServer) }),
     hostPages,
     host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;

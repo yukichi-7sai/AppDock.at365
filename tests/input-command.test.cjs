@@ -3,6 +3,7 @@ const { test } = require('node:test'),
 const { normalizeInputKeys, inputKeysFromEvent } = require('../out/main/shared/input-command');
 const { executionAuthorized } = require('../out/main/main/core/execution-permissions');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { mcpReceiverSettings } = require('./fixtures/mcp-receiver-settings.cjs');
 const fs = require('node:fs'),
   path = require('node:path');
 
@@ -17,6 +18,7 @@ test('new MCP execution grants persist independently, require execution and defa
     encrypt: (v) => v,
     decrypt: (v) => v,
     changed: () => {},
+    mcpServer: mcpReceiverSettings(),
     createApi: () => {
       throw Error('unused');
     },
@@ -32,7 +34,7 @@ test('new MCP execution grants persist independently, require execution and defa
   const file = path.join(dir, 'automation.json'),
     saved = JSON.parse(fs.readFileSync(file, 'utf8'));
   service.close();
-  fs.writeFileSync(file, JSON.stringify({ ...saved, enabled: true }));
+  fs.writeFileSync(file, JSON.stringify({ ...saved, codex: { ...saved.codex, enabled: true } }));
   service = new AutomationService(options);
   assert.equal(service.state().allowSendInput, true);
   assert.equal(service.state().allowRunProcesses, true);

@@ -12,7 +12,7 @@ MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/canc
 
 Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。
 
-本体に共通操作APIとHTTP MCPを持ちます。初期の接続範囲はこのPCのみで、IPv4のネットワーク接続も選べます。利用者の手順は[Codex連携の操作説明](usage.md#カスタムコマンド・mcp・ai)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
+本体は共通操作APIを、一般向けとローカルCodex向けの2つのHTTP MCP待ち受けから提供します。利用者の手順は[Codex連携の操作説明](usage.md#カスタムコマンド・mcp・ai)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
 
 LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命は[ネットワーク接続の設計](automation.md)にまとめています。
 
@@ -36,7 +36,7 @@ LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命
 
 `dock:automation` IPCは本体Window/mainFrame/URL検査を通し、WebAppletやAppletページへ公開しません。本体のprepareSettings/commitSettingsを共有して保存します。APIからWindows起動登録・UACを呼びません。
 
-MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscribe`は[通知イベント設計](mcp-events-design.md)を参照してください。`apiVersion: 2`はAppDock操作APIの版であり、MCPのprotocolVersionとは別です。イベント用の購読と送信待ちはPC専用の暗号化`automation-events.json`へ保存し、既存のtokenを認証主体として扱います。
+MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscribe`は[通知イベント設計](mcp-events-design.md)を参照してください。`apiVersion: 2`はAppDock操作APIの版であり、MCPのprotocolVersionとは別です。イベントの購読と送信待ちは、入口ごとにPC専用領域へ暗号化して保存します。
 
 ## API v2
 
@@ -258,23 +258,36 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 ## 通信と保存
 
-初期無効・初期読取り専用。PC専用automation.jsonのconnectionScopeは省略時local（127.0.0.1）、networkでは0.0.0.0へbindします。どちらもHost/Origin/専用Bearer tokenを検査し、CORS許可は付けません。networkのHostはループバック・現在のNICのIPv4・このPCのホスト名・networkHostnamesへ明示登録したDNS名に限定し、実ポートを必須とします。Originは未指定または検証済みHostと同じHTTP originだけを許可します。接続元IPの許可一覧は持ちません。32byte乱数のトークンを、AppDock側ではElectron safeStorageで暗号化してPC専用rootのautomation.jsonへ保存します。共有設定や配布物へ含めません。
+| 設定ページ | 待ち受け | AppDock側の保存 |
+| --- | --- | --- |
+| MCPサーバー | 既定は `127.0.0.1`。ネットワーク公開を選ぶと `0.0.0.0` でIPv4を受ける | `data/settings-<端末名>.json` の `mcpServer` に `enabled`、`port`、`connectionScope`、`networkHostnames` |
+| Codex連携 | `127.0.0.1` の専用ポート | 配置別LocalAppDataの `automation.json` の `codex` に有効状態、ポート、Codexの設定先・登録名・所有情報 |
 
-範囲切替では既存ポート・token・MCP許可・共通API・revisionを保持し、Codexの登録URLは常に127.0.0.1のままです。即時保存後に旧受付を停止して同じポートへ再bindします。起動中はランダムな識別子と認証付きの内部probeでループバックの到達先が自身のリスナーであることを確認し、実ポートの保存も成功してから公開要求を実行します。途中失敗では停止状態を表示し、勝手なポート変更・networkへの復帰はしません。保存失敗は以前の保存値と待受を保持します。「接続を再試行」は保存済み設定で再起動する操作です。MCP_SAVE_FAILED/MCP_START_FAILEDは共通エラー通知へ報告します。
+各入口は初期無効で、MCPの操作許可は共通です。2つの `AutomationMcp` で同じ `/mcp` を受け、`AppDockApi`、公開ツール、設定のrevision、同時8要求の上限を共有します。書込・実行などの許可は呼出し時と必要な保存直前に検査します。設定画面の有効化・停止・ポート変更・接続テストは選択した入口に適用します。
 
-全MCPクライアントがtoken、許可、同時8要求の上限とAI/TTSの所有者を共有します。範囲切替は通信を一時切断しますが、開始済み操作の取消は保証しません。接続設定・認証を本文読込後とAPI呼出直前にも再検査し、停止した受付から新しい操作を開始しません。応答が失われた操作を自動で再実行しないでください。接続日時はsocketの接続元に基づき、このPCとネットワークを区別します。自己テストや内部probeは日時を更新せず、日時だけでCodex接続成功とは扱いません。
+入口ごとの32バイト乱数のBearerトークンは、AppDock側ではElectron safeStorageで暗号化して `automation.json` に保存します。一般向けは `token`、Codex向けは `codex.token` です。同じ入口の同じトークンを使うクライアントは同一の認証主体として扱います。トークンの再発行・停止ではその入口の購読やジョブ管理の認可を失効させます。設定APIのrequestIdの重複判定は認証主体ごとです。
 
-トークンは「接続トークンをコピー」の明示操作時だけmainでOSクリップボードへ書き、IPC応答・画面・ログへ返しません。接続範囲、追加ホスト名、コピー、再試行は本体設定UI専用で、MCP/一般Appletへ公開しません。HTTP自体にはTLSがなく、LAN直結とtailnetによる経路保護を区別します。IPv6待受、CORS、HTTPSプロキシ設定、ファイアウォールの自動変更は含みません。
+### 旧設定からの引き継ぎ
 
-接続先候補は`networkEndpointAddresses`で表示用に絞り、Hyper-Vの既知名`vEthernet (Default Switch)`だけを除外します。IP末尾が`.1`という理由や、仮想アダプターという理由では除外しません。Tailscaleと外部LAN用vEthernetを保持します。HTTPのHost検証は引き続き`networkAddresses`の全NIC候補を使うため、表示の除外は直接接続の拒否ではありません。アダプターが改名されている場合は既知名による除外の対象外です。認証の案内では環境変数`MCP_BEARER_TOKEN`を名前の例として示し、実際のHTTPヘッダー`Authorization: Bearer <token>`と区別します。AppDock自身がこの環境変数を読み書きする機能はありません。
+バージョン1の `automation.json` がある場合、旧設定の有効状態、ポート、公開範囲、追加ホスト名を、端末別の `mcpServer` が未保存のときだけ初期値として書き込みます。一般向けトークンの暗号文、MCPの操作許可、Codexの登録名・設定ファイル・所有情報を引き継ぎます。Codex側は旧設定の有効状態を引き継ぎ、独自のトークンとポートを割り当てます。端末別の保存が済んでからPC専用ファイルをバージョン2へ原子的に更新します。途中で失敗した場合はバージョン1から再試行でき、保存済みの端末別設定を上書きしません。
 
-初回は空きポートを選び、以後保存した値を使います。競合時は勝手に変えずエラーにします。詳細のポートに0を指定して適用すると空きポートを選び直せます。変更後はCodex登録を修復してください。EXE配置の絶対パス由来のIDは内部識別と登録範囲の所有判定に使い、Codexへの登録名とは分離します。移動は別配置として扱い、旧登録を自動削除しません。
+旧URLと旧トークンは一般向けの入口で使えます。「Codex連携」の「登録を修復」を実行してCodexを再読み込みすると、同じ登録名で専用ポートへ切り替わります。初回起動時の移行はCodexのTOMLを変更しません。
 
-書込許可の切替は接続を切らず、各呼出しで許可を確認します。停止/終了は接続を閉じ、認証再発行後は旧トークンを拒否します。自己接続テストの日時はクライアント接続日時に混ぜません。日時は認証したクライアントのinitializeの観測であり、現在も接続中という保証やCodex固有の本人確認ではありません。
+### 待ち受けと接続範囲
+
+ポートに0を指定すると空きポートを選んで保存します。両方に同じ固定ポートは設定できません。起動時は認証付きの内部probeで自身のリスナーに到達することを確認し、選択ポートの保存が済んでから受付を開始します。保存失敗時は既存の待ち受けを保持します。設定の保存後にbindが失敗した場合は、該当側を停止中として表示し、「接続を再試行」で保存済み設定を使います。外部からの端末別JSONの変更も一般向けの待ち受けに反映します。
+
+どちらもHost・Origin・Bearerを検査し、本文読込後とAPI呼出直前に受付と認証を再検査します。ループバックのHostは `127.0.0.1:<port>` です。一般側のnetworkでは、ループバック・現在のNICのIPv4・PCのホスト名・明示登録したDNS名と実ポートの組を許可します。Originは未指定か、検証したHostと同じHTTP originです。CORS許可は付けず、接続元や接続先の判定に転送ヘッダーを使いません。
+
+一般側の公開範囲やポート変更はその通信を一時切断します。追加ホスト名だけの変更は保存後に検査規則を更新します。開始済み操作は応答が届かなくても完了する場合があります。結果が不明な操作を自動再送しないでください。
+
+「MCPサーバー」の接続先候補には利用可能なIPv4を表示します。表示ではHyper-Vの `vEthernet (Default Switch)` を除外し、Hostの検査には全NICの候補を使います。外部クライアントにStreamable HTTPのURLとBearerを設定し、その端末から到達性を確認してください。LAN直結のHTTPとtailnetによる経路保護を区別します。
+
+一般向けの「接続トークンをコピー」は明示操作時だけOSクリップボードへ書き込みます。秘密値は設定画面・状態応答・ログへ返しません。待ち受けの管理・コピーは本体設定UI専用です。最終接続時刻は認証済み通信の観測で、自己テストや起動probeは含みません。Codexのツール利用と別端末からの疎通は、それぞれ接続元で確認します。
 
 ## Codex登録
 
-設定ページでは連携の有効状態と登録状態を先に表示し、「Codexへ登録」（登録済みなら「登録を修復」）と「接続テスト」を主な操作として並べます。config.tomlの場所・登録名は「Codex連携」にまとめ、登録/修復・接続テスト・登録解除を「Codexへ登録」Fieldへ置きます。共通のポート・追加ホスト名・ネットワーク接続情報と接続トークンは「接続設定」へまとめ、トークンの再発行も同じFieldから行います。「操作の許可を開く」から独立した許可ページへ移動します。共有設定や認証の保存契約は変更しません。
+「Codex連携」ではこのPC専用の稼働状態と登録状態を表示します。「Codexへの登録」に、登録・修復、接続テスト、登録解除、config.tomlの場所と登録名をまとめます。「接続設定」には専用ポートと認証情報の再発行を置きます。
 
 対象は同じWindowsホストのCodex。CODEX_HOME/config.toml、未指定ならホームの.codex/config.tomlを候補とし、絶対パスを画面で変更できます。WSL/リモートの自動設定はしません。
 
@@ -298,9 +311,9 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 - `dev.bat run typecheck` / `dev.bat run build`
 - `dev.bat exec node --test tests/automation.test.cjs tests/settings-commands.test.cjs tests/settings-sync.test.cjs`
-- `dev.bat exec node scripts/automation-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe]`
+- `dev.bat exec node scripts/mcp-server-startup-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe]`で旧設定の移行・両入口の同時利用・片側停止・再起動を検査します。
 - `dev.bat exec node scripts/codex-registration-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe]`: 隔離した設定の外部変更・修復/解除・取消/フォーカス・確認中の競合を実画面で検査します。
-- APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUI生成の隔離configを実Codexで読み込み、7ツールの発見と取得/変更/再取得/復元・公開コマンド実行を確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
+- APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUIで修復した隔離configを実Codexで読み込み、ツール発見と公開API呼出しを確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
 
 証跡は.artifacts/automation-source-* / automation-portable-*とVERIFICATIONに記録します。ビルドをGUI検証と同時実行しません。
 
@@ -410,108 +423,16 @@ input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しませ�
 
 現行の発話引数とサーバー一覧は最低ホスト版0.156.0。tts.speak / tts.connections.list / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。発話はconnectionIdで登録を選び（省略時は既定）、instructionsで今回の話し方を指定できます。voice/speedは受け付けず、声は登録した設定を使います。音声は常に等速で再生します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
-### 3.1 PC専用設定
-
-既存のPC専用`automation.json`へ次を追加する。共有`settings.json`には入れず、保存ファイルも増やさない。
-
-```ts
-connectionScope: 'local' | 'network'; // 省略時 local
-networkHostnames: string[];          // 省略時 []、追加の接続先ホスト名
-```
-
-`version: 1`の追加フィールドとして読み、既存のtoken・port・allow*・configFile・serverName・ownedを保持する。省略は既定値に補完するが、未知のscope、null、型違反、不正なホスト名は設定読込エラーとしてMCPを起動しない。破損ファイルを既定値で上書きしない。
-
-`networkHostnames`は接続元の許可一覧ではなく、AppDockへ接続するURLの名前を追加するもの。通常はIPアドレスで接続でき、追加登録は不要。MagicDNSの完全名や独自DNS別名を使う場合だけ詳細設定で指定する。最大16件、各253文字までのASCII DNS名とし、ラベルは1～63文字の英数字・ハイフン、先頭末尾のハイフンを拒否する。小文字化・末尾ドット除去・重複除去を行い、スキーム、ポート、パス、ユーザー情報、ワイルドカード、IP表記、空文字を拒否する。DNS照会で任意の名前を自動許可しない。
-
-### 3.2 状態と操作
-
-`AutomationState`へ保存済み`connectionScope`・`networkHostnames`、実際の`activeConnectionScope`（停止中null）、`networkEndpoints: string[]`、`lastLocalClientAt`・`lastNetworkClientAt`、`canCopyToken: boolean`を追加する。canCopyTokenは保存済みの有効なtokenが利用できるかだけを示す。既存の`endpoint`はループバック専用のまま維持し、`lastClientAt`も互換用に保持する。トークンやAuthorizationは状態に含めない。
-
-新規操作は本体設定UI専用の`setConnectionScope { scope }`、`setNetworkHostnames { hostnames }`、`copyToken`、`copyEndpoint { endpoint }`、`retryStart`。copyEndpointは現在稼働中のendpointまたはnetworkEndpointsに含むURLだけをmainでコピーする。既存`configure { enabled, allowWrite, port }`へscopeを混ぜず、古い設定画面や操作許可画面からのconfigureでnetworkがlocalへ戻る事故を防ぐ。専用操作は指定されたフィールドだけを更新し、無関係なallow*を上書きしない。既存busyガードで操作を直列化する。
-
-追加操作は`dock:automation`と、本体設定ページの`codex`用action許可一覧へ接続する。`permissions`ページの許可一覧へは追加しない。Settings Hostとrendererで実装を重複させず、同じAutomationServiceを呼ぶ。公開操作カタログ、MCP、Applet、WebApplet、外部Webページからは呼べないことを確認する。
-
-### 4.1 接続範囲
-
-単一のAutomationMcpでbind先を切り替える。networkでもループバック接続を受け付け、同じポート・APIインスタンスを使用する。`0.0.0.0`は待受指定だけに使い、利用者向け接続URLには出さない。
-
-接続URL候補は、このPCに現在割り当てられた非ループバックのIPv4アドレスから生成する。未指定、マルチキャスト、リンクローカルのアドレスは候補・自動Host許可から除く。候補は到達性を保証せず、ネットワークモードで稼働中の場合だけ表示する。設定状態の取得時に更新し、HTTP側でも要求ごとに現在のインターフェース情報を取得してHostを判定する。DHCP・VPNの切替後に古いIPを許可し続けず、ポートやCodex登録は変えない。
-
-### 4.2 HostとOrigin
-
-接続元IPの制限と、HTTPの接続先名・ブラウザーOriginの検査を分ける。ネットワークモードでも検査を無条件に省略しない。[MCPのStreamable HTTP仕様](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)のOrigin検査を維持する。
-
-| モード／項目 | 許可条件 |
-| --- | --- |
-| localのHost / Origin | 現行と同じ。Hostは`127.0.0.1:<port>`、Originは未指定または`http://127.0.0.1:<port>` |
-| networkのHost | `127.0.0.1`、現在の非ループバックIPv4、`os.hostname()`の正規化名、保存したnetworkHostnamesのいずれかと実ポートが一致 |
-| networkのOrigin | 未指定、または検証済みHostと同じ`http://<host>:<port>`のOriginに限る |
-
-networkのHost/Originは共通の厳密なparserで正規化する。Host欠落・重複、複数Origin、`Origin: null`、userinfo、パス、query、fragment、制御文字、無効なポート、許可外名を拒否する。Hostは明示した実ポートを必須とし、Originはその同一originを要求する。ヘッダー名の大文字小文字とは別に、DNS名だけを小文字化・末尾ドット除去して比較する。IPv4は正規の4区切り十進表記に限定し、整数・16進等の代替表記を許可しない。
-
-Origin未指定はサーバー間のMCPクライアント向けに許可する。ブラウザーからの別originの直接呼出しは本設計の対象にせず、CORS許可やOPTIONS対応を追加しない。AIアプリのバックエンドから接続する。`Forwarded` / `X-Forwarded-*`を信用してHost・Origin・接続元の判定を変えない。HTTPSリバースプロキシとの互換性は別途検証し、この切替だけでTailscale Serveへ対応したとは扱わない。
-
-### 4.3 認証と共通制限
-
-全接続に既存の`Authorization: Bearer <token>`を必須とし、比較方法、本文読込後の再検査、token再発行による旧token失効を維持する。認証をURLやqueryへ埋め込まず、ローカル接続も認証を省略しない。
-
-`/mcp`だけを提供し、POST・JSON応答、GET/DELETEの405、1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒を維持する。同時8要求はローカルとネットワークの合計。操作のBUSYや設定競合も全接続で共有し、API・許可・revisionの状態を接続ごとに作り直さない。ネットワーク利用による混雑がCodexへも影響することは受入試験に含める。
-
-HTTP接続自体はTLS暗号化されない。LAN直結ではトークンと要求がHTTPで流れ、tailnet経由ではTailscaleの経路で保護される。設定画面のネットワーク説明へこの違いを短く示す。証明書管理、HTTPSサーバー、ファイアウォール規則作成、ルーターのポート開放、Tailscale設定変更は実装に含めない。
-
-### 5.1 通常の切替
-
-1. 入力検証とbusy取得後、変更対象だけを候補設定へ反映する。同値なら保存・再起動しない。
-2. 候補をatomicWriteで保存する。失敗したら保存済み値と既存リスナーを維持し、操作失敗を返す。networkからlocalへの変更でも保存失敗ならnetworkのままであることを状態とエラーで示す。
-3. 保存成功後に旧リスナーを受付停止にし、既存socket/要求を閉じる。受付世代を更新し、本文読込中など旧世代の要求が後からAPIを呼ばないよう、API呼出直前にも世代と受付可否を確認する。
-4. 同じポートで新しいbind先へ起動する。ランダムな識別子とBearer認証を使う内部probeで、127.0.0.1への要求を自身のリスナーが受け取ったことを確認する。Windowsでワイルドカードと特定アドレスの待受が共存しても、Codexの接続先が別プロセスになる状態を成功と扱わない。probeは設定・操作APIを呼ばず、接続日時も更新しない。成功してからrunning・activeConnectionScopeを更新する。連携無効なら保存だけで、次の有効化時に適用する。
-5. 失敗した場合、候補設定は保存済み、MCPは停止中としてエラーを表示する。勝手なポート変更や旧networkへの復帰は行わない。利用者は設定の修正または「接続を再試行」で回復できる。
-
-起動処理は「待受成功」と「選択ポートの保存成功」を分けて管理し、両方が成功するまで新リスナーからAPIを実行しない。port=0で選ばれた実ポートを保存できなければ、そのリスナーを閉じて停止状態にする。bind途中のserverも確実に破棄する。retryStartは連携有効・停止中の場合だけ同じ保存設定で起動し、有効化やポート選び直しを兼ねない。
-
-保存や起動の最終失敗は[共通のエラー通知とログ](error-reporting.md)へ接続し、設定欄にも現在の稼働状態と対処を返す。入力検証違反は画面内だけで扱う。例外の生文、token、HTTPヘッダーをログや通知へ出さず、同じ失敗を重複通知しない。
-
-networkHostnamesの変更は保存後に検査規則を差し替える。bind変更は不要。本文読込後にも最新規則を再検査し、削除した名前で新たなAPI実行を開始しない。ポート変更・連携無効化も同じ受付停止の仕組みを使い、登録更新の要否は次節に従う。
-
-### 5.2 既に開始した操作
-
-範囲の切替時にはCodexを含む通信が一時切断される。クライアントの自動再接続は保証しない。既にAPIへ渡った操作・保存・OS操作は、応答が届かなくても完了する場合がある。通信切断を操作の取消や失敗とみなさず、自動再実行もしない。
-
-接続範囲の変更だけではトークンを更新せず、`authorizationChanged`も発火しない。共有APIのインスタンス、AI/TTSジョブと所有者世代、重複判定を維持する。連携無効化・操作許可取消・token再発行はそれぞれ既存の取消／失効経路を使う。範囲変更は、開始済み処理を取り消す機能ではない。
-
-受付世代の切替後に旧initializeが完了しても、新リスナーの接続日時を更新しない。全接続日時をbind変更時にクリアし、自己テストは日時を更新しない。
-
 ## Codex連携の互換性
 
-| 操作 | Codexへの影響 |
+| 操作 | 反映する接続 |
 | --- | --- |
-| local ⇔ network | URL・token・登録名・所有hashを保持。config.tomlを書き換えず再登録不要。一時切断から復帰しなければCodex側で再接続／再読み込み |
-| 接続先ホスト名の追加・削除 | ループバックURLを使うCodexへの変更なし |
-| LANのIP変更・Tailscale接続切替 | ローカルCodexのURLは不変。外部クライアントのIP指定URLは必要に応じて更新 |
-| ポート変更・0で再選択 | 既存どおり「登録・修復」が必要。外部クライアントのURLも更新 |
-| 認証情報の再発行 | 既存どおりCodex登録を修復し、外部クライアントも新tokenへ更新。旧tokenは全接続で無効 |
-| 連携無効・起動失敗 | Codexから利用不可。登録の`required=false`を保持 |
+| 一般側の接続範囲・ホスト名変更 | 一般側の接続範囲とHost検査 |
+| 一般側のポート変更・トークン再発行 | 一般側クライアントのURL・認証設定を更新 |
+| Codex側のポート変更・認証再発行 | 「Codex連携」の「登録を修復」で所有する登録を更新し、Codexを再読み込み |
+| 各入口の停止・起動失敗 | 各設定ページで該当側の状態と再試行を確認 |
 
-`registrationBlock()`のループバックURL限定検証、管理コメント・所有情報による範囲の限定、TOML検証・直前bytes照合・backup・原子的置換を維持する。外部変更時の確認付き復旧と、外部削除後の孤立コメント修復条件は本書の登録仕様に従う。他PCのCodexやAIアプリの設定ファイルをこの画面から編集しない。
-
-現在の「クライアント接続」日時はCodex専用ではない。ネットワーク接続が増えてもCodexの接続成功と誤認しないよう、「このPCからの最終接続」「ネットワークからの最終接続」に分ける。分類はsocket.remoteAddressのIPv4 loopback判定で行う。このPC側でもクライアント名の自己申告をCodex認証に使わない。実際のCodexからツールが呼べたことは別途確認する。
-
-## 設定画面と外部クライアントへの登録
-
-既存の設定ページID・検索anchorの`codex`は保持する。ページ表示名を「MCP・Codex連携」にし、設定カタログの検索語へMCP・LAN・ネットワーク・tailnetを追加する。Codexへの登録欄とネットワーク接続欄を同じページに置く。
-
-- 「連携を有効にする」の直下へ「接続範囲」の2択selectを追加。選択確定で即時保存する。無効中でも選択できる。保存中だけ操作を抑止し、失敗時は保存済み値とエラーを表示する。
-- 説明: 「このPCのみ」／「ネットワークからも接続可能（IPv4）」。「ネットワークでは、接続トークンを持つクライアントにMCPの操作許可が適用されます。HTTP接続です。利用するネットワークとファイアウォールの設定を確認してください。」
-- 同じ画面に「このPCの接続先」と「ネットワークの接続先候補」を区別して表示。ネットワーク候補はIPを省略せず、URLのコピーを用意する。候補がない場合はその旨を示し、稼働・到達を保証する表示にしない。
-- 詳細欄に「追加の接続先ホスト名」を置く。改行区切りの入力をblur/Enter等の確定操作で一括検証・保存する。入力中や不正値はその画面だけに保持し、全体保存バーを設けない。localでも値を保持し、network時だけ有効にする。
-- ネットワーク設定欄に「接続トークンをコピー」を置く。既存tokenがないときは無効。押下時だけmainでクリップボードへ書き、IPC応答は成功・失敗だけ。トークンを画面、DOM、AutomationState、ログ、通知へ返さない。コピー先がOSクリップボードであることをボタン付近に明記する。共有クリップボード履歴を変更・削除せず、時間差のクリップボード消去も行わない。
-- 「接続テスト」は「このPC内の接続テスト」と表記し、LAN到達性や接続元アプリの対応を判定しない。停止エラーには「接続を再試行」を用意する。
-
-トークンコピーは既存の「状態では秘密値を返さない」契約を保った明示操作として追加する。Electron clipboardへの書込みをmain側で注入し、AutomationServiceが返すReplyへ秘密値を入れない。既存の本体Window/mainFrame/URL検査と本体設定ページの操作検査を通す。MCPの`ui.actions.invoke`や公開ツールへコピー操作を露出しない。
-
-外部クライアントへ渡す情報はStreamable HTTP、`http://<AppDock-PCのIPv4または許可済みホスト名>:<port>/mcp`、Bearer tokenの3点。例の秘密値は`<token>`とし、実値を文書へ書かない。接続元とAppDock双方のルーティング／ファイアウォールで到達可能であることが前提。
-
-同じtokenを持つクライアントは同じMCP主体として扱う。現行のAI/TTSジョブ所有・停止・参照範囲やrequestIdの重複判定も接続元ごとには分離されない。各クライアントはrequestIdにUUID等を使い、ユーザー名やIPから別主体を推測しない。クライアント別トークン・権限・監査識別は対象外とする。
+設定ページIDは一般側が `mcp-server`、Codex側が `codex` です。Codex連携は「Codex → AppDock」の受信設定を提供します。
 
 ## タッチパッドジェスチャー
 

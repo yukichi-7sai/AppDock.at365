@@ -114,7 +114,7 @@ async function apply(p, dialog) {
   await settleSettings(p);
 }
 async function rpc(method, args = {}) {
-  const state = (await action({ kind: 'status' })).state;
+  const state = (await action({ kind: 'status' })).state.codex;
   const headers = parse(fs.readFileSync(config, 'utf8')).mcp_servers[state.serverId].http_headers;
   const response = await fetch(state.endpoint, {
     method: 'POST',
@@ -157,7 +157,7 @@ async function rpc(method, args = {}) {
     await dialog.getByTestId('settings-dialog-cancel').click();
     await dialog.waitFor({ state: 'hidden' });
     await action({ kind: 'selectConfig', file: config });
-    await action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+    await action({ kind: 'configure', receiver: 'codex', enabled: true, port: 0 });
     await action({ kind: 'register' });
     assert.deepEqual((await rpc('events/list')).result.events, []);
     checks.push('fresh profile defaults OFF and exposes no notification events');

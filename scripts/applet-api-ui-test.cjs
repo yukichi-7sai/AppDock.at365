@@ -52,7 +52,13 @@ for (const id of ids) {
       })),
       settings: [
         { key: 'flag', title: 'Flag', type: 'boolean', default: false, automation: true },
-        { key: 'privateFlag', title: 'Private', type: 'boolean', default: false },
+        {
+          key: 'privateFlag',
+          title: 'Private',
+          type: 'boolean',
+          default: false,
+          automation: false,
+        },
       ],
     }),
   );
@@ -190,11 +196,8 @@ async function probe(id, action, mcp = false) {
     return entries.length > before && JSON.parse(entries.at(-1).message.slice(prefix.length));
   }, 'probe ' + action);
 }
-async function grant(id, permissions) {
-  await page.evaluate(({ id, permissions }) => window.dock.setAppletApiPermissions(permissions), {
-    id,
-    permissions,
-  });
+async function grant(permissions) {
+  await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), permissions);
 }
 (async () => {
   try {
@@ -223,57 +226,46 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 15);
-    assert.equal((await snapshot()).appletApi.permissions.useTts, false);
-    assert.equal((await snapshot()).appletApi.permissions.useAi, false);
-    assert.equal((await snapshot()).appletApi.permissions.useMcp, false);
-    assert.equal((await snapshot()).appletApi.permissions.manageCustomCommands, false);
-    assert.equal((await snapshot()).appletApi.permissions.manageMcpServers, false);
-    assert.equal((await snapshot()).appletApi.permissions.runProcesses, false);
-    assert.ok(
-      Object.entries((await snapshot()).appletApi.permissions)
-        .filter(
-          ([k]) =>
-            ![
-              'useTts',
-              'useAi',
-              'useMcp',
-              'manageCustomCommands',
-              'manageMcpServers',
-              'runProcesses',
-            ].includes(k),
-        )
-        .every(([, v]) => v === true),
-    );
+    assert.deepEqual((await snapshot()).appletApi.permissions, {
+      read: true,
+      write: true,
+      execute: true,
+      sendInput: true,
+      runProcesses: true,
+      useMcp: true,
+      useAi: true,
+      useImageAi: true,
+      useTts: true,
+    });
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Applet：/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
-    assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
+    assert.equal(await settingsSurface.getByRole('switch', { name: /^MCPからの/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
     await panel.getByRole('switch', { name: 'Applet：情報の取得', exact: true }).waitFor();
     assert.deepEqual(await panel.locator('tbody > tr > th strong').allTextContents(), [
       '情報の取得',
       '設定の変更',
-      'Appletの有効・無効・再起動',
       'コマンドの実行',
-      'ショートカットの編集',
-      'マウスジェスチャーの編集',
-      'リボンの編集',
-      'タスクトレイの編集',
-      'カスタムコマンド定義の閲覧・編集',
       'Windowsへのキー・操作メッセージ送信',
       'コマンド・プロセスの起動',
-      'MCP接続先の管理',
       'MCP接続先の利用',
       '文章生成AIサーバーへの送信・文章生成',
+      '画像生成AI',
       '音声生成AIサーバーへの送信・読み上げ',
     ]);
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 15);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 15);
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
+    assert.equal(await panel.getByRole('switch', { name: /^MCPからの/ }).count(), 8);
+    assert.equal(
+      await panel
+        .locator('[data-testid="permission-row-useImageAi"] [data-caller="MCP"]')
+        .innerText(),
+      '未対応',
+    );
     const fixedRead = panel.getByRole('switch', {
-      name: 'Codexからの情報取得を許可する（MCP連携中は常に許可）',
+      name: 'MCPからの情報取得を許可する（MCP連携中は常に許可）',
       exact: true,
     });
     assert.equal(await fixedRead.isChecked(), true);
@@ -301,10 +293,7 @@ async function grant(id, permissions) {
       'requested row labels/order, fixed-ON disabled MCP read, six MCP-only warnings while OFF and keyboard tooltips',
     );
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
-      assert.equal(
-        await control.isChecked(),
-        !/TTS|AI|MCP|カスタム|プロセス/.test(await control.getAttribute('aria-label')),
-      );
+      assert.equal(await control.isChecked(), true);
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
     assert.ok(
@@ -312,7 +301,7 @@ async function grant(id, permissions) {
         .filter(([key]) => key.startsWith('allow'))
         .every(([, v]) => v === false),
     );
-    await grant(ids[0], {});
+    await grant({});
     await until(
       async () =>
         await panel
@@ -324,7 +313,7 @@ async function grant(id, permissions) {
     assert.equal(await fixedRead.isChecked(), true);
     assert.equal(await fixedRead.isDisabled(), true);
     const mcpWrite = panel.getByRole('switch', {
-      name: 'Codexからの設定変更を許可する',
+      name: 'MCPからの設定変更を許可する',
       exact: true,
     });
     await mcpWrite.click();
@@ -353,14 +342,21 @@ async function grant(id, permissions) {
       .getByRole('textbox', { name: '設定JSON' })
       .inputValue();
     const draft = JSON.parse(originalJson);
+    draft.host ??= {};
     draft.host.startMinimized = true;
     const draftText = JSON.stringify(draft, null, 2);
     await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
     await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
     await settleSettings(page);
-    const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
+    const childGrant = panel.getByRole('switch', {
+      name: 'Applet：コマンド・プロセスの起動',
+      exact: true,
+    });
     await childGrant.click();
-    await panel.getByText(/未有効：情報の取得・コマンドの実行・設定の変更/).waitFor();
+    await panel
+      .locator('[data-testid="permission-row-runProcesses"]')
+      .getByText('未有効：情報の取得・コマンドの実行の許可が必要です', { exact: true })
+      .waitFor();
     assert.equal((await snapshot()).appletApi.permissions.read, undefined);
     await until(() => childGrant.isEnabled(), 'save child grant');
     await childGrant.click();
@@ -393,7 +389,7 @@ async function grant(id, permissions) {
         'permission save',
       );
     }
-    await grant(ids[1], { read: true, execute: true, write: true, manageApplets: true });
+    await grant({ read: true, execute: true, write: true });
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'read')).ok, true);
     for (const id of ids) {
@@ -409,14 +405,15 @@ async function grant(id, permissions) {
       await window.dock.automation({ kind: 'selectConfig', file: configFile });
       await window.dock.automation({
         kind: 'configure',
+        receiver: 'codex',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
       await window.dock.automation({ kind: 'register' });
     }, configFile);
-    const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+    const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state
+      .codex;
     assert.equal(await fixedRead.isChecked(), true);
     assert.equal(await fixedRead.isDisabled(), true);
     assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
@@ -435,11 +432,7 @@ async function grant(id, permissions) {
     });
     assert.equal(denied.structuredContent.code, 'WRITE_DISABLED');
     for (const id of ids) assert.equal((await probe(id, 'write', true)).code, 'WRITE_DISABLED');
-    await page.evaluate(
-      (port) =>
-        window.dock.automation({ kind: 'configure', enabled: true, allowWrite: true, port }),
-      state.port,
-    );
+    await page.evaluate(() => window.dock.automation({ kind: 'setWrite', allowed: true }));
     for (const id of ids) {
       assert.equal((await probe(id, 'write', true)).completion, 'settingsSaved');
       const read = await client.callTool({
@@ -448,10 +441,10 @@ async function grant(id, permissions) {
       });
       assert.deepEqual(read.structuredContent.values, { flag: true });
     }
-    await grant(ids[0], { read: true, execute: true });
+    await grant({ read: true, execute: true });
     assert.equal((await probe(ids[0], 'write', true)).code, 'WRITE_DISABLED');
     assert.equal((await probe(ids[1], 'write', true)).code, 'WRITE_DISABLED');
-    await grant(ids[0], {});
+    await grant({});
     assert.equal((await probe(ids[0], 'read')).code, 'API_DISABLED');
     assert.ok(
       (await snapshot()).logs.some(
@@ -464,7 +457,7 @@ async function grant(id, permissions) {
     checks.push(
       'MCP -> Node/.NET -> shared API reentry, shared Applet grants/revocation, public-only readback and audit',
     );
-    await grant(ids[0], { read: true, execute: true, write: true });
+    await grant({ read: true, execute: true, write: true });
     for (const theme of ['light', 'dark']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -485,7 +478,7 @@ async function grant(id, permissions) {
         if (width === 700) {
           await panel
             .getByRole('switch', {
-              name: 'CodexからのWindowsへのキー・操作メッセージ送信を許可する',
+              name: 'MCPからのWindowsへのキー・操作メッセージ送信を許可する',
               exact: true,
             })
             .scrollIntoViewIfNeeded();
@@ -536,14 +529,14 @@ async function grant(id, permissions) {
     await client.close();
     client = null;
     await page.evaluate(() =>
-      window.dock.automation({ kind: 'configure', enabled: false, allowWrite: false, port: 0 }),
+      window.dock.automation({ kind: 'configure', receiver: 'codex', enabled: false, port: 0 }),
     );
     await stop(s);
     s = await start();
     assert.equal((await probe(ids[0], 'read')).ok, true);
     assert.equal((await probe(ids[1], 'write')).completion, 'settingsSaved');
     assert.equal(
-      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.running,
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex.running,
       false,
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));

@@ -2,7 +2,39 @@ import { hostText } from '../../shared/i18n';
 import os from 'node:os';
 import { isIPv4 } from 'node:net';
 import type { IncomingMessage } from 'node:http';
-import type { ConnectionScope } from '../../shared/automation';
+import type { ConnectionScope, McpServerSettings } from '../../shared/automation';
+
+export const defaultMcpServerSettings: Readonly<McpServerSettings> = {
+  enabled: false,
+  port: 0,
+  connectionScope: 'local',
+  networkHostnames: [],
+};
+
+export function parseMcpServerSettings(value: unknown): McpServerSettings {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('enabled' in value) ||
+    typeof value.enabled !== 'boolean' ||
+    !('port' in value) ||
+    typeof value.port !== 'number' ||
+    !Number.isInteger(value.port) ||
+    value.port < 0 ||
+    value.port > 65535 ||
+    !('connectionScope' in value) ||
+    (value.connectionScope !== 'local' && value.connectionScope !== 'network') ||
+    !('networkHostnames' in value) ||
+    Object.keys(value).some((key) => !Object.hasOwn(defaultMcpServerSettings, key))
+  )
+    throw Error(hostText('services.automation.invalidServerSettings'));
+  return {
+    enabled: value.enabled,
+    port: value.port,
+    connectionScope: value.connectionScope,
+    networkHostnames: networkHostnames(value.networkHostnames),
+  };
+}
 
 function hostname(value: string): string | undefined {
   const name = value.toLowerCase().replace(/\.$/, '');

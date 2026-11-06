@@ -232,6 +232,7 @@ async function checkSectionTitles() {
         'リボン',
         'マウスジェスチャー',
         'MCPサーバー',
+        'Codex連携',
         'AppDockについて',
       ]) {
         await select(title);

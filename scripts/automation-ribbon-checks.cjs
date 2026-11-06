@@ -29,7 +29,7 @@ module.exports = async function ({
         },
       })
     ).structuredContent;
-  const grant = () => togglePermission('Codexからのリボン編集を許可する');
+  const grant = () => togglePermission('MCPからのリボン編集を許可する');
   assert.equal((await read()).ribbonEditingAllowed, false);
   assert.equal((await denied([{ kind: 'reset' }])).code, 'RIBBON_EDITING_DISABLED');
   await grant();

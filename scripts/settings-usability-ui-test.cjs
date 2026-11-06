@@ -67,9 +67,8 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     initial.tts = {
       connections: [
         {
-          id: 'default',
+          ...require('../out/main/shared/tts').newTtsServer('default'),
           name: 'Fixture',
-          ...initial.tts.connections[0],
           baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
           model: '',
           defaultVoice: '',
@@ -77,10 +76,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       ],
       defaultConnectionId: 'default',
     };
-    fs.writeFileSync(
-      require('./test-settings.cjs').file(profile, 'settings.json'),
-      JSON.stringify(initial),
-    );
+    require('./test-settings.cjs').write(profile, initial, path.join(profile, 'local'));
     const config = path.join(profile, 'codex', 'config.toml');
     fs.mkdirSync(path.dirname(config));
     fs.writeFileSync(config, '# fixture\n');
@@ -275,7 +271,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await notificationInstructions.press('Enter');
     await settleSettings(page);
     assert.equal(
-      (await snapshot()).settings.value.notificationPreferences.speech.instructions,
+      (await snapshot()).settings.value.notificationPreferences?.speech?.instructions,
       undefined,
     );
     checks.push('empty notification instructions restore the selected server defaults');
@@ -304,10 +300,14 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     checks.push(
       'notification links open TTS/MCP settings and permissions remain in connection status',
     );
+    assert.equal(await page.getByLabel('Codexの設定ファイル', { exact: true }).count(), 0);
+    await select('Codex連携');
+    await page.getByRole('heading', { name: 'Codex連携', exact: true, level: 1 }).waitFor();
+    assert.equal(await page.getByRole('combobox', { name: '接続範囲', exact: true }).count(), 0);
     await page.getByLabel('Codexの設定ファイル', { exact: true }).fill(config);
     await page.getByRole('button', { name: '設定先を変更', exact: true }).click();
     const automation = () =>
-      host.evaluate(() => window.dock.automation({ kind: 'status' })).then((r) => r.state);
+      host.evaluate(() => window.dock.automation({ kind: 'status' })).then((r) => r.state.codex);
     await until(async () => (await automation()).configFile === config, 'isolated config selected');
     await page.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
     await until(async () => (await automation()).running, 'automation enabled');

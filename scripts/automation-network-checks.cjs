@@ -5,17 +5,25 @@ const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { parse } = require('smol-toml');
 
-module.exports = async ({ page, section, client, configFile, profile, checks, until }) => {
+module.exports = async ({
+  page,
+  section,
+  client,
+  configFile,
+  profile,
+  checks,
+  until,
+  authorization,
+}) => {
   const status = async () =>
     (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   const before = await status(),
     toml = fs.readFileSync(configFile);
-  const headers = parse(toml.toString()).mcp_servers[before.serverId].http_headers;
+  const headers = { Authorization: authorization };
+  const tools = (await client.listTools()).tools;
   const settings = (await client.callTool({ name: 'appdock_get_settings', arguments: {} }))
     .structuredContent;
-  await client.close();
   const select = section.getByRole('combobox', { name: '接続範囲', exact: true });
   assert.equal(await select.inputValue(), 'local');
   await select.selectOption('network');
@@ -25,6 +33,8 @@ module.exports = async ({ page, section, client, configFile, profile, checks, un
   );
   const active = await status();
   assert.equal(active.endpoint, before.endpoint);
+  assert.equal(active.codex.endpoint, before.codex.endpoint);
+  assert.equal(active.codex.running, true);
   assert.equal(active.canCopyToken, true);
   assert.equal(
     await section.getByRole('button', { name: '接続トークンをコピー', exact: true }).isEnabled(),
@@ -51,7 +61,7 @@ module.exports = async ({ page, section, client, configFile, profile, checks, un
   if (active.networkEndpoints.length) {
     const network = await connect(active.networkEndpoints[0]);
     try {
-      assert.equal((await network.listTools()).tools.length, 22);
+      assert.deepEqual((await network.listTools()).tools, tools);
       const value = (await network.callTool({ name: 'appdock_get_settings', arguments: {} }))
         .structuredContent;
       assert.equal(value.revision, settings.revision);
@@ -60,13 +70,13 @@ module.exports = async ({ page, section, client, configFile, profile, checks, un
       await network.close();
     }
   }
-  if (!(await section.locator('details').evaluate((e) => e.open)))
-    await section.locator('summary').click();
   const names = section.getByRole('textbox', { name: '追加の接続先ホスト名', exact: true });
   await names.fill('https://invalid.example');
   await names.press('Tab');
   await until(
-    async () => (await names.isEnabled()) && (await section.innerText()).includes('DNS名だけ'),
+    async () =>
+      (await names.isEnabled()) &&
+      (await page.getByRole('alert').allTextContents()).some((text) => text.includes('DNS名だけ')),
     'hostname validation',
   );
   assert.equal((await status()).networkHostnames.length, 0);
@@ -122,11 +132,13 @@ module.exports = async ({ page, section, client, configFile, profile, checks, un
   assert.deepEqual((await status()).networkHostnames, ['dock.example']);
   const restored = await connect(before.endpoint);
   try {
-    assert.equal((await restored.listTools()).tools.length, 22);
+    assert.deepEqual((await restored.listTools()).tools, tools);
   } finally {
     await restored.close();
   }
+  assert.equal((await status()).codex.endpoint, before.codex.endpoint);
+  assert.deepEqual((await client.listTools()).tools, tools);
   checks.push(
-    'network scope GUI, exact Codex TOML/port/token preservation, SDK loopback/NIC access, shared revision, host validation and local recovery; NIC access is same-host only',
+    'network scope GUI, separate live Codex receiver and TOML, SDK loopback/NIC access, shared revision and host validation',
   );
 };

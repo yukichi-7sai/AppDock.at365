@@ -48,7 +48,7 @@ async function until(fn, label) {
   throw Error(label);
 }
 const state = () =>
-  host.evaluate(() => window.dock.automation({ kind: 'status' })).then((r) => r.state);
+  host.evaluate(() => window.dock.automation({ kind: 'status' })).then((r) => r.state.codex);
 (async () => {
   try {
     const port = await freePort();
@@ -91,7 +91,7 @@ const state = () =>
     );
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     const page = await settingsPage(host);
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const section = page.getByTestId('codex-integration-settings');
     await section
       .getByRole('textbox', { name: 'Codexの設定ファイル', exact: true })

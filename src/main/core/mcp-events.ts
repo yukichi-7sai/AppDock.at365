@@ -83,6 +83,7 @@ export class McpEvents {
   constructor(
     private options: {
       directory: string;
+      fileName?: string;
       encrypt(value: string): string;
       decrypt(value: string): string;
       enabled(): boolean;
@@ -94,7 +95,7 @@ export class McpEvents {
       now?: () => number;
     },
   ) {
-    this.file = path.join(options.directory, 'automation-events.json');
+    this.file = path.join(options.directory, options.fileName ?? 'automation-events.json');
     try {
       if (fs.existsSync(this.file)) {
         if (fs.statSync(this.file).size > 8 * 1024 * 1024) throw Error();

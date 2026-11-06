@@ -1,5 +1,6 @@
 const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
+const { inspect, electronExpression } = require('./electron-main-helper.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net');
@@ -133,6 +134,7 @@ async function freePort() {
 }
 async function start() {
   const port = await freePort(),
+    mainPort = await freePort(),
     env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(
@@ -142,10 +144,11 @@ async function start() {
       `--test-profile=${profile}`,
       `--test-local-state=${local}`,
       `--remote-debugging-port=${port}`,
+      `--inspect=${mainPort}`,
     ],
     { cwd: profile, env, windowsHide: true, stdio: 'ignore' },
   );
-  const state = { child };
+  const state = { child, mainPort };
   states.push(state);
   state.browser = await until(
     () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
@@ -181,7 +184,7 @@ async function stop(state) {
 }
 async function connect(state) {
   const s = await state.page.evaluate(
-    async () => (await window.dock.automation({ kind: 'status' })).state,
+    async () => (await window.dock.automation({ kind: 'status' })).state.codex,
   );
   const headers = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[s.serverId].http_headers;
   const client = new Client({ name: 'AppDock GUI regression', version: '1' });
@@ -238,14 +241,8 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       { webId, account, port: webServer.address().port },
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
-    const section = page.getByRole('region', { name: 'MCP・Codex連携' });
-    const openDetails = async () => {
-      const currentSection = page.getByRole('region', { name: 'MCP・Codex連携' });
-      if (!(await currentSection.locator('details').evaluate((e) => e.open)))
-        await currentSection.locator('summary').click();
-    };
-    await openDetails();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    const section = page.getByRole('region', { name: 'Codex連携', exact: true });
     async function togglePermission(name) {
       await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
       await page.getByRole('button', { name: '操作の許可', exact: true }).click();
@@ -280,26 +277,25 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         async () => (await control.isChecked()) === next && (await control.isEnabled()),
         'permission saved',
       );
-      await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+      await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     }
     await section.getByRole('textbox', { name: 'Codexの設定ファイル' }).fill(configFile);
     await section.getByRole('button', { name: '設定先を変更', exact: true }).click();
     await until(
       async () =>
         (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
-          .configFile === configFile,
+          .codex.configFile === configFile,
       'config selection',
     );
     await section.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
-    await openDetails();
     await section
       .getByRole('textbox', { name: 'Codexへの登録名', exact: true })
       .fill('AppDock_Test');
     await section.getByRole('button', { name: '登録名を保存', exact: true }).click();
     await until(
       async () =>
-        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.serverId ===
-        'AppDock_Test',
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex
+          .serverId === 'AppDock_Test',
       'custom name saved',
     );
     await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/ }).click();
@@ -313,11 +309,10 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await section.getByRole('button', { name: '登録名を保存', exact: true }).click();
     await until(
       async () =>
-        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.serverId ===
-        'AppDock',
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex
+          .serverId === 'AppDock',
       'default name saved',
     );
-    await openDetails();
     checks.push('custom short name registers/unregisters via GUI; default AppDock restored');
     await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/ }).click();
     await until(
@@ -330,16 +325,22 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     ]);
     await section.getByRole('button', { name: 'このPC内の接続テスト', exact: true }).click();
     await until(
-      async () => (await section.innerText()).includes('AppDock内の疎通に成功'),
+      async () =>
+        (await page.evaluate(() => window.dock.snapshot())).logs.some((entry) =>
+          entry.message.includes('AppDock内の疎通に成功'),
+        ),
       'self test',
     );
     assert.equal(
       (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
-        .lastClientAt,
+        .codex.lastClientAt,
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 22);
+    assert.equal(
+      (await client.listTools()).tools.length,
+      require('../out/main/shared/appdock-api').operationsFor('mcp').length,
+    );
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -347,22 +348,41 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     checks.push(
       'GUI register and self test; real SDK initialize/list/read; unrelated TOML retained',
     );
+    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    const externalSection = page.getByRole('region', { name: 'MCPサーバー', exact: true });
+    await externalSection.getByRole('switch', { name: 'MCPサーバーを有効にする' }).click();
+    await until(
+      async () =>
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.running,
+      'external receiver started',
+    );
+    const sealed = JSON.parse(fs.readFileSync(path.join(local, 'automation.json'), 'utf8')).token;
+    const token = await inspect(
+      s.mainPort,
+      electronExpression +
+        '.safeStorage.decryptString(Buffer.from(' +
+        JSON.stringify(sealed) +
+        ', "base64"))',
+    );
     await require('./automation-network-checks.cjs')({
       page,
-      section,
+      section: externalSection,
       client,
       configFile,
       profile,
       checks,
       until,
+      authorization: 'Bearer ' + token,
     });
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await client.close();
     client = await connect(s);
     const registeredBytes = fs.readFileSync(configFile, 'utf8');
     const markerId = registeredBytes.match(/^# BEGIN AppDock MCP (appdock_[a-f0-9]{16})$/m)[1];
     fs.writeFileSync(configFile, original + '# END AppDock MCP ' + markerId + '\n');
     assert.equal(
-      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.registration,
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex
+        .registration,
       'absent',
     );
     await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/, exact: true }).click();
@@ -407,7 +427,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'EXECUTION_DISABLED',
     );
     assert.equal(fs.existsSync(path.join(fixtureRoot, 'calls.json')), false);
-    await togglePermission('Codexからのコマンド実行を許可する');
+    await togglePermission('MCPからのコマンド実行を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).executable,
       'command permission',
@@ -429,7 +449,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'APPLET_MANAGEMENT_DISABLED',
     );
-    await togglePermission('CodexからのApplet管理を許可する');
+    await togglePermission('MCPからのApplet管理を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management permission',
@@ -465,7 +485,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     assert.equal(fs.readFileSync(activationFile, 'utf8'), stoppedActivations);
     // Local commands share the service but do not depend on external permissions.
-    await togglePermission('CodexからのApplet管理を許可する');
+    await togglePermission('MCPからのApplet管理を許可する');
     await until(
       async () => !(await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management revoked',
@@ -502,7 +522,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         (await call(client, 'appdock_get_applet', { id: fixtureId })).applet.state === 'running',
       'local management keyboard enables disabled Applet',
     );
-    await togglePermission('CodexからのApplet管理を許可する');
+    await togglePermission('MCPからのApplet管理を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management restored',
@@ -535,7 +555,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         await page.getByRole('region', { name: 'AppDockについて' }).waitFor({ state: 'visible' });
     }
     await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await section.waitFor({ state: 'visible' });
     checks.push(
       'separate management permission default deny/revocation; persisted enable/disable; real Node restart without save; disabled restart rejected; local command bypasses external grant; WebApplet lifecycle; three host navigation commands',
@@ -597,11 +617,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       .waitFor();
     await page.screenshot({ path: path.join(profile, 'api-audit-log.png') });
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     checks.push(
       'explicit execution permission; real fixture command and WebApplet open; API outcomes in log UI and host.log without secret values',
     );
-    await togglePermission('Codexからの設定変更を許可する');
+    await togglePermission('MCPからの設定変更を許可する');
     await until(
       async () =>
         (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
@@ -661,7 +681,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'SHORTCUT_EDITING_DISABLED',
     );
-    await togglePermission('Codexからのショートカット編集を許可する');
+    await togglePermission('MCPからのショートカット編集を許可する');
     await until(
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing grant',
@@ -688,7 +708,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       .waitFor();
     await page.screenshot({ path: path.join(profile, 'mcp-shortcut-created.png') });
     await shortcutSearch.fill('');
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const callsFile = path.join(fixtureRoot, 'calls.json');
     const beforeKeys = JSON.parse(fs.readFileSync(callsFile)).length;
     await page.keyboard.press('Control+Alt+F9');
@@ -730,7 +750,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         !(await readShortcuts()).globalHotKeys.some((s) => s.commandId === `${fixtureId}.next`),
       'OS registration removed',
     );
-    await togglePermission('Codexからのショートカット編集を許可する');
+    await togglePermission('MCPからのショートカット編集を許可する');
     await until(
       async () => !(await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing revoked',
@@ -750,7 +770,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'SHORTCUT_EDITING_DISABLED',
     );
-    await togglePermission('Codexからのショートカット編集を許可する');
+    await togglePermission('MCPからのショートカット編集を許可する');
     await until(
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing regranted',
@@ -858,7 +878,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       .fill(lifecycleId(fixtureId, 'enable'));
     await page.getByText(lifecycleId(fixtureId, 'enable'), { exact: true }).first().waitFor();
     await page.getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索' }).fill('');
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await page.keyboard.press('Control+Alt+F11');
     await until(
       async () => (await call(client, 'appdock_get_settings')).values.closeToTray === true,
@@ -877,7 +897,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       await require('./automation-codex-check.cjs')({
         executable: process.env.APPDOCK_TEST_CODEX_EXE,
         configFile,
-        server: state.serverId,
+        server: state.codex.serverId,
         output: profile,
       });
       checks.push(
@@ -890,7 +910,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     const draft = JSON.parse(await json.inputValue());
     draft.host.closeToTray = false;
     await json.fill(JSON.stringify(draft, null, 2));
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await editShortcuts([
       { kind: 'update', id: 'mcp-persistent', changes: { key: 'Ctrl+Alt+F8' } },
     ]);
@@ -921,7 +941,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       true,
     );
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     checks.push('immediate GUI settings and subsequent MCP updates converge to persisted state');
     const closeError = page.getByRole('button', { name: 'エラーを閉じる' });
     if (await closeError.isVisible()) await closeError.click();
@@ -935,7 +955,6 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-${theme}-${width}.png`) });
-        await page.getByText('登録先や接続の詳細', { exact: true }).click();
         await page
           .getByRole('button', { name: '認証情報を再発行', exact: true })
           .scrollIntoViewIfNeeded();
@@ -944,7 +963,6 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-details-${theme}-${width}.png`) });
-        await page.getByText('登録先や接続の詳細', { exact: true }).click();
         await page.locator('.settings-body').evaluate((el) => {
           el.scrollTop = 0;
         });
@@ -1018,15 +1036,14 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'real process restart retains settings/endpoint/registration and invalidates old revision',
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
-    await openDetails();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await page.getByRole('button', { name: '登録を解除', exact: true }).click();
     await until(() => fs.readFileSync(configFile, 'utf8') === original, 'unregister');
     await page.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
     await until(
       async () =>
         (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
-          .running === false,
+          .codex.running === false,
       'disable',
     );
     checks.push('GUI unregister preserves original TOML; disable closes endpoint');

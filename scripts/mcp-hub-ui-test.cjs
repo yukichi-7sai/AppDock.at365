@@ -11,6 +11,7 @@ const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const { parse } = require('smol-toml');
+const { isDeepStrictEqual } = require('node:util');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const { retiredMcpPermissionKeys } = require('../out/main/shared/automation');
 const root = path.resolve(__dirname, '..'),
@@ -260,7 +261,7 @@ let client, inputTarget, inputPeer;
 const guiProcesses = [];
 async function connect(state) {
   const status = await state.page.evaluate(
-    async () => (await window.dock.automation({ kind: 'status' })).state,
+    async () => (await window.dock.automation({ kind: 'status' })).state.codex,
   );
   const headers = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[status.serverId]
     .http_headers;
@@ -308,7 +309,7 @@ async function mcpPermissionControl(page, management = false) {
   const panel = page.getByRole('region', { name: '操作の許可', exact: true });
   const control = panel
     .getByTestId(`permission-row-${management ? 'write' : 'useMcp'}`)
-    .getByRole('switch', { name: /^Codex/ });
+    .getByRole('switch', { name: /^MCPからの/ });
   await control.waitFor();
   await until(() => control.isEnabled(), 'MCP permission control ready');
   return { panel, control };
@@ -330,8 +331,10 @@ async function setMcpPermission(page, allowed, management = false) {
   const after = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.equal(after[permission], allowed);
   if (before) {
-    const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-    assert.equal(digest({ ...after, [permission]: before[permission] }), digest(before));
+    const changedFields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+      (key) => key !== permission && !isDeepStrictEqual(before[key], after[key]),
+    );
+    assert.deepEqual(changedFields, [], 'MCP permission save changed unrelated fields');
   }
   const stateAfter = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.equal(stateAfter[permission], allowed);
@@ -435,8 +438,8 @@ async function assertMcpWriteDenied() {
       await window.dock.automation({ kind: 'selectConfig', file: configFile });
       await window.dock.automation({
         kind: 'configure',
+        receiver: 'codex',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
@@ -785,7 +788,7 @@ async function assertMcpWriteDenied() {
     const setCapability = async (label, allowed) => {
       await page.getByRole('button', { name: '操作の許可', exact: true }).click();
       const checkbox = page.getByRole('switch', {
-        name: 'Codexからの' + label + 'を許可する',
+        name: 'MCPからの' + label + 'を許可する',
         exact: true,
       });
       await until(() => checkbox.isEnabled(), 'capability ready');

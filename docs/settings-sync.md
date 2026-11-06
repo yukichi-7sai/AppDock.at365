@@ -19,7 +19,9 @@ MCP接続先とMCPツールコマンドは自端末の`settings-<端末名>.json
 
 `uiState`だけの変更では設定適用用revisionを進めず、全Appletへの設定再適用やバックアップ世代の追加を行わない。Windowの保存は既存の300ms debounceを使う。直前に端末JSONを再検証し、他の設定・別Windowの最新値を保持して原子的に置換する。同じUI状態の外部変更、破損、復旧中は保存を拒否する。Window状態の競合では、その時点の保存を破棄して最新の位置情報を読み直し、次のWindowイベントから保存を再開する。受信値による表示中Windowの移動や、拒否した保存の自動再送は行わない。読み直しに失敗した場合はエラーを報告し、正常な状態を取得するまで上書きしない。通常の設定保存・ページリセットは`uiState`を保持する。
 
-MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は通知ページで選んだ保存先の通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
+一般向けMCPサーバーの有効・ポート・接続範囲・追加ホスト名は、自端末の`settings-<端末名>.json`の`mcpServer`に保存する。この部分は受信サービスが所有し、共有設定や公開の設定APIへ投影しない。端末別ファイルの変更を監視し、保存直前に同じ設定の外部変更を検査する。一般向けトークン、Codex連携設定と専用トークン、共通の操作許可はPC専用rootの`automation.json`へ保存する。[MCP受信設定と引き継ぎ](automation.md#通信と保存)を参照。
+
+MCP Eventsの購読・署名鍵・callback・送信待ちは、一般向けを`automation-events.json`、Codex向けを`codex-events.json`としてPC専用rootへsafeStorageで暗号化して保存する。種類別の送信選択は通知ページで選んだ保存先の通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 
 共有フォルダー名は小文字の`data`。
 

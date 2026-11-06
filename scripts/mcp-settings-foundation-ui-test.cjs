@@ -270,16 +270,15 @@ async function main() {
   checks.push('9 permission rows; independent Applet/MCP write; execute remains OFF');
   await page.evaluate(async (file) => {
     await window.dock.automation({ kind: 'selectConfig', file });
-    const s = (await window.dock.automation({ kind: 'status' })).state;
     await window.dock.automation({
       kind: 'configure',
+      receiver: 'codex',
       enabled: true,
-      allowWrite: s.allowWrite,
       port: 0,
     });
     await window.dock.automation({ kind: 'register' });
   }, configFile);
-  state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+  state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex;
   const registration = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[state.serverId];
   client = new Client({ name: 'Settings foundation regression', version: '1' });
   await client.connect(

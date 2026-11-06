@@ -33,7 +33,7 @@ import { CustomCommandsSettings } from './CustomCommandsSettings';
 import { TriggerStackSettings } from './TriggerStackSettings';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
-import { CodexSettings } from './CodexSettings';
+import { McpReceiverSettings } from './McpReceiverSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
@@ -200,8 +200,15 @@ export function SettingsForm({
         onOpenCenter={onOpenNotificationCenter}
       />
     );
-  if (category === 'codex')
-    return <CodexSettings state={aux.automation} onOpenPermissions={() => select('permissions')} />;
+  if (category === 'codex' || category === 'mcp-server')
+    return (
+      <McpReceiverSettings
+        key={category}
+        receiver={category === 'codex' ? 'codex' : 'mcp'}
+        state={aux.automation}
+        onOpenPermissions={() => select('permissions')}
+      />
+    );
   if (category === 'permissions')
     return (
       <ApiPermissionsSettings

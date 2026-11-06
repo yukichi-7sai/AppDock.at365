@@ -18,6 +18,12 @@ const {
 const { AutomationService } = require('../out/main/main/core/automation');
 const { AutomationMcp } = require('../out/main/main/core/automation-mcp');
 const { AutomationError } = require('../out/main/main/core/automation-api');
+const { DeviceSettingsStore } = require('../out/main/main/core/device-settings-store');
+const {
+  changeRegistration,
+  registrationBlock,
+} = require('../out/main/main/core/codex-registration');
+const { parse } = require('smol-toml');
 const root = path.resolve(__dirname, '../.artifacts/automation-network-unit');
 
 function headers(host, origin) {
@@ -144,6 +150,13 @@ function fixture(t) {
   const base = fs.mkdtempSync(path.join(root, 'case-'));
   const failures = [],
     audit = [];
+  const settings = new DeviceSettingsStore(
+    path.join(base, 'data', 'settings.json'),
+    path.join(base, 'local'),
+    'TEST-DEVICE',
+  );
+  settings.load();
+  t.after(() => settings.close());
   let copied,
     apiCount = 0,
     revoked = 0,
@@ -155,6 +168,10 @@ function fixture(t) {
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed() {},
+    mcpServer: {
+      read: () => settings.readMcpServer(),
+      save: (next, previous) => settings.saveMcpServer(next, previous),
+    },
     failed: (code, message) => failures.push({ code, message }),
     audit: (level, message) => audit.push({ level, message }),
     writeClipboard: (s) => {
@@ -190,6 +207,8 @@ function fixture(t) {
     failures,
     audit,
     read,
+    deviceFile: settings.device.file,
+    readServer: () => JSON.parse(fs.readFileSync(settings.device.file)).mcpServer,
     copied: () => copied,
     counts: () => ({ apiCount, revoked, executions }),
   };
@@ -235,18 +254,171 @@ async function connect(endpoint, authorization) {
   return client;
 }
 
+test('version 1 retains the external port and token and repairs Codex onto an independent loopback receiver', async (t) => {
+  const f = fixture(t);
+  const configFile = path.join(f.base, 'codex', 'config.toml');
+  fs.mkdirSync(path.dirname(configFile), { recursive: true });
+  const unrelated = '# unrelated\n[mcp_servers.other]\nurl = "http://other.test/mcp"\n';
+  fs.writeFileSync(configFile, unrelated);
+  const reservation = net.createServer();
+  await new Promise((resolve, reject) =>
+    reservation.once('error', reject).listen(0, '127.0.0.1', resolve),
+  );
+  const port = reservation.address().port;
+  await new Promise((resolve) => reservation.close(resolve));
+  const endpoint = 'http://127.0.0.1:' + port + '/mcp';
+  const externalToken = 'a'.repeat(64);
+  const oldBlock = registrationBlock(f.service.id, endpoint, externalToken);
+  const hash = changeRegistration(configFile, f.service.id, oldBlock);
+  const oldToml = fs.readFileSync(configFile, 'utf8');
+  const legacy = {
+    version: 1,
+    enabled: true,
+    port,
+    connectionScope: 'network',
+    networkHostnames: ['dock.example'],
+    allowWrite: true,
+    token: f.options.encrypt(externalToken),
+    configFile,
+    owned: { [configFile]: hash },
+  };
+  fs.writeFileSync(f.file, JSON.stringify(legacy));
+
+  const service = new AutomationService(f.options);
+  t.after(() => service.close());
+  await service.initialize();
+  const state = service.state();
+  assert.equal(state.running, true);
+  assert.equal(state.endpoint, endpoint);
+  assert.equal(state.codex.running, true);
+  assert.notEqual(state.codex.port, port);
+  assert.equal(new URL(state.codex.endpoint).hostname, '127.0.0.1');
+  assert.deepEqual(f.readServer(), {
+    enabled: true,
+    port,
+    connectionScope: 'network',
+    networkHostnames: ['dock.example'],
+  });
+  const saved = f.read();
+  assert.equal(saved.version, 2);
+  assert.equal(saved.token, legacy.token);
+  assert.equal(saved.codex.port, state.codex.port);
+  assert(!fs.readFileSync(f.deviceFile, 'utf8').includes(legacy.token));
+  assert(!Object.hasOwn(saved, 'connectionScope'));
+  const externalAuth = 'Bearer ' + externalToken;
+  const localAuth = 'Bearer ' + f.options.decrypt(saved.codex.token);
+  assert.notEqual(localAuth, externalAuth);
+  assert.equal(state.codex.registration, 'conflict');
+  assert.equal(fs.readFileSync(configFile, 'utf8'), oldToml);
+  await service.action({ kind: 'register' });
+  const repaired = fs.readFileSync(configFile, 'utf8');
+  assert(repaired.startsWith(unrelated));
+  assert.equal(parse(repaired).mcp_servers.AppDock.url, state.codex.endpoint);
+  assert.equal(parse(repaired).mcp_servers.AppDock.http_headers.Authorization, localAuth);
+  assert.equal(state.allowWrite, true);
+  const external = await connect(endpoint, externalAuth);
+  t.after(() => external.close());
+  const codex = await connect(state.codex.endpoint, localAuth);
+  t.after(() => codex.close());
+  const info = (client) => client.callTool({ name: 'appdock_get_info', arguments: {} });
+  assert.deepEqual((await info(external)).structuredContent, (await info(codex)).structuredContent);
+  assert.equal(f.counts().apiCount, 1);
+  assert.equal((await request(endpoint, localAuth)).status, 401);
+  assert.equal((await request(state.codex.endpoint, externalAuth)).status, 401);
+  assert.equal(
+    (await request(state.codex.endpoint, localAuth, { Host: 'dock.example:' + state.codex.port }))
+      .status,
+    403,
+  );
+  await assert.rejects(
+    service.action({ kind: 'configure', receiver: 'codex', enabled: true, port }),
+    /異なるポート/,
+  );
+  await service.action({ kind: 'rotateToken' });
+  assert.equal((await request(endpoint, externalAuth)).status, 401);
+  assert.equal((await request(state.codex.endpoint, localAuth)).status, 200);
+  assert.equal(fs.readFileSync(configFile, 'utf8'), repaired);
+  const renewedExternalAuth = 'Bearer ' + f.options.decrypt(f.read().token);
+  await service.action({ kind: 'configure', enabled: false, port });
+  await assert.rejects(request(endpoint, renewedExternalAuth));
+  assert.equal((await request(state.codex.endpoint, localAuth)).status, 200);
+  assert.equal((await info(codex)).structuredContent.writable, true);
+
+  await service.action({ kind: 'configure', enabled: true, port });
+  await service.action({ kind: 'rotateToken', receiver: 'codex' });
+  assert.equal((await request(state.codex.endpoint, localAuth)).status, 401);
+  assert.equal((await request(endpoint, renewedExternalAuth)).status, 200);
+  const renewedLocalAuth = 'Bearer ' + f.options.decrypt(f.read().codex.token);
+  await service.close();
+  const restarted = new AutomationService(f.options);
+  t.after(() => restarted.close());
+  await restarted.initialize();
+  assert.equal(restarted.state().codex.port, state.codex.port);
+  assert.equal((await request(restarted.state().codex.endpoint, renewedLocalAuth)).status, 200);
+  assert.equal((await request(endpoint, renewedExternalAuth)).status, 200);
+});
+
+test('a migration interrupted after the device save retries without overwriting the device settings or old token', async (t) => {
+  const f = fixture(t);
+  const legacy = JSON.stringify({
+    version: 1,
+    enabled: true,
+    port: 0,
+    connectionScope: 'local',
+    allowWrite: false,
+    token: f.options.encrypt('b'.repeat(64)),
+    configFile: path.join(f.base, 'config.toml'),
+    owned: {},
+  });
+  fs.writeFileSync(f.file, legacy);
+  const interrupted = new AutomationService({
+    ...f.options,
+    encrypt: () => {
+      throw Error('fixture encryption failure');
+    },
+  });
+  t.after(() => interrupted.close());
+  await interrupted.initialize();
+  assert.equal(interrupted.state().running, false);
+  assert.equal(interrupted.state().codex.running, false);
+  assert.equal(fs.readFileSync(f.file, 'utf8'), legacy);
+  const before = f.readServer();
+  assert.equal(before.enabled, true);
+  f.options.mcpServer.save(
+    { ...before, enabled: false, networkHostnames: ['saved.example'] },
+    before,
+  );
+  await interrupted.close();
+
+  const recovered = new AutomationService(f.options);
+  t.after(() => recovered.close());
+  await recovered.initialize();
+  assert.equal(recovered.state().running, false);
+  assert.equal(recovered.state().codex.running, true);
+  assert.deepEqual(f.readServer().networkHostnames, ['saved.example']);
+  assert.equal(f.read().token, JSON.parse(legacy).token);
+  assert.equal(f.read().version, 2);
+});
+
 test('scope switching preserves credentials, permission state and exact Codex registration; shared SDK API', async (t) => {
   const f = fixture(t),
     service = f.service;
-  await service.action({ kind: 'configure', enabled: true, allowWrite: true, port: 0 });
+  await service.action({ kind: 'setWrite', allowed: true });
+  await service.action({ kind: 'configure', enabled: true, port: 0 });
+  await service.action({ kind: 'configure', receiver: 'codex', enabled: true, port: 0 });
   await service.action({ kind: 'selectConfig', file: path.join(f.base, 'codex', 'config.toml') });
   await service.action({ kind: 'register' });
-  const configFile = service.state().configFile;
+  const configFile = service.state().codex.configFile;
   const original = fs.readFileSync(configFile),
     before = f.read(),
-    endpoint = service.state().endpoint;
+    { endpoint, port } = service.state();
   const token = f.options.decrypt(before.token),
     auth = `Bearer ${token}`;
+  assert(
+    parse(original.toString()).mcp_servers.AppDock.http_headers.Authorization ===
+      'Bearer ' + f.options.decrypt(before.codex.token),
+    'a freshly selected Codex port must persist the same credential as its registration',
+  );
   let client = await connect(endpoint, auth);
   t.after(() => client.close());
   assert(service.state().lastLocalClientAt);
@@ -258,15 +430,12 @@ test('scope switching preserves credentials, permission state and exact Codex re
   client = await connect(endpoint, auth);
   assert.equal(service.state().endpoint, endpoint);
   assert.deepEqual(fs.readFileSync(configFile), original);
-  assert.deepEqual(f.read().owned, before.owned);
+  assert.deepEqual(f.read().codex, before.codex);
   assert.equal(f.read().token, before.token);
   assert.equal(f.read().allowWrite, true);
+  assert.equal((await request(endpoint, auth, { Host: `dock.example:${port}` })).status, 200);
   assert.equal(
-    (await request(endpoint, auth, { Host: `dock.example:${before.port}` })).status,
-    200,
-  );
-  assert.equal(
-    (await request(endpoint, 'Bearer wrong', { Host: `dock.example:${before.port}` })).status,
+    (await request(endpoint, 'Bearer wrong', { Host: `dock.example:${port}` })).status,
     401,
   );
   const info = (await client.callTool({ name: 'appdock_get_info', arguments: {} }))
@@ -293,15 +462,12 @@ test('scope switching preserves credentials, permission state and exact Codex re
   assert.equal(f.copied(), token);
   assert(!JSON.stringify(reply).includes(token));
   await assert.rejects(service.action({ kind: 'copyEndpoint', endpoint: 'http://evil.test/' }));
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: before.port });
+  await service.action({ kind: 'setWrite', allowed: false });
   assert.equal(service.state().connectionScope, 'network');
   await service.action({ kind: 'setConnectionScope', scope: 'local' });
   await client.close();
   client = await connect(endpoint, auth);
-  assert.equal(
-    (await request(endpoint, auth, { Host: `dock.example:${before.port}` })).status,
-    403,
-  );
+  assert.equal((await request(endpoint, auth, { Host: `dock.example:${port}` })).status, 403);
   assert.equal(
     (await client.callTool({ name: 'appdock_get_info', arguments: {} })).structuredContent.writable,
     false,
@@ -335,17 +501,21 @@ test('restored enabled server reports startup progress and publishes readiness w
   assert.equal(restarted.state().running, true);
   assert(changes.some((state) => state.starting && !state.running));
   assert(changes.some((state) => !state.starting && state.running));
-  assert.equal(f.read().enabled, true);
+  assert.equal(f.readServer().enabled, true);
   assert.equal(f.read().allowWrite, false);
 });
 
 test('legacy migration and invalid scope/hostnames fail closed without rewriting files', async (t) => {
   const f = fixture(t);
-  await f.service.action({ kind: 'setConnectionScope', scope: 'network' });
-  assert.equal(f.service.state().enabled, false);
-  const saved = f.read();
-  delete saved.connectionScope;
-  delete saved.networkHostnames;
+  const saved = {
+    version: 1,
+    enabled: false,
+    allowWrite: false,
+    port: 0,
+    token: f.options.encrypt('a'.repeat(64)),
+    configFile: path.join(f.base, 'config.toml'),
+    owned: {},
+  };
   fs.writeFileSync(f.file, JSON.stringify(saved));
   const original = fs.readFileSync(f.file);
   const legacy = new AutomationService(f.options);
@@ -405,34 +575,36 @@ test('save failure retains existing network listener; bind failure persists scop
     service = f.service;
   await service.action({ kind: 'setConnectionScope', scope: 'network' });
   await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
-  const endpoint = service.state().endpoint,
+  const { endpoint, port } = service.state(),
     saved = f.read(),
     auth = `Bearer ${f.options.decrypt(saved.token)}`;
-  fs.renameSync(f.file, f.file + '.saved');
-  fs.mkdirSync(f.file);
+  const save = f.options.mcpServer.save;
+  f.options.mcpServer.save = () => {
+    throw Error('fixture write failed');
+  };
   await assert.rejects(service.action({ kind: 'setConnectionScope', scope: 'local' }), /保存/);
   assert.equal(service.state().activeConnectionScope, 'network');
   assert.equal((await request(endpoint, auth)).status, 200);
-  fs.rmdirSync(f.file);
-  fs.renameSync(f.file + '.saved', f.file);
+  f.options.mcpServer.save = save;
   assert.equal(f.failures.length, 1);
-  await service.action({ kind: 'configure', enabled: false, allowWrite: false, port: saved.port });
+  await service.action({ kind: 'configure', enabled: false, port });
   const blocker = net.createServer();
   await new Promise((resolve, reject) =>
-    blocker.once('error', reject).listen(saved.port, '127.0.0.1', resolve),
+    blocker.once('error', reject).listen(port, '127.0.0.1', resolve),
   );
   t.after(() => blocker.close());
   await service.action({ kind: 'setConnectionScope', scope: 'local' });
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: saved.port });
+  await service.action({ kind: 'configure', enabled: true, port });
   assert.equal(service.state().running, false);
   assert.equal(service.state().starting, false);
   assert(service.state().error);
   assert.equal(service.state().activeConnectionScope, null);
-  assert.equal(f.read().connectionScope, 'local');
-  assert.equal(f.read().enabled, true);
-  assert.equal(f.read().port, saved.port);
+  assert.equal(f.readServer().connectionScope, 'local');
+  assert.equal(f.readServer().enabled, true);
+  assert.equal(f.readServer().port, port);
   await new Promise((resolve) => blocker.close(resolve));
   const retry = service.action({ kind: 'retryStart' });
+  await Promise.resolve();
   assert.equal(service.state().starting, true);
   assert.equal(service.state().error, undefined);
   await retry;
@@ -498,6 +670,50 @@ test('uncommitted listener cannot execute; stopped or changed requests cannot ex
   assert.equal(executions, 0);
 });
 
+test('the two receivers share the HTTP request limit and closing one releases its requests', async (t) => {
+  const budget = new Set();
+  const auth = 'Bearer ' + 'a'.repeat(64);
+  const make = () =>
+    new AutomationMcp(
+      { auditTarget: () => undefined, call: () => ({}) },
+      () => 'a'.repeat(64),
+      () => {},
+      'test',
+      undefined,
+      undefined,
+      undefined,
+      budget,
+    );
+  const first = make();
+  const second = make();
+  t.after(() => Promise.all([first.close(), second.close()]));
+  await first.start(0);
+  await second.start(0);
+  const sockets = Array.from({ length: 8 }, () => net.connect(first.port, '127.0.0.1'));
+  t.after(() => sockets.forEach((socket) => socket.destroy()));
+  await Promise.all(
+    sockets.map(async (socket) => {
+      await once(socket, 'connect');
+      socket.on('error', () => {});
+      socket.write(
+        'POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:' +
+          first.port +
+          '\r\nAuthorization: ' +
+          auth +
+          '\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{',
+      );
+    }),
+  );
+  const deadline = Date.now() + 5000;
+  while (budget.size !== 8 && Date.now() < deadline)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(budget.size, 8);
+  const url = 'http://127.0.0.1:' + second.port + '/mcp';
+  assert.equal((await request(url, auth)).status, 429);
+  await first.close();
+  assert.equal((await request(url, auth)).status, 200);
+});
+
 test('wildcard startup fails closed if another listener owns the loopback endpoint', async (t) => {
   const sockets = new Set();
   const blocker = net.createServer((socket) => {
@@ -521,27 +737,30 @@ test('wildcard startup fails closed if another listener owns the loopback endpoi
   });
   assert.equal(f.service.state().running, false);
   assert.equal(f.service.state().activeConnectionScope, null);
-  assert.equal(f.read().connectionScope, 'network');
+  assert.equal(f.readServer().connectionScope, 'network');
   assert.equal(f.failures.length, 1);
 });
 
 test('port zero persistence failure closes the provisional listener and retains the durable setting', async (t) => {
   const f = fixture(t);
-  const original = f.options.createApi;
-  f.options.createApi = (...args) => {
-    const result = original(...args);
-    fs.renameSync(f.file, f.file + '.saved');
-    fs.mkdirSync(f.file);
-    return result;
+  const save = f.options.mcpServer.save;
+  let provisional;
+  f.options.mcpServer.save = (next, previous) => {
+    if (next.port > 0) {
+      provisional = next.port;
+      throw Error('fixture write failed');
+    }
+    save(next, previous);
   };
   await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
   assert.equal(f.service.state().running, false);
   assert.equal(f.service.state().port, 0);
   assert.equal(f.service.state().enabled, true);
   assert.equal(f.failures[0].code, 'MCP_SAVE_FAILED');
-  fs.rmdirSync(f.file);
-  fs.renameSync(f.file + '.saved', f.file);
+  assert.equal(f.readServer().port, 0);
+  await assert.rejects(request('http://127.0.0.1:' + provisional + '/mcp', 'Bearer wrong'));
+  f.options.mcpServer.save = save;
   await f.service.action({ kind: 'retryStart' });
   assert.equal(f.service.state().running, true);
-  assert(f.read().port > 0);
+  assert(f.readServer().port > 0);
 });

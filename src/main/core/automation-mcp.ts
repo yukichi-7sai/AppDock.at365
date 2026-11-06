@@ -13,6 +13,7 @@ import { AutomationApi, AutomationError } from './automation-api';
 import type { ConnectionScope } from '../../shared/automation';
 import { isLocalClient, validMcpHeaders } from './automation-network';
 import type { McpEvents } from './mcp-events';
+import type { McpInvocationOrigin } from './command-contexts';
 import { modernRequest, modernResponse } from './mcp-modern';
 
 const entries = operationsFor('mcp');
@@ -62,6 +63,8 @@ export class AutomationMcp {
     private version: string,
     private audit: (level: string, message: string) => void = () => {},
     private events?: McpEvents,
+    private origin?: () => McpInvocationOrigin,
+    private sharedRequests = new Set<Server>(),
   ) {}
   activate() {
     if (this.server?.listening) this.accepting = true;
@@ -144,7 +147,7 @@ export class AutomationMcp {
         return fail(405);
       }
       if (!req.headers['content-type']?.startsWith('application/json')) return fail(415);
-      if (this.requests.size >= 8) return fail(429);
+      if (this.sharedRequests.size >= 8) return fail(429);
       const sdk = new Server(
         { name: 'AppDock', version: this.version },
         {
@@ -154,6 +157,7 @@ export class AutomationMcp {
         },
       );
       this.requests.add(sdk);
+      this.sharedRequests.add(sdk);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
@@ -163,6 +167,7 @@ export class AutomationMcp {
         if (disposed) return;
         disposed = true;
         this.requests.delete(sdk);
+        this.sharedRequests.delete(sdk);
         void sdk.close().catch(() => {});
       };
       res.on('close', dispose);
@@ -197,7 +202,14 @@ export class AutomationMcp {
               'NOT_FOUND',
               hostText('services.automationMcp.unsupportedTool'),
             );
-          const value = await this.api.call(methods[index], request.params.arguments ?? {});
+          const value = await this.api.call(
+            methods[index],
+            request.params.arguments ?? {},
+            undefined,
+            {
+              origin: this.origin?.(),
+            },
+          );
           this.audit(
             'info',
             `${context} result=success${method === 'commands.execute' ? ` completion=${value.completion}` : ''} durationMs=${Date.now() - started}`,
@@ -321,6 +333,7 @@ export class AutomationMcp {
     server.closeAllConnections();
     await Promise.allSettled([...this.requests].map((s) => s.close()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    for (const request of this.requests) this.sharedRequests.delete(request);
     this.requests.clear();
     this.port = 0;
   }

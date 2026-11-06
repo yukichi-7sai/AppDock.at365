@@ -26,7 +26,7 @@ module.exports = async function ({
         },
       })
     ).structuredContent;
-  const grant = () => togglePermission('Codexからのジェスチャー編集を許可する');
+  const grant = () => togglePermission('MCPからのジェスチャー編集を許可する');
   const original = await read();
   assert.equal(original.gestureEditingAllowed, false);
   const additions = ['next', 'start'].map((name, i) => ({

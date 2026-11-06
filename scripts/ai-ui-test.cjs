@@ -495,14 +495,14 @@ async function errorNoticeFor(caller) {
       await window.dock.automation({ kind: 'selectConfig', file: configFile });
       await window.dock.automation({
         kind: 'configure',
+        receiver: 'codex',
         enabled: true,
-        allowWrite: false,
         port: 0,
       });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
       await window.dock.automation({ kind: 'register' });
     }, configFile);
-    const mcp = (await host.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+    const mcp = (await host.evaluate(() => window.dock.automation({ kind: 'status' }))).state.codex;
     const headers = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[mcp.serverId]
       .http_headers;
     client = new Client({ name: 'AI integration', version: '1' });
@@ -630,7 +630,7 @@ async function errorNoticeFor(caller) {
     assert.equal(revoked.structuredContent.code, 'NOT_FOUND');
     await host.evaluate(() => window.dock.automation({ kind: 'setAi', allowed: true }));
     await host.evaluate(async () => {
-      await window.dock.automation({ kind: 'rotateToken' });
+      await window.dock.automation({ kind: 'rotateToken', receiver: 'codex' });
       await window.dock.automation({ kind: 'register' });
     });
     await client.close();

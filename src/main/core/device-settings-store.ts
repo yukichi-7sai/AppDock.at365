@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import { withoutDeviceMcp } from '../../shared/mcp-device-settings';
+import type { McpServerSettings } from '../../shared/automation';
 import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
 import { AssignedImages } from './assigned-images';
@@ -80,8 +81,21 @@ export class DeviceSettingsStore extends SettingsStore {
   private healthKeys = new Set<string>();
   private deviceConfiguration = '';
   private configurationSignature(value: DeviceSettings) {
-    const { uiState: _uiState, ...configuration } = value;
+    const { uiState: _uiState, mcpServer: _mcpServer, ...configuration } = value;
     return JSON.stringify(configuration);
+  }
+  readMcpServer() {
+    if (this.device.recovered || this.writesBlocked)
+      throw Error(hostText('services.deviceSettingsStore.recoveryRequired'));
+    return this.device.value.mcpServer;
+  }
+  saveMcpServer(next: McpServerSettings, previous: McpServerSettings | undefined) {
+    if (this.mutating || fs.existsSync(this.journal))
+      throw Error(hostText('services.deviceSettingsStore.busy'));
+    this.device.reload();
+    if (!same(previous, this.readMcpServer()))
+      throw new SettingsConflictError(hostText('services.settings.changedBeforeSave'));
+    this.device.save({ ...this.device.value, mcpServer: next }, this.device.revision);
   }
   override uiStateStorage(
     section: 'ribbon' | 'gallery' | 'soundGallery' | 'textGallery' | 'windows',
@@ -230,6 +244,7 @@ export class DeviceSettingsStore extends SettingsStore {
         serialize: (value) =>
           withoutGenerationSettings(deviceSettingsStorageValue(value, this.applets())),
         transientChange: (before, after) =>
+          same(before.mcpServer, after.mcpServer) &&
           this.configurationSignature(before) === this.configurationSignature(after),
       },
     );

@@ -312,7 +312,7 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
       hostText('settings.settings-catalog.webAccountsKeywords'),
     ],
   ],
-  codex: [
+  'mcp-server': [
     [
       'connectionScope',
       hostText('settings.settings-catalog.connectionScope'),
@@ -330,13 +330,26 @@ const hostItems = localizedMetadata<Record<string, [string, string, string?][]>>
     ],
     ['permissions', hostText('settings.settings-catalog.permissions')],
     [
+      'connection',
+      hostText('settings.codexSettings.port'),
+      hostText('settings.codexSettings.portHint'),
+    ],
+  ],
+  codex: [
+    [
+      'automation',
+      hostText('settings.codexSettings.enableLabel'),
+      hostText('settings.codexSettings.connectionHint'),
+    ],
+    ['permissions', hostText('settings.settings-catalog.permissions')],
+    [
       'registration',
       hostText('settings.settings-catalog.register'),
       hostText('settings.settings-catalog.registerKeywords'),
     ],
     [
       'connection',
-      hostText('settings.settings-catalog.registrationDetails'),
+      hostText('settings.codexSettings.port'),
       hostText('settings.settings-catalog.registrationKeywords'),
     ],
   ],
@@ -518,7 +531,7 @@ export function settingsCatalog(
       id,
       title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
       kind: 'host' as const,
-      json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
+      json: !['applets', 'web-accounts', 'permissions', 'mcp-server', 'codex'].includes(id),
       items: [
         ...hostRows(id, current.host.language)
           .filter(([key]) => id !== 'tts' || ttsPageKeys.includes(key))

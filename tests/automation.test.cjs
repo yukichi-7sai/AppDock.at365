@@ -6,6 +6,7 @@ const fs = require('node:fs'),
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationApi } = require('../out/main/main/core/automation-api');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { mcpReceiverSettings } = require('./fixtures/mcp-receiver-settings.cjs');
 const {
   automationApplets,
   automationCommands,
@@ -345,12 +346,13 @@ test('registration recovery confirmation is private, single use and bound to act
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed: () => {},
     informed: (message) => messages.push(message),
+    mcpServer: mcpReceiverSettings(),
     createApi: () => f.api,
   };
   const service = new AutomationService(options);
   t.after(() => service.close());
   await service.action({ kind: 'selectConfig', file });
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await service.action({ kind: 'configure', receiver: 'codex', enabled: true, port: 0 });
   await service.action({ kind: 'register' });
   const registered = fs.readFileSync(file, 'utf8'),
     saved = fs.readFileSync(path.join(options.localDirectory, 'automation.json'), 'utf8');
@@ -388,16 +390,16 @@ test('registration recovery confirmation is private, single use and bound to act
   assert.equal(fs.readFileSync(file, 'utf8'), external + '# concurrent\n');
   fs.writeFileSync(file, external);
   confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
-  await service.action({ kind: 'rotateToken' });
+  await service.action({ kind: 'rotateToken', receiver: 'codex' });
   await assert.rejects(
     service.action({ kind: 'register', confirmationId: confirmation.id }),
     /変更されました/,
   );
   confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
   await service.action({ kind: 'register', confirmationId: confirmation.id });
-  assert.equal(service.state().registration, 'registered');
+  assert.equal(service.state().codex.registration, 'registered');
   const reloaded = new AutomationService(options);
-  assert.equal(reloaded.state().registration, 'registered');
+  assert.equal(reloaded.state().codex.registration, 'registered');
   assert.equal(reloaded.state().error, undefined);
   await reloaded.close();
   await assert.rejects(
@@ -410,7 +412,7 @@ test('registration recovery confirmation is private, single use and bound to act
   );
   confirmation = (await service.action({ kind: 'unregister' })).registrationConfirmation;
   await service.action({ kind: 'unregister', confirmationId: confirmation.id });
-  assert.equal(service.state().registration, 'absent');
+  assert.equal(service.state().codex.registration, 'absent');
 });
 
 test('external uninstall leaves one delimiter; owned comment alone can be repaired or removed', (t) => {
@@ -535,6 +537,7 @@ test('corrupt local credentials remain untouched and expose a readable disabled 
     encrypt: (s) => Buffer.from(s).toString('base64'),
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed: () => {},
+    mcpServer: mcpReceiverSettings(),
     createApi: () => {
       throw Error('must not start');
     },
@@ -542,10 +545,10 @@ test('corrupt local credentials remain untouched and expose a readable disabled 
   t.after(() => service.close());
   await service.initialize();
   assert.equal(service.state().enabled, false);
-  assert.equal(service.state().serverId, 'AppDock');
+  assert.equal(service.state().codex.serverId, 'AppDock');
   assert.equal(service.state().running, false);
   assert.ok(service.state().error);
-  await assert.rejects(service.action({ kind: 'rotateToken' }));
+  await assert.rejects(service.action({ kind: 'rotateToken', receiver: 'codex' }));
   assert.equal(fs.readFileSync(file, 'utf8'), original);
 });
 
@@ -701,6 +704,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     audit: (level, message) => audit.push({ level, message }),
     informed: (message) => audit.push({ level: 'information', message }),
     failed: (code, message) => audit.push({ level: 'failure', code, message }),
+    mcpServer: mcpReceiverSettings(),
     createApi: (
       writable,
       instanceId,
@@ -757,11 +761,11 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(legacyService.state().allowEditRibbon, false);
   assert.equal(legacyService.state().allowEditTray, false);
   await legacyService.close();
-  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
-  let s = service.state();
+  await service.action({ kind: 'configure', receiver: 'codex', enabled: true, port: 0 });
+  const s = service.state().codex;
   assert.equal(s.running, true);
   await service.action({ kind: 'register' });
-  assert.equal(service.state().registration, 'registered');
+  assert.equal(service.state().codex.registration, 'registered');
   t.diagnostic('registered');
   const { parse } = require('smol-toml');
   const headers = parse(fs.readFileSync(file, 'utf8')).mcp_servers[s.serverId].http_headers;
@@ -775,7 +779,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     ).status,
     403,
   );
-  await service.action({ kind: 'test' });
+  await service.action({ kind: 'test', receiver: 'codex' });
   assert.equal(
     audit.filter((e) => e.level === 'information' && e.message.includes('疎通に成功')).length,
     1,
@@ -783,7 +787,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   const informationCount = audit.filter((e) => e.level === 'information').length;
   await service.action({ kind: 'status' });
   assert.equal(audit.filter((e) => e.level === 'information').length, informationCount);
-  assert.equal(service.state().lastClientAt, undefined);
+  assert.equal(service.state().codex.lastClientAt, undefined);
   assert.equal((await fetch(s.endpoint, { headers })).status, 405);
   assert.equal(
     (
@@ -822,7 +826,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   await client.connect(transport);
   t.after(() => client.close());
   t.diagnostic('SDK connected');
-  assert.ok(service.state().lastClientAt);
+  assert.ok(service.state().codex.lastClientAt);
   const tools = (await client.listTools()).tools;
   assert.deepEqual(
     tools.map((t) => t.name).sort(),
@@ -944,7 +948,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     ).structuredContent.code,
     'WRITE_DISABLED',
   );
-  await service.action({ kind: 'configure', enabled: true, allowWrite: true, port: s.port });
+  await service.action({ kind: 'setWrite', allowed: true });
   get = await client.callTool({ name: 'appdock_get_settings', arguments: {} });
   const patch = await client.callTool({
     name: 'appdock_execute_command',
@@ -956,19 +960,19 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(patch.structuredContent.values.theme, 'dark');
   t.diagnostic('patched');
   await service.action({ kind: 'setExecution', allowed: false });
-  await service.action({ kind: 'rotateToken' });
+  await service.action({ kind: 'rotateToken', receiver: 'codex' });
   assert.equal((await fetch(s.endpoint, { method: 'POST', headers })).status, 401);
   await service.action({ kind: 'register' });
-  assert.equal(service.state().registration, 'registered');
+  assert.equal(service.state().codex.registration, 'registered');
   await service.action({ kind: 'unregister' });
-  assert.equal(service.state().registration, 'absent');
+  assert.equal(service.state().codex.registration, 'absent');
   await service.close();
   await assert.rejects(fetch(s.endpoint));
   const restarted = new AutomationService(options);
   t.after(() => restarted.close());
   await restarted.initialize();
-  assert.equal(restarted.state().port, s.port);
-  assert.equal(restarted.state().running, true);
+  assert.equal(restarted.state().codex.port, s.port);
+  assert.equal(restarted.state().codex.running, true);
   assert.equal(restarted.state().allowExecute, false);
   assert.equal(restarted.state().allowManageApplets, true);
   assert.equal(restarted.state().allowEditShortcuts, true);
@@ -979,16 +983,17 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     ...options,
     localDirectory: path.join(f.base, 'other-local'),
     baseDirectory: path.join(f.base, 'other'),
+    mcpServer: mcpReceiverSettings(),
   });
   t.after(() => conflict.close());
-  await conflict.action({ kind: 'configure', enabled: true, allowWrite: false, port: s.port });
-  assert.equal(conflict.state().running, false);
-  assert.ok(conflict.state().error);
+  await conflict.action({ kind: 'configure', receiver: 'codex', enabled: true, port: s.port });
+  assert.equal(conflict.state().codex.running, false);
+  assert.ok(conflict.state().codex.error);
   assert.notEqual(conflict.id, restarted.id);
   await restarted.action({ kind: 'selectName', name: 'AppDock_Test' });
   await restarted.close();
   const renamed = new AutomationService(options);
-  assert.equal(renamed.state().serverId, 'AppDock_Test');
+  assert.equal(renamed.state().codex.serverId, 'AppDock_Test');
   assert.equal(renamed.id, service.id);
   await renamed.close();
 });

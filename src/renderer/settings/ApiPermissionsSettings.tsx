@@ -130,8 +130,12 @@ export function ApiPermissionsSettings({
   function reason(key: AppletApiPermission, applet: boolean) {
     if (!applet) {
       if (!state) return '';
-      if (state.starting) return translate('settings.apiPermissionsSettings.starting');
-      if (!state.running) return translate('settings.apiPermissionsSettings.stopped');
+      if (!state.running && !state.codex.running)
+        return translate(
+          state.starting || state.codex.starting
+            ? 'settings.apiPermissionsSettings.starting'
+            : 'settings.apiPermissionsSettings.stopped',
+        );
     }
     const missing = needs(key, applet ? grants : mcpPermissions, applet);
     return missing.length
@@ -140,9 +144,7 @@ export function ApiPermissionsSettings({
   }
   useSettingsFeedback({
     busy,
-    error: [error || appletError || state?.error ? error || appletError || state?.error : '']
-      .filter(Boolean)
-      .join('\n'),
+    error: error || appletError,
   });
   return (
     <section
@@ -219,17 +221,14 @@ export function ApiPermissionsSettings({
                             label: row.label ?? appletApiPermissionLabels[row.key],
                           })}
                           checked={!!mcpOn}
-                          disabled={hostBusy || busy || !state || state.starting}
+                          disabled={
+                            hostBusy || busy || !state || state.starting || state.codex.starting
+                          }
                           onChange={(allowed) =>
                             void save(async () => {
                               const action =
                                 row.key === 'write'
-                                  ? ({
-                                      kind: 'configure',
-                                      enabled: state!.enabled,
-                                      allowWrite: allowed,
-                                      port: state!.port,
-                                    } as const)
+                                  ? ({ kind: 'setWrite', allowed } as const)
                                   : ({ kind: row.action, allowed } as AutomationAction);
                               await settingsControls.automation(action);
                             })

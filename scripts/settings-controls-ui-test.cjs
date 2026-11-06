@@ -444,6 +444,7 @@ let app,
     const before = (await saved()).ai;
     await dialog.getByLabel('登録名', { exact: true }).fill('Control probe');
     await dialog.getByLabel('APIのURL', { exact: true }).fill('http://127.0.0.1:1/v1');
+    await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
     await dialog.getByLabel('AIの既定の出力トークン上限', { exact: true }).fill('16384');
     await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).fill('120');
     assert.deepEqual((await saved()).ai, before, 'dialog edits remain local before OK');
@@ -456,6 +457,7 @@ let app,
     assert.equal(connection.defaultTimeoutSeconds, 120);
     assert.equal(connection.baseUrl, 'http://127.0.0.1:1/v1');
     await host.getByRole('button', { name: 'Control probeの設定', exact: true }).click();
+    await dialog.getByRole('tab', { name: '詳細設定', exact: true }).click();
     assert.equal(
       await dialog.getByLabel('AIの既定の待ち時間（秒）', { exact: true }).inputValue(),
       '120',

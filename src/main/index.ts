@@ -948,8 +948,27 @@ let textLibraryPageState: ImageLibraryPageState | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
 const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
+const mcpAuthorized = (lease?: string) => !quitting && (automation?.authorized(lease) ?? false);
 const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
   !quitting && (automation?.allowed(key) ?? false);
+let mcpPermissionGeneration = 0;
+const mcpJobOwner = (lease = '') => 'mcp:' + mcpPermissionGeneration + ':' + lease;
+const mcpJobAuthorized = (owner: string) => {
+  const prefix = mcpJobOwner();
+  return owner.startsWith(prefix) && mcpAuthorized(owner.slice(prefix.length) || undefined);
+};
+const appletJobOwner = (id: string) =>
+  'applet:' + id + ':' + manager?.items.get(id)?.runtimeSession;
+const apiJobOwner = (id?: string, context: InputInvocation = {}) => {
+  const origin = context.origin;
+  const owner = mcpJobOwner(origin?.kind === 'mcp' ? origin.lease : undefined);
+  if (!id) return owner;
+  return appletJobOwner(id) + (origin?.kind === 'mcp' ? '|' + owner : '');
+};
+const ttsOwner = (id?: string, context: InputInvocation = {}) =>
+  id
+    ? apiJobOwner(id, context)
+    : 'mcp:' + (context.origin?.kind === 'mcp' ? (context.origin.lease ?? '') : '');
 const externalUiPermissions = (id?: string) =>
   id
     ? ['starting', 'running'].includes(manager?.items.get(id)?.state ?? '')
@@ -975,9 +994,6 @@ const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-keys.json'), {
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
 });
-const ttsOwner = (id?: string, context: InputInvocation = {}) =>
-  (id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp') +
-  (id && context.origin?.kind === 'mcp' ? '|mcp:' + aiMcpGeneration : '');
 const tts = new TtsService({
   settings: () => settings.value.tts ?? { connections: [] },
   key: (server) => ttsSecrets.key(server),
@@ -985,12 +1001,12 @@ const tts = new TtsService({
     if (quitting) return false;
     if (owner === 'host' || owner === 'notification-preview') return startupReady;
     if (owner.startsWith('notification:')) return notificationSpeech?.allows(owner) ?? false;
-    if (owner === 'mcp') return mcpAllowed('allowUseTts') && (!speak || mcpAllowed('allowExecute'));
-    const indirect = owner.includes('|mcp:');
-    if (indirect && (!mcpAllowed('allowUseTts') || (speak && !mcpAllowed('allowExecute'))))
-      return false;
+    const mcpTts = () => mcpAllowed('allowUseTts') && (!speak || mcpAllowed('allowExecute'));
+    if (owner.startsWith('mcp:')) return mcpAuthorized(owner.slice(4) || undefined) && mcpTts();
+    const [appletOwner, mcpOwner] = owner.split('|', 2);
+    if (mcpOwner && (!mcpJobAuthorized(mcpOwner) || !mcpTts())) return false;
     const item = [...(manager?.items.values() ?? [])].find(
-      (e) => owner === ttsOwner(e.manifest.id, indirect ? { origin: { kind: 'mcp' } } : {}),
+      (e) => appletOwner === appletJobOwner(e.manifest.id),
     );
     const grants =
       item && ['starting', 'running'].includes(item.state)
@@ -1061,10 +1077,6 @@ const serviceSettings = new SettingsServiceTargets({
   launch,
   assertWritable: assertSettingsWritable,
 });
-let aiMcpGeneration = 0;
-const aiOwner = (id?: string, context: InputInvocation = {}) =>
-  (id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration) +
-  (id && context.origin?.kind === 'mcp' ? '|mcp:' + aiMcpGeneration : '');
 const errors = new ErrorReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('error', source, message),
@@ -1083,24 +1095,25 @@ const ai = new AiService({
   canUse: (owner, kind) => {
     if (quitting) return false;
     if (owner === 'host') return startupReady;
-    if (owner === aiOwner()) {
-      const state = automation?.state();
+    if (owner.startsWith('mcp:')) {
       return (
-        !!state?.enabled &&
+        mcpJobAuthorized(owner) &&
         (kind === 'read' ||
           (kind === 'cancel'
             ? mcpAllowed('allowExecute')
             : mcpAllowed('allowUseAi') && (kind !== 'generate' || mcpAllowed('allowExecute'))))
       );
     }
-    const indirect = owner.includes('|mcp:');
+    const [appletOwner, mcpOwner] = owner.split('|', 2);
     if (
-      indirect &&
-      (!mcpAllowed('allowUseAi') || (kind === 'generate' && !mcpAllowed('allowExecute')))
+      mcpOwner &&
+      (!mcpJobAuthorized(mcpOwner) ||
+        !mcpAllowed('allowUseAi') ||
+        (kind === 'generate' && !mcpAllowed('allowExecute')))
     )
       return false;
     const item = [...(manager?.items.values() ?? [])].find(
-      (e) => owner === aiOwner(e.manifest.id, indirect ? { origin: { kind: 'mcp' } } : {}),
+      (e) => appletOwner === appletJobOwner(e.manifest.id),
     );
     const grants =
       item && ['starting', 'running'].includes(item.state)
@@ -1150,7 +1163,9 @@ const imageAi = new ImageAiService({
     if (owner === 'host') return startupReady;
     const indirect = owner.includes('|mcp:');
     if (indirect) return false;
-    const item = [...(manager?.items.values() ?? [])].find((e) => owner === aiOwner(e.manifest.id));
+    const item = [...(manager?.items.values() ?? [])].find(
+      (e) => owner === appletJobOwner(e.manifest.id),
+    );
     const grants =
       item && ['starting', 'running'].includes(item.state)
         ? appletApiAccess.get(item.manifest)
@@ -1208,27 +1223,12 @@ function mcpConnectionWarning(warning: { code: string; message: string }) {
   });
 }
 function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
-  const root: McpActor['origin'] =
-    context.origin?.kind === 'mcp'
-      ? { kind: 'mcp' }
-      : context.origin?.kind === 'applet'
-        ? context.origin
-        : undefined;
-  const origin =
-    (root?.kind === 'mcp' && !id) || (root?.kind === 'applet' && root.appletId === id)
-      ? undefined
-      : root;
-  const identity = id
-    ? 'applet:' + id + ':' + manager?.items.get(id)?.runtimeSession
-    : 'mcp:' + aiMcpGeneration;
-  const suffix =
-    origin?.kind === 'mcp'
-      ? '|mcp:' + aiMcpGeneration
-      : origin?.kind === 'applet'
-        ? '|applet:' + origin.appletId + ':' + manager?.items.get(origin.appletId)?.runtimeSession
-        : '';
+  const root = context.origin?.kind === 'local' ? undefined : context.origin;
+  const origin = root?.kind === 'applet' && root.appletId === id ? undefined : root;
   return {
-    owner: identity + suffix,
+    owner:
+      apiJobOwner(id, context) +
+      (origin?.kind === 'applet' ? '|' + appletJobOwner(origin.appletId) : ''),
     kind: id ? 'applet' : 'mcp',
     appletId: id,
     external: !id || origin?.kind === 'mcp',
@@ -1257,6 +1257,7 @@ const mcpClient = new McpClientService({
   authorized: (actor, execute) => {
     if (quitting) return false;
     if (actor.kind === 'host') return startupReady;
+    if (actor.origin?.kind === 'mcp' && !mcpAuthorized(actor.origin.lease)) return false;
     if (actor.owner !== mcpActor(actor.appletId, { origin: actor.origin }).owner) return false;
     const allowed = (id?: string) => {
       if (!id) return mcpAllowed('allowUseMcp') && (!execute || mcpAllowed('allowExecute'));
@@ -1301,6 +1302,7 @@ function customExecutionAllowed(
   return (
     !quitting &&
     startupReady &&
+    (context.origin?.kind !== 'mcp' || mcpAuthorized(context.origin.lease)) &&
     executionAuthorized(permission, context, (actor) => {
       if (actor.kind === 'mcp')
         return {
@@ -1339,7 +1341,8 @@ const customCommands = new CustomCommandService({
   ],
   authorized: (context) => {
     if (quitting) return false;
-    if (context.origin?.kind === 'mcp') return mcpAllowed('allowExecute');
+    if (context.origin?.kind === 'mcp')
+      return mcpAuthorized(context.origin.lease) && mcpAllowed('allowExecute');
     if (context.origin?.kind === 'applet') {
       const owner = manager?.items.get(context.origin.appletId);
       const permissions =
@@ -1553,7 +1556,7 @@ const operationApi = new AppDockApi({
       checkRevision: (revision) => settingsCommands.checkRevision(revision),
     }),
   ],
-  settingsPrincipal: () => automation?.principal() ?? '',
+  mcpAuthorized,
   handlers: {
     'mcp.servers.getSettings': async (p) =>
       mcpSettingsOperation(() => mcpSettings.publicSettings(p.serverId)),
@@ -1575,25 +1578,25 @@ const operationApi = new AppDockApi({
     'mcp.jobs.get': async (p, id, c) => ({ ...mcpClient.get(mcpActor(id, c), p.jobId) }),
     'mcp.jobs.cancel': async (p, id, c) => ({ ...mcpClient.cancel(mcpActor(id, c), p.jobId) }),
     'ai.image.connections.list': async (_params, id, context) => ({
-      ...imageAi.connections(aiOwner(id, context)),
+      ...imageAi.connections(apiJobOwner(id, context)),
     }),
     'ai.image.jobs.get': async (params, id, context) => ({
-      ...imageAi.get(aiOwner(id, context), params.jobId),
+      ...imageAi.get(apiJobOwner(id, context), params.jobId),
     }),
     'ai.image.jobs.cancel': async (params, id, context) => ({
-      ...imageAi.cancel(aiOwner(id, context), params.jobId),
+      ...imageAi.cancel(apiJobOwner(id, context), params.jobId),
     }),
     'ai.text.generate': async (params, id, context) => ({
-      ...ai.generate(aiOwner(id, context), params),
+      ...ai.generate(apiJobOwner(id, context), params),
     }),
     'ai.jobs.get': async (params, id, context) => ({
-      ...ai.get(aiOwner(id, context), params.jobId),
+      ...ai.get(apiJobOwner(id, context), params.jobId),
     }),
     'ai.jobs.cancel': async (params, id, context) => ({
-      ...ai.cancel(aiOwner(id, context), params.jobId),
+      ...ai.cancel(apiJobOwner(id, context), params.jobId),
     }),
     'ai.models.list': async (params, id, context) => ({
-      ...(await ai.models(aiOwner(id, context), params.connectionId)),
+      ...(await ai.models(apiJobOwner(id, context), params.connectionId)),
     }),
     'tts.speak': async (params, id, context) => tts.speak(ttsOwner(id, context), params),
     'tts.connections.list': async (_params, id, context) => tts.connections(ttsOwner(id, context)),
@@ -2726,7 +2729,7 @@ function settingsDescriptionTexts(page: SettingsPageDefinition, auxiliary: Setti
 }
 function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const id = page.id;
-  if (id === 'codex') return { automation: automation?.state() };
+  if (id === 'codex' || id === 'mcp-server') return { automation: automation?.state() };
   if (id === 'mcp-client')
     return {
       commandAssignments: settingsCommandAssignments(),
@@ -3737,14 +3740,14 @@ function settingsPageActions(
     actions.clearWebAccount = async ([id, confirmed]) =>
       pageCollections.clearAccount(string(id), confirmed as WebProfile | undefined);
   }
-  if (['permissions', 'codex'].includes(page.id)) {
+  if (['permissions', 'codex', 'mcp-server'].includes(page.id)) {
     actions.automation = async ([action]) => {
       const value = action as AutomationAction;
       const permitted =
         page.id === 'permissions'
           ? [
               'status',
-              'configure',
+              'setWrite',
               'setExecution',
               'setAppletManagement',
               'setShortcutEditing',
@@ -3763,21 +3766,19 @@ function settingsPageActions(
           : [
               'status',
               'configure',
-              'register',
-              'unregister',
               'test',
               'rotateToken',
-              'selectConfig',
-              'selectName',
-              'setConnectionScope',
-              'setNetworkHostnames',
-              'copyToken',
-              'copyEndpoint',
               'retryStart',
+              ...(page.id === 'codex'
+                ? ['register', 'unregister', 'selectConfig', 'selectName']
+                : ['setConnectionScope', 'setNetworkHostnames', 'copyToken', 'copyEndpoint']),
             ];
       if (!value || !permitted.includes(value.kind))
         throw Error(hostText('settings.index.actionUnavailable'));
-      const reply = await automation!.action(value);
+      const reply = await automation!.action({
+        ...value,
+        receiver: page.id === 'codex' ? 'codex' : 'mcp',
+      } as AutomationAction);
       customCommands.reconcile();
       mcpClient.reconcile();
       ai.reconcile();
@@ -5733,6 +5734,11 @@ async function initialize() {
     localDirectory: dataDirectory,
     baseDirectory,
     version: app.getVersion(),
+    createApi: () => operationApi,
+    mcpServer: {
+      read: () => settings.readMcpServer(),
+      save: (value, previous) => settings.saveMcpServer(value, previous),
+    },
     eventTypes: () =>
       notificationCatalog(allApplets()).filter((type) =>
         settings.value.notificationPreferences?.overrides.some(
@@ -5754,16 +5760,18 @@ async function initialize() {
       imageAi.reconcile();
       customCommands.reconcile();
       mcpClient.reconcile();
+      tts.reconcile();
       changed();
     },
-    authorizationChanged: () => {
+    authorizationChanged: (lease) => {
+      const owners = (lease ? [lease] : (automation?.activeLeases() ?? [])).map(mcpJobOwner);
+      if (!lease) mcpPermissionGeneration++;
+      for (const owner of owners) {
+        ai.forgetOwner(owner);
+        imageAi.forgetOwner(owner);
+      }
       customCommands.reconcile();
       mcpClient.reconcile();
-      const owner = aiOwner();
-      aiMcpGeneration++;
-      mcpClient.reconcile();
-      ai.forgetOwner(owner);
-      imageAi.forgetOwner(owner);
     },
     audit: (level, message) => log.audit(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),
@@ -5777,8 +5785,9 @@ async function initialize() {
         code,
         message,
       }),
-    createApi: () => operationApi,
   });
+  settings.device.on('changed', () => automation?.refreshMcpServer());
+  settings.device.on('statusChanged', () => automation?.refreshMcpServer());
   await automation.initialize();
   changed();
   log.write('info', 'host', hostText('services.index.started'));

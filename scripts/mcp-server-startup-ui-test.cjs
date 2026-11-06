@@ -2,11 +2,17 @@ const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const http = require('node:http');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
-const { createHash } = require('node:crypto');
+const { createHash, randomBytes } = require('node:crypto');
 const { chromium } = require('playwright');
-const { freePort, inspect } = require('./electron-main-helper.cjs');
+const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+const {
+  StreamableHTTPClientTransport,
+} = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const { parse } = require('smol-toml');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
@@ -157,9 +163,9 @@ async function checkPermissions() {
     await window.dock.automation({
       kind: 'configure',
       enabled: false,
-      allowWrite: true,
       port: state.port,
     });
+    await window.dock.automation({ kind: 'setWrite', allowed: true });
     await window.dock.automation({ kind: 'setExecution', allowed: true });
   });
   await pauseNextStartup();
@@ -169,7 +175,6 @@ async function checkPermissions() {
       .automation({
         kind: 'configure',
         enabled: true,
-        allowWrite: state.allowWrite,
         port: state.port,
       })
       .then(
@@ -310,7 +315,6 @@ async function checkPermissions() {
     await window.dock.automation({
       kind: 'configure',
       enabled: false,
-      allowWrite: state.allowWrite,
       port: state.port,
     });
   });
@@ -318,6 +322,188 @@ async function checkPermissions() {
   assert.deepEqual(permissionValues(await state()), permissionValues(saved));
   checks.push('recovery and disabling update the open permissions page and preserve all grants');
 }
+
+async function checkReceiverMigration() {
+  const before = await state();
+  const externalToken = randomBytes(32).toString('hex');
+  const externalAuth = 'Bearer ' + externalToken;
+  const sealed = await inspect(
+    mainPort,
+    electronExpression +
+      '.safeStorage.encryptString(' +
+      JSON.stringify(externalToken) +
+      ').toString("base64")',
+  );
+  const configFile = before.codex.configFile;
+  const localFile = path.join(profile, 'local', 'automation.json');
+  const deviceFile = require('./test-settings.cjs').file(
+    profile,
+    'settings-' + require('node:os').hostname() + '.json',
+  );
+  const {
+    registrationBlock,
+    changeRegistration,
+  } = require('../out/main/main/core/codex-registration');
+  const owner =
+    'appdock_' + createHash('sha256').update(profile.toLowerCase()).digest('hex').slice(0, 16);
+  await stop();
+  const device = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+  delete device.mcpServer;
+  fs.writeFileSync(deviceFile, JSON.stringify(device));
+  fs.mkdirSync(path.dirname(configFile), { recursive: true });
+  fs.writeFileSync(configFile, '# unrelated configuration\n');
+  const owned = changeRegistration(
+    configFile,
+    owner,
+    registrationBlock(owner, before.endpoint, externalToken),
+  );
+  const original = fs.readFileSync(configFile, 'utf8');
+  fs.writeFileSync(
+    localFile,
+    JSON.stringify({
+      version: 1,
+      enabled: true,
+      port: before.port,
+      connectionScope: 'network',
+      networkHostnames: ['appdock.fixture'],
+      allowWrite: true,
+      allowExecute: true,
+      token: sealed,
+      configFile,
+      owned: { [configFile]: owned },
+    }),
+  );
+
+  await launch();
+  await waitRunning();
+  const split = await state();
+  assert.equal(split.endpoint, before.endpoint);
+  assert.equal(split.codex.running, true);
+  assert.notEqual(split.codex.port, split.port);
+  assert.equal(split.codex.registration, 'conflict');
+  assert.equal(fs.readFileSync(configFile, 'utf8'), original);
+  assert.deepEqual(JSON.parse(fs.readFileSync(deviceFile, 'utf8')).mcpServer, {
+    enabled: true,
+    port: before.port,
+    connectionScope: 'network',
+    networkHostnames: ['appdock.fixture'],
+  });
+  const local = JSON.parse(fs.readFileSync(localFile, 'utf8'));
+  assert(local.token === sealed);
+  assert.equal(local.codex.port, split.codex.port);
+  assert(!fs.readFileSync(deviceFile, 'utf8').includes(sealed));
+  assert.equal(await host.getByLabel('Codexの設定ファイル', { exact: true }).count(), 0);
+  await host.getByRole('button', { name: 'Codex連携', exact: true }).click();
+  await host.getByTestId('codex-integration-settings').waitFor();
+  assert.equal(await host.getByRole('combobox', { name: '接続範囲', exact: true }).count(), 0);
+  await host.getByRole('button', { name: '登録を修復', exact: true }).click();
+  await until(
+    async () => (await state()).codex.registration === 'registered',
+    'repaired Codex endpoint',
+  );
+  const registered = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers.AppDock;
+  assert.equal(registered.url, split.codex.endpoint);
+  const codexAuth = registered.http_headers.Authorization;
+  assert(codexAuth !== externalAuth);
+
+  const client = new Client({ name: 'Split receiver regression', version: '1' });
+  const external = new Client({ name: 'Migrated external receiver', version: '1' });
+  const transport = (url, Authorization) =>
+    new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: { Authorization } },
+    });
+  const ping = (url, Authorization, extra = {}) =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            Authorization,
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            ...extra,
+          },
+        },
+        (response) => {
+          response.resume();
+          response.on('end', () => resolve(response.statusCode));
+        },
+      );
+      request.on('error', reject);
+      request.setTimeout(5000, () => request.destroy(Error('MCP ping timed out')));
+      request.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }));
+    });
+  try {
+    await client.connect(transport(registered.url, codexAuth));
+    await external.connect(transport(split.endpoint, externalAuth));
+    const tools = (await client.listTools()).tools;
+    assert.deepEqual((await external.listTools()).tools, tools);
+    assert.equal(await ping(split.endpoint, codexAuth), 401);
+    assert.equal(await ping(registered.url, externalAuth), 401);
+    assert.equal(
+      await ping(registered.url, codexAuth, { Host: 'appdock.fixture:' + split.codex.port }),
+      403,
+    );
+    if (split.networkEndpoints.length)
+      assert.equal(await ping(split.networkEndpoints[0], externalAuth), 200);
+    const savedDevice = JSON.parse(fs.readFileSync(deviceFile, 'utf8'));
+    savedDevice.mcpServer.networkHostnames = ['appdock-updated.fixture'];
+    require('../out/main/main/core/settings').atomicWrite(deviceFile, JSON.stringify(savedDevice));
+    await until(
+      async () => (await state()).networkHostnames[0] === 'appdock-updated.fixture',
+      'device file update applied',
+    );
+    assert.equal(
+      await ping(split.endpoint, externalAuth, { Host: 'appdock.fixture:' + split.port }),
+      403,
+    );
+    assert.equal(
+      await ping(split.endpoint, externalAuth, { Host: 'appdock-updated.fixture:' + split.port }),
+      200,
+    );
+    assert.equal(await ping(registered.url, codexAuth), 200);
+    checks.push(
+      'external device settings update the general receiver without changing the Codex connection',
+    );
+    await host.screenshot({ path: path.join(profile, 'split-codex-settings.png') });
+    await host.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
+    await host.screenshot({ path: path.join(profile, 'split-mcp-server-settings.png') });
+    await host.getByRole('switch', { name: 'MCPサーバーを有効にする', exact: true }).click();
+    await until(async () => !(await state()).running, 'external receiver stopped independently');
+    await assert.rejects(ping(split.endpoint, externalAuth));
+    const info = await client.callTool({ name: 'appdock_get_info', arguments: {} });
+    assert.equal(info.structuredContent.version, require('../package.json').version);
+    checks.push(
+      'version 1 migration keeps the external port and credential; settings pages, sockets and credentials are separate; shared tools remain available after disabling the external receiver',
+    );
+    if (process.env.APPDOCK_TEST_CODEX_EXE) {
+      await require('./automation-codex-check.cjs')({
+        executable: process.env.APPDOCK_TEST_CODEX_EXE,
+        configFile,
+        server: 'AppDock',
+        output: profile,
+        expectedTools: tools.map((tool) => tool.name),
+      });
+      checks.push(
+        'installed Codex reads the migrated TOML and calls AppDock on the dedicated loopback port',
+      );
+    }
+  } finally {
+    await Promise.all([client.close(), external.close()]);
+  }
+
+  await stop();
+  await launch();
+  const restored = await state();
+  assert.equal(restored.enabled, false);
+  assert.equal(restored.port, split.port);
+  assert.equal(restored.codex.running, true);
+  assert.equal(restored.codex.port, split.codex.port);
+  assert.equal(await ping(registered.url, codexAuth), 200);
+  checks.push('separate settings and the Codex-only connection survive a process restart');
+}
+
 (async () => {
   try {
     await launch();
@@ -331,7 +517,7 @@ async function checkPermissions() {
     await until(async () => (await state()).connectionScope === 'network', 'network scope');
 
     await pauseNextStartup();
-    await host.getByRole('switch', { name: 'Codex連携を有効にする', exact: true }).click();
+    await host.getByRole('switch', { name: 'MCPサーバーを有効にする', exact: true }).click();
     await until(
       () => inspect(mainPort, "typeof globalThis.__mcpStartupUiRelease === 'function'"),
       'startup gate',
@@ -349,7 +535,7 @@ async function checkPermissions() {
     );
     assert.equal(await retryField().count(), 0);
     assert.equal(
-      await host.getByRole('switch', { name: 'Codex連携を有効にする', exact: true }).isDisabled(),
+      await host.getByRole('switch', { name: 'MCPサーバーを有効にする', exact: true }).isDisabled(),
       true,
     );
     checks.push('in-flight startup shows progress, disables changes and offers no retry');
@@ -358,15 +544,17 @@ async function checkPermissions() {
     await settingsPage(host);
     await host.getByTestId('settings-page:notifications').waitFor();
     assert.equal((await model()).content.page.id, 'notifications');
-    await host.evaluate(() => window.dock.executeCommand('appdock.settings.codex.open'));
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.mcp-server.open'));
     await settingsPage(host);
     await until(async () => {
       const value = await model();
-      return value?.content.page.id === 'codex' && value.content.auxiliary.automation?.starting;
+      return (
+        value?.content.page.id === 'mcp-server' && value.content.auxiliary.automation?.starting
+      );
     }, 'startup projection after navigation');
     assert.equal(await retryField().count(), 0);
     assert.equal(
-      await host.getByRole('switch', { name: 'Codex連携を有効にする', exact: true }).isDisabled(),
+      await host.getByRole('switch', { name: 'MCPサーバーを有効にする', exact: true }).isDisabled(),
       true,
     );
     assert.equal((await state()).port, pendingState.port);
@@ -378,7 +566,7 @@ async function checkPermissions() {
     await waitRunning();
     const ready = await model();
     assert(ready.revision > starting.revision);
-    assert.equal(ready.content.page.id, 'codex');
+    assert.equal(ready.content.page.id, 'mcp-server');
     assert.equal(ready.content.editing.editRevision, starting.content.editing.editRevision);
     checks.push(
       'startup completion advances the page revision and updates the open page without navigation',
@@ -442,6 +630,7 @@ async function checkPermissions() {
       'narrow light retry is keyboard accessible, recovers the server and preserves connection settings',
     );
     await checkPermissions();
+    await checkReceiverMigration();
     assert.deepEqual(failures, []);
     success = true;
   } catch (error) {
