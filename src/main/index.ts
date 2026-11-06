@@ -947,7 +947,7 @@ let inputPalette: InputPaletteHost | undefined;
 let textLibraryPageState: ImageLibraryPageState | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
-const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
+const appletApiAccess = new AppletApiAccess(settings);
 const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
   !quitting && (automation?.allowed(key) ?? false);
 const externalUiPermissions = (id?: string) =>
@@ -3744,7 +3744,7 @@ function settingsPageActions(
         page.id === 'permissions'
           ? [
               'status',
-              'configure',
+              'setWrite',
               'setExecution',
               'setAppletManagement',
               'setShortcutEditing',
@@ -3786,15 +3786,8 @@ function settingsPageActions(
       return reply;
     };
     if (page.id === 'permissions')
-      actions.setAppletApiPermissions = async ([value]) => {
-        appletApiAccess.set(value);
-        customCommands.reconcile();
-        mcpClient.reconcile();
-        ai.reconcile();
-        imageAi.reconcile();
-        tts.reconcile();
-        for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
-        changed();
+      actions.setAppletApiPermissions = async ([value, before]) => {
+        appletApiAccess.set(value, before);
         information.report(
           'permissions',
           hostText('settings.index.permissions'),
@@ -4079,16 +4072,10 @@ function registerIpc() {
   handle('dock:pages:get', (id) => hostPages!.get(id));
   handle('dock:pages:act', (action) => hostPages!.act(action));
   handle('dock:pages:close', (id) => hostPages?.close(id));
-  handle('dock:appletApiPermissions', (permissions: unknown) => {
+  handle('dock:appletApiPermissions', (permissions: unknown, before?: unknown) => {
     if (!startupReady || quitting) throw Error(hostText('services.index.notReady'));
-    appletApiAccess.set(permissions);
-    customCommands.reconcile();
-    ai.reconcile();
-    imageAi.reconcile();
-    tts.reconcile();
-    for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
-    log.audit('info', 'host', '[Applet API] shared permissions updated');
-    changed();
+    appletApiAccess.set(permissions, before);
+    log.audit('info', 'host', '[Applet API] operation permissions updated');
   });
   handle('dock:automation', async (action: AutomationAction) => {
     if (!automation || quitting) throw Error(hostText('services.index.automationNotReady'));
@@ -4723,10 +4710,22 @@ async function initialize() {
     void syncHotKeys();
     changed();
   });
+  let appliedPermissions = settings.operationPermissions();
+  const reconcilePermissionChanges = () => {
+    const previous = appliedPermissions;
+    const current = settings.operationPermissions();
+    if (isDeepStrictEqual(previous, current)) return false;
+    appliedPermissions = current;
+    if (!isDeepStrictEqual(previous.applet ?? {}, current.applet ?? {}))
+      for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
+    automation?.reconcilePermissions();
+    return true;
+  };
   settings.on('changed', () => {
     touchpad?.settingsChanged();
     try {
       applyFileWatchAssistanceSettings();
+      reconcilePermissionChanges();
       customCommands.reconcile();
       mcpClient.reconcile();
       applyAudioPlaybackSettings();
@@ -4748,6 +4747,20 @@ async function initialize() {
     settingsHealthNotifications?.refresh();
   });
   settings.on('statusChanged', () => {
+    // A read error can change authorization without changing the last-good JSON.
+    queueMicrotask(() => {
+      if (quitting) return;
+      try {
+        if (!reconcilePermissionChanges()) return;
+        customCommands.reconcile();
+        mcpClient.reconcile();
+        ai.reconcile();
+        imageAi.reconcile();
+        tts.reconcile();
+      } catch {
+        settings.health.set('apply-services', 'apply-failed', settings.revision);
+      }
+    });
     settingsHealthNotifications?.refresh();
     changed();
   });
@@ -5732,6 +5745,7 @@ async function initialize() {
   automation = new AutomationService({
     localDirectory: dataDirectory,
     baseDirectory,
+    settings,
     version: app.getVersion(),
     eventTypes: () =>
       notificationCatalog(allApplets()).filter((type) =>
@@ -5757,13 +5771,12 @@ async function initialize() {
       changed();
     },
     authorizationChanged: () => {
-      customCommands.reconcile();
-      mcpClient.reconcile();
       const owner = aiOwner();
       aiMcpGeneration++;
-      mcpClient.reconcile();
       ai.forgetOwner(owner);
       imageAi.forgetOwner(owner);
+      customCommands.reconcile();
+      mcpClient.reconcile();
     },
     audit: (level, message) => log.audit(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),

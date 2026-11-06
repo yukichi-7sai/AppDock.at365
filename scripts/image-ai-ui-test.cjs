@@ -119,6 +119,7 @@ const check = (name) => {
       path.join(nativeDir, 'AppDock.Extensions.ImageAiProbe.dll'),
     );
     settings.extensions[nativeId] = { enabled: true, settings: {} };
+    settings.operationPermissions = { applet: { read: true, execute: true } };
     require('./test-settings.cjs').write(profile, settings);
     host = await launch(profile, process.argv[2]);
     const page = host.main;
@@ -211,12 +212,13 @@ const check = (name) => {
     const toggle = permission.getByRole('switch', { name: 'Applet：画像生成AI', exact: true });
     for (const value of [false, true]) {
       if ((await toggle.getAttribute('aria-checked')) !== String(value)) await toggle.click();
-      await until(
-        async () =>
-          (await page.evaluate(() => window.dock.snapshot())).appletApi.permissions.useImageAi ===
-            value && (await toggle.getAttribute('aria-checked')) === String(value),
-        'image permission saved',
-      );
+      await until(async () => {
+        const { appletApi } = await page.evaluate(() => window.dock.snapshot());
+        return (
+          (appletApi.permissions.useImageAi === true) === value &&
+          (await toggle.getAttribute('aria-checked')) === String(value)
+        );
+      }, 'image permission saved');
     }
     assert.equal(await permission.locator('[data-caller="MCP"]').innerText(), '未対応');
     await page.screenshot({ path: path.join(profile, 'image-ai-permission.png') });

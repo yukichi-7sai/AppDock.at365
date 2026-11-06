@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import { appletApiPermissionLabels, type AppletApiPermissions } from '../../shared/appdock-api';
+import { mcpPermissionKeys, type McpPermissions } from '../../shared/automation';
 import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
 import { parseMcpRoster } from '../../shared/mcp-client';
 import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
@@ -47,10 +49,15 @@ export interface DeviceHostPage {
   useLocalSettings: boolean;
   configuration?: HostPageConfiguration;
 }
+export interface OperationPermissions {
+  applet?: AppletApiPermissions;
+  mcp?: McpPermissions;
+}
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
   mcpClient?: McpDeviceSettings;
+  operationPermissions?: OperationPermissions;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
   hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
@@ -135,6 +142,22 @@ export function initialDeviceSettings(
   }
   return value;
 }
+function validateOperationPermissions(value: unknown) {
+  const valid = (permissions: unknown, keys: readonly string[]) =>
+    object(permissions) &&
+    Object.entries(permissions).every(
+      ([key, allowed]) => keys.includes(key) && typeof allowed === 'boolean',
+    );
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => key !== 'applet' && key !== 'mcp') ||
+    (Object.hasOwn(value, 'applet') &&
+      !valid(value.applet, Object.keys(appletApiPermissionLabels))) ||
+    (Object.hasOwn(value, 'mcp') && !valid(value.mcp, mcpPermissionKeys))
+  )
+    throw Error(hostText('services.operationPermissions.invalid'));
+}
+
 export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings {
   if (object(raw) && raw.schemaVersion === 1 && typeof raw.machineName === 'string')
     raw = fillSettingDefaults(raw, initialDeviceSettings(name));
@@ -163,11 +186,14 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'uiState',
           'mcpClient',
           'mcpServers',
+          'operationPermissions',
         ].includes(key),
     )
   )
     throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
+  if (raw.operationPermissions !== undefined)
+    validateOperationPermissions(raw.operationPermissions);
   if (raw.mcpServers !== undefined) parseMcpRoster(raw.mcpServers);
   if (raw.uiState !== undefined) parseDeviceUiState(raw.uiState);
   if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))

@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-11-07 操作許可のmain統合（0.171.0）
+
+- `pull --ff-only`で追跡先と一致したmain `180f53d`に、専用worktreeの`342369c`と`cbd8ec9`をマージした。版番号とこの記録の競合を解決し、両方の検証履歴を収録した。各親だけが変更した32件・34件のファイルと、統合した翻訳4,143キーを照合した。
+- 端末別の操作許可をmainの0.170.1へ取り込む保存仕様の変更として0.171.0に更新した。統合候補をレビューし、端末別の許可・登録モデルの固定・MCP設定の共通ツールバーとタブ別リセットを確認した。固定lockfileの照合、型検査、標準Node回帰1,802/1,802件が成功した。
+- 同じ統合EXEで初期値、Node/.NET Applet API、MCP起動と再起動、MCP設定基盤、MCP設定、MCPハブ、文章生成、画像生成、生成AIの端末設定、音声生成、smokeの11試験が成功した。端末ファイルの外部受信・破損による拒否と、登録モデルを使用する生成要求を隔離プロファイルとローカルfixtureで確認した。
+- 検証中に共用発行先が別作業の成果物へ更新されたため、封印済みの統合EXEと更新ZIPを`A:/40.ARTIFACT/AppDock.at365/worktrees/device-operation-permissions-main-0.171.0/`へ発行した。配置終了0。package・PE・manifest・feedは0.171.0。ビルド出力・固定試験共用runtime・発行先・更新ZIPの101ファイルがSHA256一致した。EXE=`1f113f7adfddfdc4730b6293ed61e61fb73ad14c31ef926455330326f9d80a72`、ZIP=`a8bafff3c6fdcc0f4c669f755337c21956519f37db18be023dd9d53116737ee2`、175,186,853 bytes。
+- 試験プロセスの終了を確認して専用コピー123ファイルを削除し、結果など19ファイルを照合した。試験入力・ログ・配布物のhashとマージコミットの親・treeの照合は`.artifacts/integration-device-operation-permissions-20261107/`を参照する。
+
 ## 2026-11-07 登録モデル固定のmain統合（0.170.1）
 
 - `pull --ff-only`で追跡先と一致したmain `8e10ff3`に`codex/generation-preset-models`の`7eb3dc2`と`70c767f`をマージした。競合した版番号と検証記録を解決し、両方の検証履歴を保持した。各親だけが変更した20ファイルずつと、統合した翻訳4,146キーを照合した。
@@ -26,6 +34,16 @@
 - `publish.bat`終了0。発行先は`A:/40.ARTIFACT/AppDock.at365-generation-preset-models/`。版とfeedのサイズ・SHA256を確認し、ビルド出力・発行物・更新ZIP・固定試験共用runtimeの101ファイルが一致した。EXE SHA256は`f1e201a769b64861d8ea35e6fe5a30ed79ba34325529b91a163f19d8e1691639`。更新ZIPは175,185,267 bytes、SHA256は`e95996567a67c582884f8565e650ef80f653fb677421d04ef6caeeb1abae6b7c`。
 - 固定EXEの隔離profileで文章生成17項目、画像生成8項目、生成設定18項目とスモークが成功した。Node/.NET AppletとMCPによるサーバーID指定、MCPでの`model`拒否と通信なし、画像試験で登録したモデルを送信して結果が表示されることをローカルfixtureで確認した。
 - スモークの専用コピーはプロセス終了と配布物との一致を確認し、manifestを残して100ファイルを削除した。保持した結果・設定など83ファイルのSHA256が一致した。GUIの成功profileと共用runtime、元の失敗ログは保持した。詳細なレビュー、入力・ログ・配布物のhashとstage/commitの照合は`.artifacts/commit-validation-generation-preset-models/`を参照する。
+
+## 2026-11-07 操作許可の端末別保存（0.170.0）
+
+- `origin/main`と一致した`63e9b98`を起点に、専用worktreeの`codex/device-operation-permissions`で検証した。自端末の`data/settings-<端末名>.json`の`operationPermissions.applet`と`operationPermissions.mcp`を許可の正本にした。両列の切り替え項目は既定OFFで、旧ファイルの許可を読み継がない。MCPサーバーの接続・認証・登録はPC専用ファイルで扱う。
+- 発行前に端末識別、共有設定・公開APIからの分離、両列の独立保存、即時反映、外部更新との競合、設定復旧、前提許可と元callerの判定をレビューした。画面の古いApplet許可一式による上書きを防ぐため、保存時に表示時点の値と照合する。端末ファイルの読取障害中は正常バックアップがあっても切り替え項目を拒否する。保存形式・既定値変更による本体マイナー更新。
+- 依存を独立したworktreeへ導入し、固定lockfile・供給網検査、型検査、TypeScript/renderer・.NETホスト・試験用Appletのビルド、変更CJSの構文と差分空白を確認した。Windows x64、Node 26.13.0、pnpm 12.15.0、Electron 45.1.0、.NET SDK 10.0.403。
+- 標準Node回帰は最終ビルドで1,799/1,799件成功、失敗・skip 0。初回の失敗を受け、兄弟Applet manifestと非RIDの.NET試験用ホストをworktreeに用意した。廃止済みShellを参照する検査は現行rendererの検査へ整理して別コミットにした。兄弟Appletの入力版とSHA256は`.artifacts/commit-validation-device-permissions/cleanup.json`に記録した。
+- 固定EXEの初期値、Node/.NET Applet API、MCP起動・再起動、MCP設定基盤、画像・文章・音声生成AI、MCPハブ、smokeが成功した。MCP設定基盤では受信した端末ファイルの許可が画面と実際の要求に反映され、破損時に書き込みが拒否され、正常化で編集が復帰することを確認した。MCPハブの初回は旧ファイルを参照する検査を特定し、端末ファイルへの保存と接続ファイルの独立を同じEXEで再検証した。
+- `publish.bat`のパッケージ作成と封印後、更新ヘルパーがジャンクション先への配置を拒否した。並行作業の共用発行先とは分け、同じ封印済みビルドを既存の配置・更新ZIP作成処理で`A:\40.ARTIFACT\AppDock.at365\device-operation-permissions-0.170.0`に発行した。package・manifest・feed・PE版は0.170.0。ビルド出力・発行先・共用試験runtime・ZIPの101ファイルがSHA256一致。EXE=`dbc8b99f8d49916ede75723c031aefaa8bb7f8a24e0b4b344e35d7f07b12af3f`、ZIP=`0db4b75ea510adae8c5d7ea2d0172daf95215889f128cf002358605e074c3e50`、175,185,849 bytes。
+- `.artifacts/commit-validation-device-permissions/`に完全なログ、試験入力と成果物のSHA256、stage/commit照合を保存した。終了を確認した専用の試験実行ファイル145件を削除し、残した結果・ログ等26件を照合した。固定EXEの入力・通知・ページ管理の専用試験は対象外とした。端末ファイルの受信は隔離プロファイルへの外部書き込みで検証した。
 
 ## 2026-11-07 MCP接続・ツールコマンドの端末別保存と認証復旧（0.169.1）
 

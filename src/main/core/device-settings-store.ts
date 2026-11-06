@@ -46,6 +46,7 @@ import {
   deviceHostKeys,
   type DeviceCollection,
   type DeviceSettings,
+  type OperationPermissions,
 } from './device-settings';
 
 import {
@@ -82,6 +83,23 @@ export class DeviceSettingsStore extends SettingsStore {
   private configurationSignature(value: DeviceSettings) {
     const { uiState: _uiState, ...configuration } = value;
     return JSON.stringify(configuration);
+  }
+  get operationPermissionsError() {
+    return this.device.recovered ? hostText('services.operationPermissions.readFailed') : undefined;
+  }
+  operationPermissions(): Readonly<OperationPermissions> {
+    return this.device.recovered ? {} : (this.device.value.operationPermissions ?? {});
+  }
+  saveOperationPermissions(patch: Partial<Record<keyof OperationPermissions, unknown>>) {
+    if (!this.loaded || this.mutating || fs.existsSync(this.journal))
+      throw Error(hostText('services.deviceSettingsStore.busy'));
+    const error = this.operationPermissionsError;
+    if (error) throw Error(error);
+    const device = this.device.value;
+    this.device.save(
+      { ...device, operationPermissions: { ...device.operationPermissions, ...patch } },
+      this.device.revision,
+    );
   }
   override uiStateStorage(
     section: 'ribbon' | 'gallery' | 'soundGallery' | 'textGallery' | 'windows',
@@ -145,6 +163,7 @@ export class DeviceSettingsStore extends SettingsStore {
       device = this.device.storedValue();
     const result = structuredClone(shared);
     delete result.mcpServers;
+    delete result.operationPermissions;
     result.mcpClient = structuredClone(this.device.value.mcpClient);
     result.host ??= {};
     for (const key of deviceHostKeys) {

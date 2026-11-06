@@ -12,6 +12,7 @@ const { appDockOperations } = require('../out/main/shared/appdock-api');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationService } = require('../out/main/main/core/automation');
+const { openOperationPermissions } = require('./fixtures/operation-permissions.cjs');
 const root = path.join(__dirname, '../.artifacts/ai-unit');
 fs.mkdirSync(root, { recursive: true });
 const temp = () => fs.mkdtempSync(path.join(root, 'case-'));
@@ -660,15 +661,14 @@ test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   fs.writeFileSync(path.join(dir, 'keys.json'), '{broken');
   assert(store.status(c).error);
 });
-test('Applet AI defaults ON and existing grants retain their explicit permissions', () => {
-  const dir = temp(),
-    file = path.join(dir, 'access.json');
-  assert.equal(new AppletApiAccess(file).get().useAi, true);
-  fs.writeFileSync(
-    file,
-    JSON.stringify({ version: 2, permissions: { read: true, execute: true, useTts: true } }),
-  );
-  assert.equal(new AppletApiAccess(file).get().useAi, undefined);
+test('Applet AI requires a separate device grant and defaults OFF', (t) => {
+  const dir = temp();
+  const access = new AppletApiAccess(openOperationPermissions(t, dir));
+  assert.equal(access.get().useAi, undefined);
+  access.set({ read: true, execute: true, useTts: true });
+  assert.equal(access.get().useAi, undefined);
+  access.set({ read: true, execute: true, useAi: true });
+  assert.equal(new AppletApiAccess(openOperationPermissions(t, dir)).get().useAi, true);
   assert.deepEqual(appDockOperations['ai.text.generate'].callers, ['mcp', 'applet']);
   assert.deepEqual(appDockOperations['ai.text.generate'].permissions, ['read', 'execute', 'useAi']);
 });
@@ -725,11 +725,12 @@ test('shared dispatcher enforces independent Applet/MCP grants and the same AI s
     (e) => e.code === 'INVALID_ARGUMENT',
   );
 });
-test('MCP AI permission is stored independently and absent legacy values remain OFF', async (t) => {
+test('MCP AI permission is stored independently and defaults OFF on another device', async (t) => {
   const dir = temp(),
     s = new AutomationService({
       localDirectory: dir,
       baseDirectory: dir,
+      settings: openOperationPermissions(t, dir),
       version: 'test',
       encrypt: (v) => v,
       decrypt: (v) => v,
@@ -743,12 +744,11 @@ test('MCP AI permission is stored independently and absent legacy values remain 
   await s.action({ kind: 'setAi', allowed: true });
   assert.equal(s.state().allowUseAi, true);
   assert.equal(s.state().allowUseTts, false);
-  const config = JSON.parse(fs.readFileSync(path.join(dir, 'automation.json'), 'utf8'));
-  delete config.allowUseAi;
-  fs.writeFileSync(path.join(dir, 'automation.json'), JSON.stringify(config));
-  const legacy = new AutomationService({
+  assert.equal(fs.existsSync(path.join(dir, 'automation.json')), false);
+  const other = new AutomationService({
     localDirectory: dir,
     baseDirectory: dir,
+    settings: openOperationPermissions(t, dir, 'OtherDevice'),
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,
@@ -757,8 +757,8 @@ test('MCP AI permission is stored independently and absent legacy values remain 
       throw Error('unused');
     },
   });
-  t.after(() => legacy.close());
-  assert.equal(legacy.state().allowUseAi, false);
+  t.after(() => other.close());
+  assert.equal(other.state().allowUseAi, false);
 });
 test('MCP authorization changes invalidate jobs synchronously before action completion', async (t) => {
   const dir = temp();
@@ -766,6 +766,7 @@ test('MCP authorization changes invalidate jobs synchronously before action comp
   const service = new AutomationService({
     localDirectory: dir,
     baseDirectory: dir,
+    settings: openOperationPermissions(t, dir),
     version: 'test',
     encrypt: (v) => v,
     decrypt: (v) => v,
@@ -780,6 +781,7 @@ test('MCP authorization changes invalidate jobs synchronously before action comp
   assert.equal(invalidations, 0);
   await service.action({ kind: 'setAi', allowed: false });
   assert.equal(invalidations, 1);
+  await service.action({ kind: 'selectName', name: 'Fixture' });
   await service.action({ kind: 'rotateToken' });
   assert.equal(invalidations, 2);
 });

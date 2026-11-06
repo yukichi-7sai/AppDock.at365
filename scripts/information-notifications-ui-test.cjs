@@ -422,7 +422,7 @@ async function main() {
   ).screenshot({ path: path.join(profile, 'information-settings.png') });
   checks.push('settings order, 6 second default, mandatory banners and read-only legacy repair');
   await dismissAll();
-  await automation({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await automation({ kind: 'configure', enabled: true, port: 0 });
   await dismissAll();
   await automation({ kind: 'test' });
   const success = await until(
@@ -455,7 +455,7 @@ async function main() {
   await automation({ kind: 'status' });
   assert.equal((await info()).length, 0);
   checks.push('no OFF control; results notify and log, status does not replay dismissed results');
-  await automation({ kind: 'configure', enabled: false, allowWrite: false, port: 0 });
+  await automation({ kind: 'configure', enabled: false, port: 0 });
   await assert.rejects(automation({ kind: 'test' }), /AppDock内の疎通を確認できません/);
   const failure = await until(
     async () =>

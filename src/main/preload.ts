@@ -241,8 +241,8 @@ const api: DockApi = {
   },
   navigate: (route, restore) => ipcRenderer.invoke('dock:navigate', route, restore),
   ribbonViewport: (bounds) => ipcRenderer.invoke('dock:ribbonViewport', bounds),
-  setAppletApiPermissions: (permissions) =>
-    ipcRenderer.invoke('dock:appletApiPermissions', permissions),
+  setAppletApiPermissions: (permissions, before) =>
+    ipcRenderer.invoke('dock:appletApiPermissions', permissions, before),
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
   refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
   restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),
