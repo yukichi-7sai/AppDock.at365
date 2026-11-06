@@ -213,6 +213,8 @@ read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検
 
 ## MCP接続一覧
 
+保存先の変更とMCPツールコマンドのlist対象追加は[端末別保存と認証復旧の設計](mcp-device-settings-design.md)に記載する。未実装であり、以下は現在の契約とする。
+
 `category: mcp-client`のlist対象は、既存の共有名簿とPC専用接続を同じ所有サービスから読み書きする。行のidは読取り専用で、追加時にUUIDを生成する。name/descriptionは共有名簿へ、`connection.enabled/transport/command/args/cwd/url/authentication/published/publishedTools`はPC専用のmcp-client.jsonへ保存する。取得したitemRefを使い、部分編集・全行の並べ替え・秘密のない行の削除を行う。行数・引数・公開ツール名に固定件数上限は設けず、公開ツール名の重複を拒否する。空の引数も既存の接続検証に従って保持する。
 
 新規行の接続は既定で無効・非公開とし、HTTPは有効なURL、stdioは絶対EXEパス等の既存条件を満たす必要がある。token/environment・暗号文・環境変数名はSchema/値/プレビューに公開せず、MCPから指定できない。秘密のない行をBearer認証へ切り替える操作はローカル設定を必要とする。秘密付きの行は接続先・EXE・引数・作業フォルダー・認証方法の変更と削除を拒否し、名前・説明・有効状態・公開設定の編集や順序変更では暗号文をそのまま保持する。現在の制限はitems.listのwritableKeys/removableで確認する。

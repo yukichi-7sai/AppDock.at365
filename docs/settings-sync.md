@@ -1,5 +1,7 @@
 # 設定同期と保存領域
 
+今後の変更: [MCP接続・ツールコマンドの端末別保存](mcp-device-settings-design.md)は未実装。現在のMCP保存先は[共通MCPクライアント](mcp-client-design.md)を参照する。
+
 未導入Appletのカタログ結果は配置別のPC専用rootに `applet-catalog-cache.json` として保存する。公開版・開発版の取得時刻、表示用情報とAPI再開時刻を保持する。削除後は未導入分だけを再取得する。[カタログの表示と更新](applet-management-settings-design.md#未インストールのapplet)を参照。
 
 新規Appletと宣言型の子ページは、このPCで有効状態が未保存なら有効とし、保存済みのOFFを保持する。Appletの再起動では有効状態を変更しない。

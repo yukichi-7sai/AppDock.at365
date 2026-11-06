@@ -2,6 +2,8 @@
 
 [生成AIのPC専用設定とプリセット別MCP許可](docs/generation-settings.md)
 
+[MCP接続・ツールコマンドの端末別保存と認証復旧（未実装の設計）](docs/mcp-device-settings-design.md)
+
 機能の説明・操作方法・設定・既定値・動作環境は[機能・操作・設定](docs/usage.md)を参照してください。共通の文書構成は[ドキュメント方針](docs/documentation.md)に従います。
 
 全ローカルUIのテーマJSON・アクセント色と新しい画面の追加規則は[共通配色](docs/appearance.md)、各色の用途は[テーマの色一覧](THEME.md)を参照してください。基本色は `resources/configs/theme.json`、アクセントプリセットは `resources/configs/accent-color.json` にまとめ、画面ごとにパレットを定義せず共通CSS変数を利用します。
