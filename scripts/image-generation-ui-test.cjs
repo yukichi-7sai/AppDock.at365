@@ -21,6 +21,9 @@ fs.writeFileSync(
   path.join(directory, 'unsupported.svg'),
   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="red"/></svg>',
 );
+fs.mkdirSync(path.join(directory, 'reference-limit'));
+for (let i = 1; i <= 17; i++)
+  fs.writeFileSync(path.join(directory, 'reference-limit', `${i}.png`), png);
 const requests = [],
   checks = [],
   errors = [],
@@ -91,6 +94,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       ],
       defaultConnectionId: 'fixture',
     };
+    settings.imageAi.connections[0].defaults.providerOptions.quality = 'medium';
     settings.operationPermissions = {
       applet: { read: true, write: true, execute: true, useImageAi: true },
       mcp: { allowWrite: true, allowExecute: true, allowUseImageAi: true },
@@ -154,6 +158,101 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       async () => (await page.evaluate(() => window.dock.pages.get()))?.kind === 'image-library',
       'image library',
     );
+    const selectReferences = async (files, folder = '') => {
+      await page.evaluate(
+        async ({ files, folder }) => {
+          const current = await window.dock.pages.get();
+          await window.dock.pages.act({
+            id: current.id,
+            type: 'gallery',
+            command: 'folder',
+            folder,
+          });
+          await window.dock.pages.act({ id: current.id, type: 'gallery', command: 'clear' });
+          const updated = await window.dock.pages.get();
+          for (const file of files) {
+            const item = updated.content.items.find((item) => item.title === file);
+            if (!item) throw Error('Missing fixture image: ' + file);
+            await window.dock.pages.act({
+              id: current.id,
+              type: 'gallery',
+              command: 'select',
+              imageId: item.id,
+              selected: true,
+            });
+          }
+        },
+        { files, folder },
+      );
+    };
+    const openGeneration = async () => {
+      await page.getByRole('button', { name: '画像を生成', exact: true }).click();
+      await dialog().waitFor();
+    };
+    const closeGeneration = async () => {
+      await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
+      await dialog().waitFor({ state: 'detached' });
+      await until(
+        async () => !(await page.evaluate(() => window.dock.pages.get())).content.busy,
+        'generation dialog closed',
+      );
+    };
+    const referenceFiles = () =>
+      dialog()
+        .locator('[data-reference-file]')
+        .evaluateAll((items) => items.map((item) => item.dataset.referenceFile));
+    await selectReferences(['reference-two.png', 'reference-one.png']);
+    await openGeneration();
+    assert.deepEqual(await referenceFiles(), ['reference-one.png', 'reference-two.png']);
+    assert.equal(
+      await dialog()
+        .getByRole('button', { name: /参照画像.*を(前|後ろ)へ/ })
+        .count(),
+      0,
+    );
+    await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
+    fs.mkdirSync(path.join(directory, 'refresh-during-generation'));
+    await until(
+      async () => (await model()).folders.includes('refresh-during-generation'),
+      'generation model refresh',
+    );
+    assert.deepEqual(await referenceFiles(), ['reference-two.png']);
+    await closeGeneration();
+    await openGeneration();
+    assert.deepEqual(await referenceFiles(), ['reference-one.png', 'reference-two.png']);
+    await closeGeneration();
+    await selectReferences(['unsupported.svg']);
+    await openGeneration();
+    assert.deepEqual(await referenceFiles(), ['unsupported.svg']);
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('unsupported reference');
+    assert(await dialog().getByRole('button', { name: '生成して追加', exact: true }).isDisabled());
+    await dialog()
+      .getByRole('alert')
+      .getByText(/参照画像を確認/)
+      .waitFor();
+    await closeGeneration();
+    await selectReferences([], 'reference-limit');
+    await page.evaluate(async () => {
+      const current = await window.dock.pages.get();
+      await window.dock.pages.act({ id: current.id, type: 'gallery', command: 'select-all' });
+    });
+    await openGeneration();
+    assert.equal((await referenceFiles()).length, 17);
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('too many references');
+    assert(await dialog().getByRole('button', { name: '生成して追加', exact: true }).isDisabled());
+    await dialog()
+      .getByRole('alert')
+      .getByText(/参照画像を確認/)
+      .waitFor();
+    await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
+    assert.equal((await referenceFiles()).length, 16);
+    assert(await dialog().getByRole('button', { name: '生成して追加', exact: true }).isEnabled());
+    await closeGeneration();
+    assert.equal(requests.length, 0);
+    check(
+      'selected references initialize once per opening; removal survives refresh and originals stay selected',
+    );
+    check('unsupported and excess selected references remain removable with visible validation');
     await page.evaluate(async () => {
       const p = await window.dock.pages.get();
       await window.dock.pages.act({
@@ -172,17 +271,24 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     });
     await page.getByRole('button', { name: '画像を生成', exact: true }).click();
     await dialog().waitFor();
+    assert.deepEqual(await referenceFiles(), []);
     assert.equal(
       await dialog().getByLabel('保存先フォルダー', { exact: true }).inputValue(),
       'pictures',
     );
     await dialog().getByLabel('プロンプト', { exact: true }).fill('flowers');
     assert.equal(await dialog().getByLabel('追加プロンプト', { exact: true }).count(), 0);
+    assert.equal(await dialog().getByLabel('品質', { exact: true }).inputValue(), '');
+    assert.equal(
+      await dialog().getByRole('option', { name: 'プリセットの既定値', exact: true }).count(),
+      1,
+    );
+    await dialog().getByText('現在の既定値：medium', { exact: true }).waitFor();
     await dialog().getByLabel('品質', { exact: true }).selectOption('high');
     await dialog().getByRole('button', { name: '参照画像を選ぶ', exact: true }).click();
     const picker = page.locator('dialog.image-picker-dialog');
     await picker.waitFor();
-    for (const file of ['reference-one.png', 'reference-two.png'])
+    for (const file of ['reference-two.png', 'reference-one.png'])
       await picker
         .locator('[data-image-id]')
         .filter({ hasText: file })
@@ -201,7 +307,26 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     assert(await picker.getByRole('button', { name: '画像を使う', exact: true }).isDisabled());
     await picker.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal(await dialog().locator('[data-reference-file]').count(), 2);
-    await dialog().getByRole('button', { name: '参照画像2を前へ', exact: true }).click();
+    await dialog().locator('.image-generation-reference-preview').first().click();
+    const referencePreview = page.locator('dialog.library-preview-dialog');
+    await referencePreview.waitFor();
+    const referenceImage = referencePreview.locator('.ad-gallery-preview-stage > img');
+    await until(
+      () => referenceImage.evaluate((image) => image.complete && image.naturalWidth > 0),
+      'original reference preview',
+    );
+    const previewSize = await referenceImage.evaluate((image) => ({
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      width: image.getBoundingClientRect().width,
+      height: image.getBoundingClientRect().height,
+    }));
+    await page.screenshot({ path: path.join(profile, 'reference-preview.png') });
+    assert.equal(previewSize.naturalWidth, 240);
+    assert.equal(previewSize.naturalHeight, 140);
+    assert(previewSize.width > 450 && previewSize.height > 300, JSON.stringify(previewSize));
+    await referencePreview.getByRole('button', { name: '閉じる', exact: true }).click();
+    check('reference preview displays the original image in a full preview area');
     assert.equal(
       await dialog().locator('[data-reference-file]').first().getAttribute('data-reference-file'),
       'reference-two.png',
@@ -231,7 +356,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     assert.deepEqual(fs.readFileSync(path.join(directory, 'reference-one.png')), png);
     assert.deepEqual(fs.readFileSync(path.join(directory, 'reference-two.png')), secondPng);
     const preset = require('./test-settings.cjs').read(profile).imageAi.connections[0];
-    assert.equal(preset.defaults.providerOptions.quality, 'auto');
+    assert.equal(preset.defaults.providerOptions.quality, 'medium');
     assert.equal(preset.referenceImages, undefined);
     assert.equal(preset.alwaysPrompt, undefined);
     await until(
@@ -273,6 +398,7 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     );
     await page.locator('dialog.settings-group-dialog').waitFor({ state: 'detached' });
     check('shared enlargement, rename and recycle-bin delete');
+    await dialog().getByLabel('品質', { exact: true }).selectOption('');
     for (const [width, height] of [
       [1720, 1000],
       [900, 620],
@@ -287,6 +413,13 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       await page.screenshot({ path: path.join(profile, `references-${width}.png`) });
       assert(await dialog().getByRole('button', { name: '閉じる', exact: true }).isVisible());
       assert(await dialog().evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
+      const bounds = await dialog().evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return { height: rect.height, top: rect.top, bottom: rect.bottom, viewport: innerHeight };
+      });
+      assert(bounds.top >= 0 && bounds.bottom <= bounds.viewport + 1);
+      if (bounds.viewport > 850)
+        assert(bounds.height > 760, 'large windows use more dialog height');
     }
     await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
     await dialog().getByRole('button', { name: '参照画像1を外す', exact: true }).click();
@@ -300,6 +433,26 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
       'text only generation',
     );
     assert.equal(requests.at(-1).endpoint, '/v1/images/generations');
+    assert.equal(requests.at(-1).quality, 'medium');
+    await dialog().getByLabel('品質', { exact: true }).selectOption('auto');
+    await dialog().getByLabel('プロンプト', { exact: true }).fill('explicit auto');
+    await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();
+    await until(
+      async () =>
+        (await model()).items.some(
+          (item) => item.input === 'explicit auto' && item.job.state === 'completed',
+        ),
+      'explicit auto quality',
+    );
+    assert.equal(requests.at(-1).quality, 'auto');
+    assert.equal(
+      require('./test-settings.cjs').read(profile).imageAi.connections[0].defaults.providerOptions
+        .quality,
+      'medium',
+    );
+    check(
+      'default quality selection can be restored after an override and differs from explicit auto',
+    );
     check('removing references preserves original files and restores text-only JSON generation');
     await dialog().getByLabel('プロンプト', { exact: true }).fill('hold');
     await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();

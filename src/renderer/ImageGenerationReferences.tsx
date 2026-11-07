@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { imageReferenceMaxBytes, imageReferenceMaxCount } from '../shared/image-ai';
 import { libraryBasename, type LibraryEntry, type LibraryRef } from '../shared/library-assets';
 import { useHostTranslation } from './HostTranslation';
+import { Icon } from './Icon';
 import { SettingsField, SettingsActions } from './settings-ui/SettingsSections';
 import { SettingsButton } from './settings-ui/SettingsButton';
 import { RegisteredImagePicker, RegisteredImagePreview } from './settings-ui/RegisteredImagePicker';
@@ -34,18 +35,6 @@ export function ImageGenerationReferences({
   const { t } = useHostTranslation();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const move = (index: number, direction: number) => {
-    const next = [...value];
-    [next[index], next[index + direction]] = [next[index + direction], next[index]];
-    onChange(next);
-    requestAnimationFrame(() =>
-      root.current
-        ?.querySelector<HTMLButtonElement>(
-          `[data-reference-file="${CSS.escape(value[index].file)}"] .image-generation-reference-preview`,
-        )
-        ?.focus(),
-    );
-  };
   return (
     <SettingsField
       title={t('imageGeneration.references', { count: value.length })}
@@ -59,6 +48,9 @@ export function ImageGenerationReferences({
         </SettingsActions>
         {!value.length && (
           <p className="image-generation-reference-empty">{t('imageGeneration.noReferences')}</p>
+        )}
+        {value.length > imageReferenceMaxCount && (
+          <p role="alert">{t('imageAi.referenceInvalid')}</p>
         )}
         <ol className="image-generation-reference-list">
           {value.map((ref, index) => {
@@ -79,38 +71,20 @@ export function ImageGenerationReferences({
                   {index + 1}. {libraryBasename(ref.file)}
                 </span>
                 {!valid && <p role="alert">{t('imageAi.referenceInvalid')}</p>}
-                <SettingsActions>
-                  <SettingsButton
-                    icon
-                    disabled={index === 0}
-                    title={t('imageGeneration.moveBefore', { index: index + 1 })}
-                    aria-label={t('imageGeneration.moveBefore', { index: index + 1 })}
-                    onClick={() => move(index, -1)}
-                  >
-                    ←
-                  </SettingsButton>
-                  <SettingsButton
-                    icon
-                    disabled={index === value.length - 1}
-                    title={t('imageGeneration.moveAfter', { index: index + 1 })}
-                    aria-label={t('imageGeneration.moveAfter', { index: index + 1 })}
-                    onClick={() => move(index, 1)}
-                  >
-                    →
-                  </SettingsButton>
-                  <SettingsButton
-                    icon
-                    aria-label={t('imageGeneration.removeReference', { index: index + 1 })}
-                    onClick={() => {
-                      onChange(value.filter((image) => image.file !== ref.file));
-                      requestAnimationFrame(() =>
-                        root.current?.querySelector<HTMLButtonElement>('button')?.focus(),
-                      );
-                    }}
-                  >
-                    {t('imageGeneration.detach')}
-                  </SettingsButton>
-                </SettingsActions>
+                <SettingsButton
+                  icon
+                  className="image-generation-reference-remove"
+                  title={t('imageGeneration.removeReference', { index: index + 1 })}
+                  aria-label={t('imageGeneration.removeReference', { index: index + 1 })}
+                  onClick={() => {
+                    onChange(value.filter((image) => image.file !== ref.file));
+                    requestAnimationFrame(() =>
+                      root.current?.querySelector<HTMLButtonElement>('button')?.focus(),
+                    );
+                  }}
+                >
+                  <Icon name="close" size={16} />
+                </SettingsButton>
               </li>
             );
           })}

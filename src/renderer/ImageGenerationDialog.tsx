@@ -57,7 +57,9 @@ export function ImageGenerationDialog({
   const [serverId, setServerId] = useState(model.defaultConnectionId ?? '');
   const [input, setInput] = useState('');
   const [name, setName] = useState('');
-  const [referenceImages, setReferenceImages] = useState<LibraryRef[]>([]);
+  const [referenceImages, setReferenceImages] = useState<LibraryRef[]>(
+    () => model.initialReferenceImages,
+  );
   const [quality, setQuality] = useState<string>();
   const [size, setSize] = useState<string>();
   const [count, setCount] = useState<string>();
@@ -195,12 +197,18 @@ export function ImageGenerationDialog({
             />
           </SettingsField>
           <div className="image-generation-options">
-            <SettingsField title={t('imageAi.quality')}>
+            <SettingsField
+              title={t('imageAi.quality')}
+              description={t('imageGeneration.qualityDefaultHint', {
+                quality: server?.defaults.providerOptions.quality ?? 'auto',
+              })}
+            >
               <select
                 aria-label={t('imageAi.quality')}
-                value={quality ?? server?.defaults.providerOptions.quality ?? 'auto'}
-                onChange={(e) => setQuality(e.target.value)}
+                value={quality ?? ''}
+                onChange={(e) => setQuality(e.target.value || undefined)}
               >
+                <option value="">{t('imageGeneration.qualityDefault')}</option>
                 {imageQualities.map((value) => (
                   <option key={value}>{value}</option>
                 ))}
@@ -417,7 +425,11 @@ export function ImageGenerationDialog({
         />
       )}
       {preview && (
-        <LibraryPreviewDialog title={preview.ref.file} onClose={() => setPreview(null)}>
+        <LibraryPreviewDialog
+          title={preview.ref.file}
+          className="image-library-preview-modal"
+          onClose={() => setPreview(null)}
+        >
           <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
         </LibraryPreviewDialog>
       )}

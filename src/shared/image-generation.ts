@@ -15,6 +15,7 @@ export interface ImageGenerationModel {
   revision: number;
   folder: string;
   folders: string[];
+  initialReferenceImages: LibraryRef[];
   defaultConnectionId?: string;
   servers: { id: string; name: string; defaults: ImageGenerationOptions }[];
   items: ImageGenerationItem[];

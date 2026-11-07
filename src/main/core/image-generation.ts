@@ -5,6 +5,7 @@ import {
   libraryParent,
   libraryPath,
   type LibraryEntry,
+  type LibraryRef,
 } from '../../shared/library-assets';
 import type { ImageAiSettings } from '../../shared/image-ai';
 import type {
@@ -23,6 +24,7 @@ export class ImageGeneration {
     owner: string;
     folder: string;
     group?: string;
+    initialReferenceImages: LibraryRef[];
     items: ImageGenerationItem[];
     resolve(): void;
   };
@@ -39,12 +41,25 @@ export class ImageGeneration {
       failed(): void;
     },
   ) {}
-  open(owner: string, folder: string, group?: string): Promise<void> {
+  open(
+    owner: string,
+    folder: string,
+    group?: string,
+    referenceImages: LibraryRef[] = [],
+  ): Promise<void> {
     if (this.session) throw Error(hostText('imageGeneration.busy'));
     if (!libraryFolder(folder)) throw Error(hostText('imageGeneration.invalidFolder'));
     this.options.library.assertWritable();
     return new Promise((resolve) => {
-      this.session = { id: randomUUID(), owner, folder, group, items: [], resolve };
+      this.session = {
+        id: randomUUID(),
+        owner,
+        folder,
+        group,
+        initialReferenceImages: structuredClone(referenceImages),
+        items: [],
+        resolve,
+      };
       this.signature = '';
       this.refresh();
     });
@@ -75,6 +90,7 @@ export class ImageGeneration {
       revision: this.revision,
       folder: s.folder,
       folders: [...new Set(['', ...this.options.library.images.folders])],
+      initialReferenceImages: s.initialReferenceImages,
       defaultConnectionId: configuration.defaultConnectionId,
       servers: configuration.connections.map(({ id, name, defaults }) => ({
         id,

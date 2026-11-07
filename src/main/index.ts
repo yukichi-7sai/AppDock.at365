@@ -5453,7 +5453,8 @@ async function initialize() {
                 : undefined,
             generateImages:
               request.kind === 'image-library'
-                ? (folder, group) => imagesGeneration.open(request.id, folder, group)
+                ? (folder, group, referenceImages) =>
+                    imagesGeneration.open(request.id, folder, group, referenceImages)
                 : undefined,
             cancelGeneration:
               request.kind === 'sound-library'

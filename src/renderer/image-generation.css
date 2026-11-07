@@ -1,3 +1,6 @@
+.settings-modal.image-generation-dialog[open] {
+  height: calc(100dvh - 32px);
+}
 .image-generation-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12,8 +15,9 @@
   margin: 8px 0 0;
 }
 .image-generation-reference-list li {
+  position: relative;
   min-width: 0;
-  padding: 8px;
+  padding: 28px 8px 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -40,13 +44,15 @@
 .image-generation-reference-list p {
   font-size: 12px;
 }
-.image-generation-reference-list .settings-actions {
-  gap: 4px;
-  flex-wrap: nowrap;
+.image-generation-reference-remove.settings-action-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
 }
-.image-generation-reference-list .settings-action-button {
-  min-width: 32px;
-  padding-inline: 6px;
+.image-generation-reference-remove.settings-action-button:not(:hover):not(:active) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 .image-generation-reference-empty {
   color: var(--muted);

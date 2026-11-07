@@ -1,4 +1,4 @@
-import type { LibraryEntry } from '../../shared/library-assets';
+import type { LibraryEntry, LibraryRef } from '../../shared/library-assets';
 import { libraryText } from '../../shared/library-text';
 import type { LibrarySoundPreview } from './library-sound-preview';
 import type { TextLibraryService } from './text-library-service';
@@ -129,7 +129,11 @@ export class ImageLibraryPageSession implements HostPageController {
       texts?: TextLibraryService;
       preview?: LibrarySoundPreview;
       generateSounds?(folder: string, group?: string): Promise<void>;
-      generateImages?(folder: string, group?: string): Promise<void>;
+      generateImages?(
+        folder: string,
+        group?: string,
+        referenceImages?: LibraryRef[],
+      ): Promise<void>;
       cancelGeneration?(): void;
       state: ImageLibraryPageState;
       groups(): import('../../shared/registered-images').ImageGroup[];
@@ -361,6 +365,11 @@ export class ImageLibraryPageSession implements HostPageController {
         await generate(
           s.folder === '*' ? '' : s.folder,
           s.group.startsWith('group:') ? s.group.slice(6) : undefined,
+          action.command === 'image-generation'
+            ? this.filtered()
+                .filter(([key]) => s.selected.has(key))
+                .map(([, item]) => item.entry.ref)
+            : undefined,
         );
       } finally {
         s.busy = false;
