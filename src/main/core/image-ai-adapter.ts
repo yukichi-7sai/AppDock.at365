@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { httpFetch, logHttpJsonError } from './http-client';
 import { aiObject } from '../../shared/ai';
 import { AutomationError } from './appdock-api';
 import { imageReferenceMaxBytes, imageReferenceMaxCount } from '../../shared/image-ai';
@@ -107,7 +108,9 @@ export class OpenAiImageAdapter implements ImageAdapter {
     }
     let response: Response | undefined;
     try {
-      response = await this.fetcher(
+      response = await httpFetch(
+        'image-ai',
+        this.fetcher,
         c.baseUrl + (editing ? '/images/edits' : '/images/generations'),
         {
           method: 'POST',
@@ -129,6 +132,7 @@ export class OpenAiImageAdapter implements ImageAdapter {
       const value: unknown = await response
         .json()
         .catch(() => imageFail('IMAGE_AI_INVALID_RESPONSE', 'invalidResponse'));
+      logHttpJsonError('image-ai', response.status, value);
       if (!aiObject(value) || !Array.isArray(value.data) || value.data.length !== o.count)
         return imageFail('IMAGE_AI_INVALID_RESPONSE', 'invalidResponse');
       return value.data.map((item: unknown) => {

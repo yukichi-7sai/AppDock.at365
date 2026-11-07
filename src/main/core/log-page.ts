@@ -125,7 +125,6 @@ export class LogPageSession implements HostPageController {
       typeof f.source !== 'string' ||
       f.source.length > 200 ||
       typeof f.text !== 'string' ||
-      f.text.length > 4000 ||
       !['all', 'standard', 'debug', 'info', 'warn', 'error'].includes(f.level) ||
       !['all', 'normal', 'audit'].includes(f.category)
     )

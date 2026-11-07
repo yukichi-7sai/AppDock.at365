@@ -1,5 +1,6 @@
 import { hostText, updaterWindowMessages } from '../../shared/i18n';
 import { physicalFs } from './physical-fs';
+import { httpFetch, logHttpJsonError } from './http-client';
 import { orderedReads } from './ordered-io';
 import path from 'node:path';
 import os from 'node:os';
@@ -93,7 +94,10 @@ async function readBounded(
       throw Error(hostText('services.portableUpdates.invalidFile'));
     stream = createReadStream(location, { signal: combined });
   } else {
-    const response = await fetcher(location, { signal: combined, redirect: 'follow' });
+    const response = await httpFetch('updates', fetcher, location, {
+      signal: combined,
+      redirect: 'follow',
+    });
     if (!response.ok) throw new UpdateHttpError(response.status);
     if (new URL(response.url || location).protocol !== new URL(location).protocol)
       throw Error(hostText('services.portableUpdates.protocolChanged'));
@@ -133,7 +137,10 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
 type ReleaseAssets = { name: string; browser_download_url: string }[];
 
 export async function readUpdateJson(location: string, fetcher: Fetcher, signal?: AbortSignal) {
-  return json(await readBounded(location, 1024 * 1024, fetcher, signal));
+  const bytes = await readBounded(location, 1024 * 1024, fetcher, signal);
+  const value = json(bytes);
+  if (/^https?:/i.test(location)) logHttpJsonError('updates', 200, value);
+  return value;
 }
 
 export async function readGithubRelease(

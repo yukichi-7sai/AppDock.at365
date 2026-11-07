@@ -46,12 +46,12 @@ APIの`maxOutputTokens`／`timeoutMs`を明示した場合は、要求だけそ�
 
 同じ[AppDockApi](appdock-api.md)と操作カタログを使用する。Appletには`appdock-api` capabilityが必要。`connectionId`に登録済みのサーバーIDを指定し、省略時は既定のサーバーを使う。`model`など定義にない引数を渡した場合は`INVALID_ARGUMENT`を返す。
 
-| 操作               | MCPツール                  | 入力                                                                                   |
-| ------------------ | -------------------------- | -------------------------------------------------------------------------------------- |
-| `ai.text.generate` | `appdock_ai_generate_text` | 必須requestId、任意connectionId/additionalPrompt/input/timeoutMs/maxOutputTokens       |
-| `ai.jobs.get`      | `appdock_ai_get_job`       | jobId                                                                                  |
-| `ai.jobs.cancel`   | `appdock_ai_cancel_job`    | jobId                                                                                  |
-| `ai.models.list`   | `appdock_ai_list_models`   | 任意connectionId                                                                       |
+| 操作               | MCPツール                  | 入力                                                                             |
+| ------------------ | -------------------------- | -------------------------------------------------------------------------------- |
+| `ai.text.generate` | `appdock_ai_generate_text` | 必須requestId、任意connectionId/additionalPrompt/input/timeoutMs/maxOutputTokens |
+| `ai.jobs.get`      | `appdock_ai_get_job`       | jobId                                                                            |
+| `ai.jobs.cancel`   | `appdock_ai_cancel_job`    | jobId                                                                            |
+| `ai.models.list`   | `appdock_ai_list_models`   | 任意connectionId                                                                 |
 
 生成の受付はjobIdと`completion:accepted`を返す。状態は`queued/running/completed/failed/canceled`。完了時だけtextと任意usageを取得できる。エラーは安全なcode/message、状態にはモデルと接続ID・時刻を含める。本文が期限で回収された後は`resultExpired:true`となり、再生成しない。
 
@@ -90,6 +90,6 @@ const job = await context.appdock.call('ai.jobs.get', { jobId: accepted.jobId })
 
 APIキーは正規化URLが一致する場合だけ使う。URL変更後はキーを再入力する。認証なしに変更すると保存時にキーを削除する。OKではSettingsStoreの関連データトランザクションを使い、設定の書き込み失敗時はキーを元に戻す。モデル一覧の一時キーを保存・ログ・画面モデルへ載せない。取得は5秒で終了し、閉じたダイアログの取消が新しい要求を取り消さないよう要求IDで分離する。
 
-キーを画面モデル・部分JSON・エクスポートへ戻さない。プロンプト・入力・生成本文・生のサーバーエラーをログへ含めない。各サーバーのプロンプトは端末別の通常設定として同期・バックアップの対象になるため、秘密値はAPIキー欄へ入力する。HTTPを使うLAN接続ではTLS暗号化がない。ローカルURLでもクラウドモデルやプロキシが外部へ転送する場合がある。
+キーを画面モデル・部分JSON・エクスポートへ戻さない。要求のプロンプト・入力・生成本文をログへ追加しない。外部API応答の`error`全体は[共通HTTP診断](logging.md#外部http-apiのエラー応答)でそのままログへ記録し、通知・公開結果は安全な説明を維持する。各サーバーのプロンプトは端末別の通常設定として同期・バックアップの対象になるため、秘密値はAPIキー欄へ入力する。HTTPを使うLAN接続ではTLS暗号化がない。ローカルURLでもクラウドモデルやプロキシが外部へ転送する場合がある。
 
 UIの試験結果はテキストとして表示する。結果をコマンドやHTMLとして実行しない。[設定同期](settings-sync.md)の保存分類と原子的保存を使用し、TTSの設定・キー・許可を共有しない。

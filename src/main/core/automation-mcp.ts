@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { logHttpErrorBody } from './http-client';
 import { operationsFor } from '../../shared/appdock-api';
 import http, { type IncomingMessage } from 'node:http';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
@@ -88,12 +89,15 @@ export class AutomationMcp {
             },
           },
           (response) => {
-            response.resume();
-            response.on('end', () =>
-              response.statusCode === 204 && probe.seen
-                ? resolve()
-                : reject(Error('LOOPBACK_MISMATCH')),
-            );
+            const chunks: Buffer[] = [];
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.on('end', () => {
+              const status = response.statusCode ?? 0;
+              if (status !== 204 || !probe.seen)
+                logHttpErrorBody('automation', status, Buffer.concat(chunks).toString('utf8'));
+              if (status === 204 && probe.seen) resolve();
+              else reject(Error('LOOPBACK_MISMATCH'));
+            });
             response.on('error', reject);
           },
         );

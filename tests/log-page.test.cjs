@@ -85,7 +85,10 @@ test('revision changes only with content; filters survive provider reconnect and
   await session.act({ id: 'session', type: 'open-directory' });
   assert.equal(state.opened, 1);
   await assert.rejects(filter({ level: 'invalid' }), /Invalid/);
-  await assert.rejects(filter({ text: 'x'.repeat(4001) }), /Invalid/);
+  const longText = 'x'.repeat(8000);
+  state.entries = [entry('a', 'error', longText)];
+  await filter({ text: longText });
+  assert.equal(session.snapshot().content.entries[0].message, longText);
   await assert.rejects(session.act({ id: 'session', type: 'delete' }), /Unknown/);
 });
 test('page request validates route and scope before creating a controller', () => {

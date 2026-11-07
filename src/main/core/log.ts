@@ -34,7 +34,7 @@ export class HostLog {
       level,
       category,
       source,
-      message: String(message).slice(0, 4000),
+      message: String(message),
     };
     this.entries.push(entry);
     if (this.entries.length > 500) this.entries.shift();

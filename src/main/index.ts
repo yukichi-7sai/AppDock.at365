@@ -1,4 +1,5 @@
 import { SoundLibraryService } from './core/sound-library-service';
+import { setHttpErrorLog } from './core/http-client';
 import { TextLibraryService } from './core/text-library-service';
 import { snippetGroupId } from '../shared/text-library';
 import type { SoundGallery } from './core/library-sound-preview';
@@ -4328,6 +4329,7 @@ async function initialize() {
   const endServices = hostStartupTiming.begin('services');
   const logPaths = logDirectories(sharedDirectory, dataDirectory, os.hostname());
   log = new HostLog(logPaths.shared, changed, logPaths.fallback);
+  setHttpErrorLog((source, message) => log.write('error', source, message));
   ribbonState = new RibbonState(
     settings.uiStateStorage('ribbon'),
     changed,

@@ -1,6 +1,7 @@
 import { ttsApiKey } from './tts-secrets';
 import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import { hostText } from '../../shared/i18n';
+import { httpFetch, logHttpErrorBody } from './http-client';
 import { randomUUID, createHash } from 'node:crypto';
 import { AutomationError } from './appdock-api';
 import { ttsSpeechRequest } from '../../shared/tts-request';
@@ -597,7 +598,10 @@ export class TtsService {
           : 'TTS_INVALID_AUDIO';
     let response: Response | undefined;
     try {
-      response = await (this.options.fetcher ?? fetch)(url, { ...init, redirect: 'error' });
+      response = await httpFetch('tts', this.options.fetcher ?? fetch, url, {
+        ...init,
+        redirect: 'error',
+      });
       if (!response.ok) {
         const s = response.status;
         if (s === 401 || s === 403)
@@ -613,6 +617,10 @@ export class TtsService {
         fail('TTS_SERVER_ERROR', hostText('services.ttsService.httpError', { status: String(s) }));
       }
       const mime = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      if (!voices && (mime === 'application/json' || mime.endsWith('+json'))) {
+        logHttpErrorBody('tts', response.status, await response.text());
+        fail(invalidCode, hostText('services.ttsService.responseFormat'));
+      }
       if (
         voices
           ? mime !== 'application/json'
@@ -645,7 +653,9 @@ export class TtsService {
         await reader.cancel().catch(() => {});
         reader.releaseLock();
       }
-      return Buffer.concat(chunks, size);
+      const bytes = Buffer.concat(chunks, size);
+      if (voices) logHttpErrorBody('tts', response.status, bytes.toString('utf8'));
+      return bytes;
     } catch (error) {
       if (error instanceof TtsError) throw error;
       if (init.signal?.aborted)

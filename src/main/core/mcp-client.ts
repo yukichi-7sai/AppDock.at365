@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { httpFetch, httpJsonErrorEvents, logHttpErrorBody } from './http-client';
 import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -346,7 +347,7 @@ export class McpClientService {
       const headers = new Headers(init.headers);
       if (token) headers.set('Authorization', 'Bearer ' + token);
       else headers.delete('Authorization');
-      const response = await fetcher(input, {
+      const response = await httpFetch('mcp-client', fetcher, input, {
         ...init,
         headers,
         redirect: 'error',
@@ -359,21 +360,40 @@ export class McpClientService {
         return fail('RESULT_TOO_LARGE', hostText('services.mcpClient.responseLimit'));
       }
       if (!response.body) return response;
+      const mime = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      const events =
+        response.ok && mime === 'text/event-stream'
+          ? httpJsonErrorEvents('mcp-client', response.status)
+          : undefined;
       let bytes = 0;
       const body = response.body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
           transform(chunk, controller) {
             bytes += chunk.byteLength;
             if (bytes > 2 * 1024 * 1024) controller.error(new Error('MCP response limit'));
-            else controller.enqueue(chunk);
+            else {
+              events?.write(chunk);
+              controller.enqueue(chunk);
+            }
+          },
+          flush() {
+            events?.end();
           },
         }),
       );
-      return new Response(body, {
+      const bounded = new Response(body, {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers,
       });
+      if (bounded.ok && mime === 'application/json') {
+        try {
+          logHttpErrorBody('mcp-client', bounded.status, await bounded.clone().text());
+        } catch {
+          // The original bounded stream still reports its existing transport/size failure.
+        }
+      }
+      return bounded;
     }) as typeof fetch;
   }
   private async session(actor: McpActor, id: string) {

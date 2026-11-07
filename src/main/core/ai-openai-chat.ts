@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { httpFetch, logHttpJsonError } from './http-client';
 import { AutomationError } from './appdock-api';
 import {
   aiObject,
@@ -22,7 +23,7 @@ export class AiOpenAiChat {
   ): Promise<unknown> {
     let response: Response | undefined;
     try {
-      response = await this.fetcher(c.baseUrl + '/' + path, {
+      response = await httpFetch('ai', this.fetcher, c.baseUrl + '/' + path, {
         method: body === undefined ? 'GET' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +67,11 @@ export class AiOpenAiChat {
         await reader.cancel().catch(() => {});
       }
       try {
-        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
+        const value: unknown = JSON.parse(
+          new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)),
+        );
+        logHttpJsonError('ai', response.status, value);
+        return value;
       } catch {
         return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.jsonResponse'));
       }

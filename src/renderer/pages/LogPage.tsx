@@ -96,7 +96,6 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             aria-label={t('logs.search')}
             placeholder={t('logs.searchPlaceholder')}
             value={filters.text}
-            maxLength={4000}
             onChange={(e) => change({ ...filters, text: e.target.value })}
           />
         </div>

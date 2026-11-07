@@ -759,7 +759,7 @@ class ExtensionManager extends EventEmitter {
       });
       child.stderr.setEncoding('utf8');
       child.stderr.on('data', (data) => {
-        if (current()) this.log('warn', m.id, data.slice(0, 4000).trim());
+        if (current()) this.log('warn', m.id, data.trim());
       });
       peer.on('protocolError', (err) => {
         if (!current()) return;

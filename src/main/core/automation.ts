@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { hostText } from '../../shared/i18n';
+import { httpFetch, logHttpJsonError } from './http-client';
 import type {
   AutomationAction,
   AutomationReceiver,
@@ -764,7 +765,7 @@ export class AutomationService {
       case 'test': {
         if (!this.listeners[receiver].server)
           throw Error(hostText('services.automation.notRunning'));
-        const response = await fetch(endpoint(settings.port), {
+        const response = await httpFetch('automation', fetch, endpoint(settings.port), {
           method: 'POST',
           signal: AbortSignal.timeout(5000),
           headers: {
@@ -785,6 +786,7 @@ export class AutomationService {
           }),
         });
         const value = (await response.json()) as any;
+        if (response.ok) logHttpJsonError('automation', response.status, value);
         if (!response.ok || !value.result?.serverInfo)
           throw Error(hostText('services.automation.testFailed'));
         return hostText('services.automation.testSucceeded');

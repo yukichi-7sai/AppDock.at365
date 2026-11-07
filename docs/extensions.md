@@ -263,7 +263,7 @@ StorageはJSON値を扱う共通APIで、設定フォームの項目はSettings�
 
 ### ログと設定の受信
 
-ログは.NETの`context.Log.DebugAsync/InfoAsync/ErrorAsync`、Nodeの`context.log.debug/info/error`を使い、独自ファイルへの出力を避けてください。debugは本体0.109.2以降とSDK/Runtime 0.27.1以降に対応し、利用するAppletはminimumHostVersionを揃えます。ホストがApplet IDと通常の種類を付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。レベル・監査の分類と画面は[ログ仕様](logging.md)を参照してください。deactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
+ログは.NETの`context.Log.DebugAsync/InfoAsync/ErrorAsync`、Nodeの`context.log.debug/info/error`を使い、独自ファイルへの出力を避けてください。debugは本体0.109.2以降とSDK/Runtime 0.27.1以降に対応し、利用するAppletはminimumHostVersionを揃えます。ホストがApplet IDと通常の種類を付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。本体0.178.0以降はメッセージを4000文字で切り詰めず全文を保存します。長文ログの全文保持が必要なAppletは最低ホスト版を0.178.0以降にします。SDK/Runtimeの呼出し形式は変わりません。レベル・監査の分類と画面は[ログ仕様](logging.md)を参照してください。deactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
 
 設定変更はキャッシュへ通知します。設定に依存する表示やタイマー間隔等は、OnChangedの購読または都度読み取りで反映してください。UIへHTML/JavaScriptは渡せません。Reactがテキストとして描画します。API v1は1拡張1パネルです。
 

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { logHttpErrorBody } from './http-client';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { atomicWrite } from './settings';
@@ -449,13 +450,13 @@ export class McpEvents {
       .catch(() => this.audit('EVENT_ENQUEUE_FAILED'))
       .finally(() => this.queued--);
   }
-  private send(sub: Subscription, id: string, body: string) {
+  private async send(sub: Subscription, id: string, body: string) {
     if (Buffer.byteLength(body) > 262144) throw Error('payload_too_large');
     const seconds = Math.floor(this.now() / 1000);
     const signatures = [webhookSignature(sub.secret, id, seconds, body)];
     if (sub.oldSecret && (sub.rotateUntil ?? 0) > this.now())
       signatures.push(webhookSignature(sub.oldSecret, id, seconds, body));
-    return (this.options.post ?? postWebhook)(
+    const response = await (this.options.post ?? postWebhook)(
       sub.url,
       body,
       {
@@ -466,6 +467,8 @@ export class McpEvents {
       },
       AbortSignal.any([this.controller.signal, AbortSignal.timeout(10000)]),
     );
+    logHttpErrorBody('mcp-events', response.status, response.body);
+    return response;
   }
   start() {
     this.started = true;
