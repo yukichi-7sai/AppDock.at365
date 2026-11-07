@@ -1,3 +1,4 @@
+import { libraryFolderLabel } from '../shared/library-sources';
 import { useEffect, useRef, useState } from 'react';
 import type { ImageGenerationAction, ImageGenerationModel } from '../shared/image-generation';
 import { imageQualities, type ImageFormat } from '../shared/image-ai';
@@ -145,7 +146,8 @@ export function ImageGenerationDialog({
             >
               {model.folders.map((folder) => (
                 <option key={folder} value={folder}>
-                  {folder || t('imageGeneration.rootFolder')}
+                  {libraryFolderLabel(folder, model.sources ?? [], t('library.sources.direct')) ||
+                    t('imageGeneration.rootFolder')}
                 </option>
               ))}
             </select>
@@ -391,7 +393,13 @@ export function ImageGenerationDialog({
                       {item.server} / {item.job.model}
                     </dd>
                     <dt>{t('soundGeneration.folder')}</dt>
-                    <dd>{item.folder || t('imageGeneration.rootFolder')}</dd>
+                    <dd>
+                      {libraryFolderLabel(
+                        item.folder,
+                        model.sources ?? [],
+                        t('library.sources.direct'),
+                      ) || t('imageGeneration.rootFolder')}
+                    </dd>
                     <dt>
                       {t('imageGeneration.references', { count: item.referenceImages.length })}
                     </dt>

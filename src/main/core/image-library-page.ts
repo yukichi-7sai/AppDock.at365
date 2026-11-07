@@ -1,5 +1,9 @@
 import type { LibraryEntry, LibraryRef } from '../../shared/library-assets';
-import { externalLibraryLocation, libraryRootFolder } from '../../shared/library-sources';
+import {
+  externalLibraryLocation,
+  libraryRootFolder,
+  libraryWriteFolder,
+} from '../../shared/library-sources';
 import { libraryText } from '../../shared/library-text';
 import type { LibrarySoundPreview } from './library-sound-preview';
 import type { TextLibraryService } from './text-library-service';
@@ -377,7 +381,7 @@ export class ImageLibraryPageSession implements HostPageController {
       this.options.changed();
       try {
         await generate(
-          s.folder === '*' ? '' : s.folder,
+          libraryWriteFolder(s.folder),
           s.group.startsWith('group:') ? s.group.slice(6) : undefined,
           action.command === 'image-generation'
             ? this.filtered()
@@ -512,7 +516,7 @@ export class ImageLibraryPageSession implements HostPageController {
       this.options.changed();
       try {
         if (action.command === 'open-folder')
-          await this.options.host.openFolder(action.folder ?? (s.folder === '*' ? '' : s.folder));
+          await this.options.host.openFolder(action.folder ?? libraryWriteFolder(s.folder));
         else {
           await this.options.host.fileAction(action.operation, entries);
           s.message = this.text(
@@ -879,6 +883,7 @@ export class ImageLibraryPageSession implements HostPageController {
         if (
           ![
             'source-add',
+            'source-edit',
             'source-remove',
             'add',
             'rename',
@@ -934,7 +939,7 @@ export class ImageLibraryPageSession implements HostPageController {
           throw Error(this.text('services.imageLibraryPage.unreadable'));
         if (action.kind === 'folder-move' && !images.length)
           throw Error(this.text('services.imageLibraryPage.selectImage'));
-        const folder = action.folder ?? (s.folder === '*' ? '' : s.folder);
+        const folder = libraryWriteFolder(action.folder ?? s.folder);
         if (
           [
             'text-create',
@@ -984,14 +989,17 @@ export class ImageLibraryPageSession implements HostPageController {
           media: this.options.host.media,
           kind: kind === 'membership' && images.length > 1 ? 'batch-add' : kind,
           document,
+          sources: this.options.host.images.sources,
           source: this.options.host.images.sources.find(
             (source) => source.id === externalLibraryLocation(folder)?.id,
           ),
           groups: this.options.groups(),
           images,
           folder,
-          folders: this.options.host.images.folders.filter((folder) =>
-            this.options.host.images.canWrite(folder),
+          folders: this.options.host.images.folders.filter(
+            (folder) =>
+              this.options.host.images.canWrite(folder) &&
+              externalLibraryLocation(folder)?.relative !== '*',
           ),
           iconSets:
             this.options.host.media === 'image'
@@ -1073,7 +1081,7 @@ export class ImageLibraryPageSession implements HostPageController {
     s.retry = undefined;
     this.options.changed();
     try {
-      const results = await this.options.host.registerMany(s.folder === '*' ? '' : s.folder);
+      const results = await this.options.host.registerMany(libraryWriteFolder(s.folder));
       const successes = results.flatMap((r) => (r.image ? [r.image] : []));
       if (!results.length || s.closed) return;
       s.message = this.text('services.imageLibraryPage.importSummary', {

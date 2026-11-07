@@ -30,7 +30,8 @@ export interface AssetPolicy {
   assignedDirectory: string;
   maxBytes: number;
   allowEmpty?: boolean;
-  /** External sources have independent readers and never inspect sibling assigned directories. */
+  /** External roots never create their root or inspect sibling assigned directories. */
+  external?: boolean;
   readOnly?: boolean;
   format(bytes: Buffer): string;
   validate(bytes: Buffer, name: string): Promise<DecodedAsset>;
@@ -112,7 +113,7 @@ export class RegisteredAssets {
       ...source,
       available: files.loaded && !files.error,
       loading: !files.loaded,
-      canWrite: !files.policy.readOnly,
+      canWrite: files.canWrite() && files.loaded && !files.error,
     }));
   }
   configureSources(sources: ExternalLibrarySource[]) {
@@ -122,7 +123,7 @@ export class RegisteredAssets {
     const byId = new Map(sources.map((source) => [source.id, source]));
     for (const [id, item] of this.external) {
       const next = byId.get(id);
-      if (!next || next.path !== item.source.path || next.access !== item.source.access) {
+      if (!next || next.path !== item.source.path) {
         item.files.stop();
         this.external.delete(id);
       }
@@ -131,11 +132,12 @@ export class RegisteredAssets {
       const existing = this.external.get(source.id);
       if (existing) {
         existing.source = structuredClone(source);
+        existing.files.policy.readOnly = source.access !== 'read-write';
         continue;
       }
       const files = new RegisteredAssets(
         source.path,
-        { ...this.policy, readOnly: true },
+        { ...this.policy, external: true, readOnly: source.access !== 'read-write' },
         () => this.notify(),
         this.assistance,
       );
@@ -156,12 +158,21 @@ export class RegisteredAssets {
   canWrite(name = ''): boolean {
     const location = externalLibraryLocation(name);
     return (
+      !this.stopped &&
       !this.policy.readOnly &&
       (!location || this.external.get(location.id)?.files.canWrite() === true)
     );
   }
   assertWritable(name = '') {
     if (!this.canWrite(name)) throw Error(hostText('library.sources.readOnly'));
+  }
+  folderTarget(folder: string) {
+    const target = this.externalTarget(folder);
+    return {
+      root: target?.files.directory ?? this.directory,
+      relative: (target?.ref.file ?? folder) === '*' ? '' : (target?.ref.file ?? folder),
+      external: !!target || !!this.policy.external,
+    };
   }
   async folderDirectory(folder: string) {
     const target = this.externalTarget(folder);
@@ -219,7 +230,7 @@ export class RegisteredAssets {
   }
   private async root(create = false) {
     if (create) this.assertWritable();
-    if (create) safeDirectory(this.directory, '', true);
+    if (create) safeDirectory(this.directory, '', !this.policy.external);
     const real = await fs.realpath(this.directory);
     if (
       real.toLowerCase() !== path.resolve(this.directory).toLowerCase() ||
@@ -551,13 +562,24 @@ export class RegisteredAssets {
     return reply(task);
   }
   /** Copy to a private stage, validate it, then publish exclusively in the destination. */
-  addFile(source: string, filename: string, writable: () => void = () => {}) {
+  addFile(
+    source: string,
+    filename: string,
+    writable: () => void = () => {},
+  ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
+    const target = this.externalTarget(filename);
+    if (target)
+      return target.files.addFile(source, target.ref.file, writable).then((result) => ({
+        ...result,
+        ref: { file: externalLibraryPath(target.id, result.ref.file) },
+      }));
     const run = async () => {
       this.assertWritable(filename);
       writable();
       if (!this.validName(filename) || assignedImage(filename) || !this.policy.validateFile)
         throw Error(this.text('services.registeredImages.invalidFilename'));
       await this.root(true);
+      this.assertWritable(filename);
       const parent = imageParent(filename);
       safeDirectory(this.directory, parent, true);
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
@@ -579,7 +601,10 @@ export class RegisteredAssets {
             throw Error(this.text('services.registeredImages.duplicateName', { name }));
           reused = true;
         };
+        this.assertWritable(filename);
         writable();
+        this.assertWritable(filename);
+        safeDirectory(this.directory, imageParent(name));
         if (existing) await duplicate();
         else
           try {
@@ -612,9 +637,20 @@ export class RegisteredAssets {
     return (await this.addWithResult(bytes, filename)).ref;
   }
   /** Replace the confirmed generation only; external edits are rechecked at atomic commit. */
-  updateContent(ref: RegisteredImageRef, generation: string, bytes: Buffer, writable: () => void) {
+  updateContent(
+    ref: RegisteredImageRef,
+    generation: string,
+    bytes: Buffer,
+    writable: () => void,
+  ): Promise<ReadAsset> {
     this.assertWritable(ref.file);
+    const target = this.externalTarget(ref);
+    if (target)
+      return target.files
+        .updateContent(target.ref, generation, bytes, writable)
+        .then((result) => ({ ...result, ref }));
     const run = async () => {
+      this.assertWritable(ref.file);
       if (this.policy.media !== 'text' || !this.reference(ref) || !generation)
         throw Error(this.text('services.registeredImages.invalidReference'));
       writable();
@@ -623,6 +659,7 @@ export class RegisteredAssets {
       writable();
       safeDirectory(this.directory, imageParent(ref.file));
       await this.fileSignature(ref.file);
+      this.assertWritable(ref.file);
       writable();
       if (original.bytes.equals(bytes)) return original;
       try {
@@ -645,6 +682,8 @@ export class RegisteredAssets {
     generation: string,
     options: { trash(file: string): Promise<void>; prepare(): () => void },
   ): Promise<void> {
+    const target = this.externalTarget(ref);
+    if (target) return target.files.remove(target.ref, generation, options);
     const run = async () => {
       this.assertWritable(ref.file);
       if (!this.reference(ref))
@@ -670,6 +709,9 @@ export class RegisteredAssets {
           )
             throw Error(this.text('services.registeredImages.changed'));
         }
+        this.assertWritable(ref.file);
+        await this.fileSignature(ref.file);
+        this.assertWritable(ref.file);
         trashStarted = true;
         await options.trash(file);
         recycled = true;
@@ -722,13 +764,35 @@ export class RegisteredAssets {
     filename: string,
     options: { unique?: boolean; writable?(): void; journal?: AssetRegistrationJournal } = {},
   ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
+    const target = this.externalTarget(filename);
+    if (target) {
+      const journal = options.journal;
+      const intent = journal?.intent;
+      if (intent && externalLibraryLocation(intent.file)?.id !== target.id)
+        throw Error(this.text('services.registeredImages.changed'));
+      const result = await target.files.addVerified(bytes, target.ref.file, {
+        ...options,
+        journal: journal
+          ? {
+              intent: intent
+                ? { ...intent, file: externalLibraryLocation(intent.file)!.relative }
+                : undefined,
+              prepare: (value) =>
+                journal.prepare({ ...value, file: externalLibraryPath(target.id, value.file) }),
+            }
+          : undefined,
+      });
+      return { ...result, ref: { file: externalLibraryPath(target.id, result.ref.file) } };
+    }
     const run = async () => {
       this.assertWritable(filename);
       options.writable?.();
       if (assignedImage(filename))
         throw Error(this.text('services.registeredImages.invalidFilename'));
       const decoded = await this.validate(bytes, filename);
+      this.assertWritable(filename);
       await this.root(true);
+      this.assertWritable(filename);
       const intent = options.journal?.intent;
       if (intent) {
         // A previously reserved write is never silently replaced by another unique copy.
@@ -770,6 +834,7 @@ export class RegisteredAssets {
         return { ref, reused: true, generation: record.entry.generation! };
       };
       if (existing) return duplicate();
+      this.assertWritable(filename);
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
       const handle = await fs.open(temp, 'wx');
       try {
@@ -778,7 +843,10 @@ export class RegisteredAssets {
         const identity = await handle.stat({ bigint: true });
         await handle.close();
         try {
+          this.assertWritable(filename);
           options.writable?.();
+          this.assertWritable(filename);
+          safeDirectory(this.directory, imageParent(name));
           options.journal?.prepare({
             file: name,
             hash: createHash('sha256').update(bytes).digest('hex'),
@@ -810,8 +878,13 @@ export class RegisteredAssets {
     this.queue = task.catch(() => {});
     return task;
   }
-  async recoverRegistration(intent: AssetRegistrationIntent) {
+  async recoverRegistration(intent: AssetRegistrationIntent): Promise<ReadAsset> {
     this.assertWritable(intent.file);
+    const target = this.externalTarget(intent.file);
+    if (target) {
+      const result = await target.files.recoverRegistration({ ...intent, file: target.ref.file });
+      return { ...result, ref: { file: intent.file } };
+    }
     const saved = await this.read({ file: intent.file });
     const stat = await fs.stat(this.file(intent.file), { bigint: true });
     if (`${stat.dev}:${stat.ino}` !== intent.identity || saved.hash !== intent.hash)
@@ -971,6 +1044,14 @@ export class RegisteredAssets {
             ),
         ).then(() => {});
     } else for (const target of this.external.values()) void target.files.refresh(retry);
+    return this.refreshLocal(retry, files);
+  }
+  /** After writes, await only affected roots; unrelated network roots remain independent. */
+  async refreshRoots(names: string[]) {
+    const readers = new Set(names.map((name) => this.externalTarget(name)?.files ?? this));
+    await Promise.all([...readers].map((reader) => reader.refreshLocal(true)));
+  }
+  private refreshLocal(retry: boolean, files?: string[]): Promise<void> {
     if (retry && this.refreshing) return this.refreshing.then(() => this.refresh(true));
     if (retry)
       for (const record of this.entries.values())
@@ -997,12 +1078,12 @@ export class RegisteredAssets {
       this.pendingFiles.clear();
       if (!this.stopped && (full || pending.length))
         void this.beginRefresh(full ? undefined : pending);
-      if (initial && this.policy.readOnly) this.notify();
+      if (initial && this.policy.external) this.notify();
     });
     return this.refreshing;
   }
   private async connectWatch(
-    directory = this.policy.readOnly ? this.directory : path.dirname(this.directory),
+    directory = this.policy.external ? this.directory : path.dirname(this.directory),
     recover = true,
   ): Promise<void> {
     const connectionGeneration = ++this.connectionGeneration;
@@ -1079,7 +1160,7 @@ export class RegisteredAssets {
           this.error = this.watchError = this.text('services.registeredImages.readFailed');
           this.notify();
           const parent = path.dirname(directory);
-          if (!this.policy.readOnly && recover && parent !== directory)
+          if (!this.policy.external && recover && parent !== directory)
             void this.connectWatch(parent, false);
         });
         return;
@@ -1088,7 +1169,7 @@ export class RegisteredAssets {
           return;
         const parent = path.dirname(directory);
         if (
-          !this.policy.readOnly &&
+          !this.policy.external &&
           (error as NodeJS.ErrnoException).code === 'ENOENT' &&
           parent !== directory
         ) {
@@ -1107,7 +1188,7 @@ export class RegisteredAssets {
       try {
         await this.root();
       } catch (error) {
-        if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (this.policy.external || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();
@@ -1115,7 +1196,7 @@ export class RegisteredAssets {
       if (files) names = files.map((name) => ({ name }));
       else {
         const tree = await scanAssetTree(this.directory, this.policy.media).catch((error) => {
-          if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT')
+          if (this.policy.external || (error as NodeJS.ErrnoException).code !== 'ENOENT')
             throw error;
           return { folders: [''], files: [] as string[] };
         });
@@ -1128,7 +1209,7 @@ export class RegisteredAssets {
         }
         names = tree.files.map((name) => ({ name }));
         const assignedRoot = path.join(path.dirname(this.directory), this.policy.assignedDirectory);
-        if (!this.policy.readOnly)
+        if (!this.policy.external)
           try {
             safeDirectory(assignedRoot, '');
             names.push(
@@ -1209,7 +1290,7 @@ export class RegisteredAssets {
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();
       if (this.stopped) return;
-      if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT')
+      if (this.policy.external || (error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = this.text('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
         const state = (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';

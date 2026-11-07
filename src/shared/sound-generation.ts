@@ -22,6 +22,7 @@ export interface SoundGenerationModel {
   revision: number;
   folder: string;
   folders: string[];
+  sources?: import('./library-sources').ExternalLibrarySource[];
   servers: {
     id: string;
     name: string;

@@ -100,6 +100,27 @@ async function fixture(t, extra = {}) {
     },
   };
 }
+test('generated images register into an external source with stable journal references and classifications', async (t) => {
+  const f = await fixture(t);
+  const external = path.join(f.directory, 'external-fixture');
+  await fs.mkdir(external);
+  f.files.configureSources([
+    { id: 'external', name: 'External', path: external, access: 'read-write' },
+  ]);
+  await f.files.refreshRoots(['@external:external']);
+  const job = f.service.generateAndRegister('host', {
+    ...f.input,
+    destination: { ...f.input.destination, folder: '@external:external' },
+  });
+  const done = await settled(f, job, 'completed');
+  assert.equal(done.images.length, 2);
+  for (const image of done.images) {
+    assert.match(image.ref.file, /^@external:external\/flower-/);
+    assert.deepEqual((await f.files.read(image.ref)).bytes, png);
+    assert(f.groups[0].images.some((ref) => ref.file === image.ref.file));
+  }
+});
+
 test('reference reads use validated original library bytes and reject invalid or missing paths', async (t) => {
   const f = await fixture(t);
   await fs.writeFile(path.join(f.directory, 'pictures/reference.png'), png);

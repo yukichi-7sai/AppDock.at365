@@ -1,4 +1,10 @@
 import { SettingsField } from './settings-ui/SettingsSections';
+import {
+  externalLibraryLocation,
+  externalLibraryPath,
+  libraryFolderLabel,
+  type LibrarySourceAccess,
+} from '../shared/library-sources';
 import { LibraryMediaProvider, useLibraryTranslation } from './image-browser/LibraryMedia';
 import { libraryPath } from '../shared/library-assets';
 import { snippetGroupId } from '../shared/text-library';
@@ -100,6 +106,9 @@ function Editor({
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
   const [name, setName] = useState(current?.name ?? '');
   const [sourcePath, setSourcePath] = useState('');
+  const [sourceAccess, setSourceAccess] = useState<LibrarySourceAccess>(
+    r.source?.access ?? 'read-only',
+  );
   const [ids, setIds] = useState(r.images[0] ? before(r.images[0]) : []);
   const [target, setTarget] = useState(current?.id ?? r.groups[0]?.id ?? '');
   const entries = r.entries ?? (r.entry ? [r.entry] : []);
@@ -115,7 +124,13 @@ function Editor({
   );
   const [error, setError] = useState('');
   const [folderPath, setFolderPath] = useState(
-    r.kind === 'folder-create' && r.folder ? r.folder + '/' : (r.folder ?? ''),
+    (() => {
+      const folder =
+        r.kind === 'folder-move'
+          ? r.folder
+          : (externalLibraryLocation(r.folder)?.relative ?? r.folder);
+      return r.kind === 'folder-create' && folder ? folder + '/' : (folder ?? '');
+    })(),
   );
   const [setId, setSetId] = useState(r.iconSets?.[0]?.id ?? '');
   const completed = useRef(false);
@@ -127,12 +142,18 @@ function Editor({
     await window.dock.imageLibraryDialog.complete(r.id, operation);
     completed.current = true;
   };
-  if (r.kind === 'source-add' || r.kind === 'source-remove')
+  if (r.kind === 'source-add' || r.kind === 'source-edit' || r.kind === 'source-remove')
     return (
       <SettingsDialog
-        title={t(r.kind === 'source-add' ? 'library.sources.add' : 'library.sources.remove')}
-        description={
+        title={t(
           r.kind === 'source-add'
+            ? 'library.sources.add'
+            : r.kind === 'source-edit'
+              ? 'library.sources.edit'
+              : 'library.sources.remove',
+        )}
+        description={
+          r.kind !== 'source-remove'
             ? t('library.sources.hint')
             : t('library.sources.removeConfirm', { name: r.source?.name ?? '' })
         }
@@ -143,8 +164,10 @@ function Editor({
         onApply={() =>
           save(
             r.kind === 'source-add'
-              ? { kind: 'source-add', name, path: sourcePath }
-              : { kind: 'source-remove' },
+              ? { kind: 'source-add', name, path: sourcePath, access: sourceAccess }
+              : r.kind === 'source-edit'
+                ? { kind: 'source-edit', access: sourceAccess }
+                : { kind: 'source-remove' },
           )
         }
       >
@@ -166,6 +189,28 @@ function Editor({
             </SettingsField>
           </>
         ) : null}
+        {r.kind === 'source-edit' && (
+          <p style={{ overflowWrap: 'anywhere' }}>
+            {r.source?.name}
+            <br />
+            {r.source?.path}
+          </p>
+        )}
+        {r.kind !== 'source-remove' && (
+          <>
+            <SettingsField title={t('library.sources.access')}>
+              <select
+                aria-label={t('library.sources.access')}
+                value={sourceAccess}
+                onChange={(e) => setSourceAccess(e.target.value as LibrarySourceAccess)}
+              >
+                <option value="read-only">{t('library.sources.readOnlyLabel')}</option>
+                <option value="read-write">{t('library.sources.readWriteLabel')}</option>
+              </select>
+            </SettingsField>
+            <p>{t('library.sources.accessHint')}</p>
+          </>
+        )}
       </SettingsDialog>
     );
   if (r.kind === 'text-create' || r.kind === 'text-edit' || r.kind === 'text-preview')
@@ -278,7 +323,15 @@ function Editor({
         error={error}
         applyLabel={t('images.apply')}
         onClose={close}
-        onApply={() => save({ kind: 'folder', destination: folderPath })}
+        onApply={() =>
+          save({
+            kind: 'folder',
+            destination:
+              r.kind !== 'folder-move' && r.source
+                ? externalLibraryPath(r.source.id, folderPath)
+                : folderPath,
+          })
+        }
       >
         {r.kind === 'folder-delete' ? (
           <p>{t('images.folderDeleteConfirm')}</p>
@@ -291,7 +344,8 @@ function Editor({
             >
               {r.folders?.map((folder) => (
                 <option key={folder} value={folder}>
-                  {folder || t('images.rootFolder')}
+                  {libraryFolderLabel(folder, r.sources ?? [], t('library.sources.direct')) ||
+                    t('images.rootFolder')}
                 </option>
               ))}
             </select>

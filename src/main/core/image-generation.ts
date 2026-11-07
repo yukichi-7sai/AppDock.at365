@@ -1,3 +1,4 @@
+import { externalLibraryLocation } from '../../shared/library-sources';
 import { randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import {
@@ -123,11 +124,14 @@ export class ImageGeneration {
       recoveryError: this.options.ai.recoveryError,
       revision: this.revision,
       folder: s.folder,
+      sources: this.options.library.images.sources,
       folders: [
         ...new Set([
           '',
-          ...this.options.library.images.folders.filter((folder) =>
-            this.options.library.images.canWrite(folder),
+          ...this.options.library.images.folders.filter(
+            (folder) =>
+              this.options.library.images.canWrite(folder) &&
+              externalLibraryLocation(folder)?.relative !== '*',
           ),
         ]),
       ],

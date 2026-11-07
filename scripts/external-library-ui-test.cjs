@@ -235,6 +235,17 @@ async function run() {
   checks.push(
     'sound/text sources shared, direct-child scope, text body search, write controls disabled',
   );
+  ({ session, page } = await require('./external-library-write-check.cjs')({
+    session,
+    profile,
+    portable,
+    external,
+    source,
+    errors,
+  }));
+  checks.push(
+    'access cancel/save/restart, external import/rename/move/recycle/folders/text editing, shared revocation',
+  );
   await session.close();
   session = undefined;
   session = await launch(profile, portable);

@@ -955,6 +955,8 @@ const externalLibrarySources = new ExternalLibrarySources(
   [registeredImages, soundLibrary.files, textLibrary.files],
   assertSettingsWritable,
 );
+for (const library of [imageLibraryHost, soundLibrary.host, textLibrary.host])
+  library.setFolderPeers([imageLibraryHost, soundLibrary.host, textLibrary.host]);
 let updater: PortableUpdates;
 let gestureIndicatorHost: GestureIndicatorHost | undefined;
 let inputPalette: InputPaletteHost | undefined;
@@ -5370,7 +5372,12 @@ async function initialize() {
     },
     edit: (operation, request) => {
       if (operation.kind === 'source-add')
-        return externalLibrarySources.add(operation.name, operation.path);
+        return externalLibrarySources.add(operation.name, operation.path, operation.access);
+      if (operation.kind === 'source-edit') {
+        if (!request.source) throw Error(hostText('library.sources.invalid'));
+        externalLibrarySources.update(request.source, operation.access);
+        return Promise.resolve();
+      }
       if (operation.kind === 'source-remove') {
         if (!request.source) throw Error(hostText('library.sources.invalid'));
         externalLibrarySources.remove(request.source);

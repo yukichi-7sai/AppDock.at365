@@ -22,6 +22,7 @@ export type ImageLibraryPageRequest = { id: string } & (
 );
 export type ImageLibraryDialogKind =
   | 'source-add'
+  | 'source-edit'
   | 'source-remove'
   | 'text-create'
   | 'text-duplicate'
@@ -45,7 +46,13 @@ export type ImageLibraryDialogKind =
   | 'import-progress'
   | 'delete-image';
 export type ImageLibraryDialogOperation =
-  | { kind: 'source-add'; name: string; path: string }
+  | {
+      kind: 'source-add';
+      name: string;
+      path: string;
+      access: import('./library-sources').LibrarySourceAccess;
+    }
+  | { kind: 'source-edit'; access: import('./library-sources').LibrarySourceAccess }
   | { kind: 'source-remove' }
   | { kind: 'text-save'; name: string; body: string }
   | ImageLibraryEdit
@@ -70,6 +77,7 @@ export interface ImageLibraryDialogRequest {
   cancelling?: boolean;
   document?: import('./text-library').LibraryTextDocument;
   source?: import('./library-sources').ExternalLibrarySource;
+  sources?: import('./library-sources').ExternalLibrarySource[];
 }
 export interface ImageLibraryLayout {
   sidebarWidth: number;

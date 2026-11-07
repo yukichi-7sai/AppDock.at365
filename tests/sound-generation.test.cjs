@@ -149,6 +149,36 @@ async function fixture(t, fetcher) {
     played: () => played,
   };
 }
+test('generation saves to writable external roots and retries the same WAV after access revocation', async (t) => {
+  const f = await fixture(t);
+  const external = path.join(f.directory, 'external-fixture');
+  await fs.mkdir(external);
+  const source = { id: 'external', name: 'External', path: external, access: 'read-write' };
+  const folder = '@external:external';
+  f.library.files.configureSources([source]);
+  await f.library.files.refreshRoots([folder]);
+  const saved = await f.generate({ folder });
+  assert.equal(f.item(saved).state, 'saved');
+  assert.match(f.item(saved).file, /^@external:external\//);
+  assert.deepEqual(await fs.readFile(f.library.files.file(f.item(saved).file)), wave(1000));
+  const add = f.library.files.addVerified.bind(f.library.files);
+  let revoke = true;
+  f.library.files.addVerified = async (...args) => {
+    if (revoke) f.library.files.configureSources([{ ...source, access: 'read-only' }]);
+    return add(...args);
+  };
+  const failed = await f.generate({ folder });
+  assert.equal(f.item(failed).state, 'unsaved');
+  const requests = f.requests.length;
+  revoke = false;
+  f.library.files.configureSources([source]);
+  await f.generation.act(f.id, { kind: 'retry', itemId: failed });
+  await f.settle(failed);
+  assert.equal(f.item(failed).state, 'saved');
+  assert.equal(f.requests.length, requests);
+  assert.deepEqual(await fs.readFile(f.library.files.file(f.item(failed).file)), wave(1000));
+});
+
 test('generated WAVs are distinct saved assets, inherit the chosen server and survive dialog closure', async (t) => {
   const f = await fixture(t);
   await f.generate();

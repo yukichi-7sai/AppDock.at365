@@ -37,6 +37,10 @@ let activePicker: AssetLibraryHost | undefined;
 export class AssetLibraryHost {
   readonly configuration: ImageLibrarySettings;
   private filesBusy = false;
+  private folderPeers: AssetLibraryHost[] = [this];
+  setFolderPeers(libraries: AssetLibraryHost[]) {
+    this.folderPeers = libraries;
+  }
   private generated = new Map<string, Set<string>>();
   private pickerAlive?: () => boolean;
   private pending?: {
@@ -142,24 +146,37 @@ export class AssetLibraryHost {
     for (const ref of images) this.images.assertWritable(ref.file);
     if (!imageFolder(folder) || (destination !== undefined && !imageFolder(destination)))
       throw Error(this.text('images.folderInvalid'));
-    const root = this.images.directory;
-    safeDirectory(root, '', true);
+    const targetFolder = this.images.folderTarget(folder);
+    const targetDestination =
+      destination === undefined ? undefined : this.images.folderTarget(destination);
+    if (targetDestination && targetDestination.root !== targetFolder.root)
+      throw Error(this.text('images.folderInvalid'));
+    const root = targetFolder.root;
+    const localFolder = targetFolder.relative;
+    const localDestination = targetDestination?.relative;
+    const check = () => {
+      this.options.writable();
+      this.images.assertWritable(folder);
+      if (destination !== undefined) this.images.assertWritable(destination);
+    };
+    safeDirectory(root, '', !targetFolder.external);
     try {
       if (operation === 'create') {
-        if (!destination) throw Error(this.text('images.folderInvalid'));
-        safeDirectory(root, imageParent(destination));
-        await fs.mkdir(path.join(root, ...destination.split('/')));
+        if (!localDestination) throw Error(this.text('images.folderInvalid'));
+        safeDirectory(root, imageParent(localDestination));
+        check();
+        await fs.mkdir(path.join(root, ...localDestination.split('/')));
       } else if (operation === 'rename') {
         if (
-          !folder ||
-          !destination ||
-          destination.toLowerCase().startsWith(folder.toLowerCase() + '/')
+          !localFolder ||
+          !localDestination ||
+          localDestination.toLowerCase().startsWith(localFolder.toLowerCase() + '/')
         )
           throw Error(this.text('images.folderInvalid'));
-        const source = safeDirectory(root, folder);
+        const source = safeDirectory(root, localFolder);
         const target = path.join(
-          safeDirectory(root, imageParent(destination)),
-          imageBasename(destination),
+          safeDirectory(root, imageParent(localDestination)),
+          imageBasename(localDestination),
         );
         if (
           await fs.lstat(target).then(
@@ -171,12 +188,18 @@ export class AssetLibraryHost {
           )
         )
           throw Error(this.text('images.destinationExists'));
-        await fs.rename(source, target);
+        check();
+        safeDirectory(root, localFolder);
+        safeDirectory(root, imageParent(localDestination));
+        if (targetFolder.external)
+          await this.renameExternalFolder(folder, destination!, source, target, check);
+        else await fs.rename(source, target);
       } else if (operation === 'delete') {
-        if (!folder) throw Error(this.text('images.folderInvalid'));
-        await fs.rmdir(safeDirectory(root, folder));
+        if (!localFolder) throw Error(this.text('images.folderInvalid'));
+        check();
+        await fs.rmdir(safeDirectory(root, localFolder));
       } else if (operation === 'move-images') {
-        safeDirectory(root, folder);
+        safeDirectory(root, localFolder);
         const confirmed =
           entries ??
           images.map((ref) => {
@@ -197,8 +220,79 @@ export class AssetLibraryHost {
         throw Error(this.text('images.destinationExists'));
       throw error;
     } finally {
-      await this.images.refresh(true);
+      await this.images.refreshRoots([folder]);
       this.reconcileGroups();
+    }
+  }
+  /** External directories can contain all media; classifications commit in one settings revision. */
+  private async renameExternalFolder(
+    folder: string,
+    destination: string,
+    source: string,
+    target: string,
+    check: () => void,
+  ) {
+    const peers = this.folderPeers;
+    if (peers.some((peer) => peer.filesBusy))
+      throw Error(this.text('services.imageLibraryPage.busy'));
+    const prefix = folder.toLowerCase() + '/';
+    const inFolder = (ref: RegisteredImageRef) => ref.file.toLowerCase().startsWith(prefix);
+    const validate = () => {
+      check();
+      for (const peer of peers) {
+        peer.options.writable();
+        if (peer.images.list().some((entry) => inFolder(entry.ref) && peer.inUse(entry.ref)))
+          throw Error(this.text('services.imageLibraryHost.inUse'));
+      }
+    };
+    validate();
+    const store = this.options.settings;
+    const revision = store.revision;
+    const next = structuredClone(store.value);
+    for (const peer of peers) {
+      const rewrite = (value: unknown): unknown => {
+        if (peer.images.reference(value))
+          return inFolder(value) ? { file: destination + value.file.slice(folder.length) } : value;
+        if (Array.isArray(value)) return value.map(rewrite);
+        if (value && typeof value === 'object')
+          return Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [key, rewrite(item)]),
+          );
+        return value;
+      };
+      const key = `${peer.media}Library` as 'imageLibrary' | 'soundLibrary' | 'textLibrary';
+      Object.assign(next, { [key]: rewrite(next[key]) });
+    }
+    peers.forEach((peer) => {
+      peer.filesBusy = true;
+    });
+    let renamed = false;
+    try {
+      await fs.rename(source, target);
+      renamed = true;
+      validate();
+      if (store.revision !== revision)
+        throw Error(this.text('services.imageLibraryHost.conflictRestored'));
+      if (JSON.stringify(next) !== JSON.stringify(store.value)) store.save(next, revision);
+    } catch (error) {
+      if (renamed) {
+        try {
+          const root = this.images.folderTarget(destination);
+          safeDirectory(root.root, root.relative);
+          await fs.rename(target, source);
+        } catch {
+          throw Error(this.text('images.renameRestoreFailed'));
+        }
+      }
+      throw error;
+    } finally {
+      try {
+        await Promise.all(peers.map((peer) => peer.images.refreshRoots([folder])));
+      } finally {
+        peers.forEach((peer) => {
+          peer.filesBusy = false;
+        });
+      }
     }
   }
   async snapshot(): Promise<ImageLibrarySnapshot> {
@@ -277,6 +371,7 @@ export class AssetLibraryHost {
     if (!entries.length) throw Error(this.text('images.selectImages'));
     // Preflight the whole confirmation before moving the first file to the recycle bin.
     for (const entry of entries) {
+      this.images.assertWritable(entry.ref.file);
       if (this.inUse(entry.ref)) throw Error(this.text('services.imageLibraryHost.inUse'));
       await this.images.readFile(entry.ref, entry.generation ?? '');
     }

@@ -47,15 +47,20 @@ export async function renameLibraryFiles(
       ref,
       source: images.file(entry.ref.file),
       target: images.file(ref.file),
-      stage: path.join(safeDirectory(images.directory, parent), `.appdock-rename-${randomUUID()}`),
+      stage: path.join(
+        safeDirectory(images.folderTarget(parent).root, images.folderTarget(parent).relative),
+        `.appdock-rename-${randomUUID()}`,
+      ),
       bytes: Buffer.alloc(0) as Buffer,
       hash: '',
       backup: images.policy.validateFile
-        ? path.join(images.directory, `.appdock-recovery-${randomUUID()}`)
+        ? path.join(path.dirname(images.file(entry.ref.file)), `.appdock-recovery-${randomUUID()}`)
         : undefined,
       staged: false,
       removed: false,
       created: false,
+      copied: false,
+      identity: '',
     };
   });
   if (new Set(tasks.map((t) => imageKey(t.ref))).size !== tasks.length)
@@ -82,33 +87,70 @@ export async function renameLibraryFiles(
     }
   }
   const commit = prepare(mapping);
+  const check = () => {
+    for (const task of tasks) {
+      if (
+        images.file(task.entry.ref.file) !== task.source ||
+        images.file(task.ref.file) !== task.target
+      )
+        throw Error(text('services.registeredImages.changed'));
+      images.assertWritable(task.entry.ref.file);
+      images.assertWritable(task.ref.file);
+      for (const folder of [imageParent(task.entry.ref.file), imageParent(task.ref.file)]) {
+        const target = images.folderTarget(folder);
+        safeDirectory(target.root, target.relative);
+      }
+    }
+  };
   const same = (file: string, task: (typeof tasks)[number]) => sameFileHash(file, task.hash);
   let completed = false;
   let restored = true;
   try {
     for (const task of changed)
       if (task.backup) {
+        check();
         await fs.copyFile(task.source, task.backup, fs.constants.COPYFILE_EXCL);
         if (!(await same(task.backup, task)))
           throw Error(text('services.registeredImages.changed'));
       }
     for (const task of changed) {
-      await fs.link(task.source, task.stage);
+      check();
+      const original = await fs.lstat(task.source, { bigint: true });
+      task.identity = `${original.dev}:${original.ino}`;
+      try {
+        await fs.link(task.source, task.stage);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+        check();
+        await fs.copyFile(task.source, task.stage, fs.constants.COPYFILE_EXCL);
+        task.copied = true;
+      }
       task.staged = true;
     }
     for (const task of changed) {
-      const [source, stage] = await Promise.all([fs.lstat(task.source), fs.lstat(task.stage)]);
-      if (source.ino !== stage.ino || source.dev !== stage.dev || !(await same(task.source, task)))
+      const [source, stage] = await Promise.all([
+        fs.lstat(task.source, { bigint: true }),
+        fs.lstat(task.stage, { bigint: true }),
+      ]);
+      if (
+        `${source.dev}:${source.ino}` !== task.identity ||
+        (!task.copied && (source.ino !== stage.ino || source.dev !== stage.dev)) ||
+        !(await same(task.source, task)) ||
+        !(await same(task.stage, task))
+      )
         throw Error(text('services.registeredImages.changed'));
+      check();
       await fs.unlink(task.source);
       task.removed = true;
     }
     for (const task of changed) {
+      check();
       await fs.link(task.stage, task.target);
       task.created = true;
     }
     for (const task of changed)
       if (!(await same(task.target, task))) throw Error(text('services.registeredImages.changed'));
+    check();
     commit();
     completed = true;
     return tasks.map((t) => t.ref);
@@ -150,6 +192,6 @@ export async function renameLibraryFiles(
         await fs.unlink(task.stage).catch(() => {});
       if (task.backup && (completed || restored)) await fs.unlink(task.backup).catch(() => {});
     }
-    await images.refresh(true);
+    await images.refreshRoots(tasks.flatMap((task) => [task.entry.ref.file, task.ref.file]));
   }
 }

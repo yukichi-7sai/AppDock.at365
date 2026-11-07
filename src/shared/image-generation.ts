@@ -19,6 +19,7 @@ export interface ImageGenerationModel {
   revision: number;
   folder: string;
   folders: string[];
+  sources?: import('./library-sources').ExternalLibrarySource[];
   initialReferenceImages: LibraryRef[];
   defaultConnectionId?: string;
   servers: { id: string; name: string; defaults: ImageGenerationOptions }[];

@@ -1,3 +1,4 @@
+import { libraryFolderLabel } from '../shared/library-sources';
 import { useEffect, useRef, useState } from 'react';
 import type {
   GeneratedSound,
@@ -107,7 +108,8 @@ export function SoundGenerationDialog({
               {!model.folders.includes(folder) && <option value={folder}>{folder}</option>}
               {model.folders.map((value) => (
                 <option key={value} value={value}>
-                  {value || t('soundGeneration.rootFolder')}
+                  {libraryFolderLabel(value, model.sources ?? [], t('library.sources.direct')) ||
+                    t('soundGeneration.rootFolder')}
                 </option>
               ))}
             </select>
@@ -221,7 +223,9 @@ export function SoundGenerationDialog({
                 canceled: 'soundGeneration.canceled',
               } as const
             )[item.state];
-            const folderName = item.folder || t('soundGeneration.rootFolder');
+            const folderName =
+              libraryFolderLabel(item.folder, model.sources ?? [], t('library.sources.direct')) ||
+              t('soundGeneration.rootFolder');
             const status = item.resultDeleted
               ? t('generationJobs.resultsDeleted')
               : playback

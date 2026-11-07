@@ -47,8 +47,7 @@ export function parseExternalLibrarySources(value: unknown): ExternalLibrarySour
       typeof row.path !== 'string' ||
       !/^(?:[a-z]:[\\/]|\\\\[^\\/? .]+\\[^\\/? .]+)/i.test(row.path) ||
       /[\x00-\x1f\x7f]/.test(row.path) ||
-      // Writable external roots are deliberately not enabled by editing settings JSON.
-      row.access !== 'read-only'
+      !['read-only', 'read-write'].includes(row.access)
     )
       throw invalid();
     const key = row.path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
@@ -64,6 +63,16 @@ export function libraryRootFolder(folder: string) {
   return location ? externalLibraryPath(location.id, '*') : '*';
 }
 
+/** Browse roots include descendants; writes always target their actual root directory. */
+export function libraryWriteFolder(folder: string) {
+  const location = externalLibraryLocation(folder);
+  return location?.relative === '*'
+    ? externalLibraryPath(location.id)
+    : folder === '*'
+      ? ''
+      : folder;
+}
+
 export function libraryFolderLabel(
   folder: string,
   sources: ExternalLibrarySource[],
@@ -75,4 +84,9 @@ export function libraryFolderLabel(
   return location.relative === '*'
     ? (source?.name ?? '')
     : `${source?.name ?? ''}/${location.relative || directLabel}`;
+}
+
+export function libraryFolderWritable(folder: string, sources: LibrarySourceSnapshot[]) {
+  const location = externalLibraryLocation(folder);
+  return !location || sources.some((source) => source.id === location.id && source.canWrite);
 }

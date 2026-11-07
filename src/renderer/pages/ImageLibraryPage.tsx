@@ -21,7 +21,11 @@ import { ImageLibraryMenu, type LibraryMenuItem } from './ImageLibraryMenu';
 import '../image-gallery/gallery.css';
 import './image-library.css';
 import { ImageBrowserNavigation } from '../image-browser/ImageBrowserNavigation';
-import { externalLibraryLocation, libraryFolderLabel } from '../../shared/library-sources';
+import {
+  externalLibraryLocation,
+  libraryFolderLabel,
+  libraryFolderWritable,
+} from '../../shared/library-sources';
 import {
   ImageBrowserFilters,
   ImageBrowserSplitter,
@@ -387,7 +391,9 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             return {
               element,
               id: 'folder:' + folder,
-              canDrop: latest.current.content.canWrite && !externalLibraryLocation(folder),
+              canDrop:
+                latest.current.content.canWrite &&
+                libraryFolderWritable(folder, latest.current.content.sources),
               description: (count: number) =>
                 libraryText(media, 'images.dragMoveToFolder', {
                   count,
@@ -657,22 +663,32 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       },
       {
         label: t('images.createFolder'),
-        disabled: !!externalLibraryLocation(menu.target),
+        disabled: !libraryFolderWritable(menu.target ?? '', c.sources),
         run: () => dialog('folder-create', undefined, menu.target, undefined, menu.opener),
       },
       {
         label: t('images.renameFolder'),
-        disabled: !menu.target || !!externalLibraryLocation(menu.target),
+        disabled:
+          !menu.target ||
+          ['', '*'].includes(externalLibraryLocation(menu.target)?.relative ?? 'folder') ||
+          !libraryFolderWritable(menu.target, c.sources),
         run: () => dialog('folder-rename', undefined, menu.target, undefined, menu.opener),
       },
       {
         label: t('images.deleteFolder'),
-        disabled: !menu.target || !!externalLibraryLocation(menu.target),
+        disabled:
+          !menu.target ||
+          ['', '*'].includes(externalLibraryLocation(menu.target)?.relative ?? 'folder') ||
+          !libraryFolderWritable(menu.target, c.sources),
         danger: true,
         run: () => dialog('folder-delete', undefined, menu.target, undefined, menu.opener),
       },
       ...(externalLibraryLocation(menu.target)
         ? [
+            {
+              label: t('library.sources.edit'),
+              run: () => dialog('source-edit', undefined, menu.target, undefined, menu.opener),
+            },
             {
               label: t('library.sources.remove'),
               run: () => dialog('source-remove', undefined, menu.target, undefined, menu.opener),

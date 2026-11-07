@@ -1,3 +1,4 @@
+import { externalLibraryLocation } from '../../shared/library-sources';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { libraryFolder, libraryPath, libraryParent } from '../../shared/library-assets';
@@ -282,11 +283,14 @@ export class SoundGeneration {
       draft: this.draft,
       revision: this.revision,
       folder: s.folder,
+      sources: this.options.library.files.sources,
       folders: [
         ...new Set([
           '',
-          ...this.options.library.files.folders.filter((folder) =>
-            this.options.library.files.canWrite(folder),
+          ...this.options.library.files.folders.filter(
+            (folder) =>
+              this.options.library.files.canWrite(folder) &&
+              externalLibraryLocation(folder)?.relative !== '*',
           ),
         ]),
       ],

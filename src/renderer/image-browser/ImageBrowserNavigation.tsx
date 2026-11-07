@@ -192,7 +192,9 @@ export function ImageBrowserNavigation({
                       ? 'library.sources.loading'
                       : !source.available
                         ? 'library.sources.unavailable'
-                        : 'library.sources.readOnlyLabel',
+                        : source.access === 'read-write'
+                          ? 'library.sources.readWriteLabel'
+                          : 'library.sources.readOnlyLabel',
                   )}
                 </small>
               )}
