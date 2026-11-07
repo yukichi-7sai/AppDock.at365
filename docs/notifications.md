@@ -40,7 +40,7 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナー、閉じるまで表示、読み上げOFF。通知先は自由に選択でき、通知センターのみも指定できる。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityと宣言済みの種類を使い、publish/policy/endへ接続する。未宣言の種類は生成しない。旧show通知APIと旧種類の自動生成は廃止した。
 
 「設定 → 通知」は本体の共通設定画面を使い、読み上げ共通値は確定後すぐ保存し、通知種類の設定は編集ダイアログのOKでまとめて保存する。通知そのもののOFFは設けず、種類ごとの通知先・表示時間・通知音・読み上げを通知ページで選んだ保存先のnotificationPreferences.overridesに保存する。targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。通知種類は一つのテーブルで、通知名（提供元マークと説明ヒント）・通知先・表示時間・通知音・読み上げ・MCP Events・鉛筆の編集操作を表示する。必須の通知先、固定の表示時間、停止中のAppletや前提不足などの状態も一覧に残す。編集は共通ダイアログ内の一時入力とし、取消では保存しない。OKでは元の上書き値と通知仕様を照合し、その通知だけを最新の設定へ合成する。競合・保存失敗では入力と原因をダイアログに残す。未変更の既定値は明示値として固定しない。
 
@@ -139,7 +139,7 @@ Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protoco
 
 通知の起動先には配置先の本体EXEを使い、Electronのsingle-instance経路で実行中の本体へ通知引数を渡す。起動途中の引数はstartupReadyまで保留し、準備後に既存の通知操作へ渡す。`scripts/notification-portable-test.cjs`でShell URIの隔離起動と引き継ぎを確認する。実管理者環境のUAC承認後の動作は別途確認する。
 
-旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出はhost/updates/available (banner/6秒、消音)へ統合する。更新適用成功host/updates/appliedも既定banner/6秒とする。
+起動時更新検出はhost/updates/available（banner/6秒、消音）、更新適用成功はhost/updates/appliedへ接続する。本体の更新通知で使うWindowsクリック操作は現行の内部機能として維持し、Appletの旧show通知とは分離する。
 
 Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveにしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
 

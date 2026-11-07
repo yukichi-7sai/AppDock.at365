@@ -47,7 +47,6 @@ import type {
   ExtensionSnapshot,
   Command,
   TrayItem,
-  ResolvedPanel,
   SettingOption,
   AppletCommand,
 } from '../../shared/contracts';
@@ -309,7 +308,6 @@ export interface ExtensionInstance {
   state: ExtensionSnapshot['state'];
   commands: Command[];
   tray: TrayItem[];
-  panel: ResolvedPanel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
   startupMeasurement?: {
@@ -444,7 +442,6 @@ class ExtensionManager extends EventEmitter {
             state: 'stopped',
             commands: [],
             tray: [],
-            panel: null,
             settingOptions: {},
             error: null,
           });
@@ -472,7 +469,6 @@ class ExtensionManager extends EventEmitter {
         e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
       commands: this.commandCatalog(e),
       tray: e.tray,
-      panel: e.panel,
       settingOptions: e.settingOptions,
     }));
   }
@@ -866,7 +862,6 @@ class ExtensionManager extends EventEmitter {
     e.error = message;
     e.commands = [];
     e.tray = [];
-    e.panel = null;
     this.log('error', e.manifest.id, message);
     this.emit('changed');
   }
@@ -902,7 +897,6 @@ class ExtensionManager extends EventEmitter {
     e.state = 'stopped';
     e.commands = [];
     e.tray = [];
-    e.panel = null;
     e.error = null;
     this.emit('changed');
   }
@@ -1050,24 +1044,6 @@ class ExtensionManager extends EventEmitter {
           });
         },
       }));
-  }
-  executePanelAction(extensionId: string, actionId: string) {
-    const extension = this.items.get(extensionId);
-    const actions = [
-      ...(extension?.panel?.actions ?? []),
-      ...(extension?.panel?.tabs ?? []),
-      ...(extension?.panel?.images ?? []).flatMap((image) => image.actions ?? []),
-    ];
-    if (
-      this.shuttingDown ||
-      extension?.state !== 'running' ||
-      !extension.peer ||
-      extension.peer.closed ||
-      typeof actionId !== 'string' ||
-      !actions.some((action) => action.actionId === actionId)
-    )
-      throw new Error(hostText('services.extensions.operationUnavailable'));
-    return extension.peer.request('panel.action', { id: actionId });
   }
   restart(id: string, immediate = false) {
     this.queue = this.queue

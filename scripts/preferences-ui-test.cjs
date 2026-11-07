@@ -14,11 +14,16 @@ delete legacy.pinnedCommands;
 legacy.host.notifications = false;
 require('./profile-settings-fixture.cjs').installProfileSettings(profile, legacy);
 require('../tests/fixtures/install.cjs')(profile, legacy);
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(legacy, null, 2),
+);
 let application;
 async function launch() {
   application = await electron.launch({
-    executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+    executablePath: process.argv[2]
+      ? require('./copy-host.cjs').prepareTestHost(path.resolve(process.argv[2]), profile)
+      : require('electron'),
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     timeout: 30000,
   });
@@ -83,35 +88,42 @@ async function waitPins(page, pins) {
     );
     await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     await page.keyboard.press('Control+,');
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: 'ショートカットキー', exact: true })
-      .click();
     const setShortcut = async (commandId, key) => {
-      const row = (await settingsPage()).locator(
-        `.shortcuts-editor [data-shortcut-command="${commandId}"]`,
+      const bindings = require('../out/main/shared/keybindings').getKeybindings(
+        (await page.evaluate(() => window.dock.snapshot())).settings.value,
       );
-      await row.waitFor();
-      const existing = row.locator('.applet-shortcut-edit').first();
-      const adding = !(await existing.count());
-      if (adding) await row.getByRole('button', { name: /に割り当てを追加/ }).click();
-      else await existing.click();
-      const panel = (await settingsPage()).locator('.applet-shortcut-dialog');
-      await panel.getByText('押して入力', { exact: true }).waitFor();
-      await panel.getByRole('button', { name: 'ショートカットキーを入力', exact: true }).press(key);
-      await panel.getByLabel('割り当てのいつ・どこで').selectOption('app');
-      await panel.getByRole('button', { name: adding ? '追加' : '適用', exact: true }).click();
+      await page.evaluate(
+        async ({ commandId, bindings }) => {
+          const state = await window.dock.snapshot();
+          state.settings.value.keybindings = bindings.filter((row) => row.command !== commandId);
+          await window.dock.saveSettings(state.settings.value, state.settings.revision);
+          await window.dock.executeCommand('appdock.settings.command-triggers.open');
+        },
+        { commandId, bindings },
+      );
+      const ui = await settingsPage();
+      const row = ui.locator('[data-shortcut-command="' + commandId + '"]');
+      await row.locator('.command-title').hover();
+      await ui.getByTestId('binding-add:' + commandId + ':shortcuts').click();
+      const dialog = ui.getByTestId('settings-dialog');
+      await dialog.getByRole('button', { name: 'キージェスチャーを入力', exact: true }).press(key);
+      await dialog.getByRole('button', { name: '追加', exact: true }).click();
+      await settleSettings(ui);
+      await page.evaluate(async (commandId) => {
+        const state = await window.dock.snapshot();
+        for (const row of state.settings.value.keybindings)
+          if (row.command === commandId) row.when = { scope: 'app', appletIds: [] };
+        await window.dock.saveSettings(state.settings.value, state.settings.revision);
+      }, commandId);
     };
     await setShortcut('appdock.commands.search', 'Control+Alt+p');
     await setShortcut('appdock.welcome.verify-storage', 'Control+Alt+p');
     await settleSettings(await settingsPage());
     await settleSettings(await settingsPage());
-    assert.equal(
-      (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
-        'appdock.commands.search'
-      ].includes('Ctrl+Alt+P'),
-      true,
+    assert(
+      (await page.evaluate(() => window.dock.snapshot())).settings.value.keybindings.some(
+        (row) => row.command === 'appdock.commands.search' && row.key === 'Ctrl+Alt+P',
+      ),
     );
     await setShortcut('appdock.welcome.verify-storage', 'Control+Alt+r');
     await settleSettings(await settingsPage());
@@ -142,24 +154,20 @@ async function waitPins(page, pins) {
           ),
         ),
     );
-    // Assign and execute a real .NET command through the same shortcut settings.
-    await (
-      await require('./shell-overlay-helper.cjs').ribbonPage(page)
-    )
-      .getByRole('button', { name: 'Applet', exact: true })
-      .click();
-    await page
-      .getByRole('complementary', { name: 'Applet一覧' })
-      .getByRole('button', { name: /.NET Connection Demo/ })
-      .click();
-    await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
-    await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
-    await page.keyboard.press('Control+,');
+    // Assign and execute a real .NET command through the current trigger editor.
+    await page.evaluate(() => window.dock.toggleExtension('appdock.dotnet-demo', true));
+    await require('./settings-host-helper.cjs').waitForHost(
+      page,
+      async () =>
+        (await window.dock.snapshot()).extensions.find((e) => e.id === 'appdock.dotnet-demo')
+          ?.state === 'running',
+    );
     await setShortcut('appdock.dotnet-demo.refresh', 'Control+Alt+d');
     await settleSettings(await settingsPage());
-    const before = (await page.evaluate(() => window.dock.snapshot())).extensions
-      .find((e) => e.id === 'appdock.dotnet-demo')
-      .panel.facts.find((f) => f.label === 'Refresh').value;
+    const before = (await page.evaluate(() => window.dock.snapshot())).logs
+      .filter((e) => e.source === 'appdock.dotnet-demo' && e.message.startsWith('fixture-refresh:'))
+      .at(-1)
+      .message.slice(16);
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
     )
@@ -170,16 +178,18 @@ async function waitPins(page, pins) {
     await page.keyboard.press('Control+Alt+d');
     await page.waitForFunction(
       (previous) =>
-        window.dock
-          .snapshot()
-          .then(
-            (s) =>
-              Number(
-                s.extensions
-                  .find((e) => e.id === 'appdock.dotnet-demo')
-                  .panel.facts.find((f) => f.label === 'Refresh').value,
-              ) > Number(previous),
-          ),
+        window.dock.snapshot().then(
+          (s) =>
+            Number(
+              s.logs
+                .filter(
+                  (e) =>
+                    e.source === 'appdock.dotnet-demo' && e.message.startsWith('fixture-refresh:'),
+                )
+                .at(-1)
+                .message.slice(16),
+            ) > Number(previous),
+        ),
       before,
     );
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
@@ -223,7 +233,7 @@ async function waitPins(page, pins) {
           checks: [
             'legacy settings / Ctrl+P default',
             'pin / order / filter / unpin',
-            'shortcut recording / shared bindings / remapping',
+            'current trigger key recording / shared bindings / remapping',
             'TypeScript and .NET keyboard commands',
             'declarative Profile Applet settings and restart persistence',
             'restart persistence',

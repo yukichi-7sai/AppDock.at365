@@ -33,15 +33,15 @@ test('Applet activation and settings notifications pass saved input settings wit
         version: '1.0.0',
         runtime: 'node',
         entry: 'index.js',
-        capabilities: ['ui', 'settings'],
+        capabilities: ['storage', 'settings'],
       }),
     );
     fs.writeFileSync(
       path.join(folder, 'index.js'),
       `exports.activate = async c => {
-      const refresh = () => c.ui.showPanel({ title: 'Settings', description: JSON.stringify(
+      const refresh = () => c.storage.set('fixture-state',
         Object.fromEntries(${JSON.stringify(keys)}.map(key => [key, c.settings.get(key)]))
-      ) });
+      , 'memory');
       c.settings.onChanged(refresh);
       await refresh();
     };`,
@@ -58,12 +58,13 @@ test('Applet activation and settings notifications pass saved input settings wit
     });
   }
   const manager = new ExtensionManager({
+    hostVersion: '0.180.0',
     roots: [fixtures],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
     api: async (e, method, p) => {
-      if (method === 'host.ui.panel') e.panel = p;
+      if (method === 'host.storage.set') e.fixtureState = p.value;
       return null;
     },
     log: () => {},
@@ -77,16 +78,13 @@ test('Applet activation and settings notifications pass saved input settings wit
   for (const id of ids) {
     const item = manager.items.get(id);
     assert.equal(item.state, 'running');
-    assert.deepEqual(JSON.parse(item.panel.description), settings.value.extensions[id].settings);
+    assert.deepEqual(item.fixtureState, settings.value.extensions[id].settings);
     // Absent keys must stay absent when settings are replaced and notified.
     settings.updateExtension(id, { settings: { custom: { items: ['updated'] } } });
   }
   await manager.reconcile();
   for (const id of ids)
-    assert.deepEqual(
-      JSON.parse(manager.items.get(id).panel.description),
-      settings.value.extensions[id].settings,
-    );
+    assert.deepEqual(manager.items.get(id).fixtureState, settings.value.extensions[id].settings);
 });
 
 test('commands are catalogued before loading; explicit start and legacy alias activate once without delay', async (t) => {
@@ -96,13 +94,13 @@ test('commands are catalogued before loading; explicit start and legacy alias ac
   const manager = new ExtensionManager({
     roots: [path.join(root, '.artifacts/test-extensions')],
     settings,
-    hostVersion: '0.6.0',
+    hostVersion: '0.180.0',
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
     dotnetHost: path.join(root, '.artifacts/dotnet-host'),
     log: () => {},
     api: async (e, method, p) => {
-      if (method === 'host.ui.panel') e.panel = p;
+      if (method === 'host.storage.set') e.fixtureState = p.value;
       return null;
     },
   });
@@ -157,14 +155,15 @@ test('real Node and .NET extensions: activation, commands, crash isolation, rest
   settings.updateExtension('appdock.welcome', { enabled: true });
   settings.updateExtension('appdock.dotnet-demo', { enabled: true });
   const manager = new ExtensionManager({
+    hostVersion: '0.180.0',
     roots: [path.join(root, '.artifacts/test-extensions')],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
     dotnetHost: path.join(root, '.artifacts/dotnet-host'),
     api: async (e, method, p) => {
-      if (method === 'host.ui.panel') {
-        e.panel = p;
+      if (method === 'host.storage.set') {
+        e.fixtureState = p.value;
         return null;
       }
       if (method === 'host.log') return null;
@@ -182,7 +181,7 @@ test('real Node and .NET extensions: activation, commands, crash isolation, rest
   const dotnet = manager.items.get('appdock.dotnet-demo');
   const node = manager.items.get('appdock.welcome');
   assert.notEqual(dotnet.child.pid, node.child.pid);
-  assert.equal(dotnet.panel.title, 'C# is docked.');
+  assert.equal(dotnet.fixtureState.greeting, 'C# is docked.');
   await manager.execute('appdock.welcome.refresh');
   await manager.execute('appdock.dotnet-demo.refresh');
   const originalPid = dotnet.child.pid;
@@ -198,12 +197,11 @@ test('real Node and .NET extensions: activation, commands, crash isolation, rest
   settings.updateExtension('appdock.welcome', { settings: { greeting: 'テストのメッセージ' } });
   await manager.reconcile();
   await manager.execute('appdock.welcome.refresh');
-  assert.equal(node.panel.description, 'テストのメッセージ');
+  assert.equal(node.fixtureState.greeting, 'テストのメッセージ');
   const children = [dotnet.child, node.child];
   settings.updateExtension('appdock.dotnet-demo', { enabled: false });
   await manager.reconcile();
   assert.equal(dotnet.state, 'stopped');
-  assert.equal(dotnet.panel, null);
   await manager.shutdown();
   assert.equal(node.state, 'stopped');
   assert.ok(children.every((c) => c.exitCode !== null || c.signalCode !== null));

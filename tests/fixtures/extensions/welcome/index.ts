@@ -1,21 +1,18 @@
 import type { NodeExtensionContext } from '../../../../src/main/node-worker';
 export async function activate(context: NodeExtensionContext) {
   const refresh = async () =>
-    context.ui.showPanel({
-      title: 'Your tools, together.',
-      description: context.settings.get('greeting', '自分の道具を、ひとつの場所に。'),
-      facts: [
-        { label: 'Runtime', value: 'Node.js · TypeScript' },
-        { label: 'Host API', value: 'Connected' },
-      ],
-      actions: [
-        { title: '表示を更新', command: 'appdock.welcome.refresh' },
-        { title: '通知を試す', command: 'appdock.welcome.notify' },
-      ],
-    });
+    context.storage.set(
+      'fixture-state',
+      { greeting: context.settings.get('greeting', '自分の道具を、ひとつの場所に。') },
+      'memory',
+    );
   context.commands.register('appdock.welcome.refresh', 'ウェルカムを更新', refresh);
   context.commands.register('appdock.welcome.notify', 'テスト通知を表示', () =>
-    context.notifications.show('AppDock.at365', '拡張からの通知が届きました。'),
+    context.notifications.publish({
+      typeId: 'fixture',
+      title: 'AppDock.at365',
+      body: '拡張からの通知が届きました。',
+    }),
   );
   context.commands.register('appdock.welcome.verify-storage', '保存APIを確認', async () => {
     await context.storage.set('check', { ok: true });

@@ -106,7 +106,6 @@ export class SettingsInputSession {
           ({
             commands,
             tray,
-            panel,
             settingOptions,
             startupTiming,
             error,

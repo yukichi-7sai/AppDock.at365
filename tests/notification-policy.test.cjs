@@ -67,22 +67,6 @@ test('stopped publishers and ended deferred notifications are not replayed on un
   assert.equal(f.publications.length, 0);
   assert.deepEqual(f.service.targetItems('banner'), []);
 });
-test('typed Applets expose only declared notifications while legacy-only Applets retain their kind', () => {
-  const applets = [
-    { id: 'typed', notificationTypes: [definition()] },
-    { id: 'legacy' },
-    { id: 'empty', notificationTypes: [] },
-  ].map((a) => ({ ...a, displayName: a.id, state: 'running', capabilities: ['notifications'] }));
-  const kinds = p.notificationCatalog(applets).filter((t) => t.ownerKind === 'applet');
-  assert.deepEqual(
-    kinds.map((t) => [t.ownerId, t.typeId]),
-    [
-      ['typed', 'message'],
-      ['legacy', 'appdock.legacy'],
-      ['empty', 'appdock.legacy'],
-    ],
-  );
-});
 function setup(t, definitions = [definition()]) {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-policy-unit-'));
   let clock = 100000,

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileHash } from './file-content';
 import { soundLibraryReference } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
 import { AssetLibraryHost } from './asset-library-host';
@@ -14,6 +15,7 @@ export interface SoundLibraryAccess {
   pick(current?: string, alive?: () => boolean): Promise<SoundLibrarySelection | null>;
   pickFile(alive?: () => boolean): Promise<string | null>;
   resolve(file: string): Promise<string>;
+  importLegacy(source: string, owner: string): Promise<SoundLibrarySelection>;
 }
 
 /** Shared library files and immutable copies used by sound settings. */
@@ -82,6 +84,34 @@ export class SoundLibraryService implements SoundLibraryAccess {
     if (!selected || !alive()) return null;
     const file = await this.resolve(selected.file);
     return alive() ? file : null;
+  }
+  /** Preserve existing Applet assets in a separate library folder and retain settings copies. */
+  async importLegacy(source: string, owner: string): Promise<SoundLibrarySelection> {
+    this.host.assertWritable();
+    const name = path.basename(source);
+    const original = await fileHash(source);
+    const folder = `Imported notification sounds/${owner}`;
+    const preferred = `${folder}/${name}`;
+    const writable = () => this.host.assertWritable();
+    let imported;
+    try {
+      imported = await this.files.addFile(source, preferred, writable);
+    } catch (error) {
+      let existing;
+      try {
+        existing = await this.files.readFile({ file: preferred });
+      } catch {
+        throw error;
+      }
+      if (existing.hash === original || (await fileHash(source)) !== original) throw error;
+      // Preserve both originals and their filenames when migration sources share a name.
+      imported = await this.files.addFile(source, `${folder}/${original}/${name}`, writable);
+    }
+    const retained = await this.host.retain(imported.ref);
+    const file = '@library/' + retained.file;
+    if ((await fileHash(await this.resolve(file))) !== original)
+      throw Error(hostText('services.registeredImages.changed'));
+    return { file, name };
   }
   async resolve(file: string) {
     if (!soundLibraryReference(file)) throw Error(hostText('sounds.invalidWave'));

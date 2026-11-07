@@ -19,7 +19,7 @@ import {
   type ImagePickResult,
 } from '../../shared/registered-images';
 import type { ExtensionManifest } from '../../shared/contracts';
-import { imageDirectory } from './panel-images';
+import { imageDirectory } from './applet-image-cache';
 import { ImageLibrarySettings } from './image-library-settings';
 
 import { decodeRegisteredImage, registeredImageClipboardPng } from './registered-image-decoder';

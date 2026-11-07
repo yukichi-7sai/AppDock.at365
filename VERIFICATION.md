@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-11-07 現行Applet契約への統一（0.180.0 / SDK・Runtime 0.34.0）
+
+- 5つのAppletと本体/SDK/Runtime/Node worker/IPC/型/描画/通知カタログをレビューし、旧パネル・パネル操作と旧通知show APIを廃止した。現行ページ画像キャッシュ、ブラウザー起動、設定への移動、共通音声再生と本体更新のWindows通知クリック処理を保持した。画像キャッシュ・登録音・監視の現行検証は専用テストへ移し、廃止機能だけの試験・スクリプトを除去した。
+- Gmail等の旧通知音を共通音ライブラリーへ取り込む。未使用の登録音と絶対パスの割り当ても対象とし、内容を照合した設定用保管コピーへ更新する。原音、アカウントID/選択/監視/ログインとON/OFFを保持。同名別内容は内容ハッシュのサブフォルダーへ元の名前で保存する。コピー・保存失敗は再試行でき、先行した選択変更・削除・停止を上書きしない。実利用プロファイルは変更せず、更新後の初回起動で移行する。
+- 型検査、標準回帰1,829件、3 native AppletのRelease buildと回帰（Watch 24件、WindowsTools 43件、壁紙の構成/走査/監視/描画/停止）、Gmail 26件、WebBrowserTools 3件に成功。固定発行EXEでApplet API/Node・.NET再入/許可UI、Storage/Secrets/大きいJSON、翻訳、トレイ、ピン留め・現行トリガー記録と実入力、Gmail移行・音選択・通知・再起動、2配置の同期/復旧/PC別音割当、Windows通知の配信/置換/取消/世代・所有者/停止・コールド起動を確認した。5 Appletの個別GUI/プロトコルも成功した。
+- 初期のbuild/型検査、旧fixtureのパネル依存・通知宣言不足、未処理だったGmail履歴48,000 bytes削減、既存GUI試験の古いMCP形式/公開設定・管理コマンド/既定値省略保存/PC別Storage保存先/ショートカット画面/起動待ちを切り分けて修正し、該当試験を成功まで再実行した。元の失敗ログは保持する。旧画像キャッシュ/音ファイルの安全性・ファイル監視・復旧の検証は維持した。
+- 公開連携API削除と新しいPC専用移行マーカーにより本体/SDK・Runtimeをminor更新。各publish.batで6 repoを40.ARTIFACTへ発行し、manifestの版/最低本体版、管理ファイル、更新ZIPのサイズ・SHA256と固定EXEの一致を確認した。実Google認証・実メール受信、物理スピーカー出力、実2台間の同期と実操作の壁紙切替は未確認。不要な再試験は追加せず、成功した標準回帰は入力照合で再利用する。
+- 証跡は`.artifacts/legacy-api-retirement-20261107/`（review.md、inputs-before-validation.json、inputs-after-gui.json、inputs-after-format.json、published-artifacts.json、各試験・発行の完全ログ）。最終整形はPrettierだけで、製品入力と発行物は不変。最後のnative fixture変更は結果文言のみで、再build・プロトコル確認に成功した。stage/commit tree、再利用判断、後片付けは`.artifacts/commit-validation-legacy-api-retirement-20261107/`へ記録する。すべてmain、repoごとのローカルコミットとし、push・Release・実利用先への配置は行わない。
+
 ## 2026-11-07 容量制限撤去のコミット前照合（0.179.1）
 
 - 実装時の入力1,153ファイル、変更140ファイル、成功・失敗ログ40件、発行manifest所有の101ファイルと更新ZIPのSHA256を照合し、一致した。標準回帰1,834件・native回帰24件、型検査・各build、実native接続/表示/保存/停止、固定EXEのStorage/Secretsと共通API/MCP/許可画面の成功結果を再利用した。製品内容・版・発行物の追加変更と回帰の再実行はない。

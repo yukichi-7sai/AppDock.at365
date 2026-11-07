@@ -321,7 +321,6 @@ const api: DockApi = {
   toggleExtension: (id, enabled) => ipcRenderer.invoke('dock:toggleExtension', id, enabled),
   restartExtension: (id) => ipcRenderer.invoke('dock:restartExtension', id),
   executeCommand: (id) => ipcRenderer.invoke('dock:executeCommand', id),
-  executePanelAction: (id, actionId) => ipcRenderer.invoke('dock:executePanelAction', id, actionId),
   openPath: (kind) => ipcRenderer.invoke('dock:openPath', kind),
   windowAction: (action) => ipcRenderer.invoke('dock:windowAction', action),
   barViewport: (region, bounds) => ipcRenderer.invoke('dock:barViewport', region, bounds),

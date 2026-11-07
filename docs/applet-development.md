@@ -71,8 +71,7 @@ public sealed class Applet : IAppDockExtension
 
     public async Task ActivateAsync(IExtensionContext context, CancellationToken token)
     {
-        Task Refresh(CancellationToken ct) => context.Ui.ShowPanelAsync(
-            new Panel("Sample", context.Settings.Get("message", "こんにちは")), ct);
+        Task Refresh(CancellationToken ct) => context.Log.InfoAsync(context.Settings.Get("message", "こんにちは"), ct);
 
         context.Commands.Register(context.ExtensionId + ".refresh", "表示を更新", Refresh);
         subscription = context.Settings.OnChanged(Refresh);
@@ -189,9 +188,9 @@ UIテストは本repoの`.artifacts`内に一意のprofileを作り、[共通テ
 
 モニターごとのフォームには`object-list`とフィールド内の`string-list`を使います。ロード前に設定したいコマンドはmanifestの`commands`へ宣言し、即時ロードを許す開始操作だけ`activateOnExecute`を指定します。旧IDは`aliases`で維持できます。
 
-履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
+履歴画像など件数が変わる表示と操作はローカルページとpages APIを使用します。ページ内の選択や操作は宣言したページアクションへ接続し、一般コマンドへ行ごとの操作を増やしません。画像は`local-images`と`Ui.GetImageDirectoryAsync`で取得したキャッシュを使い、必要な画像だけをページへ登録します。ページ変更・終了時には自分のキャッシュを整理します。
 
-契約と範囲は[拡張API](extensions.md#宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshowの開発ガイド](../../Applet.WallpaperSlideshow.at365/DEVELOPMENT.md)を参照してください。利用APIの最低ホスト版をmanifestへ指定し、SDK・Runtimeを含めて発行します。
+契約と範囲は[拡張API](applet-pages.md)、実装例と検証は[WallpaperSlideshowの開発ガイド](../../Applet.WallpaperSlideshow.at365/DEVELOPMENT.md)を参照してください。利用APIの最低ホスト版をmanifestへ指定し、SDK・Runtimeを含めて発行します。
 
 ## トレイ表示
 
@@ -205,7 +204,7 @@ UIテストは本repoの`.artifacts`内に一意のprofileを作り、[共通テ
 
 TypeScript/Nodeの現行実利用例は[Gmail](../../Applet.Gmail.at365/DEVELOPMENT.md)です。ローカルReact UIとWebアカウントのDOM観測を分け、ログイン領域はホストへ任せます。別途APIクライアントを実装する場合は、一般設定をホストフォーム、秘密をSecrets、履歴をStorageへ分けます。認証やポーリングはコマンド受付から切り離し、停止時にAbortControllerで中止してください。
 
-ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。
+ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.publish`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、ローカルページとリモートページの権限境界を維持します。
 
 Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
 

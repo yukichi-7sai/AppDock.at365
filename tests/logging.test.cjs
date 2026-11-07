@@ -250,7 +250,7 @@ test('common logging remains available during deactivation; other APIs and inact
       'cleanup: ' + state,
     ]),
   );
-  for (const method of ['host.settings.set', 'host.ui.panel', 'host.notifications.show'])
+  for (const method of ['host.settings.set', 'host.storage.set', 'host.notifications.publish'])
     await assert.rejects(api(extension, method, {}), /停止/);
   for (const state of ['stopped', 'error']) {
     extension.state = state;

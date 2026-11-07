@@ -9,9 +9,11 @@ namespace AppDock.Tests {
     public sealed class LocalizationProbe : IAppDockExtension {
         private IDisposable? subscription;
         public async Task ActivateAsync(IExtensionContext context, CancellationToken token) {
-            Task Show(CancellationToken ct) => context.Ui.ShowPanelAsync(new Panel(context.Localization.Text("title"),
-                context.Localization.Text("named", new Dictionary<string, object?> { ["name"] = "{{count}} $t(title)", ["count"] = 3 }),
-                [new PanelFact("language", context.Localization.Language)]), ct);
+            Task Show(CancellationToken ct) => context.Storage.SetAsync("localization", new {
+                title = context.Localization.Text("title"),
+                named = context.Localization.Text("named", new Dictionary<string, object?> { ["name"] = "{{count}} $t(title)", ["count"] = 3 }),
+                language = context.Localization.Language
+            }, StorageScope.Memory, ct);
             context.Commands.Register(context.ExtensionId + ".show", context.Localization.Text("title"), Show);
             subscription = context.Localization.OnChanged(Show);
             await Show(token);

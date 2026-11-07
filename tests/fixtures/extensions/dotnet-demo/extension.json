@@ -1,7 +1,37 @@
 {
-  "apiVersion": 1, "id": "appdock.dotnet-demo", "name": ".NET Connection Demo", "version": "0.1.0",
-  "runtime": "dotnet", "entry": "AppDock.Extensions.Demo.dll", "type": "AppDock.Extensions.Demo.DemoExtension",
+  "apiVersion": 1,
+  "id": "appdock.dotnet-demo",
+  "name": ".NET Connection Demo",
+  "version": "0.1.0",
+  "runtime": "dotnet",
+  "entry": "AppDock.Extensions.Demo.dll",
+  "type": "AppDock.Extensions.Demo.DemoExtension",
   "description": "C#のDLLから、画面・通知・トレイ・定期実行を利用するサンプルです。",
-  "capabilities": ["ui", "notifications", "settings", "storage", "secrets"],
-  "settings": [{ "key": "intervalSeconds", "title": "更新間隔（秒）", "type": "number", "default": 30, "minimum": 5, "maximum": 3600 }]
+  "capabilities": ["notifications", "settings", "storage", "secrets"],
+  "settings": [
+    {
+      "key": "intervalSeconds",
+      "title": "更新間隔（秒）",
+      "type": "number",
+      "default": 30,
+      "minimum": 5,
+      "maximum": 3600
+    }
+  ],
+  "notificationTypes": [
+    {
+      "typeId": "fixture",
+      "title": "Fixture notification",
+      "levels": ["info"],
+      "defaultLevel": "info",
+      "allowedTargets": ["windows"],
+      "defaultTargets": ["windows"],
+      "lifetimePolicy": "userDuration",
+      "defaultDurationSeconds": 10,
+      "history": "none",
+      "requiredTargets": [],
+      "description": "Fixture notification delivery"
+    }
+  ],
+  "minimumHostVersion": "0.180.0"
 }

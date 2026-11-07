@@ -2815,7 +2815,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     enabled: a.enabled,
     commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
     tray: id === 'tray' ? a.tray : [],
-    panel: null,
     settingOptions: {},
     pages:
       page.kind === 'applet' ||
@@ -4281,9 +4280,6 @@ function registerIpc() {
     information.report('applets', 'Applet', hostText('services.index.appletRestarted'));
   });
   handle('dock:executeCommand', (id: string) => executeCommand(id));
-  handle('dock:executePanelAction', (id: string, actionId: string) =>
-    manager.executePanelAction(id, actionId),
-  );
   handle('dock:openPath', async (kind: string) => {
     const target = (
       {
@@ -4834,27 +4830,6 @@ async function initialize() {
     const url = new URL(request.url);
     if (url.host === 'host' && url.pathname.startsWith('/library-original/'))
       return originalImageSources.response(request);
-    if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
-      const image = [...manager.items.values()]
-        .flatMap((extension) => extension.panel?.images ?? [])
-        .find((item) => item.image === url.href);
-      if (!image?.imageFile || !fs.existsSync(image.imageFile))
-        return new Response('Not found', { status: 404 });
-      return net.fetch(pathToFileURL(image.imageFile).href).then(
-        (response) =>
-          new Response(response.body, {
-            headers: {
-              'Content-Type': /\.png$/i.test(image.imageFile!)
-                ? 'image/png'
-                : /\.webp$/i.test(image.imageFile!)
-                  ? 'image/webp'
-                  : 'image/jpeg',
-              'Cache-Control': 'no-store',
-              'X-Content-Type-Options': 'nosniff',
-            },
-          }),
-      );
-    }
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const file = path.resolve(renderer, relative || 'index.html');
     if (
@@ -6094,9 +6069,7 @@ async function runSmoke() {
         {
           ok: true,
           result,
-          extensions: manager
-            .snapshot()
-            .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
+          extensions: manager.snapshot().map((e) => ({ id: e.id, state: e.state })),
           settingsPath: settings.file,
           registeredImage: path.join(registeredImages.directory, libraryImage.file),
           trayCommands: {

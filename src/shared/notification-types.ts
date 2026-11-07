@@ -1,4 +1,3 @@
-import { localizedMetadata } from './translation-metadata';
 import { hostText } from './i18n';
 import { soundLibraryReference } from './library-assets';
 import type { ExtensionSnapshot, Settings } from './contracts';
@@ -76,20 +75,6 @@ const id = (v: unknown): v is string =>
   /^[a-z0-9][a-z0-9._-]{0,100}$/.test(v) &&
   !['constructor', 'prototype', '__proto__'].includes(v);
 const targetNames = ['banner', 'desktop', 'windows'];
-export const legacyNotificationTypeId = 'appdock.legacy';
-const legacyNotificationType = localizedMetadata<NotificationTypeDefinition>(() => ({
-  typeId: legacyNotificationTypeId,
-  title: hostText('settings.notification-types.legacy'),
-  description: hostText('settings.notification-types.legacyHint'),
-  levels: ['info'],
-  defaultLevel: 'info',
-  allowedTargets: ['banner', 'desktop', 'windows'],
-  defaultTargets: ['windows'],
-  requiredTargets: [],
-  lifetimePolicy: 'userDuration',
-  defaultDurationSeconds: null,
-  history: 'persistent',
-}));
 const targets = (v: unknown): v is NotificationTarget[] =>
   Array.isArray(v) &&
   v.length <= 3 &&
@@ -126,7 +111,7 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       !object(v) ||
       Object.keys(v).some((k) => !keys.includes(k)) ||
       !id(v.typeId) ||
-      (!host && v.typeId === legacyNotificationTypeId) ||
+      (!host && v.typeId === 'appdock.legacy') ||
       typeof v.title !== 'string' ||
       !v.title.trim() ||
       v.title.length > 100 ||
@@ -348,12 +333,7 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       defaultDurationSeconds: 6,
     },
     ...applets.flatMap((a) =>
-      [
-        ...(a.capabilities?.includes('notifications') && !a.notificationTypes?.length
-          ? [legacyNotificationType]
-          : []),
-        ...(a.notificationTypes ?? []),
-      ].map((t) => ({
+      (a.notificationTypes ?? []).map((t) => ({
         ...t,
         ownerKind: 'applet' as const,
         ownerId: a.id,

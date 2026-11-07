@@ -10,7 +10,7 @@ public sealed class DemoExtension : IAppDockExtension
     {
         this.context = context;
         context.Commands.Register("appdock.dotnet-demo.refresh", ".NET拡張の状態を更新", RefreshAsync);
-        context.Commands.Register("appdock.dotnet-demo.notify", ".NETからテスト通知", token => context.Notifications.ShowAsync("AppDock · .NET", "C#拡張からホストの通知APIを呼び出しました。", token));
+        context.Commands.Register("appdock.dotnet-demo.notify", ".NETからテスト通知", token => context.Notifications.PublishAsync(new NotificationRequest("fixture", "AppDock · .NET", "C#拡張からホストの通知APIを呼び出しました。"), token));
         context.Commands.Register("appdock.dotnet-demo.verify-storage", ".NETの保存APIを確認", async token =>
         {
             await context.Storage.SetAsync("check", "dotnet-ok", token);
@@ -47,12 +47,10 @@ public sealed class DemoExtension : IAppDockExtension
         nextRefresh = DateTimeOffset.UtcNow.AddSeconds(Math.Clamp(context!.Settings.Get("intervalSeconds", 30), 5, 3600));
         await RefreshAsync(token);
     }
-    private Task RefreshAsync(CancellationToken token) => context!.Ui.ShowPanelAsync(new Panel(
-        "C# is docked.", "既存の.NETロジックを載せるための、最初の接続。",
-        [new("Runtime", System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription),
-         new("Process", Environment.ProcessId.ToString()),
-         new("Refresh", Interlocked.Increment(ref refreshCount).ToString()),
-         new("Last updated", DateTime.Now.ToString("HH:mm:ss"))],
-        [new("状態を更新", "appdock.dotnet-demo.refresh"), new("通知を試す", "appdock.dotnet-demo.notify")]), token);
+    private async Task RefreshAsync(CancellationToken token) {
+        var count = Interlocked.Increment(ref refreshCount);
+        await context!.Storage.SetAsync("fixture-state", new { greeting = "C# is docked.", refresh = count }, StorageScope.Memory, token);
+        await context.Log.InfoAsync("fixture-refresh:" + count, token);
+    }
     public Task DeactivateAsync(CancellationToken cancellationToken) { schedule?.Dispose(); return Task.CompletedTask; }
 }

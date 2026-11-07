@@ -99,17 +99,6 @@ for (const id of ids) {
     );
   settings.extensions[id] = { enabled: true, settings: {} };
 }
-const legacyDll = process.env.APPDOCK_TEST_LEGACY_DEMO_DLL;
-if (legacyDll) {
-  const dir = path.join(profile, 'extensions', 'legacy-dotnet');
-  fs.mkdirSync(dir, { recursive: true });
-  require('./copy-host.cjs').copyHost(
-    path.join(root, 'tests/fixtures/extensions/dotnet-demo/extension.json'),
-    path.join(dir, 'extension.json'),
-  );
-  require('./copy-host.cjs').copyHost(legacyDll, path.join(dir, 'AppDock.Extensions.Demo.dll'));
-  settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
-}
 fs.writeFileSync(
   require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(settings),
@@ -212,18 +201,6 @@ async function grant(id, permissions) {
 (async () => {
   try {
     let s = await start();
-    if (legacyDll) {
-      await until(
-        async () =>
-          (await snapshot()).extensions.some(
-            (e) => e.id === 'appdock.dotnet-demo' && e.state === 'running',
-          ),
-        'legacy startup',
-      );
-      await page.evaluate(() => window.dock.executeCommand('appdock.dotnet-demo.refresh'));
-      assert.ok((await snapshot()).extensions.find((e) => e.id === 'appdock.dotnet-demo').panel);
-      checks.push('pre-change .NET DLL loads and executes with unchanged assembly identity');
-    }
     assert.equal(
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
       false,
@@ -544,7 +521,6 @@ async function grant(id, permissions) {
       profile,
       portable: !!portable,
       sha256: portable ? hash(portable) : null,
-      legacySha256: legacyDll ? hash(legacyDll) : null,
       fixtureSha256: hash(
         path.join(profile, 'extensions', ids[1], 'AppDock.Extensions.ApiProbe.dll'),
       ),

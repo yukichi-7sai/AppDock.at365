@@ -160,7 +160,6 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     {
         foreach (var handler in notificationHandlers.Values) await handler(lifetime);
     }
-    public Task ShowAsync(string title, string body, CancellationToken cancellationToken = default) => CallAsync("host.notifications.show", new { title, body }, cancellationToken);
     Task IPageService.OpenAsync(string id, CancellationToken cancellationToken) => CallAsync("host.pages.open", new { id }, cancellationToken);
     public Task<PageListResult> ListAsync(CancellationToken cancellationToken = default)
         => RequestAsync<PageListResult>("host.pages.list", new { }, cancellationToken);
@@ -179,7 +178,6 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public Task OpenSettingsAsync(CancellationToken cancellationToken = default) => CallAsync("host.ui.openSettings", new { }, cancellationToken);
     private async Task<T> RequestAsync<T>(string method, object parameters, CancellationToken token)
         => (await connection.RequestAsync(method, parameters, token)).Deserialize<T>(JsonRpcConnection.Json)!;
-    public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);
     public async Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default) =>
         (await connection.RequestAsync("host.ui.imageDirectory", new { }, cancellationToken)).GetString()!;
     public Task OpenAsync(string url, CancellationToken cancellationToken = default) => CallAsync("host.browser.open", new { url }, cancellationToken);

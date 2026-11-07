@@ -77,7 +77,7 @@ write(path.join(folder, 'resources/translations/applet_fr.json'), {
 fs.writeFileSync(
   path.join(folder, 'index.cjs'),
   `exports.activate = async (context) => {
-  const refresh = () => context.ui.showPanel({title: context.localization.t('title'), facts: [{label:'language', value:context.localization.language}]});
+  const refresh = () => context.log.info('localization:' + context.localization.t('title'));
   context.commands.register('${id}.open', 'runtime literal', () => context.pages.open('main'));
   context.localization.onChanged(refresh); await refresh();
 };`,
@@ -126,7 +126,12 @@ async function start() {
     assert.equal(initial.displayName, 'Localization Applet');
     assert.equal(initial.settings[0].title, 'Saved text');
     assert.equal(initial.commands[0].title, 'Open localization page');
-    assert.equal(initial.panel.title, 'Bundled English');
+    assert.equal(
+      (await state()).logs
+        .filter((entry) => entry.source === id && entry.message.startsWith('localization:'))
+        .at(-1).message,
+      'localization:Bundled English',
+    );
     assert.equal(
       (await state()).extensions.find((entry) => entry.id === id + '.stopped').displayName,
       'Localization Applet',
@@ -143,7 +148,9 @@ async function start() {
     await page.getByRole('heading', { name: '同梱の日本語' }).waitFor();
     await until(
       async () =>
-        (await state()).extensions.find((entry) => entry.id === id).panel.title === '同梱の日本語',
+        (await state()).logs.some(
+          (entry) => entry.source === id && entry.message === 'localization:同梱の日本語',
+        ),
       'Node language callback',
     );
     assert.equal(await page.locator('#draft').inputValue(), 'draft {{count}} %name%');
@@ -165,7 +172,7 @@ async function start() {
     await page.getByRole('heading', { name: 'Bundled English' }).waitFor();
     result.checks.push(
       'Manual placement uses the host-selected bundled language without copying dictionaries or adding Applet-only languages',
-      'Manifest, stopped Applet and Node panel switch language while IDs, stored values and local page draft/identity remain unchanged',
+      'Manifest, stopped Applet and Node language callback switch language while IDs, stored values and local page draft/identity remain unchanged',
     );
     await instance.close();
     instance = undefined;
@@ -174,8 +181,10 @@ async function start() {
     });
     await start();
     assert.equal(
-      (await state()).extensions.find((entry) => entry.id === id).panel.title,
-      'External English',
+      (await state()).logs
+        .filter((entry) => entry.source === id && entry.message.startsWith('localization:'))
+        .at(-1).message,
+      'localization:External English',
     );
     await instance.main.evaluate((id) => window.dock.openAppletPage(id, 'main'), id);
     const externalPage = await instance.page('/page.html');

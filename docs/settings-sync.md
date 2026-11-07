@@ -40,12 +40,12 @@ Gmail 0.12.0以降の共通グループ名簿は`data/web-account-groups/at365.g
 ## ファイル名を使う登録素材
 
 - 共通原画像: `data/assets/images/<相対パス>`。PNG/JPEG/WebP/SVG。ファイルからの取り込みに容量・寸法の固定上限は設けない。実フォルダーを同期し、分類は共有`imageLibrary.groups`へ独立して保存する。設定用コピーは`data/assets/assigned-images/`、参照は`{file}`の予約名前空間`@assigned/`。両方とも共有dataに含める。詳しくは[共通画像](registered-images.md)。
-- 共通原音: `data/assets/sounds/<相対パス>`。WAV・16MiB以下。分類は共有`soundLibrary.groups`の`files`、設定用コピーは`data/assets/assigned-sounds/<SHA256>.wav`。Webアカウントは`@library/@assigned/<SHA256>.wav`と表示名を保存する。カードと分類欄の表示状態は端末別`uiState.soundGallery`へ管理/選択画面を分けて保存する。[素材ライブラリー](asset-libraries.md)を参照。
-- 既存のApplet別通知音: `data/assets/applets/<Applet ID>/sounds/<元ファイル名>`。Gmailは`at365.gmail`。既存の16MB以下WAV検証を使い、512件まで登録する。旧選択の`{enabled,file}`のfileはファイル名だけ。新規選択は共通音ライブラリーを使い、既存の登録音は移行せず読める。保存された絶対パスをそのまま共有しない。
+- 共通原音: `data/assets/sounds/<相対パス>`。対応形式は[素材ライブラリー](asset-libraries.md)を参照。固定容量上限はなく、分類はsoundLibrary.groups、設定用コピーはdata/assets/assigned-soundsへ内容hashで保存する。Webアカウントは@library/@assigned参照と表示名をPC専用設定へ保存する。
+- 旧Applet別通知音は、Webアカウント起動時に共通ライブラリーへ取り込み、割り当てを設定用保管コピーへ更新する。原音を削除せず、保存失敗は元の参照を保ち、完了記録はPC専用rootのsound-library-migration.jsonへ保存する。
 - 同一フォルダー内の大文字小文字を無視した同名照合を行う。同名同内容は既存素材を再利用、同名別内容は登録拒否。上書き・連番生成をしない。新規ファイルはexclusive create。登録元・用途の別フォルダーでは同名を使用できる。
 - ファイル名はWindowsの禁止文字/予約名/末尾の空白・点/パス区切りを拒否し、登録rootから外れる参照や転送root/ファイルを受け入れない。任意パスをローカルUIの一覧選択から渡さない。
-- 一覧は実ファイルから生成し、インデックスJSONやID対応表を作らない。Gmailのsnapshot.registeredSoundsはローカルUIだけに渡す。Node readへ素材一覧を含めない。枠の削除・停止時に共有素材を自動pruneしない。
-- 素材だけ届く変更も監視する。共通画像は通常watchと任意の共通補助確認で変更を検出し、一時欠落時は参照と直近正常表示を保持する。現行通知音一覧も初期照合・通常watch・任意の共通補助確認を使い、独立した2秒確認は持たない。
+- 一覧は共通ライブラリーの実ファイルから生成し、Applet別の索引やID対応表を追加しない。枠の削除・停止で共有素材と保管コピーを自動削除しない。
+- 素材だけ届く変更も監視する。共通画像は通常watchと任意の共通補助確認で変更を検出し、一時欠落時は参照と直近正常表示を保持する。音ライブラリーも共通のファイル監視を使う。
 
 ## 設定と名簿の受信
 
@@ -81,7 +81,7 @@ PC専用`settings-backups/`へ検証済み設定を保存し、`last-good.json`�
 
 ## 検証と制約
 
-`tests/settings-sync.test.cjs`と`tests/registered-sounds.test.cjs`、updaterのローカルjournal復旧回帰、`scripts/settings-sync-ui-test.cjs`で検証する。GUIスクリプトは2個の隔離配置にファイルを配達して実挙動を確認し、単一EXE引数でも同じ手順を使う。`--test-profile`の既存隔離テストは従来のrootを維持し、新仕様の検証には配置内の`--test-local-state=<絶対パス>`を追加する。EXE引数の後ろへ`--production-path`を付ける試験ではtest-profileを使わず、fixture内にLOCALAPPDATAを向けて通常起動のat365保存先を検証する。実利用LOCALAPPDATAへテスト用のログイン領域を作らない。
+`tests/settings-sync.test.cjs`と`tests/sound-library-files.test.cjs`、updaterのローカルjournal復旧回帰、`scripts/settings-sync-ui-test.cjs`で検証する。GUIスクリプトは2個の隔離配置にファイルを配達して実挙動を確認し、単一EXE引数でも同じ手順を使う。`--test-profile`の既存隔離テストは従来のrootを維持し、新仕様の検証には配置内の`--test-local-state=<絶対パス>`を追加する。EXE引数の後ろへ`--production-path`を付ける試験ではtest-profileを使わず、fixture内にLOCALAPPDATAを向けて通常起動のat365保存先を検証する。実利用LOCALAPPDATAへテスト用のログイン領域を作らない。
 
 この実装はファイル同期サービスを設定・代行しない。2台の未同期同時編集を自動mergeする保証はなく、受信した正常ファイルを適用する。2台で同名別素材を同時に登録するケースも同期サービスの競合になるため、別名での登録や競合コピーの確認が必要。
 

@@ -12,7 +12,7 @@ UI snapshotの`group?: {id,title}`で共有範囲を表示できます。既存�
 
 ## 専用アカウントの基本契約
 
-PC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。グループを宣言しないサービスの枠はPC専用rootのweb-accountsに保存します。ローカルUIのsnapshot.registeredSoundsに登録済みのファイル名を渡します。setSoundは登録済みファイル名、pickSoundはファイル登録、testSoundは試聴です。sound.fileは枠に紐づくローカル設定としてファイル名だけを保存し、ホストが自身のAppletの素材rootへ解決します。
+PC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。グループを宣言しないサービスの枠はPC専用rootのweb-accountsに保存します。通知音は本体の共通音ライブラリーを使います。pickSoundは共通選択、setSoundは保管コピー参照とON/OFFの保存、testSoundは試聴です。sound.fileは@library/@assignedの共通参照を保存し、ローカルUIへApplet別のファイル名一覧を公開しません。
 
 [Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の「操作Window」はローカルUIと選択アカウントを表示するWindowを指し、本体ページ表示では本体Windowです。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。
 
@@ -64,7 +64,7 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 `read`は`monitoringResets:string[]`も返します。ON/OFFの遷移を次のreadまで保持し、OFF→ONが読取間隔内に発生しても基準を消去できます。Appletは該当するmonitorをresetし、個別/全体の監視OFFなら履歴・件数を消去してください。再開時の未読取り込みはAppletの方針です。
 
-任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（各アカウント固有のログイン済みセッション・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFのみ、ストリームを含め64KBまで。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
+任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（各アカウント固有のログイン済みセッション・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFを受け付け、本文サイズの固定上限は設けません。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
 
 | Node                                                       | RPC                         | 処理                                                                      |
 | ---------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------- |
@@ -94,13 +94,13 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`を公開します。`cycle/openItem/setSound/pickSound/testSound`も利用できます。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
 
-`openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
+`openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した空でないkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
 
 アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（無音）。`setSound(id,sound)`で保存し、`pickSound(id)`は本体の共通音選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず共通再生キューで試聴します（音声未選択は無音）。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
 
-新規選択は[音ライブラリー](asset-libraries.md)のフォルダー/グループ/検索/試聴を使い、対応する音声を容量上限なしで`data/assets/assigned-sounds`へ内容hashで保管します。`file`は`@library/@assigned/<SHA256>.<拡張子>`、`name`は表示用の元ファイル名です。元ファイルの移動・変更で設定済みの音は変わりません。選択中の別編集・削除・呼出元終了が優先され、取消でON/OFFやファイルを変更しません。既存のApplet別登録名・絶対パス設定は従来どおり読み、`setSound`へ絶対パスを渡したときのApplet別登録も保ちます。保管ファイルは未参照キャッシュとして削除しません。
+新規選択は[音ライブラリー](asset-libraries.md)のフォルダー/グループ/検索/試聴を使い、対応する音声を容量上限なしで`data/assets/assigned-sounds`へ内容hashで保管します。`file`は`@library/@assigned/<SHA256>.<拡張子>`、`name`は表示用の元ファイル名です。元ファイルの移動・変更で設定済みの音は変わりません。選択中の別編集・削除・呼出元終了が優先され、取消でON/OFFやファイルを変更しません。setSoundの新規保存は空文字または共通ライブラリーの保管コピー参照だけを受け付けます。保管ファイルは未参照キャッシュとして削除しません。
 
-通知音の一覧は、開始時に1回取得し、通常のファイル監視と[共通補助確認](file-watch-assistance-design.md)で更新します。補助確認は一般設定のON/OFF・待機時間に従い、独立した2秒タイマーは持ちません。繰り返しのWorker readで初期走査を再実行せず、登録・選択時は明示的に再確認します。一覧はファイル名だけを読み、音声内容の検証・再生は従来の操作時に行います。停止は監視登録だけを解放し、登録済みファイルと選択値は保持します。
+既存のApplet別通知音と絶対パスの割り当ては、起動時に共通音ライブラリーのImported notification sounds/<Applet ID>/へ取り込み、内容を検証した設定用保管コピーへ割り当てを更新する。未使用の登録音も取り込み、ON/OFF・アカウントID・選択中アカウント・監視・ログイン状態を保持する。同名別内容は上書きせず、内容ハッシュのサブフォルダーに元の名前で保存する。原音は削除しない。コピー・保存の失敗では元の割り当てを保持し、次回起動で再試行する。選択変更・削除・停止が先行した場合は古い結果を適用しない。完了後はPC専用rootのsound-library-migration.jsonで再取り込みを抑止する。独自の音一覧監視は持たず、共通ライブラリーの監視を使う。
 
 snapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 
@@ -134,7 +134,7 @@ Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコード�
 
 公式仕様: [WebContentsView](https://www.electronjs.org/docs/latest/api/web-contents-view)、[session.fromPath](https://www.electronjs.org/docs/latest/api/session#sessionfrompathpath-options)、[webContents](https://www.electronjs.org/docs/latest/api/web-contents)。
 
-snapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。ローカルUIは変更を見て受信トレイ表示へ戻せます。Web履歴の移動可否は従来のcanGoBack/canGoForwardを使用し、履歴の端では移動しません。navigateはWindowを開く操作を含まず、表示はopenで制御します。Gmailの通知は既存のnotifications.show(...,{command:"at365.gmail.open",silent:true})を使い、クリック時はホストが同じ起動世代の実行中Appletか確認してからコマンドを実行します。
+snapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。ローカルUIは変更を見て受信トレイ表示へ戻せます。Web履歴の移動可否は従来のcanGoBack/canGoForwardを使用し、履歴の端では移動しません。navigateはWindowを開く操作を含まず、表示はopenで制御します。Gmailの通知は宣言済みnew-mail種類とnotifications.publish/endを使います。Windows通知の本文クリックは通知一覧を開き、一覧の宣言済みアクションは本体が実行中Appletと起動世代を確認してからコマンドを実行します。
 
 ## WebViewの言語
 

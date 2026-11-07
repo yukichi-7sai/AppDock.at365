@@ -1,6 +1,6 @@
-import { soundLibraryReference } from '../../shared/library-assets';
+import { libraryPath, soundLibraryReference } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
-import { audioExtension, audioExtensions } from '../../shared/audio-formats';
+import { audioExtension } from '../../shared/audio-formats';
 import { safePageShortcut } from '../../shared/keybindings';
 import {
   BrowserWindow,
@@ -29,7 +29,7 @@ import type {
 import { AppletSurface } from './applet-pages';
 import { pageKey, type AppletPageDefinition } from '../../shared/applet-pages';
 import { queueSound } from './sounds';
-import { RegisteredSounds, soundFilename } from './registered-sounds';
+import { migrateWebAccountSounds } from './web-account-sound-migration';
 import { keepWebPageActive } from './web-page-activity';
 import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-avatar';
 import {
@@ -66,7 +66,7 @@ interface WebAccountServices {
   assistance?: import('./file-watch-assistance').FileWatchAssistance;
   windowState?: import('./state-storage').StateStorage;
   sharedRoot?: string;
-  soundsDirectory?: string;
+  legacySoundDirectory?: string;
   soundLibrary?: import('./sound-library-service').SoundLibraryAccess;
   capabilities: string[];
   page?: AppletPageDefinition;
@@ -98,7 +98,7 @@ export function serializeWebReport(raw: unknown): string {
   return json;
 }
 export function serializeWebItemKey(raw: unknown): string {
-  if (typeof raw !== 'string' || !raw || raw.length > 200 || /[\u0000-\u001f\u007f]/.test(raw))
+  if (typeof raw !== 'string' || !raw || /[\u0000-\u001f\u007f]/.test(raw))
     throw Error('Invalid Web account item key');
   return JSON.stringify(raw);
 }
@@ -108,14 +108,15 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
     !sound ||
     typeof sound.enabled !== 'boolean' ||
     typeof sound.file !== 'string' ||
-    sound.file.length > 4096 ||
     /[\u0000-\u001f\u007f]/.test(sound.file) ||
     (sound.name !== undefined &&
-      (typeof sound.name !== 'string' ||
-        sound.name.length > 200 ||
-        /[\u0000-\u001f\u007f]/.test(sound.name))) ||
+      (typeof sound.name !== 'string' || /[\u0000-\u001f\u007f]/.test(sound.name))) ||
     (sound.file &&
-      !soundFilename(sound.file) &&
+      !(
+        path.basename(sound.file) === sound.file &&
+        !sound.file.includes('/') &&
+        libraryPath(sound.file, 'sound')
+      ) &&
       !soundLibraryReference(sound.file) &&
       (!path.isAbsolute(sound.file) || !audioExtension(sound.file)))
   )
@@ -266,10 +267,6 @@ export class WebAccountController {
   private file: string;
   private initializing?: Promise<void>;
   private soundFailures = new Map<string, string>();
-  private sounds: RegisteredSounds;
-  private registeredSounds: string[] = [];
-  private soundWatch?: ReturnType<RegisteredSounds['watch']>;
-  private soundsInitialized?: Promise<void>;
   private avatars = new Map<
     string,
     { url: string; image: string; retryAt: number; abort?: AbortController }
@@ -294,7 +291,6 @@ export class WebAccountController {
       failed: () => {},
     },
   ) {
-    this.sounds = new RegisteredSounds(services.soundsDirectory || path.join(root, 'sounds'));
     this.definition = validateWebAccounts(folder, definition);
     this.uiURL = pathToFileURL(asset(folder, definition.ui)).href;
     this.source = fs.readFileSync(asset(folder, definition.observer), 'utf8');
@@ -569,11 +565,8 @@ export class WebAccountController {
       if (soundLibraryReference(parsed.file)) {
         if (!this.services.soundLibrary) throw Error(hostText('services.webAccounts.soundPath'));
         await this.services.soundLibrary.resolve(parsed.file);
-      } else if (path.isAbsolute(parsed.file)) parsed.file = await this.sounds.add(parsed.file);
-      else parsed.file = path.basename(await this.sounds.resolve(parsed.file));
+      } else throw Error(hostText('services.webAccounts.soundPath'));
     }
-    if (!soundLibraryReference(parsed.file)) delete parsed.name;
-    await this.refreshSounds();
     if (this.disposed || !alive()) return;
     this.account(a.id);
     this.soundFailures.delete(a.id);
@@ -583,17 +576,6 @@ export class WebAccountController {
         item.id === a.id ? { ...item, sound: parsed } : item,
       ),
     });
-  }
-  private receiveSounds(files: string[]) {
-    if (this.disposed) return;
-    if (JSON.stringify(files) !== JSON.stringify(this.registeredSounds)) {
-      this.registeredSounds = files;
-      this.changed();
-    }
-  }
-  private async refreshSounds() {
-    if (this.soundWatch) await this.soundWatch.check(true);
-    else this.receiveSounds(await this.sounds.list());
   }
   async cycle(direction: unknown) {
     if (this.disposed) throw Error('Web accounts are closed');
@@ -661,7 +643,6 @@ export class WebAccountController {
         : {}),
       navigationRevision: this.navigationRevision ?? 0,
       dark: nativeTheme?.shouldUseDarkColors ?? true,
-      ...(includeData ? { registeredSounds: this.registeredSounds } : {}),
       ...(includeData && this.services?.settings ? { settings: this.services.settings() } : {}),
       selected: this.state.selected,
       accounts: this.state.accounts.map((a) => {
@@ -868,53 +849,40 @@ export class WebAccountController {
     if (this.disposed) throw Error('Web accounts are closed');
     if (!this.initializing)
       this.initializing = (async () => {
-        let changed = false;
-        const originalSounds = new Map(
-          this.state.accounts.map((a) => [a.id, JSON.stringify(a.sound)]),
-        );
-        const accounts = [] as Saved['accounts'];
-        for (const a of this.state.accounts) {
-          let next = a;
-          if (a.sound?.file && path.isAbsolute(a.sound.file)) {
-            try {
-              const file = await this.sounds.add(
-                a.sound.file,
-                a.sound.name || path.basename(a.sound.file),
+        const library = this.services.soundLibrary;
+        if (!library) return;
+        await migrateWebAccountSounds({
+          owner: this.id,
+          root: this.root,
+          legacyDirectory: this.services.legacySoundDirectory || path.join(this.root, 'sounds'),
+          accounts: this.state.accounts,
+          library,
+          active: () => !this.disposed,
+          failed: (id) => {
+            if (this.disposed) return;
+            if (id) this.soundFailures.set(id, hostText('services.webAccounts.soundCopyFailed'));
+            this.services.failed(hostText('services.webAccounts.soundCopyFailed'));
+          },
+          apply: (updates) => {
+            let changed = false;
+            const accounts = this.state.accounts.map((current) => {
+              const update = updates.find(
+                (item) => item.id === current.id && item.original === JSON.stringify(current.sound),
               );
-              next = {
-                ...a,
-                sound: { enabled: a.sound.enabled, file },
-              };
+              if (!update || this.deleting.has(current.id)) return current;
               changed = true;
-            } catch {
-              this.soundFailures.set(a.id, hostText('services.webAccounts.soundCopyFailed'));
-              this.services.failed(hostText('services.webAccounts.soundCopyFailed'));
-            }
-          }
-          accounts.push(next);
-        }
-        if (!this.disposed && changed)
-          this.save({
-            ...this.state,
-            accounts: this.state.accounts.map((current) => {
-              const migrated = accounts.find((a) => a.id === current.id);
-              return migrated && JSON.stringify(current.sound) === originalSounds.get(current.id)
-                ? { ...current, ...(migrated.sound ? { sound: migrated.sound } : {}) }
-                : current;
-            }),
-          });
-      })();
+              return { ...current, sound: update.sound };
+            });
+            if (changed) this.save({ ...this.state, accounts });
+            return this.state.accounts.every(
+              (item) => !item.sound?.file || soundLibraryReference(item.sound.file),
+            );
+          },
+        });
+      })().catch(() => {
+        if (!this.disposed) this.services.failed(hostText('services.webAccounts.soundCopyFailed'));
+      });
     await this.initializing;
-    if (this.disposed) return;
-    this.soundWatch ??= this.sounds.watch(
-      (files) => this.receiveSounds(files),
-      () => this.services.failed(hostText('services.webAccounts.soundListFailed')),
-      this.services.assistance,
-    );
-    await (this.soundsInitialized ??= this.soundWatch.check().catch((error) => {
-      this.soundsInitialized = undefined;
-      throw error;
-    }));
     if (this.disposed) return;
     for (const a of this.state.accounts) if (!this.deleting.has(a.id)) this.view(a.id);
   }
@@ -1165,7 +1133,9 @@ export class WebAccountController {
         this.requireCapability('file-dialog');
         this.requireCapability('audio');
         const a = this.account(args[0]);
-        if (this.services.soundLibrary) {
+        const library = this.services.soundLibrary;
+        if (!library) throw Error(hostText('services.webAccounts.soundPath'));
+        {
           const before = JSON.stringify(a.sound);
           const live = () =>
             !this.disposed &&
@@ -1173,7 +1143,7 @@ export class WebAccountController {
             this.state.accounts.some(
               (item) => item.id === a.id && JSON.stringify(item.sound) === before,
             );
-          const result = await this.services.soundLibrary.pick(a.sound?.file, live);
+          const result = await library.pick(a.sound?.file, live);
           if (result && live())
             await this.sound(
               a.id,
@@ -1182,32 +1152,17 @@ export class WebAccountController {
             );
           return;
         }
-        const result = await dialog.showOpenDialog(this.window!, {
-          title: hostText('services.webAccounts.soundTitle'),
-          properties: ['openFile'],
-          filters: [
-            {
-              name: hostText('soundLibrary.services.imageLibraryHost.imageFilter'),
-              extensions: audioExtensions,
-            },
-          ],
-        });
-        if (!this.disposed && !this.deleting.has(a.id) && !result.canceled && result.filePaths[0])
-          await this.sound(a.id, {
-            ...(this.account(a.id).sound ?? { enabled: false }),
-            file: result.filePaths[0],
-            name: undefined,
-          });
-        return;
       }
       case 'testSound': {
         this.requireCapability('audio');
         const a = this.account(args[0]);
         queueSound(
           a.sound?.file
-            ? soundLibraryReference(a.sound.file) && this.services.soundLibrary
+            ? this.services.soundLibrary
               ? await this.services.soundLibrary.resolve(a.sound.file)
-              : await this.sounds.resolve(a.sound.file)
+              : (() => {
+                  throw Error(hostText('services.webAccounts.soundPath'));
+                })()
             : '',
           () =>
             !this.disposed &&
@@ -1466,7 +1421,6 @@ export class WebAccountController {
     this.disposed = true;
     this.readChannel.close();
     this.reads.clear();
-    this.soundWatch?.close();
     this.unsubscribeGroup?.();
     this.unsubscribeSettings?.();
     nativeTheme.removeListener('updated', this.themeChanged);

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { imageDirectory } from './panel-images';
+import { imageDirectory } from './applet-image-cache';
 
 export interface PageImageFile {
   key: string;

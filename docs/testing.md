@@ -169,6 +169,6 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 `tests/file-watch-assistance.test.cjs`は保留中の無巡回・解除後の1巡・I/O途中の保留と短い解除でも直列性が保たれることも確認する。`tests/input-synchronization.test.cjs`はセッション保留のnative設定への伝達と入力規則・手動ジェスチャー停止の独立性、`InputTests --input-environment`はnative補助タイマーの停止と解除後の状態更新を検査する。
 
-現行soundsの一覧監視は`tests/file-watch-sounds.test.cjs`で初期照合・OFF時の無走査・通知欠落と完了待ち・走査中の通知・watch失敗・停止後の結果拒否・開始の重複を確認する。`tests/registered-sounds.test.cjs`と`tests/sound-assets.test.cjs`は既存のWAV検証・同名登録・保存先を担当する。`scripts/file-watch-sounds-ui-test.cjs [固定EXE]`は隔離した実Electronで通常watch、補助OFF/ON、抑止した通知の回復、選択値と素材の保持、停止/再開時の登録寿命を確認する。外部サービスと実スピーカー再生は使わない。
+音ライブラリーの通常watchと停止後の素材保持は`tests/file-watch-sounds.test.cjs`、共通監視の通知欠落・直列化・停止は`tests/file-watch-images.test.cjs`と補助確認の回帰で検証する。`tests/sound-library-files.test.cjs`は同名・大文字小文字・形式・包含検査、`tests/web-account-sound-migration.test.cjs`は旧登録音と割り当ての移行・競合・再試行を担当する。Gmailの`scripts/test-portable.cjs`は固定EXEで実Gmail UIの移行・共通選択・取消・再起動保持を検査する。旧Applet別音一覧のGUI監視スクリプトは削除した。実Google受信と物理音声出力とは区別する。
 
 `tests/file-watch-assistance.test.cjs`は共通ループ、`tests/file-observer.test.cjs`と`tests/settings-observer-race.test.cjs`は安定確認・通知欠落・保存競合、`tests/file-watch-images.test.cjs`は画像の祖先watch・差分確認・走査中イベント、`tests/file-watch-rosters.test.cjs`は名簿の登録寿命と通知欠落時の受信、`tests/file-watch-settings.test.cjs`は設定の既定/検証/保存を担当する。`scripts/file-watch-assistance-ui-test.cjs [固定EXE]`は設定のON/OFF・数値確定/取消/失敗・通常watch継続・広狭幅・既存データ保持を確認する。共通の警告episodeは`tests/warning-reporter.test.cjs`が担当する。

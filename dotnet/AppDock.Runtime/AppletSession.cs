@@ -73,11 +73,6 @@ public static class AppletSession
                             try { await pending.CancelAsync(); }
                             catch (ObjectDisposedException) { /* Command completed concurrently. */ }
                         return null;
-                    case "panel.action":
-                        if (context is null || applet is not IPanelActionHandler panelActions)
-                            throw new InvalidOperationException("Panel actions are not supported.");
-                        await panelActions.HandlePanelActionAsync(parameters.GetProperty("id").GetString()!, active.Token);
-                        return null;
                     case "page.action":
                         if (context is null || !Volatile.Read(ref activated) || applet is not IPageActionHandler pageActions)
                             throw new InvalidOperationException("ページ操作は提供されていません。");

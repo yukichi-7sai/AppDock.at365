@@ -7,15 +7,12 @@ import type { TypedNotifications } from './typed-notifications';
 import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
 import path from 'node:path';
-import { imageDirectory, registerLocalImages } from './panel-images';
+import { imageDirectory } from './applet-image-cache';
 import { safeStorage, shell, dialog, nativeTheme, nativeImage } from 'electron';
-import { legacyNotificationTypeId } from '../../shared/notification-types';
 import { queueSound } from './sounds';
-import { RegisteredSounds } from './registered-sounds';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
 import { atomicWrite, isObject } from './settings';
-import type { Panel } from '../../shared/contracts';
 import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
 import { parseExtensionCommands } from '../../shared/extension-commands';
 import {
@@ -77,18 +74,6 @@ export function createHostApi(
     if (!isObject(params)) throw new Error(hostText('services.hostApi.argumentObject'));
     const p = params;
     const id = e.manifest.id;
-    const validAction = (action: unknown) =>
-      isObject(action) &&
-      typeof action.title === 'string' &&
-      action.title.length <= 200 &&
-      (action.selected == null || typeof action.selected === 'boolean') &&
-      ((typeof action.command === 'string' &&
-        action.command.startsWith(id + '.') &&
-        !action.actionId) ||
-        (typeof action.actionId === 'string' &&
-          action.actionId.startsWith(id + '.') &&
-          action.actionId.length <= 200 &&
-          !action.command));
     const stoppingLog = e.state === 'stopping' && method === 'host.log';
     if (['stopped', 'stopping', 'error'].includes(e.state) && !stoppingLog)
       throw new Error(hostText('services.hostApi.stopped'));
@@ -546,7 +531,7 @@ export function createHostApi(
             assistance,
             windowState: settings.uiStateStorage('windows', `web-accounts:${id}`),
             capabilities: e.manifest.capabilities ?? [],
-            soundsDirectory: path.join(assetRoot, id, 'sounds'),
+            legacySoundDirectory: path.join(assetRoot, id, 'sounds'),
             soundLibrary,
             page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),
             settings: () =>
@@ -644,9 +629,7 @@ export function createHostApi(
         queueSound(
           soundLibraryReference(p.file) && soundLibrary
             ? await soundLibrary.resolve(p.file)
-            : p.file && !path.isAbsolute(p.file)
-              ? await new RegisteredSounds(path.join(assetRoot, id, 'sounds')).resolve(p.file)
-              : p.file,
+            : p.file,
           () => e.child === child && ['starting', 'running'].includes(e.state),
           () => log('error', id, hostText('services.hostApi.soundPlaybackFailed')),
           e.soundLifetime?.signal,
@@ -814,67 +797,6 @@ export function createHostApi(
           generation,
         );
       }
-      case 'host.notifications.show': {
-        requireCapability('notifications');
-        if (typeof p.title !== 'string' || typeof p.body !== 'string')
-          throw new Error(hostText('services.hostApi.titleBodyRequired'));
-        if (p.silent != null && typeof p.silent !== 'boolean')
-          throw new Error(hostText('services.hostApi.invalidSilent'));
-        if (
-          p.command != null &&
-          (typeof p.command !== 'string' ||
-            ![...e.commands, ...generatedSettingCommands(id, e.manifest.settings ?? [], true)].some(
-              (c) => c.id === p.command,
-            ))
-        )
-          throw new Error(hostText('services.hostApi.ownRegisteredCommand'));
-        const service = typedNotifications?.();
-        if (!service) throw Error(hostText('services.hostApi.notificationsNotReady'));
-        const owner = { ownerKind: 'applet' as const, ownerId: id };
-        if (!service.policy(owner, legacyNotificationTypeId).enabled) return null;
-        const generation = e.runtimeSession,
-          child = e.child;
-        service.publish(
-          owner,
-          legacyNotificationTypeId,
-          {
-            level: 'info',
-            title: p.title,
-            body: p.body,
-            windowsSilent: p.silent === true,
-            historyText: {
-              title: hostText('services.hostApi.legacyNotificationTitle'),
-              body: hostText('services.hostApi.legacyNotificationBody'),
-            },
-            ...(p.command
-              ? {
-                  windowsClickAction: 'open',
-                  actions: [
-                    {
-                      key: 'open',
-                      label: hostText('services.hostApi.open'),
-                      run: async () => {
-                        if (
-                          e.state !== 'running' ||
-                          e.child !== child ||
-                          e.runtimeSession !== generation ||
-                          ![
-                            ...e.commands,
-                            ...generatedSettingCommands(id, e.manifest.settings ?? [], true),
-                          ].some((c) => c.id === p.command)
-                        )
-                          throw Error(hostText('services.hostApi.notificationChanged'));
-                        await executeCommand(p.command);
-                      },
-                    },
-                  ],
-                }
-              : {}),
-          },
-          generation,
-        );
-        return null;
-      }
       case 'host.browser.open': {
         requireCapability('browser');
         const url = new URL(String(p.url));
@@ -896,54 +818,6 @@ export function createHostApi(
         if (Object.keys(p).length || !pageUi?.openSettings)
           throw Error(hostText('services.hostApi.ownAppletSettings'));
         return pageUi.openSettings(id);
-      case 'host.ui.panel': {
-        requireCapability('ui');
-        if (
-          p.images != null &&
-          (!Array.isArray(p.images) ||
-            p.images.length > 1000 ||
-            p.images.some(
-              (item: unknown) =>
-                !isObject(item) ||
-                typeof item.title !== 'string' ||
-                (item.imageFile != null &&
-                  (typeof item.imageFile !== 'string' ||
-                    !path.isAbsolute(item.imageFile) ||
-                    !e.manifest.capabilities?.includes('local-images'))) ||
-                (item.tooltip != null && typeof item.tooltip !== 'string') ||
-                (item.description != null && typeof item.description !== 'string') ||
-                Object.hasOwn(item, 'image') ||
-                (item.actions != null &&
-                  (!Array.isArray(item.actions) ||
-                    item.actions.length > 4 ||
-                    item.actions.some((a: unknown) => !validAction(a)))),
-            ))
-        )
-          throw new Error(hostText('services.hostApi.panelImageLimit'));
-        if (
-          typeof p.title !== 'string' ||
-          (p.tabs != null &&
-            (!Array.isArray(p.tabs) ||
-              p.tabs.length > 100 ||
-              p.tabs.some((a: unknown) => !validAction(a)))) ||
-          (p.description != null && typeof p.description !== 'string') ||
-          (p.facts != null &&
-            (!Array.isArray(p.facts) ||
-              p.facts.length > 30 ||
-              p.facts.some(
-                (f: unknown) =>
-                  !isObject(f) || typeof f.label !== 'string' || typeof f.value !== 'string',
-              ))) ||
-          (p.actions != null &&
-            (!Array.isArray(p.actions) ||
-              p.actions.length > 100 ||
-              p.actions.some((a: unknown) => !validAction(a))))
-        )
-          throw new Error(hostText('services.hostApi.panelFormat'));
-        e.panel = registerLocalImages(structuredClone(p) as unknown as Panel, dataRoot, id);
-        changed();
-        return null;
-      }
       case 'host.storage.get':
       case 'host.storage.set': {
         requireCapability('storage');

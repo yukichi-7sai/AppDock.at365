@@ -54,7 +54,6 @@ export interface WebAccountSound {
 }
 export interface WebAccountSnapshot {
   group?: { id: string; title: string };
-  registeredSounds?: string[];
   navigationRevision?: number;
   dark: boolean;
   settings?: Record<string, boolean | string>;

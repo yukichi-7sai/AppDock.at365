@@ -11,7 +11,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
 import { webAccountReader, type AccountRead } from './core/web-account-read';
-import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
+import type { Command, TrayItem, SettingOption } from '../shared/contracts';
 refreshTranslationMetadata(effectiveHostLanguage());
 export interface NodeCommandInvocation {
   signal: AbortSignal;
@@ -93,16 +93,10 @@ export interface NodeExtensionContext {
     getPolicy(typeId: string): Promise<import('../shared/notification-types').NotificationPolicy>;
     end(notificationId: string, status?: 'resolved' | 'withdrawn'): Promise<unknown>;
     onChanged(handler: Handler): () => void;
-    show(
-      title: string,
-      body: string,
-      options?: { silent?: boolean; command?: string },
-    ): Promise<unknown>;
   };
   ui: {
     openDetails(): Promise<unknown>;
     openSettings(): Promise<unknown>;
-    showPanel(panel: Panel): Promise<unknown>;
     getImageDirectory(): Promise<string>;
     pickFile(kind: 'json' | 'wav'): Promise<string | null>;
   };
@@ -126,7 +120,6 @@ export interface NodeExtensionContext {
 export interface NodeExtension {
   activate(context: NodeExtensionContext): Promise<void>;
   deactivate?(): Promise<void>;
-  onPanelAction?(actionId: string): Promise<void>;
   onPageAction?(actionId: string, input: Record<string, unknown>, pageId: string): Promise<unknown>;
   onPageFileRemoved?(pageId: string, file: string): Promise<void>;
 }
@@ -280,7 +273,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           openDetails: () => peer.request('host.ui.openDetails', {}),
           openSettings: () => peer.request('host.ui.openSettings', {}),
           pickFile: (kind) => peer.request('host.ui.pickFile', { kind }, 300000),
-          showPanel: (panel) => peer.request('host.ui.panel', panel),
           getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,
         },
         notifications: {
@@ -296,8 +288,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             disposables.push(stop);
             return stop;
           },
-          show: (title, body, options) =>
-            peer.request('host.notifications.show', { title, body, ...options }),
         },
         browser: { open: (url) => peer.request('host.browser.open', { url }) },
         log: {
@@ -376,10 +366,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       return extension.onPageAction(p.id, p.input, p.pageId);
     case 'page.fileRemoved':
       await extension?.onPageFileRemoved?.(p.pageId, p.file);
-      return null;
-    case 'panel.action':
-      if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
-      await extension.onPanelAction(p.id);
       return null;
     case 'notifications.changed':
       for (const handler of notificationHandlers) await handler();

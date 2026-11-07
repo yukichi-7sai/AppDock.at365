@@ -248,18 +248,8 @@ async function gmail(s) {
   checks.push(
     'each PC imports its original Gmail identity before receiving the shared group roster',
   );
-  const wave = Buffer.alloc(44);
-  wave.write('RIFF');
-  wave.write('WAVE', 8);
-  const soundPath = path.join(
-    pa.base,
-    'data',
-    'assets',
-    'applets',
-    'at365.gmail',
-    'sounds',
-    'ベル.wav',
-  );
+  const wave = require('./sound-library-fixture.cjs').wave(100);
+  const soundPath = path.join(pa.base, 'data', 'assets', 'sounds', 'ベル.wav');
   fs.mkdirSync(path.dirname(soundPath), { recursive: true });
   fs.writeFileSync(soundPath, wave);
   deliverShared(a, b);
@@ -269,24 +259,28 @@ async function gmail(s) {
   );
   assert.equal((await accountSnapshot(uiB)).accounts.length, 1);
   checks.push('Gmail group identities synchronize; account-specific sound settings remain local');
+  async function chooseSound(state, ui) {
+    await ui.getByRole('button', { name: '音ライブラリーから選ぶ', exact: true }).click();
+    const picker = state.dock.getByRole('dialog', { name: '音を選択', exact: true });
+    await picker.waitFor();
+    await picker.getByRole('button', { name: 'ベル.wavを選択', exact: true }).click();
+    await picker.getByRole('button', { name: '音を使う', exact: true }).click();
+    await picker.waitFor({ state: 'hidden' });
+  }
+  await chooseSound(a, uiA);
   await until(
-    async () =>
-      (await accountSnapshot(uiA)).registeredSounds.includes('ベル.wav') &&
-      (await accountSnapshot(uiB)).registeredSounds.includes('ベル.wav'),
-    'registered list',
-  );
-  await uiA.getByLabel('登録済みの通知音', { exact: true }).selectOption('ベル.wav');
-  await until(
-    async () => (await accountSnapshot(uiA)).accounts[0].sound.file === 'ベル.wav',
-    'select existing',
+    async () => (await accountSnapshot(uiA)).accounts[0].sound.file.startsWith('@library/'),
+    'select common sound',
   );
   assert.equal((await accountSnapshot(uiB)).accounts[0].sound.file, '');
-  await uiB.getByLabel('登録済みの通知音', { exact: true }).selectOption('ベル.wav');
+  await chooseSound(b, uiB);
   await until(
-    async () => (await accountSnapshot(uiB)).accounts[0].sound.file === 'ベル.wav',
-    'select other PC',
+    async () => (await accountSnapshot(uiB)).accounts[0].sound.file.startsWith('@library/'),
+    'other PC common sound',
   );
-  checks.push('registered filenames are listed live and selected independently per Gmail account');
+  checks.push(
+    'common library files synchronize while retained Gmail sound assignments stay local to each PC',
+  );
   const imageFile = path.join(pa.base, 'data/assets/images/fixture.png');
   fs.mkdirSync(path.dirname(imageFile), { recursive: true });
   require('./copy-host.cjs').copyHost(path.join(root, 'assets/icon.png'), imageFile);
@@ -345,7 +339,10 @@ async function gmail(s) {
   await stop(b);
   b = await start(pb);
   const again = await gmail(b);
-  assert.equal((await accountSnapshot(again)).accounts[0].sound.file, 'ベル.wav');
+  assert.equal((await accountSnapshot(again)).accounts[0].sound.name, 'ベル.wav');
+  assert.ok(
+    (await accountSnapshot(again)).accounts[0].sound.file.startsWith('@library/@assigned/'),
+  );
   checks.push('restart retains the shared Gmail roster and local notification sound selection');
   for (const s of states) await stop(s);
   assert.equal(fs.existsSync(path.join(pa.base, '.appdock')), false);

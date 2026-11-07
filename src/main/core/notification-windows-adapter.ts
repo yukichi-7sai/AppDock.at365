@@ -1,6 +1,5 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
-import { legacyNotificationTypeId } from '../../shared/notification-types';
 import {
   showNotification,
   type NativeNotificationInput,
@@ -101,9 +100,7 @@ export class NotificationWindowsAdapter {
         this.service.setDelivery('windows', [item.id], value);
       };
       try {
-        const legacy =
-          item.typeId === legacyNotificationTypeId ||
-          this.service.windowsOptions(item.id).actionId !== undefined;
+        const hasAction = this.service.windowsOptions(item.id).actionId !== undefined;
         const labels = {
           info: hostText('services.notificationWindowsAdapter.information'),
           warning: hostText('services.notificationWindowsAdapter.warning'),
@@ -111,14 +108,14 @@ export class NotificationWindowsAdapter {
         };
         slot.handle = (this.options.deliver ?? showNotification)({
           id: item.id,
-          title: legacy
+          title: hasAction
             ? item.title
             : hostText('services.notificationWindowsAdapter.titleWithLevel', {
                 level: labels[item.level],
                 title: item.title,
               }),
           body:
-            item.actions.length && !legacy
+            item.actions.length && !hasAction
               ? hostText('services.notificationWindowsAdapter.bodyWithActions', { body: item.body })
               : item.body,
           level: item.level,

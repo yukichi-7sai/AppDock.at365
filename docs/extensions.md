@@ -186,7 +186,7 @@ public sealed class Extension : IAppDockExtension
         context.Tray.Add("今すぐ確認", "at365.my-tool.check");
         schedule = context.Scheduler.Every(TimeSpan.FromSeconds(30), ct =>
             context.Log.InfoAsync("定期処理", ct));
-        await context.Ui.ShowPanelAsync(new Panel("My Tool", "準備ができました。"), token);
+        await context.Log.InfoAsync("準備ができました。", token);
     }
     public Task DeactivateAsync(CancellationToken token)
     {
@@ -208,10 +208,10 @@ DLL用の.NETホストはframework-dependentで発行し、PCにインストー�
 import type { NodeExtensionContext } from '../../src/main/node-worker';
 export async function activate(context: NodeExtensionContext) {
   context.commands.register('at365.my-tool.check', '今すぐ確認', async () => {
-    await context.notifications.show('My Tool', '確認しました。');
+    await context.notifications.publish({ typeId: 'checked', title: 'My Tool', body: '確認しました。', silent: true });
   });
   context.tray.add('今すぐ確認', 'at365.my-tool.check');
-  await context.ui.showPanel({ title: 'My Tool', description: '準備ができました。' });
+  await context.log.info('準備ができました。');
 }
 export async function deactivate() {
   /* 独自のリソースを解放 */
@@ -273,7 +273,7 @@ StorageはJSON値を扱う共通APIで、設定フォームの項目はSettings�
 
 UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（固定容量上限なし、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
 
-拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
+拡張→ホストは `host.settings.get/set/options` / `host.notifications.publish/policy/end` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
 
 ## ショートカット初期値
 
@@ -297,11 +297,9 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（固�
 - snapshotの`state: waiting`、`scheduledStartAt`（Unixミリ秒）で待機を表示。無効化・再起動・終了でタイマーを解放。再起動も遅延を適用し、「今すぐ開始」だけ即時にする。
 - `type: json`の設定値は固定文字数上限のないJSON文字列。ホストで構文、Appletで意味と範囲を検証。
 
-パネルの各画像項目は`title`、任意の`description`・`imageFile`、名前空間内の`actions`を持つ。画像は下記の専用キャッシュファイルから渡し、埋め込み画像の`image`入力は受け付けない。.NETの`PanelImage`は`Title/Description/Actions`と任意の`ImageFile/Tooltip`を持ち、Nodeの`ui.showPanel`も同じ入力を使う。SDK/Runtime 0.33.0では未使用のBase64 `Image`引数を削除したため、その旧コンストラクターを使うコードはファイル参照へ変更して再ビルドする。
+Appletの本文は[ページAPI](applet-pages.md)で表示する。SDK/Runtime 0.34.0では旧パネルの型・送信・操作APIを削除した。設定を開くUi.OpenSettingsAsync/openSettingsと、ローカルページ画像用のGetImageDirectoryAsync/getImageDirectoryは維持する。
 
-これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
-
-## 宣言コマンド・構造化一覧・パネル操作
+## 宣言コマンド・構造化一覧
 
 この節の機能を使うAppletは`minimumHostVersion: "0.6.0"`を指定してください。
 
@@ -309,9 +307,7 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 
 `type: object-list`の設定は`fields`と`itemTitle`を持つ64件までのオブジェクト配列です。フォームで追加・並べ替え・削除します。旧JSON文字列も読み取れます。フィールドはboolean / number / string / select / string-listで、一覧の入れ子は不可。`string-list`はフィールド内だけで使用し、64件までの文字列を追加・削除します。`select`の`numericOptions: true`は旧数値enumをoptionsの順序で読み取ります。正規化時も未知のフィールドを保持します。
 
-`Panel.Images`は最大1000件、`Tabs`は最大100件です。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
-
-`local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。Base64 `Image`入力は公開しません。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
+ローカルページ画像は`local-images` capabilityと`Ui.GetImageDirectoryAsync` / `ui.getImageDirectory`で専用キャッシュを取得し、`Pages.RegisterImagesAsync` / `pages.registerImages`へ登録する。[Appletページ](applet-pages.md)の所有者・ページ寿命・パス包含検査を使い、独自の画像配信APIは追加しない。
 
 ## Node Appletの通知・ファイル選択
 
@@ -322,7 +318,6 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 | `ui.pickFile('json' \| 'wav')`                           | `file-dialog`    | JSONはファイル選択、wavは共通音選択（トークンは互換維持）。絶対パスまたは取消時null。RPC待機は5分 |
 | `audio.play(file?)`                                      | `audio`          | 対応するローカル音声を共通キューで再生。空文字/省略が無音。キュー受付時に戻る        |
 | `tray.attention(boolean)`                                | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示                  |
-| `notifications.show(title, body, { silent?, command? })` | `notifications`  | 音の抑制とクリック時の自Appletコマンドを任意指定                            |
 
 音声は既存の絶対パス・Applet別登録名、またはWebアカウントが返す`@library/@assigned/<SHA256>.<拡張子>`を受け付ける。WAV/MP3/AAC/M4A/FLAC/OGG/OGA/OPUS/WEBMに対応し、ファイルの容量上限は設けない。コーデックの範囲と検証は[共通音声API](audio-playback.md#ファイルからの読み込み)を参照する。待機は32件まで、1回の再生は30秒で打ち切ります。再生時だけsandbox/contextIsolation有効の非表示Electronウィンドウを作り、終了時に破棄します。停止・再起動したAppletの音は中止し、待機分は破棄します。再生失敗はホストログに記録します。外部URLやシェルによる再生は行いません。音声の選択は[音ライブラリー](asset-libraries.md)の共通ダイアログを使い、確定時は保管コピーの絶対パスを返します。取消時null、呼出元の停止・再起動時は選択を取り消します。
 
@@ -354,7 +349,7 @@ MCPの[固定設定API](settings-api.md)は宣言済みobject-listの行操作�
 
 登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、本体のバナー・デスクトップと本体の通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
 
-最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを起動中の履歴へ保持します。
+notifications capabilityとmanifestのnotificationTypesを宣言し、PublishAsync/notifications.publish、policy、endを使う。旧ShowAsync/notifications.showと本体生成の旧通知種類は廃止した。現行契約はAppDock 0.180.0、SDK/Runtime 0.34.0を基準とし、本文・履歴要約・操作の所有者と起動世代を検証する。
 
 ```json
 {

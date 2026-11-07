@@ -26,9 +26,9 @@ for (const mode of ['node', 'dotnet', 'native'])
       fs.writeFileSync(
         nodeEntry,
         `exports.activate = async (context) => {
-    const show = () => context.ui.showPanel({ title: context.localization.t('title'),
-      description: context.localization.t('named', {name: '{{count}} $t(title)', count: 3}),
-      facts: [{label:'language', value:context.localization.language}] });
+    const show = () => context.storage.set('localization', { title: context.localization.t('title'),
+      named: context.localization.t('named', {name: '{{count}} $t(title)', count: 3}),
+      language: context.localization.language }, 'memory');
     context.commands.register('fixture.localized.show', context.localization.t('title'), show);
     context.localization.onChanged(show); await show();
   };`,
@@ -55,9 +55,9 @@ for (const mode of ['node', 'dotnet', 'native'])
       const exited = once(child, 'exit');
       let stderr = '';
       child.stderr.on('data', (data) => (stderr += data));
-      const panels = [];
+      const updates = [];
       const peer = new JsonLinePeer(child.stdout, child.stdin, async (method, params) => {
-        if (method === 'host.ui.panel') panels.push(params);
+        if (method === 'host.storage.set') updates.push(params.value);
         else throw Error('Unexpected request: ' + method);
         return null;
       });
@@ -74,14 +74,14 @@ for (const mode of ['node', 'dotnet', 'native'])
         localization: en,
       });
       assert.equal(activated.commands[0].title, 'English');
-      assert.equal(panels.at(-1).title, 'English');
-      assert.equal(panels.at(-1).description, '{{count}} $t(title): 3');
+      assert.equal(updates.at(-1).title, 'English');
+      assert.equal(updates.at(-1).named, '{{count}} $t(title): 3');
       await peer.request('localization.changed', ja);
-      assert.equal(panels.at(-1).title, '日本語');
-      assert.equal(panels.at(-1).description, '{{count}} $t(title) は 3 件');
-      assert.equal(panels.at(-1).facts[0].value, 'ja');
+      assert.equal(updates.at(-1).title, '日本語');
+      assert.equal(updates.at(-1).named, '{{count}} $t(title) は 3 件');
+      assert.equal(updates.at(-1).language, 'ja');
       await peer.request('command.execute', { id: 'fixture.localized.show' });
-      assert.equal(panels.at(-1).title, '日本語');
+      assert.equal(updates.at(-1).title, '日本語');
       await peer.request('deactivate');
       child.stdin.end();
       const [code] = await exited;

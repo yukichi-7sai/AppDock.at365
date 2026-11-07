@@ -5,10 +5,6 @@ public interface IAppDockExtension
     Task ActivateAsync(IExtensionContext context, CancellationToken cancellationToken);
     Task DeactivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
-public interface IPanelActionHandler
-{
-    Task HandlePanelActionAsync(string actionId, CancellationToken cancellationToken);
-}
 public interface IExtensionContext
 {
     ILocalizationService Localization => throw new NotSupportedException("Applet localization requires AppDock 0.159.0 or later.");
@@ -52,7 +48,6 @@ public interface ISettingsService
     Task SetOptionsAsync(string key, IReadOnlyList<SettingOption> options, CancellationToken cancellationToken = default);
 }
 public interface INotificationService {
-    Task ShowAsync(string title, string body, CancellationToken cancellationToken = default);
     Task<NotificationPublishResult> PublishAsync(NotificationRequest request, CancellationToken cancellationToken = default)
         => throw new NotSupportedException("Typed notifications require AppDock 0.30.0 or later.");
     Task<NotificationPolicy> GetPolicyAsync(string typeId, CancellationToken cancellationToken = default)
@@ -74,7 +69,6 @@ public sealed record NotificationLifetime(string Type, int? Milliseconds);
 public sealed record NotificationPolicy(bool Enabled, IReadOnlyList<string> SelectedTargets, IReadOnlyList<string> Targets,
     NotificationLifetime Lifetime, bool Dismissible, int? DurationSeconds, string? Reason);
 public interface IUiService {
-    Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default);
     Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default);
     Task OpenDetailsAsync(CancellationToken cancellationToken = default)
         => throw new NotSupportedException("Opening Applet details requires AppDock 0.66.1 or later.");
@@ -109,22 +103,6 @@ public interface ISchedulerService
 {
     // The next tick is skipped until the previous callback completes.
     IDisposable Every(TimeSpan interval, Func<CancellationToken, Task> callback);
-}
-public sealed record Panel(string Title, string? Description = null, IReadOnlyList<PanelFact>? Facts = null, IReadOnlyList<PanelAction>? Actions = null)
-{
-    public IReadOnlyList<PanelImage>? Images { get; init; }
-    public IReadOnlyList<PanelAction>? Tabs { get; init; }
-}
-public sealed record PanelImage(string Title, string? Description = null, IReadOnlyList<PanelAction>? Actions = null)
-{
-    public string? Tooltip { get; init; }
-    public string? ImageFile { get; init; }
-}
-public sealed record PanelFact(string Label, string Value);
-public sealed record PanelAction(string Title, string Command)
-{
-    public string? ActionId { get; init; }
-    public bool? Selected { get; init; }
 }
 public sealed record SettingOption(string Label, string Value);
 

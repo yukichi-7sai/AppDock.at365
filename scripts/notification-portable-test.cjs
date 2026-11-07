@@ -63,7 +63,7 @@ const copies = ['installed', 'test'].map((name) => {
   settings.host.hardwareAcceleration = false;
   settings.globalShortcutCommands = [];
   settings.extensions['test.notification'] = { enabled: true, settings: {} };
-  settings.extensions['test.notification.legacy'] = { enabled: true, settings: {} };
+  settings.extensions['test.notification.routing'] = { enabled: true, settings: {} };
   settings.extensions['fixture.notifications.native'] = { enabled: true, settings: {} };
   settings.notificationPreferences = {
     overrides: [
@@ -81,7 +81,10 @@ const copies = ['installed', 'test'].map((name) => {
     path.join(folder, 'data/update-result.json'),
     JSON.stringify({ ok: true, message: 'Synthetic update completion' }),
   );
-  fs.writeFileSync(require('./test-settings.cjs').file(folder, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(
+    require('./test-settings.cjs').file(folder, 'settings.json'),
+    JSON.stringify(settings),
+  );
   fs.writeFileSync(
     path.join(folder, 'extensions/notification/extension.json'),
     JSON.stringify({
@@ -126,35 +129,49 @@ exports.activate = async context => {
   context.commands.register('test.notification.end','End',async()=>context.notifications.end(id));
 };`,
   );
-  const legacy = path.join(folder, 'extensions/legacy');
-  fs.mkdirSync(legacy, { recursive: true });
+  const routing = path.join(folder, 'extensions/routing');
+  fs.mkdirSync(routing, { recursive: true });
   fs.writeFileSync(
-    path.join(legacy, 'extension.json'),
+    path.join(routing, 'extension.json'),
     JSON.stringify({
-      id: 'test.notification.legacy',
-      name: 'Legacy notification fixture',
+      id: 'test.notification.routing',
+      name: 'Typed routing fixture',
       version: '1.0.0',
       apiVersion: 1,
       runtime: 'node',
       entry: 'index.js',
       capabilities: ['notifications', 'storage'],
+      minimumHostVersion: '0.180.0',
+      notificationTypes: [
+        {
+          typeId: 'message',
+          title: 'Routing notice',
+          description: 'Fixture',
+          levels: ['info'],
+          defaultLevel: 'info',
+          allowedTargets: ['windows'],
+          defaultTargets: ['windows'],
+          requiredTargets: [],
+          lifetimePolicy: 'userDuration',
+          defaultDurationSeconds: null,
+          history: 'persistent',
+        },
+      ],
       commands: [
-        { id: 'test.notification.legacy.send', title: 'Send' },
-        { id: 'test.notification.legacy.open', title: 'Open' },
+        { id: 'test.notification.routing.send', title: 'Send' },
+        { id: 'test.notification.routing.open', title: 'Open' },
       ],
     }),
   );
   fs.writeFileSync(
-    path.join(legacy, 'index.js'),
+    path.join(routing, 'index.js'),
     `
 exports.activate = async context => {
-  context.commands.register('test.notification.legacy.open', 'Open', async () => {
+  context.commands.register('test.notification.routing.open', 'Open', async () => {
     const count = (await context.storage.get('clicks')) || 0;
     await context.storage.set('clicks', count + 1);
   });
-  context.commands.register('test.notification.legacy.send', 'Send', () => context.notifications.show(
-    'AppDock synthetic ${name}', 'Gmail-style command notification <&>',
-    { silent: true, command: 'test.notification.legacy.open' }));
+  context.commands.register('test.notification.routing.send', 'Send', () => context.notifications.publish({typeId:'message',title:'AppDock synthetic ${name}',body:'Typed command notification <&>',silent:true,historyText:{title:'Routing fixture',body:'Synthetic notice'},actions:[{key:'open',label:'Open synthetic',command:'test.notification.routing.open'}]}));
 };`,
   );
   const native = path.join(folder, 'extensions/native');
@@ -267,7 +284,7 @@ async function start(copy, initialUri) {
   );
   const snapshot = await copy.dock.evaluate(() => window.dock.snapshot());
   if (!initialUri)
-    for (const id of ['test.notification', 'test.notification.legacy'])
+    for (const id of ['test.notification', 'test.notification.routing'])
       assert.equal(snapshot.extensions.find((e) => e.id === id)?.state, 'running', id);
 }
 async function stop(copy) {
@@ -280,7 +297,12 @@ async function stop(copy) {
   copy.browser = undefined;
 }
 const count = (copy) => {
-  const file = path.join(copy.folder, 'data/storage/test.notification.legacy/clicks.json');
+  const file = path.join(
+    copy.folder,
+    'data/storage/test.notification.routing/devices',
+    require('node:os').hostname(),
+    'clicks.json',
+  );
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : 0;
 };
 function historyUri(copy) {
@@ -338,7 +360,12 @@ const checks = [];
   );
   const copy = copies[0];
   const typedTag = () => {
-    const file = path.join(copy.folder, 'data/storage/test.notification/typed.json');
+    const file = path.join(
+      copy.folder,
+      'data/storage/test.notification/devices',
+      require('node:os').hostname(),
+      'typed.json',
+    );
     return (
       fs.existsSync(file) &&
       createHash('sha256')
@@ -396,7 +423,7 @@ const checks = [];
     'real .NET typed Windows delivery and Shell activation open the notification center; stopping the owner retracts its OS entry',
   );
   for (const copy of copies) {
-    await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.legacy.send'));
+    await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.routing.send'));
     copy.uri = await until(() => historyUri(copy), 'native toast in Action Center');
     const command = powershell(
       `$k=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\\Classes\\${copy.protocol}\\shell\\open\\command'); $k.GetValue(''); $k.Close()`,
@@ -410,12 +437,18 @@ const checks = [];
   );
   await main(copies[0], hostWindow + '.hide()');
   activate(copies[0], copies[0].uri);
-  await until(() => count(copies[0]) === 1, 'installed callback');
+  await until(() => centerReady(copies[0]), 'installed notification center');
+  assert.equal(count(copies[0]), 0);
+  await copies[0].dock.getByRole('button', { name: 'Open synthetic', exact: true }).last().click();
+  await until(() => count(copies[0]) === 1, 'installed explicit action');
   assert.equal(await main(copies[0], hostWindow + '.isVisible()'), true);
   assert.equal(count(copies[1]), 0);
   await main(copies[1], hostWindow + '.minimize()');
   activate(copies[1], copies[1].uri);
-  await until(() => count(copies[1]) === 1, 'test callback');
+  await until(() => centerReady(copies[1]), 'test notification center');
+  assert.equal(count(copies[1]), 0);
+  await copies[1].dock.getByRole('button', { name: 'Open synthetic', exact: true }).last().click();
+  await until(() => count(copies[1]) === 1, 'test explicit action');
   assert.equal(
     await main(copies[1], hostWindow + '.isVisible() && !' + hostWindow + '.isMinimized()'),
     true,
@@ -425,15 +458,15 @@ const checks = [];
   await until(() => centerReady(copies[0]), 'old URI opens center');
   assert.equal(count(copies[0]), 1);
   checks.push(
-    'Windows Shell activation returns to the matching running copy; command runs once and never in the other copy',
+    'Windows Shell activation returns to the matching running copy; default click opens the center and an explicit action runs only in its owning copy',
   );
-  await copies[0].dock.evaluate(() => window.dock.executeCommand('test.notification.legacy.send'));
+  await copies[0].dock.evaluate(() => window.dock.executeCommand('test.notification.routing.send'));
   const stale = await until(() => {
     const uri = historyUri(copies[0]);
     return uri && uri !== copies[0].uri && uri;
   }, 'fresh native toast');
   await copies[0].dock.evaluate(() =>
-    window.dock.toggleExtension('test.notification.legacy', false),
+    window.dock.toggleExtension('test.notification.routing', false),
   );
   await copies[0].dock.evaluate(() => window.dock.navigate('logs'));
   await main(copies[0], hostWindow + '.hide()');

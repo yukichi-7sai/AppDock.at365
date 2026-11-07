@@ -45,7 +45,7 @@ for (const owner of ['a', 'b']) {
   );
   fs.writeFileSync(
     path.join(dir, 'index.js'),
-    `exports.activate=async c=>{let count=0; const show=()=>c.ui.showPanel({title:'Count',facts:[{label:'Count',value:String(count)}]});c.commands.register('${owner}.run','操作 ${owner}',async()=>{count++;await show();});await show();};`,
+    `exports.activate=async c=>{let count=0; const show=()=>c.log.info('counter:'+count);c.commands.register('${owner}.run','操作 ${owner}',async()=>{count++;await show();});await show();};`,
   );
   settings.extensions[owner] = { enabled: true, settings: {} };
 }
@@ -292,8 +292,10 @@ const checks = [];
       );
       await page.waitForFunction(
         async () =>
-          (await window.dock.snapshot()).extensions.find((e) => e.id === 'b').panel.facts[0]
-            .value === '1',
+          (await window.dock.snapshot()).logs
+            .filter((e) => e.source === 'b' && e.message.startsWith('counter:'))
+            .at(-1)
+            .message.slice(8) === '1',
       );
       await app.evaluate(() => {
         globalThis.testTray.emit('click');
@@ -301,19 +303,26 @@ const checks = [];
       });
       await page.waitForFunction(
         async () =>
-          (await window.dock.snapshot()).extensions.find((e) => e.id === 'b').panel.facts[0]
-            .value === '2',
+          (await window.dock.snapshot()).logs
+            .filter((e) => e.source === 'b' && e.message.startsWith('counter:'))
+            .at(-1)
+            .message.slice(8) === '2',
       );
       await page.waitForTimeout(1000);
       assert.equal(
-        (await snapshot()).extensions.find((e) => e.id === 'a').panel.facts[0].value,
+        (await snapshot()).logs
+          .filter((e) => e.source === 'a' && e.message.startsWith('counter:'))
+          .at(-1)
+          .message.slice(8),
         '0',
       );
       await app.evaluate(() => globalThis.testTray.emit('click'));
       await page.waitForFunction(
         async () =>
-          (await window.dock.snapshot()).extensions.find((e) => e.id === 'a').panel.facts[0]
-            .value === '1',
+          (await window.dock.snapshot()).logs
+            .filter((e) => e.source === 'a' && e.message.startsWith('counter:'))
+            .at(-1)
+            .message.slice(8) === '1',
       );
       await page.evaluate((id) => window.dock.executeCommand(id), pause);
       menu = await native();

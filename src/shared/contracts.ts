@@ -186,30 +186,6 @@ export interface SettingSection {
   actions?: string[];
   collapsible?: boolean;
 }
-export interface Panel {
-  title: string;
-  description?: string;
-  facts?: { label: string; value: string }[];
-  actions?: PanelAction[];
-  tabs?: PanelAction[];
-  images?: {
-    title: string;
-    tooltip?: string;
-    imageFile?: string;
-    description?: string;
-    actions?: PanelAction[];
-  }[];
-}
-/** Host-resolved file URLs are output metadata, never embedded Applet image input. */
-export interface ResolvedPanel extends Panel {
-  images?: (NonNullable<Panel['images']>[number] & { image?: string })[];
-}
-export interface PanelAction {
-  title: string;
-  command: string;
-  actionId?: string;
-  selected?: boolean;
-}
 export interface ExtensionManifest extends Partial<
   import('./applet-common-settings').AppletCommonValues
 > {
@@ -263,7 +239,6 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   enabled: boolean;
   commands: AppletCommand[];
   tray: TrayItem[];
-  panel: ResolvedPanel | null;
   settingOptions: Record<string, SettingOption[]>;
 }
 export type LogCategory = 'normal' | 'audit';
@@ -382,7 +357,6 @@ export interface DockApi {
   toggleExtension(id: string, enabled: boolean): Promise<void>;
   restartExtension(id: string): Promise<void>;
   executeCommand(id: string): Promise<unknown>;
-  executePanelAction(id: string, actionId: string): Promise<unknown>;
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   barViewport(

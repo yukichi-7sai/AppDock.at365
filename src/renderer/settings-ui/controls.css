@@ -1797,40 +1797,12 @@ summary {
   align-items: center;
   font-size: 12px;
 }
-.panel-images {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin: 16px 0;
-}
-.panel-images article {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.panel-images img {
-  display: block;
-  width: 100%;
-  height: 180px;
-  object-fit: contain;
-  margin-bottom: 8px;
-}
 .image-preview-button {
   border: none;
   padding: 0;
   background: transparent;
   width: 100%;
   cursor: zoom-in;
-}
-.panel-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0;
-}
-.panel-tabs button[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 .image-preview-dialog {
   max-width: 90vw;

@@ -130,9 +130,9 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 構造化フォームは`ObjectListSetting`と共有の`object-list`変換・設定検証で扱います。旧JSON・Folder・数値enum、モニター別Padding、未知のデータの保持を回帰確認します。フォルダー選択は既存のIPC呼び出し元検証を通します。
 
-履歴専用操作は一般コマンドとは独立した`panel.action`です。現在のパネル（actions / tabs / images）にあるIDだけ許可します。ローカル画像は`panel-images.ts`で実パスの包含を確認し、CSPを緩めず`appdock://host/panel-images`で配信します。ホスト管理外のファイルや外部画像URLは受け付けません。
+ページ内の履歴操作はpagesのactionへ接続し、現在のページ・Applet起動世代・宣言済み操作・入力を検証する。ローカル画像のキャッシュはapplet-image-cache.tsで共用し、page-images.tsが実パスの包含と表示寿命を検証する。
 
-[panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDKの既存コンストラクターを維持し、利用するAPIの最低ホスト版をmanifestへ指定します。
+[ページ画像のテスト](../tests/page-images.test.cjs)と[キャッシュ取得のテスト](../tests/applet-image-cache.test.cjs)で、画像の完全性・パス包含・権限・ページ寿命を確認する。[ライフサイクル](../tests/lifecycle.test.cjs)ではロード前宣言、別名、起動・停止、設定受信、Node/.NETの独立性を確認する。
 
 ## トレイコマンドとメニュー
 
