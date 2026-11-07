@@ -8,6 +8,16 @@
 
 ローカル発行は実利用先への配置・commit・push・GitHub Releaseとは別工程です。実利用先へ配置する場合は対象のAppDockを完全終了し、本体一式または対象Appletの配布フォルダーをコピーします。設定・data・他Appletは保持してください。
 
+## .NETランタイムの共通方針
+
+AppDock本体と各.NET Appletは、環境にインストールされた.NETランタイムを使用し、ランタイムを配布物へ同梱しません。新規実装・既存実装の変更・テスト用発行にも適用します。`framework-dependent`（`--self-contained false`）で発行し、単一EXEでもこの方針を維持します。
+
+通常の.NET処理には.NET 10 Runtime、WPF/WinFormsを使うInputHost・Watch・WallpaperSlideshowには.NET 10 Desktop Runtime（いずれもWindows x64）が必要です。Desktop Runtimeには通常の.NET Runtimeも含まれます。各Appletの動作環境へ必要な種類・版・アーキテクチャを記載してください。
+
+native Appletのプロジェクトは本体の[`dotnet/Directory.Build.targets`](../dotnet/Directory.Build.targets)をimportし、`SelfContained=true`・`PublishSelfContained=true`・`PublishAot=true`による発行を拒否します。`publish.bat`から呼ぶスクリプトでも`--self-contained false`を明示し、プロジェクトの指定を同梱ありへ上書きしません。DLL Appletは本体のExtensionHost上で実行します。
+
+完成した配布物の`runtimeconfig.json`（単一EXEでは埋め込み内容）が共有frameworkを参照し、`includedFrameworks`やランタイム本体のDLLを含まないことを確認します。実際の起動トレースでPC側の共有ランタイムの使用を確認し、空の`DOTNET_ROOT_X64`を指定した子プロセスではランタイム未検出で終了することを検証します。PCのインストール状態は変更しません。native単一EXEは固定Nodeで`scripts/test-native-applet-runtime.cjs <発行EXEの絶対パス> <Appletの.artifacts内の証跡先>`を実行できます。接続前の起動・EOF終了を検証し、Appletの動作確認は各repoのプロトコル/GUI試験で行います。
+
 ## 本体の.NETプロセス
 
 AppDock本体が配布する.NETプロセスは、すべて利用先のPCにインストールされた共有ランタイムを使います。現在は.NET 10 Desktop Runtime（Windows x64）を用意すれば、WPFのInputHostと、通常の.NETを使うExtensionHost・ProcessHost・Updaterが動作します。

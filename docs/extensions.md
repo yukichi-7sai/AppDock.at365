@@ -198,7 +198,7 @@ public sealed class Extension : IAppDockExtension
 
 1拡張ごとにホストランナーを1プロセス起動します。各DLLは独立したAssemblyLoadContextで読み込み、AppDock.SDKの型はランナーと共有します。コマンド処理は同一拡張内で直列化します。定期処理は前回の完了まで次回を重ねません。定期処理とコマンドの同時実行が問題になるロジックでは、拡張側にも排他を置いてください。定期処理はSDKから停止されますが、拡張が独自に作成したリソースはDeactivateAsyncで解放してください。CancellationTokenを処理へ渡してください。
 
-DLL用の.NETホストはframework-dependentで発行し、PCにインストール済みのMicrosoft.NETCore.App 10.0（Windows x64）を使用します。DLL用ホストには.NETランタイムを同梱せず、WindowsDesktopランタイムも要求しません。本体のInputHostは同じPCの.NET 10 Desktop Runtime（Windows x64）を使用します。WPF/WinFormsの画面やSTAメッセージループが必要なAppletは、上記の `runtime: native` と専用EXEで実装します。時計Appletは自身のWindowsDesktopランタイムを同梱します。別のnative Appletをframework-dependentで配布する場合は、利用先に必要なWindowsDesktopランタイムを用意してください。任意の既存EXEを置くだけで接続されるものではなく、SDKの接続とライフサイクルへの対応が必要です。P/InvokeのようなWindows API処理をDLL Appletに置くことも可能です。
+DLL用の.NETホストはframework-dependentで発行し、PCにインストール済みのMicrosoft.NETCore.App 10.0（Windows x64）を使用します。DLL用ホストには.NETランタイムを同梱せず、WindowsDesktopランタイムも要求しません。本体のInputHostは同じPCの.NET 10 Desktop Runtime（Windows x64）を使用します。WPF/WinFormsの画面やSTAメッセージループが必要なAppletは、上記の `runtime: native` と専用EXEで実装します。Watch・WallpaperSlideshowを含めnativeの.NET Appletもランタイムを同梱せず、[共通ランタイム方針](publishing.md#netランタイムの共通方針)に従いframework-dependentで発行します。利用先には必要な.NET RuntimeまたはDesktop Runtimeを用意してください。任意の既存EXEを置くだけで接続されるものではなく、SDKの接続とライフサイクルへの対応が必要です。P/InvokeのようなWindows API処理をDLL Appletに置くことも可能です。
 
 ## TypeScript / Node.js
 

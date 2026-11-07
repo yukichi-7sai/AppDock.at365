@@ -31,7 +31,7 @@ Appletは1つの道具として有効化・停止・再起動できる単位で�
 | runtime  | 選ぶ場面                                                  | 実装と参照例                                                                                                                                                  |
 | -------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#検証用拡張](../tests/fixtures/dotnet/AppDock.Extensions.Demo/DemoExtension.cs)                                           |
-| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要       | 自身のランタイムを持つEXE。[Watch](../../Applet.Watch.at365/DEVELOPMENT.md)                                                                                   |
+| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要       | 環境の共有ランタイムを使用する専用EXE。[Watch](../../Applet.Watch.at365/DEVELOPMENT.md)                                                                                   |
 | `node`   | TypeScriptで実装する処理。Electron同梱Nodeを利用          | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts)、[WebBrowserTools](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md) |
 
 独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。専用画面は[Appletページ](applet-pages.md)を使い、Webアカウントが必要な場合は[WebアカウントAPI](web-accounts.md)を使います。
@@ -142,7 +142,7 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 2. `[STAThread]`のMainでWPF Applicationを作り、`ShutdownMode.OnExplicitShutdown`でDispatcherを維持します。`AppletSession.RunAsync`はバックグラウンドで実行し、画面操作は `Dispatcher.InvokeAsync`へ渡します。接続処理をUIスレッドで待機しません。
 3. stdoutはUTF-8のJSON-RPC専用です。元の `Console.Out` を保存してセッションへ渡し、通常のConsole出力はstderrへ転送します。自作通信や生のstdout出力を追加すると接続が壊れます。
 4. セッション終了・stdinのEOF・異常時はApplicationを終了します。Deactivateでウィンドウ、タイマー、設定購読、SystemEvents、フックを解放します。非表示と終了を区別し、非表示の時計はタイマーも停止します。
-5. Watchと同様にself-containedの `win-x64` でpublishできます。単一EXEにするなら同プロジェクトのpublish設定を参照し、nativeライブラリや必要なコンテンツも含めます。`extension.json`は別ファイルです。AppDockのDLL用ホストは環境の.NET 10 Runtimeを使用します。native / WPF Appletをframework-dependentで配布する場合は、別途.NET 10 Desktop Runtime（Windows x64）が必要です。
+5. [共通ランタイム方針](publishing.md#netランタイムの共通方針)に従い、`win-x64`・framework-dependent（`--self-contained false`）でpublishします。.NETランタイムは同梱せず、環境にインストールされたものを使用します。WPF/WinFormsには.NET 10 Desktop Runtime（Windows x64）が必要です。Watchと同様に共通`Directory.Build.targets`をimportして自己完結発行を拒否します。単一EXEにする場合も同じ方針で、`extension.json`と必要なコンテンツは別途配置します。
 6. AssemblyName、namespace、StartupObject、XAMLのx:Class、manifestのentry、リソースのpack URIを一緒に整合させます。時計の `Watch.ico` やフォントを別機能へ無条件に流用しません。
 
 AppDockはdeactivateを最大2秒待ってからプロセスを停止します。終了処理は短く、複数回呼ばれても安全にしてください。強制停止もあるため、大切な状態を終了時だけ保存する設計は避けます。子プロセスを独自に起動する場合、その終了管理もAppletの責任です。

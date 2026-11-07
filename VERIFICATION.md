@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-11-07 .NET Appletの共有ランタイム方針と検証
+
+- cleanなmainから`pull --ff-only`で最新を確認。AGENTS・publishing・Applet実装ガイド・API文書へ、本体と各.NET Appletが環境にインストールされたランタイムを使い、同梱しない方針を統一した。既存の`dotnet/Directory.Build.targets`をWatch/WallpaperSlideshowからimportする。ホスト製品コード・SDK/API・依存・本体の版0.180.0は不変のため、本体の版更新/再発行なし。
+- `scripts/test-native-applet-runtime.cjs`を追加。単一EXEのruntimeconfig/同梱DLL、実起動の共有ランタイム解決と正常EOF、空のDOTNET_ROOT_X64での起動失敗を確認する。トレースは毎回初期化し、PCのインストール状態は変更しない。旧self-contained Watch EXEで意図した拒否を確認し、新しいWatch 0.6.1/WallpaperSlideshow 0.14.1で両方成功した。
+- 両AppletのRelease build・標準回帰（Watch24件、Wallpaper9群）、SelfContained/PublishSelfContained/PublishAot拒否計6件、発行nativeのRPC/終了確認、Watchの固定本体GUI15群が成功。両publishとZIP全2/11ファイルの版・サイズ・ハッシュ一致。Watch初回のNuGet NU1900は制限環境による取得失敗で、検査を維持して通常環境の再実行で解消した。
+- 発行前レビュー、ソース入力ハッシュ、使用SDK/Node/本体EXE・asar、変更前/後の配布物比較は`.artifacts/shared-runtime-20261107/`。Applet固有ログとhost traceは各repoの同名フォルダー。追加した文書リンクとJavaScript構文、git diff --checkが成功。実行物/入力に後続変更がないことを照合して同じ成功をコミット判定へ再利用し、stage/commit treeは`.artifacts/commit-validation-shared-runtime-20261107/`へ記録する。
+- 本体製品/依存の変更がないため、本体全回帰と再発行は行わない。共用テストホストは保持し、Watchの隔離GUI専用EXEのみプロセス終了・証跡保存後に回収した。実利用先の設定/配置・実デスクトップ操作・push・GitHub Releaseは行っていない。
+
 ## 2026-11-07 現行Applet契約への統一（0.180.0 / SDK・Runtime 0.34.0）
 
 - 5つのAppletと本体/SDK/Runtime/Node worker/IPC/型/描画/通知カタログをレビューし、旧パネル・パネル操作と旧通知show APIを廃止した。現行ページ画像キャッシュ、ブラウザー起動、設定への移動、共通音声再生と本体更新のWindows通知クリック処理を保持した。画像キャッシュ・登録音・監視の現行検証は専用テストへ移し、廃止機能だけの試験・スクリプトを除去した。
