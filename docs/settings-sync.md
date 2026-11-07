@@ -9,6 +9,8 @@ MCP接続先とMCPツールコマンドは自端末の`settings-<端末名>.json
 
 ## 保存先
 
+[バックグラウンドジョブ基盤](background-jobs-design.md)では、配置別PC専用rootに生成原本・復旧記録の`background-jobs/<jobId>/`を新設する設計を定める。時間で回収するキャッシュと分離し、登録済み素材は従来の共有`data/assets`へ保存する。これは未実装であり、以下の現行保存先へ追加済みとは扱わない。
+
 共有設定はEXE隣の`data/settings.json`、端末別設定は同じ`data/`直下の`settings-<端末名>.json`を使う。旧配置の設定・画面状態・Storageは読込・コピー・移行しない。通常の新規起動は新しい保存先から開始する。
 
 リボンのグループ定義・所属・表示名・アイコンのみ表示・手動時の大きさは、リボンページで選んだ共有`settings.json`または自端末の`settings-<端末名>.json`へ保存する。手動時の大きさは`host.ribbonDisplayMode`で既定expanded。旧`uiState.ribbon.displayMode`は引き継がない。持続型グループの開閉は端末別設定の`uiState.ribbon`へ分離し、ホバーによる一時表示・一時パネル・バッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-customization-design.md#pc専用の開閉状態)を参照する。
