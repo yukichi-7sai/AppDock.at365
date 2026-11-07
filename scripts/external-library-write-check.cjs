@@ -71,6 +71,11 @@ module.exports = async function checkExternalWrites({
   await page.screenshot({ path: path.join(profile, 'source-access-light.png') });
   await apply(dialog, 'OK');
   await until(async () => (await model()).content.canWrite, 'write mode enabled');
+  assert.equal(
+    (await model()).content.sources[0].canWrite,
+    true,
+    'external drop destinations enabled',
+  );
   assert.equal((await model()).content.sources[0].id, source.id);
   await session.close();
   session = await launch(profile, portable);
@@ -89,7 +94,23 @@ module.exports = async function checkExternalWrites({
         if (!file.startsWith(external + path.sep)) throw Error('Outside isolated external root');
         const trash = path.join(profile, 'recycled');
         await fs.mkdir(trash, { recursive: true });
-        await fs.rename(file, path.join(trash, path.basename(file)));
+        const target = path.join(trash, path.basename(file));
+        try {
+          await fs.rename(file, target);
+        } catch (error) {
+          if (error.code !== 'EXDEV') throw error;
+          // Isolated recycle adapter only; real OS recycle behavior is outside this test.
+          const stat = await fs.lstat(file);
+          if (stat.isSymbolicLink()) throw Error('Unexpected link in isolated recycle fixture');
+          if (stat.isDirectory()) {
+            if ((await fs.readdir(file)).length) throw Error('Expected empty fixture folder');
+            await fs.mkdir(target);
+            await fs.rmdir(file);
+          } else {
+            await fs.copyFile(file, target, 1 /* COPYFILE_EXCL */);
+            await fs.unlink(file);
+          }
+        }
       };
     },
     { imported, external, profile },

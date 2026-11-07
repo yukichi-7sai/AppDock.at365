@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { watch, type FSWatcher } from 'node:fs';
+import { watchDirectory, type DirectoryWatcher } from './directory-watch';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { base64Value } from '../../shared/base64';
@@ -13,7 +13,13 @@ import {
   type LibraryRef as RegisteredImageRef,
   type LibraryEntry as RegisteredImageEntry,
 } from '../../shared/library-assets';
-import { assetFile, safeDirectory, safeDirectoryAsync, scanAssetTree } from './library-files';
+import {
+  assetFile,
+  safeDirectory,
+  safeDirectoryAsync,
+  scanAssetTree,
+  sameDirectoryPath,
+} from './library-files';
 import {
   externalLibraryLocation,
   externalLibraryPath,
@@ -191,7 +197,7 @@ export class RegisteredAssets {
   private watchError?: string;
   private pendingFull = false;
   private pendingFiles = new Set<string>();
-  private watcher?: FSWatcher;
+  private watcher?: DirectoryWatcher;
   private listeners = new Set<() => void>();
   private deferredChanges = 0;
   private changedWhileDeferred = false;
@@ -1091,13 +1097,13 @@ export class RegisteredAssets {
       if (this.watcher && this.watchedDirectory === directory) return;
       try {
         if (
-          (await fs.realpath(directory)).toLowerCase() !== path.resolve(directory).toLowerCase() ||
+          !sameDirectoryPath(await fs.realpath(directory), directory) ||
           (await fs.lstat(directory)).isSymbolicLink()
         )
           throw Error('Redirected image watch directory');
         if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
           return;
-        const next = watch(
+        const next = watchDirectory(
           directory,
           { recursive: directory === this.directory || directory === path.dirname(this.directory) },
           (event, filename) => {
@@ -1107,7 +1113,7 @@ export class RegisteredAssets {
             // They cannot add a folder or a supported image; scanning the whole tree
             // for each event would make a bulk import quadratic.
             if (name && /(?:^|\/)\.[a-f0-9-]{36}\.tmp$/i.test(name)) return;
-            if (directory === path.dirname(this.directory)) {
+            if (directory !== this.directory && directory === path.dirname(this.directory)) {
               const prefix = path.basename(this.directory) + '/';
               const relative = name?.startsWith(prefix)
                 ? name.slice(prefix.length)
@@ -1157,12 +1163,16 @@ export class RegisteredAssets {
           next.close();
           this.watcher = undefined;
           this.watchedDirectory = undefined;
-          this.error = this.watchError = this.text('services.registeredImages.readFailed');
+          this.watchError = this.text('services.registeredImages.readFailed');
           this.notify();
+          // Check actual access once; do not turn a persistent watch failure into a retry loop.
+          void this.checkAccessAfterWatchFailure();
           const parent = path.dirname(directory);
           if (!this.policy.external && recover && parent !== directory)
             void this.connectWatch(parent, false);
         });
+        // Connect before scanning so changes during the initial read cannot be missed.
+        await next.ready;
         return;
       } catch (error) {
         if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
@@ -1179,6 +1189,17 @@ export class RegisteredAssets {
         this.watchError = this.text('services.registeredImages.readFailed');
         return;
       }
+    }
+  }
+  private async checkAccessAfterWatchFailure() {
+    const generation = this.connectionGeneration;
+    try {
+      await safeDirectoryAsync(this.directory, '');
+      await fs.readdir(this.directory);
+    } catch {
+      if (this.stopped || this.watcher || generation !== this.connectionGeneration) return;
+      this.error = this.text('services.registeredImages.readFailed');
+      this.notify();
     }
   }
   private async scan(files?: string[]) {
@@ -1285,7 +1306,8 @@ export class RegisteredAssets {
             value.entry.available = false;
             value.entry.state = 'missing';
           }
-      this.error = this.watchError;
+      // Change-notification failures do not make readable files inaccessible.
+      this.error = undefined;
     } catch (error) {
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();

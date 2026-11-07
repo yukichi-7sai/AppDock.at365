@@ -257,6 +257,7 @@ import { AiSettingsController } from './core/ai-settings';
 import { ErrorReporter } from './core/error-reporter';
 import { WarningReporter } from './core/warning-reporter';
 import { FileWatchAssistance } from './core/file-watch-assistance';
+import { NativeDirectoryWatchService, useDirectoryWatchService } from './core/directory-watch';
 import { configureHostLanguage } from './core/host-translation-source';
 import { effectiveHostLanguage } from '../shared/host-language';
 import { refreshTranslationMetadata } from '../shared/translation-metadata';
@@ -866,6 +867,34 @@ let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
 let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+const directoryWatching = new NativeDirectoryWatchService(
+  path.join(
+    app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), '.artifacts'),
+    'dotnet-host',
+    'file-watch',
+    'AppDock.FileWatchHost.exe',
+  ),
+  (error) => {
+    const diagnostic = error as NodeJS.ErrnoException & { nativeCode?: number };
+    log.write(
+      'warn',
+      'storage',
+      JSON.stringify({
+        event: 'FILE_WATCH_FAILED',
+        code: diagnostic.code,
+        nativeCode: diagnostic.nativeCode,
+      }),
+    );
+    void errors.report({
+      eventId: randomUUID(),
+      source: 'storage',
+      code: 'FILE_WATCH_FAILED',
+      title: hostText('general.fileWatch.section'),
+      message: hostText('services.fileWatch.nativeFailed'),
+    });
+  },
+);
+useDirectoryWatchService(directoryWatching);
 const fileWatchAssistance = new FileWatchAssistance({
   failed: () =>
     errors.report({
@@ -6138,6 +6167,7 @@ app.on('before-quit', (event) => {
   quitting = true;
   gestures?.requestRefresh();
   fileWatchAssistance.dispose();
+  directoryWatching.close();
   startupUi.cancel();
   completeStartup!();
   trayClicks?.close();

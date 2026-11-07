@@ -7,6 +7,7 @@ const hosts = [
   ['AppDock.ExtensionHost', ''],
   ['AppDock.InputHost', 'input'],
   ['AppDock.ProcessHost', 'process'],
+  ['AppDock.FileWatchHost', 'file-watch'],
 ];
 const processOnly = process.argv.includes('--process-only');
 // A partial test build must also remove files from an earlier self-contained publish.

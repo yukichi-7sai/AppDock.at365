@@ -10,6 +10,10 @@ import {
 } from '../../shared/library-assets';
 import { externalLibraryLocation } from '../../shared/library-sources';
 
+/** Normalize both spellings: realpath may omit the trailing separator of a UNC root. */
+export const sameDirectoryPath = (a: string, b: string) =>
+  path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
 export function assetFile(root: string, name: string, media: LibraryMedia) {
   if (externalLibraryLocation(name) || !libraryPath(name, media)) throw Error('Invalid image path');
   return assignedImage(name)
@@ -32,7 +36,7 @@ export function safeDirectory(root: string, relative: string, create = false) {
         ancestor = path.dirname(ancestor);
       if (
         fs.lstatSync(ancestor).isSymbolicLink() ||
-        fs.realpathSync(ancestor).toLowerCase() !== ancestor.toLowerCase()
+        !sameDirectoryPath(fs.realpathSync(ancestor), ancestor)
       )
         throw Error(hostText('services.registeredImages.redirectedDirectory'));
       fs.mkdirSync(current, { recursive: !part });
@@ -41,7 +45,7 @@ export function safeDirectory(root: string, relative: string, create = false) {
     if (
       !stat.isDirectory() ||
       stat.isSymbolicLink() ||
-      fs.realpathSync(current).toLowerCase() !== current.toLowerCase()
+      !sameDirectoryPath(fs.realpathSync(current), current)
     )
       throw Error(hostText('services.registeredImages.redirectedDirectory'));
   }
@@ -76,7 +80,7 @@ export async function safeDirectoryAsync(root: string, relative: string) {
     if (
       !stat.isDirectory() ||
       stat.isSymbolicLink() ||
-      (await fsp.realpath(current)).toLowerCase() !== current.toLowerCase()
+      !sameDirectoryPath(await fsp.realpath(current), current)
     )
       throw Error(hostText('services.registeredImages.redirectedDirectory'));
   }

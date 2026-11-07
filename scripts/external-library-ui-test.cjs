@@ -6,7 +6,10 @@ const { wave } = require('./sound-library-fixture.cjs');
 const { hostText } = require('../out/main/shared/i18n');
 const portable = process.argv[2] ? path.resolve(process.argv[2]) : undefined;
 const profile = fs.mkdtempSync(path.resolve(__dirname, '../.artifacts/external-library-ui-'));
-const external = path.join(profile, 'external');
+const share = process.argv[3] && path.resolve(process.argv[3]);
+const external = share
+  ? fs.mkdtempSync(path.join(share, 'appdock-external-ui-'))
+  : path.join(profile, 'external');
 fs.mkdirSync(path.join(external, 'nested'), { recursive: true });
 const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="24" height="24" fill="red"/></svg>';
@@ -106,6 +109,13 @@ async function run() {
   await until(async () => (await model()).content.total === 2, 'external subtree');
   await page.locator('.ad-gallery-card').first().waitFor();
   assert.equal((await model()).content.canWrite, false);
+  assert.equal((await model()).content.sources[0].available, true);
+  // External edits must arrive through native notifications with assistance left OFF.
+  fs.writeFileSync(path.join(external, 'watch-arrival.svg'), svg);
+  await until(async () => (await model()).content.total === 3, 'native external arrival');
+  fs.unlinkSync(path.join(external, 'watch-arrival.svg'));
+  await until(async () => (await model()).content.total === 2, 'native external deletion');
+  checks.push('native change notifications with assistance OFF');
   for (const key of [
     'images.addImages',
     'imageGeneration.open',
@@ -292,6 +302,7 @@ async function run() {
       {
         ok: true,
         portable,
+        external,
         sha256: portable ? hash(portable) : undefined,
         display,
         zoomFactor,
@@ -319,5 +330,14 @@ async function run() {
     process.exitCode = 1;
   } finally {
     await session?.close();
+    if (share && !process.exitCode) {
+      // Only the exact newly created fixture is removed; no recursive share deletion.
+      assert.equal(path.dirname(external).toLowerCase(), share.toLowerCase());
+      assert(path.basename(external).startsWith('appdock-external-ui-'));
+      for (const file of ['sample.svg', 'sample.wav', 'sample.txt', 'nested/child.svg'])
+        fs.unlinkSync(path.join(external, file));
+      fs.rmdirSync(path.join(external, 'nested'));
+      fs.rmdirSync(external);
+    }
   }
 })();

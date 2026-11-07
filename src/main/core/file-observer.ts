@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readObservedFile } from './file-reader';
 import type { FileWatchAssistance } from './file-watch-assistance';
+import { watchDirectory as createDirectoryWatch, type DirectoryWatcher } from './directory-watch';
 
 const stableInterval = 180;
 const signature = (stat: fs.BigIntStats) =>
@@ -26,7 +27,7 @@ export function observeFile(
   let checkingGeneration = 0;
   let checking: Promise<void> | undefined;
   let finishStability: (() => void) | undefined;
-  let watcher: fs.FSWatcher | undefined, watchedDirectory: string | undefined;
+  let watcher: DirectoryWatcher | undefined, watchedDirectory: string | undefined;
   let lastWatchError = '',
     lastError = '',
     timer: ReturnType<typeof setTimeout> | undefined;
@@ -51,7 +52,23 @@ export function observeFile(
     if (closed || signal?.aborted) return;
     const currentGeneration = generation;
     try {
-      if (watchedDirectory !== path.dirname(file)) watchDirectory(path.dirname(file));
+      if (watchedDirectory !== path.dirname(file)) {
+        let directory = path.dirname(file);
+        // Keep the existing ancestor until a closer directory exists. Replacing it
+        // speculatively would turn each async ready/error pair into a retry loop.
+        while (!closed && directory !== watchedDirectory) {
+          try {
+            await fs.promises.stat(directory);
+            watchDirectory(directory);
+            break;
+          } catch (error) {
+            const parent = path.dirname(directory);
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || parent === directory)
+              throw error;
+            directory = parent;
+          }
+        }
+      }
       const stat = await fs.promises.stat(file, { bigint: true });
       if (closed || signal?.aborted || currentGeneration !== generation) return;
       if (!stat.isFile()) throw Error(hostText('services.fileObserver.invalidFile'));
@@ -124,8 +141,9 @@ export function observeFile(
     return checking;
   };
   function watchDirectory(directory: string): void {
+    if (closed) return;
     try {
-      const next = fs.watch(directory, (_, name) => {
+      const next = createDirectoryWatch(directory, undefined, (_, name) => {
         if (closed) return;
         if (directory === path.dirname(file) && name) {
           const changed = name.toString();
@@ -146,12 +164,21 @@ export function observeFile(
         watcher = undefined;
         watchedDirectory = undefined;
         generation++;
-        reportWatchError(error);
+        const parent = path.dirname(directory);
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT' && parent !== directory)
+          watchDirectory(parent);
+        else reportWatchError(error);
       });
       watcher?.close();
       watcher = next;
       watchedDirectory = directory;
       lastWatchError = '';
+      // Reconcile after asynchronous native registration, including a recovered watch.
+      void next.ready?.then(() => {
+        if (closed || watcher !== next) return;
+        generation++;
+        schedule(100);
+      });
     } catch (error) {
       const parent = path.dirname(directory);
       if ((error as NodeJS.ErrnoException).code === 'ENOENT' && parent !== directory) {
