@@ -43,11 +43,11 @@ export class WarningReporter {
     return {
       update: (warning, actions) => {
         if (resolved) return;
-        const title = warning.title.slice(0, 200);
+        const title = warning.title;
         const body = hostText('services.warningReporter.bodyWithCode', {
           message: String(warning.message),
           code: String(warning.code),
-        }).slice(0, 2000);
+        });
         const next = JSON.stringify([title, body, warning.logDetails]);
         if (next !== fingerprint) {
           fingerprint = next;

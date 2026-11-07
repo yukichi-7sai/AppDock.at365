@@ -14,10 +14,8 @@ export function parseSettingOptions(value: unknown): SettingOption[] {
         !object(o) ||
         typeof o.label !== 'string' ||
         !o.label ||
-        o.label.length > 160 ||
         typeof o.value !== 'string' ||
-        !o.value ||
-        o.value.length > 256,
+        !o.value,
     ) ||
     new Set(value.map((o) => o.value)).size !== value.length
   )
@@ -40,15 +38,14 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
   if (
     definition.type === 'string' &&
     (typeof value !== 'string' ||
-      value.length > (definition.maxLength ?? 10000) ||
+      (definition.maxLength !== undefined && value.length > definition.maxLength) ||
       value.trim().length < (definition.minLength ?? 0))
   )
     fail();
   if (definition.type === 'registered-image' && value !== null && !imageReference(value)) fail();
   if (
     definition.type === 'string-list' &&
-    (!Array.isArray(value) ||
-      value.some((item) => typeof item !== 'string' || !item.trim() || item.length > 32767))
+    (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !item.trim()))
   )
     fail();
   if (definition.type === 'object-list') {
@@ -80,7 +77,7 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
       }
   }
   if (definition.type === 'json') {
-    if (typeof value !== 'string' || value.length > 10000) {
+    if (typeof value !== 'string') {
       fail();
       return;
     }
@@ -95,7 +92,6 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
     definition.type === 'select' &&
     (typeof value !== 'string' ||
       !value ||
-      value.length > 256 ||
       (!definition.dynamic && !definition.options?.some((o) => o.value === value)))
   )
     fail();
@@ -117,7 +113,6 @@ export function parseSettingDefinitions(
       keys.has(s.key) ||
       typeof s.title !== 'string' ||
       !s.title ||
-      s.title.length > 160 ||
       ![
         'boolean',
         'number',
@@ -129,8 +124,7 @@ export function parseSettingDefinitions(
         'string-list',
         'object-list',
       ].includes(s.type) ||
-      (s.description !== undefined &&
-        (typeof s.description !== 'string' || s.description.length > 500))
+      (s.description !== undefined && typeof s.description !== 'string')
     )
       throw new Error(hostText('settings.setting-definitions.definition'));
     keys.add(s.key);
@@ -147,7 +141,7 @@ export function parseSettingDefinitions(
     for (const key of ['minLength', 'maxLength'])
       if (
         s[key] !== undefined &&
-        (s.type !== 'string' || !Number.isInteger(s[key]) || s[key] < 0 || s[key] > 10000)
+        (s.type !== 'string' || !Number.isSafeInteger(s[key]) || s[key] < 0)
       )
         throw Error(hostText('settings.setting-definitions.textLength'));
     if (s.minLength !== undefined && s.maxLength !== undefined && s.minLength > s.maxLength)
@@ -183,8 +177,7 @@ export function parseSettingDefinitions(
       (s.type === 'object-list' && (depth > 0 || !Array.isArray(s.fields) || !s.fields.length)) ||
       (depth === 0 && s.type === 'string-list') ||
       (depth > 0 && ['object-list', 'shortcut-list', 'json'].includes(s.type)) ||
-      (s.itemTitle !== undefined &&
-        (typeof s.itemTitle !== 'string' || s.itemTitle.length > 100)) ||
+      (s.itemTitle !== undefined && typeof s.itemTitle !== 'string') ||
       (s.format !== undefined && !['directory', 'url'].includes(s.format)) ||
       (s.format === 'url' && s.type !== 'string') ||
       (s.numericOptions !== undefined && typeof s.numericOptions !== 'boolean') ||
@@ -273,7 +266,6 @@ export function parseSettingDefinitions(
           !/^[a-z][a-z0-9.-]{0,79}$/.test(action.id) ||
           typeof action.title !== 'string' ||
           !action.title.trim() ||
-          action.title.length > 160 ||
           !has(action.inputKey, 'string') ||
           !Array.isArray(action.fields) ||
           !action.fields.length ||

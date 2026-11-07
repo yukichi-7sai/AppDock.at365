@@ -43,7 +43,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## Host APIを追加する手順
 
-1. **入出力と失敗条件を先に決める。** `host.<機能>.<操作>`、JSONで送れる引数、戻り値、必要なcapability、サイズ上限、キャンセルと停止時の挙動を[API仕様](extensions.md)へ記述します。通常のRPCは15秒以内です。長時間の処理は開始と状態確認に分け、UIを待たせ続けない設計にします。
+1. **入出力と失敗条件を先に決める。** `host.<機能>.<操作>`、JSONで送れる引数、戻り値、必要なcapability、接続先・規格に必須の制約と根拠、分割処理、キャンセルと停止時の挙動を[API仕様](extensions.md)へ記述します。通常のRPCは15秒以内です。長時間の処理は開始と状態確認に分け、UIを待たせ続けない設計にします。
 2. **mainで入力を検証する。** [createHostApi](../src/main/core/host-api.ts)のswitchへ処理を追加します。`ExtensionInstance`から呼出元IDを取得し、引数の任意IDを信用して他Appletの設定・秘密領域へ書き込みません。型・範囲・URL・パス・キー・capabilityを処理前に確認します。rendererやSDKの型だけでは実行時の検証になりません。
 3. **保存と表示更新をつなぐ。** 設定はSettingsStore経由で更新し、全JSONの独自書き込みを避けます。状態をメモリへ追加した場合はsnapshotへ含め、`changed()`またはmanagerのchangedイベントでrendererへ通知します。既存の変更通知はまとめて送られます。React側では更新が届くまで待つ必要があります。
 4. **SDKへ公開する。** .NETは[Contracts.cs](../dotnet/AppDock.SDK/Contracts.cs)のインターフェースと型、[ExtensionContext](../dotnet/AppDock.Runtime/ExtensionContext.cs)の実装を対応させます。Nodeは[NodeExtensionContext](../src/main/node-worker.ts)とactivate時に渡すcontextの実装を対応させます。片方だけ対応する場合はAPI仕様に明記し、未対応なのに型だけ存在する状態を避けます。

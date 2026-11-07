@@ -323,6 +323,38 @@ async function call(f, actor, id, name, args = {}, extra = {}) {
     return j.state !== 'running' && j;
   });
 }
+
+for (const transport of ['http', 'stdio'])
+  test(`large MCP catalogs, Schema, arguments and results retain their data over ${transport}`, async (t) => {
+    const f = fixture(t);
+    let id;
+    if (transport === 'http') {
+      const server = await httpFixture(t);
+      server.state.largeCatalog = true;
+      id = f.add({ enabled: true, url: server.url });
+    } else {
+      id = f.add(
+        {
+          enabled: true,
+          transport: 'stdio',
+          command: process.execPath,
+          args: [path.resolve(__dirname, 'fixtures/mcp-server.cjs')],
+        },
+        { environment: { MCP_FIXTURE_LARGE_CATALOG: '1' } },
+      );
+    }
+    const listing = await f.service.tools(host, { serverId: id, limit: 50 });
+    assert.equal(listing.items.length, 10);
+    assert.equal(listing.items[0].description.length, 750000);
+    const { tool } = await f.service.tool(host, { serverId: id, name: 'echo' });
+    assert.equal(tool.inputSchema.description.length, 48000);
+    assert.equal(tool.unsupportedReason, undefined);
+    // The stdio echo duplicates this text and exceeds the SDK's default 10MiB buffer.
+    const message = 'message'.repeat(transport === 'stdio' ? 800000 : 160000);
+    const job = await call(f, host, id, 'echo', { message });
+    assert.equal(job.state, 'succeeded');
+    assert.equal(job.result.structuredContent.message, message);
+  });
 test('management settings preview and save preserve unrelated data and keep credentials write-only', async (t) => {
   const f = fixture(t),
     server = await httpFixture(t),
@@ -715,12 +747,14 @@ test('timeout is outcome unknown without retry, revocation removes results, and 
     (e) => e.code === 'SCHEMA_CHANGED',
   );
 });
-test('invalid output and oversized results are never success; auth failures and AppDock loops are rejected', async (t) => {
+test('large results retain their content; invalid output, auth failures and AppDock loops are rejected', async (t) => {
   const f = fixture(t),
     server = await httpFixture(t),
     id = f.add({ enabled: true, url: server.url });
   assert.equal((await call(f, host, id, 'invalid_output')).error.code, 'INVALID_RESULT');
-  assert.equal((await call(f, host, id, 'oversized')).state, 'outcome-unknown');
+  const large = await call(f, host, id, 'oversized');
+  assert.equal(large.state, 'succeeded');
+  assert.equal(large.result.content[0].text.length, 1100000);
   const secured = await httpFixture(t, { bearer: 'test-secret' }),
     secureId = f.add({ enabled: true, url: secured.url });
   await assert.rejects(

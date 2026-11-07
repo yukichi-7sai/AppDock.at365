@@ -256,8 +256,10 @@ async function grant(id, permissions) {
       '画像生成AI',
       '音声生成AIサーバーへの送信・読み上げ',
     ]);
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
-    assert.equal(await panel.getByRole('switch', { name: /^MCPからの/ }).count(), 8);
+    for (const row of await panel.locator('tbody > tr').all()) {
+      assert.equal(await row.getByRole('switch', { name: /^Applet：/ }).count(), 1);
+      assert.equal(await row.getByRole('switch', { name: /^MCPからの/ }).count(), 1);
+    }
     const fixedRead = panel.getByRole('switch', {
       name: 'MCPからの情報取得を許可する（MCP連携中は常に許可）',
       exact: true,
@@ -270,6 +272,7 @@ async function grant(id, permissions) {
       ['runProcesses', 'コマンド・プロセスの起動'],
       ['useMcp', 'MCP接続先の利用'],
       ['useAi', '文章生成AIサーバーへの送信・文章生成'],
+      ['useImageAi', '画像生成AI'],
       ['useTts', '音声生成AIサーバーへの送信・読み上げ'],
     ];
     assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
@@ -284,7 +287,7 @@ async function grant(id, permissions) {
       await page.keyboard.press('Tab');
     }
     checks.push(
-      'requested row labels/order, fixed-ON disabled MCP read, six MCP-only warnings while OFF and keyboard tooltips',
+      'requested row labels/order, fixed-ON disabled MCP read, MCP-only warnings while OFF and keyboard tooltips',
     );
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
       assert.equal(await control.isChecked(), false);

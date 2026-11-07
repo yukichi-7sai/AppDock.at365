@@ -109,6 +109,29 @@ function fixture(t) {
   };
 }
 
+test('MCP settings API preserves long display text, URLs and stdio arguments', (t) => {
+  const f = fixture(t),
+    text = 'data'.repeat(20000);
+  const id = f.add(text, 'http://example.test/' + text);
+  f.apply([{ kind: 'update', itemRef: f.row(id).itemRef, changes: { description: text } }]);
+  assert.equal(f.row(id).values.name, text);
+  assert.equal(f.row(id).values.description, text);
+  assert.equal(f.row(id).values['connection.url'], 'http://example.test/' + text);
+  f.apply([
+    {
+      kind: 'add',
+      values: {
+        name: 'stdio',
+        'connection.transport': 'stdio',
+        'connection.command': 'C:\\fixture.exe',
+        'connection.args': [text],
+      },
+    },
+  ]);
+  const stdio = f.owner.roster().at(-1).id;
+  assert.deepEqual(f.row(stdio).values['connection.args'], [text]);
+});
+
 test('MCP connections use fixed device storage and stable IDs without changing shared bytes', (t) => {
   const f = fixture(t),
     discovery = f.call('targets.list').items.find((item) => item.targetId === targetId);

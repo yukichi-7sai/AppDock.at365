@@ -2,14 +2,14 @@ import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { Panel } from '../../shared/contracts';
+import type { Panel, ResolvedPanel } from '../../shared/contracts';
 
 export function imageDirectory(root: string, id: string) {
   const folder = path.join(root, 'cache', 'panel-images', id);
   fs.mkdirSync(folder, { recursive: true });
   return folder;
 }
-export function registerLocalImages(panel: Panel, root: string, id: string): Panel {
+export function registerLocalImages(panel: Panel, root: string, id: string): ResolvedPanel {
   const images = panel.images?.map((item) => {
     if (!item.imageFile) return item;
     const file = fs.realpathSync(item.imageFile);

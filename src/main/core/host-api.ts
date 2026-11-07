@@ -209,7 +209,6 @@ export function createHostApi(
         requireCapability('images');
         if (
           !Array.isArray(p.bytes) ||
-          p.bytes.length > 4 * 1024 * 1024 ||
           !p.bytes.every((v: unknown) => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 255)
         )
           throw Error(hostText('services.hostApi.imageSizeLimit'));
@@ -220,11 +219,8 @@ export function createHostApi(
           bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
         if (!png && !jpeg && !webp) throw Error(hostText('services.hostApi.imageFormat'));
         const source = nativeImage.createFromBuffer(bytes);
-        const size = source.getSize();
-        if (source.isEmpty() || size.width > 2048 || size.height > 2048)
-          throw Error(hostText('services.hostApi.invalidImage'));
+        if (source.isEmpty()) throw Error(hostText('services.hostApi.invalidImage'));
         const result = source.resize({ width: 32, height: 32 }).toDataURL();
-        if (result.length > 24576) throw Error(hostText('services.hostApi.imageTooLarge'));
         return result;
       }
       case 'host.settings.update': {
@@ -274,8 +270,6 @@ export function createHostApi(
         const images = localPageImages(target);
         if (!images) throw Error(hostText('services.hostApi.openPageFirst'));
         if (method.endsWith('.register')) {
-          if (Buffer.byteLength(JSON.stringify(p)) > 256 * 1024 - 512)
-            throw Error(hostText('services.hostApi.batchImages'));
           return images.register(p.files);
         }
         images.release(p.imageIds);
@@ -476,7 +470,6 @@ export function createHostApi(
                 const fields = declaration?.parameters ?? {};
                 if (
                   !declaration ||
-                  JSON.stringify(input.input).length > 65536 ||
                   Object.keys(input.input).some((key) => !Object.hasOwn(fields, key)) ||
                   Object.entries(fields).some(
                     ([key, type]) => typeof (input.input as Record<string, unknown>)[key] !== type,
@@ -846,8 +839,8 @@ export function createHostApi(
           legacyNotificationTypeId,
           {
             level: 'info',
-            title: p.title.slice(0, 100),
-            body: p.body.slice(0, 500),
+            title: p.title,
+            body: p.body,
             windowsSilent: p.silent === true,
             historyText: {
               title: hostText('services.hostApi.legacyNotificationTitle'),
@@ -913,21 +906,13 @@ export function createHostApi(
               (item: unknown) =>
                 !isObject(item) ||
                 typeof item.title !== 'string' ||
-                item.title.length > 1200 ||
                 (item.imageFile != null &&
                   (typeof item.imageFile !== 'string' ||
                     !path.isAbsolute(item.imageFile) ||
                     !e.manifest.capabilities?.includes('local-images'))) ||
-                (item.tooltip != null &&
-                  (typeof item.tooltip !== 'string' || item.tooltip.length > 32767)) ||
-                (item.description != null &&
-                  (typeof item.description !== 'string' || item.description.length > 1000)) ||
-                (item.image != null &&
-                  (typeof item.image !== 'string' ||
-                    item.image.length > 200000 ||
-                    !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
-                      item.image,
-                    ))) ||
+                (item.tooltip != null && typeof item.tooltip !== 'string') ||
+                (item.description != null && typeof item.description !== 'string') ||
+                Object.hasOwn(item, 'image') ||
                 (item.actions != null &&
                   (!Array.isArray(item.actions) ||
                     item.actions.length > 4 ||
@@ -941,7 +926,6 @@ export function createHostApi(
             (!Array.isArray(p.tabs) ||
               p.tabs.length > 100 ||
               p.tabs.some((a: unknown) => !validAction(a)))) ||
-          p.title.length > 200 ||
           (p.description != null && typeof p.description !== 'string') ||
           (p.facts != null &&
             (!Array.isArray(p.facts) ||
@@ -970,8 +954,6 @@ export function createHostApi(
           const memory = (e.memoryStorage ??= new MemoryStorage());
           if (method.endsWith('.get')) return memory.get(k);
           const text = JSON.stringify(p.value ?? null);
-          if (Buffer.byteLength(text) > 1024 * 1024)
-            throw new Error(hostText('services.hostApi.dataSizeLimit'));
           memory.set(k, JSON.parse(text), !localPage);
           notifyAppletPages(id);
           return null;
@@ -980,8 +962,6 @@ export function createHostApi(
         if (method.endsWith('.get'))
           return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
         const text = JSON.stringify(p.value ?? null);
-        if (Buffer.byteLength(text) > 1024 * 1024)
-          throw new Error(hostText('services.hostApi.dataSizeLimit'));
         atomicWrite(file, text);
         return null;
       }
@@ -1000,7 +980,7 @@ export function createHostApi(
           if (fs.existsSync(file)) fs.unlinkSync(file);
           return null;
         }
-        if (typeof p.value !== 'string' || p.value.length > 100000)
+        if (typeof p.value !== 'string')
           throw new Error(hostText('services.hostApi.secretSizeLimit'));
         // Base64 is used only for the atomic writer, never exposed through the renderer.
         atomicWrite(file, safeStorage.encryptString(p.value).toString('base64'));

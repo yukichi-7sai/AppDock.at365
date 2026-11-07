@@ -47,7 +47,7 @@ import type {
   ExtensionSnapshot,
   Command,
   TrayItem,
-  Panel,
+  ResolvedPanel,
   SettingOption,
   AppletCommand,
 } from '../../shared/contracts';
@@ -309,7 +309,7 @@ export interface ExtensionInstance {
   state: ExtensionSnapshot['state'];
   commands: Command[];
   tray: TrayItem[];
-  panel: Panel | null;
+  panel: ResolvedPanel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
   startupMeasurement?: {

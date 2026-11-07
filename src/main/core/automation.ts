@@ -134,7 +134,6 @@ export class AutomationService {
     this.file = path.join(options.localDirectory, 'automation.json');
     try {
       if (fs.existsSync(this.file)) {
-        if (fs.statSync(this.file).size > 262144) throw Error();
         const { config, legacy } = parseAutomationConfig(
           JSON.parse(fs.readFileSync(this.file, 'utf8')),
         );

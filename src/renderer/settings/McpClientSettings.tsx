@@ -450,7 +450,7 @@ export function McpClientSettingsForm({
           ))}
           {result && (
             <pre aria-label={translate('settings.mcpClientSettings.result')}>
-              {JSON.stringify(result, null, 2).slice(0, 65536)}
+              {JSON.stringify(result, null, 2)}
             </pre>
           )}
         </SettingsSection>
@@ -579,7 +579,6 @@ function McpConnectionDialog({
           aria-label={translate('settings.mcpClientSettings.name')}
           data-initial-focus={recover ? undefined : true}
           value={name}
-          maxLength={160}
           onChange={(e) => setName(e.target.value)}
         />
       </SettingsField>
@@ -590,7 +589,6 @@ function McpConnectionDialog({
         <SettingsTextarea
           aria-label={translate('settings.mcpClientSettings.description')}
           value={description}
-          maxLength={1024}
           onChange={(e) => setDescription(e.target.value)}
         />
       </SettingsField>

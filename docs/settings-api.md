@@ -70,7 +70,7 @@ Appletのホスト管理共通項目は[src/shared/applet-common-settings.ts](..
 
 MCP専用の入口。読取りは「情報の取得」、applyは「情報の取得」と「設定の変更」を必要とし、コマンド実行許可は不要。dryRunと保存済み要求の再送にも最新の許可を検査する。許可自体はこのAPIから変更できない。
 
-targets/schema/items/optionsはitemsと任意nextCursorを返す。limitは既定50、最大100。cursorは主体・対象・検索条件・各revisionに結び付け、変更後の続きをREVISION_CONFLICTで拒否する。1応答は256KiBまで、1項目も収まらなければRESULT_TOO_LARGE。valuesはページ分割せず、超える場合はkeysで絞り込む。list対象の値はitems.listを使い、values.getでの全体取得は拒否する。
+targets/schema/items/optionsはitemsと任意nextCursorを返す。limitは既定50、最大100。cursorは主体・対象・検索条件・各revisionに結び付け、変更後の続きをREVISION_CONFLICTで拒否する。1応答・単一項目に固定容量上限は設けない。valuesはページ分割せず、必要な場合はkeysで取得項目を絞り込む。list対象の値はitems.listを使い、values.getでの全体取得は拒否する。
 
 catalogRevisionは公開対象の構成、schemaRevisionは対象の公開定義、revisionは値と保存上書きの状態を表す。それぞれ用途が異なり、旧settings.getやコマンドAPIのrevisionとも交換できない。プロセス再起動後は値を再取得する。targetIdは探索結果を使い、名称から合成しない。
 
@@ -103,7 +103,7 @@ items.listの行は`itemRef`・`values`・`removable`を返す。行ごとの操
 
 itemRefは主体・target・Schema・値のrevision・行の識別に結び付いた不透明な参照。同名行を名前で識別しない。list.idKeyがあれば内部で保存IDに対応し、ID列が公開されていれば読取り専用にする。追加時だけ既存UIと同じUUIDを生成する。IDなしの一覧には保存IDを追加せず、取得したスナップショット内の位置を使用する。保存後・Schema変更後・再起動後は行を再取得する。
 
-宣言型・所有サービスの保存一覧に固定件数上限は設けず、Schemaとreorder.itemRefsのmaxItemsは省略する。内部設定APIの要求に合計サイズ上限は設けない。MCP通信の要求64KiB・設定APIの応答256KiBは維持する。add/remove/reorderは1要求につき1件とし、他の操作と混在させない。updateは1～32件で、同じ行の同じ保存フィールドの重複を拒否する。最新行を複製して部分変更し、非公開列・未知キー・未編集の入れ子・互換形式を保持する。propertyPath・別名・数値の旧select表現は共通object-list部品で解釈し、指定された列だけを正規化する。JSON文字列で保存された旧一覧も、無変更なら書き直さない。
+宣言型・所有サービスの保存一覧に固定件数上限は設けず、Schemaとreorder.itemRefsのmaxItemsは省略する。内部設定APIの要求に合計サイズ上限は設けない。MCP通信の要求・設定APIの応答にも固定容量上限は設けない。add/remove/reorderは1要求につき1件とし、他の操作と混在させない。updateは1～32件で、同じ行の同じ保存フィールドの重複を拒否する。最新行を複製して部分変更し、非公開列・未知キー・未編集の入れ子・互換形式を保持する。propertyPath・別名・数値の旧select表現は共通object-list部品で解釈し、指定された列だけを正規化する。JSON文字列で保存された旧一覧も、無変更なら書き直さない。
 
 addは宣言済みの既定値とID生成を使い、非公開列を要求から設定させない。汎用の全体置換・一覧resetは提供しない。removeは非公開列や未対応列に値があればローカル操作とし、画像参照等の寿命管理が必要なデータを汎用削除で消さない。dryRunは公開列だけの変更計画を返す。保存結果のchangesは操作種別と公開された変更内容で、行参照は取得時のもの。保存後の参照はitems.listで再取得する。
 
@@ -264,7 +264,7 @@ Shell選択のservice.shellは廃止しています。対象一覧とschemaに�
 }
 ```
 
-例のキーは本体の外観対象に対するもの。外側のツールSchemaにはtargetId・キー・kindの列挙を固定しないが、実行時は最新の対象定義と操作Schemaへ厳密に照合する。未対応操作、余分なプロパティ、同一キーへの複数操作、範囲・型違反は保存前に拒否する。操作は1～32件、set/resetそれぞれ1～128キー、MCP通信の要求本文は64KiBまで。1要求を複数対象へ分割保存しない。
+例のキーは本体の外観対象に対するもの。外側のツールSchemaにはtargetId・キー・kindの列挙を固定しないが、実行時は最新の対象定義と操作Schemaへ厳密に照合する。未対応操作、余分なプロパティ、同一キーへの複数操作、範囲・型違反は保存前に拒否する。操作は1～32件、set/resetそれぞれ1～128キー、MCP通信の要求本文に固定容量上限は設けない。1要求を複数対象へ分割保存しない。
 
 resetは指定された保存上書きを解除して現在の既定値へ戻す。通常はsetで既定値を指定した場合も同じ扱いにする。既定値と等しい値が保存されている場合も上書きを解除する。ただし`service.notifications.speech.connectionId`のsetは現在の既定IDと同じでも明示選択を保存し、後から既定サーバーが変わってもその登録を使う。resetで既定への継承に戻す。変更がなければ書き込まず、revisionを変えない。共有設定とPC専用設定、Appletのローカル設定、未宣言・非公開の値は既存の保存経路と分類を使う。
 

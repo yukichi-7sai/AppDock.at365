@@ -421,7 +421,6 @@ export class SoundGeneration {
         'host',
         item.request,
         item.abort.signal,
-        this.options.library.files.policy.maxBytes,
         (state) => {
           item.view.state = state;
           this.refresh();
@@ -495,7 +494,6 @@ export class SoundGeneration {
       if (
         typeof action.text !== 'string' ||
         !action.text.trim() ||
-        Array.from(action.text).length > 4096 ||
         typeof action.connectionId !== 'string' ||
         (action.instructions !== undefined && typeof action.instructions !== 'string')
       )

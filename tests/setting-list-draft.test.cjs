@@ -133,12 +133,7 @@ test('results from a replaced runtime are rejected', async () => {
   );
 });
 test('malformed provider selections, messages and image bytes are rejected', async () => {
-  for (const reply of [
-    { navigation: 'any' },
-    { message: 'x'.repeat(1001) },
-    { imageBytes: [300] },
-    { imageBytes: [1, 2, 3] },
-  ]) {
+  for (const reply of [{ navigation: 'any' }, { imageBytes: [300] }, { imageBytes: [1, 2, 3] }]) {
     const { owner } = provider(reply);
     await assert.rejects(
       settingListDraftAction(owner, 'items', { kind: 'fetch', input: 'url' }, async () => ({

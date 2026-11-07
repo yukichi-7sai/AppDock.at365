@@ -231,19 +231,26 @@ test('RPC times out and rejects outstanding requests on disconnect', async () =>
   input.destroy();
   output.destroy();
 });
-test('RPC rejects oversized input without attempting to parse it', () => {
-  const input = new PassThrough();
-  const output = new PassThrough();
-  const peer = new JsonLinePeer(input, output, async () => null);
-  let error;
-  peer.on('protocolError', (e) => {
-    error = e;
-  });
-  input.write('x'.repeat(1024 * 1024 + 1));
-  assert.ok(error);
-  assert.equal(peer.closed, true);
-  input.destroy();
-  output.destroy();
+test('RPC preserves large UTF-8 requests and replies while concurrent messages keep their framing', async () => {
+  const aToB = new PassThrough(),
+    bToA = new PassThrough();
+  const a = new JsonLinePeer(bToA, aToB, async () => null);
+  const b = new JsonLinePeer(aToB, bToA, async (_method, value) => value);
+  try {
+    const value = { text: '日本語🌙'.repeat(150000) };
+    const replies = await Promise.all([
+      a.request('echo', value),
+      a.request('echo', { next: true }),
+    ]);
+    assert.deepEqual(replies, [value, { next: true }]);
+    assert.equal(a.closed, false);
+    assert.equal(b.closed, false);
+  } finally {
+    a.close();
+    b.close();
+    aToB.destroy();
+    bToA.destroy();
+  }
 });
 test('manifest entry cannot escape its extension folder', (t) => {
   const dir = temporary(t);

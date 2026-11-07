@@ -238,13 +238,14 @@ test('list owners also await a guarded commit without changing the fixed list op
   assert.deepEqual(f.call('apply', request), saved);
 });
 
-test('an oversized planned result is rejected before any asynchronous owner action', (t) => {
-  const f = fixture(t),
+test('large planned results preserve asynchronous owner actions and completion', async (t) => {
+  const f = fixture(t, { automatic: true }),
     request = f.request('small');
   f.state.large = true;
-  assert.throws(() => f.call('apply', request), { code: 'RESULT_TOO_LARGE' });
-  assert.equal(f.state.starts, 0);
-  assert.equal(f.state.writes, 0);
+  const result = await f.call('apply', request);
+  assert.equal(result.completion, 'settingsSaved');
+  assert.equal(f.state.starts, 1);
+  assert.equal(f.state.writes, 1);
 });
 
 test('completed asynchronous request caches keep the existing 512-entry bound', async (t) => {

@@ -43,7 +43,7 @@ export async function runPowerShell(script: string, encode = true): Promise<stri
       {
         windowsHide: true,
         timeout: 180000,
-        maxBuffer: 1024 * 1024,
+        maxBuffer: Infinity,
       },
     );
     return result.stdout.trim();
@@ -116,8 +116,6 @@ export class WindowsLaunch {
   }
   private recoveryRecord(): LaunchRecovery | undefined {
     if (!this.recovery || !fs.existsSync(this.recovery.file)) return;
-    if (fs.statSync(this.recovery.file).size > 2 * 1024 * 1024)
-      throw Error(hostText('launch.errors.invalidRecovery'));
     const record = JSON.parse(fs.readFileSync(this.recovery.file, 'utf8')) as LaunchRecovery;
     if (
       record.version !== 1 ||

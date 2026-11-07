@@ -134,7 +134,6 @@ export function TtsConnectionDialog({
             <SettingsInput
               data-initial-focus
               aria-label={t('settings.aiConnectionDialog.name')}
-              maxLength={200}
               value={draft.name}
               onChange={(e) => change({ name: e.target.value })}
             />

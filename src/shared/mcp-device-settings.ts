@@ -1,4 +1,4 @@
-import { boundedJson, customDescription, jsonObject, type JsonObject } from './custom-commands';
+import { validateJson, customDescription, jsonObject, type JsonObject } from './custom-commands';
 import { commandCategory } from './command-category';
 import {
   mcpUuid,
@@ -72,7 +72,6 @@ export function parseMcpToolCommand(value: unknown): McpToolCommand {
     !mcpUuid(value.id) ||
     typeof value.title !== 'string' ||
     !value.title.trim() ||
-    value.title.length > 100 ||
     /[\x00-\x1f\x7f]/.test(value.title) ||
     !mcpUuid(value.serverId) ||
     typeof value.toolName !== 'string' ||
@@ -99,7 +98,7 @@ export function parseMcpToolCommand(value: unknown): McpToolCommand {
   )
     return invalid();
   if (!binding && (value.enabled || value.automation)) return invalid();
-  boundedJson(value.arguments, Infinity, 40, Infinity);
+  validateJson(value.arguments);
   return structuredClone({
     ...value,
     title: value.title.trim(),
@@ -117,7 +116,7 @@ export function parseMcpDeviceSettings(value: unknown): McpDeviceSettings {
     !Array.isArray(value.commands)
   )
     return invalid();
-  boundedJson(value, Infinity, 48, Infinity);
+  validateJson(value);
   const roster = parseMcpRoster({
     version: 1,
     items: value.servers.map((row) =>

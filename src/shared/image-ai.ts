@@ -97,7 +97,7 @@ export interface ImageReadResult extends GeneratedImageInfo {
   done: boolean;
   data: string;
 }
-// The native Applet RPC line is limited to 1 MiB. Base64 plus metadata stays below it.
+// Internal result reads use a processing unit without limiting the complete image.
 export const imageReadChunkBytes = 256 * 1024;
 export const defaultImageAiSettings = (): ImageAiSettings => ({ connections: [] });
 export const newImageAiConnection = (id: string): ImageAiConnection => ({

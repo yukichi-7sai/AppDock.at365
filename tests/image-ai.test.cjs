@@ -285,7 +285,7 @@ test('large results are read in bounded chunks and no raw image is in the job pr
     parts = [];
   for (;;) {
     const p = f.s.read('one', { jobId: j.jobId, imageId: done.images[0].id, offset });
-    assert(JSON.stringify(p).length < 1024 * 1024);
+    assert(Buffer.from(p.data, 'base64').length <= imageReadChunkBytes);
     parts.push(Buffer.from(p.data, 'base64'));
     offset = p.nextOffset;
     if (p.done) break;

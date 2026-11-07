@@ -26,8 +26,9 @@ test('dynamic pages validate capabilities, collisions, limits and copy context a
       [page],
     ),
   );
-  assert.throws(() =>
-    parseDynamicPages(owner, [{ ...page, context: { text: 'あ'.repeat(6000) } }]),
+  assert.equal(
+    parseDynamicPages(owner, [{ ...page, context: { text: 'あ'.repeat(6000) } }])[0].context.text,
+    'あ'.repeat(6000),
   );
   assert.equal(parsed[0].openCommand, 'test.pages.pages.one.open');
   parsed[0].context.document = 'changed';
@@ -36,7 +37,6 @@ test('dynamic pages validate capabilities, collisions, limits and copy context a
     [page, page],
     [{ ...page, id: 'fixed' }],
     [{ ...page, source: 'remote' }],
-    [{ ...page, context: { text: 'x'.repeat(16385) } }],
     Array.from({ length: 65 }, (_, i) => ({ ...page, id: 'p' + i })),
   ])
     assert.throws(() => parseDynamicPages(owner, rows));

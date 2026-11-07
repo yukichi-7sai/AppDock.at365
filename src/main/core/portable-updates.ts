@@ -15,7 +15,6 @@ import type { AppletPackagePlan } from '../../shared/applet-packages';
 
 const fs = physicalFs.promises;
 const { createReadStream } = physicalFs;
-const limit = 512 * 1024 * 1024;
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface UpdateTarget {
   id: string;
@@ -75,23 +74,18 @@ export function safeRelative(value: unknown): value is string {
       )
   );
 }
-async function readBounded(
+async function* readSource(
   location: string,
-  max: number,
   fetcher: Fetcher,
   signal?: AbortSignal,
-  progress?: (received: number) => void,
-): Promise<Buffer> {
-  const combined = AbortSignal.any([
-    AbortSignal.timeout(max <= 1024 * 1024 ? 10000 : 120000),
-    ...(signal ? [signal] : []),
-  ]);
+  timeoutMs = 10000,
+): AsyncGenerator<Uint8Array> {
+  const combined = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]);
   combined.throwIfAborted();
   let stream: AsyncIterable<Uint8Array>;
   if (!/^https?:/i.test(location)) {
     const stat = await fs.stat(location);
-    if (!stat.isFile() || stat.size > max)
-      throw Error(hostText('services.portableUpdates.invalidFile'));
+    if (!stat.isFile()) throw Error(hostText('services.portableUpdates.invalidFile'));
     stream = createReadStream(location, { signal: combined });
   } else {
     const response = await httpFetch('updates', fetcher, location, {
@@ -104,17 +98,42 @@ async function readBounded(
     if (!response.body) throw Error(hostText('services.portableUpdates.emptyPayload'));
     stream = response.body as unknown as AsyncIterable<Uint8Array>;
   }
-  const chunks: Buffer[] = [];
-  let size = 0;
   for await (const chunk of stream) {
     combined.throwIfAborted();
-    size += chunk.length;
-    if (size > max) throw Error(hostText('services.portableUpdates.sizeLimit'));
-    chunks.push(Buffer.from(chunk));
-    progress?.(size);
+    yield chunk;
   }
   combined.throwIfAborted();
+}
+async function readContent(location: string, fetcher: Fetcher, signal?: AbortSignal) {
+  const chunks: Buffer[] = [];
+  for await (const chunk of readSource(location, fetcher, signal)) chunks.push(Buffer.from(chunk));
   return Buffer.concat(chunks);
+}
+async function receiveFile(
+  location: string,
+  destination: string,
+  fetcher: Fetcher,
+  signal: AbortSignal,
+  progress: (received: number) => void = () => {},
+) {
+  const file = await fs.open(destination, 'wx');
+  const hash = createHash('sha256');
+  let size = 0;
+  try {
+    for await (const chunk of readSource(location, fetcher, signal, 120000)) {
+      for (let offset = 0; offset < chunk.length; offset += 64 * 1024) {
+        signal.throwIfAborted();
+        await file.writeFile(chunk.subarray(offset, offset + 64 * 1024));
+      }
+      hash.update(chunk);
+      size += chunk.length;
+      progress(size);
+    }
+    await file.sync();
+    return { size, sha256: hash.digest('hex') };
+  } finally {
+    await file.close();
+  }
 }
 function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Feed {
   if (value?.schemaVersion !== 1 || value.kind !== target.kind || value.id !== target.id)
@@ -128,7 +147,6 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
     !/^[a-f0-9]{64}$/i.test(p.sha256) ||
     !Number.isSafeInteger(p.size) ||
     p.size <= 0 ||
-    p.size > limit ||
     !(target.kind === 'host' ? ['exe', 'zip'] : ['zip']).includes(p.format)
   )
     throw Error(hostText('services.portableUpdates.invalidPayload'));
@@ -137,7 +155,7 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
 type ReleaseAssets = { name: string; browser_download_url: string }[];
 
 export async function readUpdateJson(location: string, fetcher: Fetcher, signal?: AbortSignal) {
-  const bytes = await readBounded(location, 1024 * 1024, fetcher, signal);
+  const bytes = await readContent(location, fetcher, signal);
   const value = json(bytes);
   if (/^https?:/i.test(location)) logHttpJsonError('updates', 200, value);
   return value;
@@ -250,8 +268,9 @@ async function copyTree(
       );
     }
   } else {
-    if (!stat.isFile() || ++budget.files > 10000 || (budget.bytes += stat.size) > limit)
-      throw Error(hostText('services.portableUpdates.sourceLimit'));
+    if (!stat.isFile()) throw Error(hostText('services.portableUpdates.sourceLimit'));
+    budget.files++;
+    budget.bytes += stat.size;
     await fs.copyFile(source, destination);
     signal.throwIfAborted();
     progress(budget.bytes);
@@ -381,9 +400,8 @@ export class PortableUpdates {
       !(await fs.stat(path.join(source, 'update.json')).catch(() => null))
     ) {
       const manifest = json(
-        await readBounded(
+        await readContent(
           path.join(source, 'extension.json'),
-          1024 * 1024,
           this.fetcher,
           this.controller?.signal,
         ),
@@ -722,26 +740,28 @@ export class PortableUpdates {
         const staged = path.join(temporary, `payload-${index}`);
         if (candidate.directory) await copyTree(candidate.directory, staged, signal, report);
         else {
-          const data = await readBounded(candidate.payload!, limit, this.fetcher, signal, report);
+          const archive = candidate.feed!.payload.format === 'exe' ? staged : `${staged}.zip`;
+          const received = await receiveFile(
+            candidate.payload!,
+            archive,
+            this.fetcher,
+            signal,
+            report,
+          );
           this.state.phase = hostText('services.portableUpdates.verifying', {
             name: String(candidate.target.name),
           });
           this.options.changed();
-          const hash = createHash('sha256').update(data).digest('hex');
           if (
-            data.length !== candidate.feed!.payload.size ||
-            hash.toLowerCase() !== candidate.feed!.payload.sha256.toLowerCase()
+            received.size !== candidate.feed!.payload.size ||
+            received.sha256 !== candidate.feed!.payload.sha256.toLowerCase()
           )
             throw Error(
               hostText('services.portableUpdates.hashMismatch', {
                 name: String(candidate.target.name),
               }),
             );
-          if (candidate.feed!.payload.format === 'exe')
-            await fs.writeFile(staged, data, { flag: 'wx' });
-          else {
-            const archive = `${staged}.zip`;
-            await fs.writeFile(archive, data, { flag: 'wx' });
+          if (candidate.feed!.payload.format !== 'exe') {
             await execute(
               helper,
               [candidate.target.kind === 'host' ? '--extract-host' : '--extract', archive, staged],
@@ -755,9 +775,8 @@ export class PortableUpdates {
         }
         if (candidate.target.kind === 'applet') {
           const m = json(
-            await readBounded(
+            await readContent(
               path.join(staged, 'extension.json'),
-              1024 * 1024,
               this.fetcher,
               this.controller?.signal,
             ),
@@ -782,7 +801,7 @@ export class PortableUpdates {
             {
               windowsHide: true,
               timeout: 120000,
-              maxBuffer: 16 * 1024 * 1024,
+              maxBuffer: Infinity,
               signal,
             },
           );
@@ -898,7 +917,7 @@ export class PortableUpdates {
     for (const dir of await fs.readdir(root, { withFileTypes: true }).catch(() => [])) {
       if (!dir.isDirectory() || dir.name === '.transactions') continue;
       const file = path.join(root, dir.name, 'extension.json');
-      const m = await readBounded(file, 1024 * 1024, this.fetcher)
+      const m = await readContent(file, this.fetcher)
         .then(json)
         .catch(() => undefined);
       if (m?.id === id) throw Error(hostText('services.portableUpdates.duplicateInstallFolder'));
@@ -945,15 +964,13 @@ export class PortableUpdates {
       const staged = path.join(temporary, 'payload');
       if (directory) await copyTree(directory, staged, signal, () => {});
       else {
-        const bytes = await readBounded(candidate!.payload, limit, this.fetcher, signal);
+        const archive = path.join(temporary, 'package.zip');
+        const received = await receiveFile(candidate!.payload, archive, this.fetcher, signal);
         if (
-          bytes.length !== candidate!.feed.payload.size ||
-          createHash('sha256').update(bytes).digest('hex') !==
-            candidate!.feed.payload.sha256.toLowerCase()
+          received.size !== candidate!.feed.payload.size ||
+          received.sha256 !== candidate!.feed.payload.sha256.toLowerCase()
         )
           throw Error(hostText('services.portableUpdates.distributionHash'));
-        const archive = path.join(temporary, 'package.zip');
-        await fs.writeFile(archive, bytes, { flag: 'wx' });
         await execute(helper, ['--extract', archive, staged], {
           windowsHide: true,
           timeout: 120000,
@@ -1118,7 +1135,7 @@ export class PortableUpdates {
         {
           windowsHide: true,
           timeout: 120000,
-          maxBuffer: 16 * 1024 * 1024,
+          maxBuffer: Infinity,
         },
       );
       expandedItems.push(...JSON.parse(plan.stdout));

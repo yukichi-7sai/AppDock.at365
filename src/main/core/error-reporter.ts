@@ -38,11 +38,11 @@ export class ErrorReporter {
     return {
       update: (error, actions) => {
         if (resolved) return;
-        const title = error.title.slice(0, 200);
+        const title = error.title;
         const body = hostText('services.errorReporter.bodyWithCode', {
           message: String(error.message),
           code: String(error.code),
-        }).slice(0, 2000);
+        });
         const next = JSON.stringify([title, body]);
         if (next !== fingerprint) {
           fingerprint = next;
@@ -95,11 +95,11 @@ export class ErrorReporter {
     if (this.seen.has(key)) return;
     this.seen.add(key);
     while (this.seen.size > 512) this.seen.delete(this.seen.values().next().value!);
-    const title = error.title.slice(0, 200),
+    const title = error.title,
       body = hostText('services.errorReporter.bodyWithCode', {
         message: String(error.message),
         code: String(error.code),
-      }).slice(0, 2000);
+      });
     const write = (message: string) => {
       try {
         this.options.log(error.source, message);

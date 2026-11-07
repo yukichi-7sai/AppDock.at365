@@ -40,7 +40,7 @@ export function codexConfigPath(file: unknown): string {
 function read(file: string) {
   if (!fs.existsSync(file)) return '';
   const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024)
+  if (!stat.isFile() || stat.isSymbolicLink())
     throw Error(hostText('services.codexRegistration.unsafeFile'));
   return fs.readFileSync(file, 'utf8');
 }

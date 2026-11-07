@@ -36,9 +36,15 @@ export function mcpClientSettingsTarget(
   const text = (
     key: string,
     title: string,
-    maxLength: number,
+    maxLength?: number,
     minLength = 0,
-  ): SettingDefinition => ({ key, title, type: 'string', minLength, maxLength });
+  ): SettingDefinition => ({
+    key,
+    title,
+    type: 'string',
+    minLength,
+    ...(maxLength === undefined ? {} : { maxLength }),
+  });
   const select = (key: string, title: string, values: string[]): SettingDefinition => ({
     key,
     title,
@@ -47,8 +53,8 @@ export function mcpClientSettingsTarget(
   });
   const fields: SettingDefinition[] = [
     text('id', hostText('settings.aiSettings.connectionId'), 100),
-    text('name', hostText('settings.mcpClientSettings.name'), 160, 1),
-    text('description', hostText('settings.mcpClientSettings.description'), 1024),
+    text('name', hostText('settings.mcpClientSettings.name'), undefined, 1),
+    text('description', hostText('settings.mcpClientSettings.description')),
     ...[
       {
         key: 'enabled',
@@ -56,14 +62,14 @@ export function mcpClientSettingsTarget(
         type: 'boolean' as const,
       },
       select('transport', hostText('settings.mcpClientSettings.transport'), ['http', 'stdio']),
-      text('command', hostText('settings.mcpClientSettings.executable'), 4096),
+      text('command', hostText('settings.mcpClientSettings.executable')),
       {
         key: 'args',
         title: hostText('settings.mcpClientSettings.argsArray'),
         type: 'string-list' as const,
       },
-      text('cwd', hostText('settings.mcpClientSettings.workingDirectory'), 4096),
-      text('url', hostText('settings.mcpClientSettings.url'), 4096),
+      text('cwd', hostText('settings.mcpClientSettings.workingDirectory')),
+      text('url', hostText('settings.mcpClientSettings.url')),
       select('authentication', hostText('settings.mcpClientSettings.auth'), ['none', 'bearer']),
       {
         key: 'published',
@@ -118,7 +124,7 @@ export function mcpClientSettingsTarget(
     removable: (row) => available && !protectedRow(row),
     inputSchema: (field) =>
       field.key === 'connection.args'
-        ? { type: 'array', items: { type: 'string', maxLength: 4096 } }
+        ? { type: 'array', items: { type: 'string' } }
         : field.key === 'connection.publishedTools'
           ? {
               type: 'array',
@@ -128,7 +134,7 @@ export function mcpClientSettingsTarget(
           : settingInputSchema(field),
     validateField: (field, value) => {
       if (field.key === 'connection.args') {
-        if (!Array.isArray(value) || !value.every((item) => mcpText(item, 4096))) throw Error();
+        if (!Array.isArray(value) || !value.every((item) => mcpText(item))) throw Error();
       } else if (field.key === 'connection.publishedTools') {
         if (
           !Array.isArray(value) ||

@@ -6,7 +6,7 @@ const {
   fetchWebAvatar,
   webAvatarResponse,
 } = require('../out/main/main/core/web-account-avatar');
-test('Native image requests expose redirects, bound response chunks and abort outstanding work', async () => {
+test('Native image requests expose redirects, preserve complete responses and abort outstanding work', async () => {
   const { EventEmitter } = require('node:events');
   const fake = (action) => {
     const req = new EventEmitter();
@@ -33,13 +33,14 @@ test('Native image requests expose redirects, bound response chunks and abort ou
   assert.deepEqual(await readWebAvatar(result), Buffer.from([1, 2]));
   req = fake((r) => {
     const incoming = new EventEmitter();
+    incoming.statusCode = 200;
+    incoming.headers = { 'content-type': 'image/png' };
     r.emit('response', incoming);
     incoming.emit('data', Buffer.alloc(65537));
+    incoming.emit('end');
   });
-  await assert.rejects(
-    webAvatarResponse(new AbortController().signal, () => req),
-    /large/,
-  );
+  const large = await webAvatarResponse(new AbortController().signal, () => req);
+  assert.equal((await readWebAvatar(large)).length, 65537);
   assert.equal(req.aborted, true);
   const abort = new AbortController();
   req = fake(() => {});
@@ -121,10 +122,5 @@ test('Avatar URLs require exact declared HTTPS origins; images are raster-only a
     Buffer.from([1, 2, 3]),
   );
   await assert.rejects(readWebAvatar(response('svg', 'image/svg+xml')), /Invalid/);
-  await assert.rejects(readWebAvatar(response(new Uint8Array(65537))), /large/);
-  await assert.rejects(
-    readWebAvatar(response('x', 'image/png', { 'content-length': '65537' })),
-    /Invalid/,
-  );
   await assert.rejects(readWebAvatar(response('')), /Empty/);
 });

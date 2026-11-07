@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { base64Value } from '../../shared/base64';
 import {
   assignedAsset as assignedImage,
   libraryParent as imageParent,
@@ -722,16 +723,9 @@ export class RegisteredAssets {
     return saved;
   }
   import(input: { filename?: string; base64: string }) {
-    if (
-      !input ||
-      typeof input.base64 !== 'string' ||
-      input.base64.length > 700000 ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.base64)
-    )
+    if (!input || !base64Value(input.base64))
       throw Error(this.text('services.registeredImages.invalidData'));
     const bytes = Buffer.from(input.base64, 'base64');
-    if (bytes.length > 512 * 1024)
-      throw Error(this.text('services.registeredImages.programmaticSizeLimit'));
     const format = this.policy.format(bytes);
     return this.add(
       bytes,

@@ -186,10 +186,10 @@ export function AiConnectionDialog({
             invalidTab = 'connection';
           }
           if (
-            !aiString(next.defaultModel ?? '', 200) ||
+            !aiString(next.defaultModel ?? '') ||
             /[\r\n]/.test(next.defaultModel ?? '') ||
-            !aiString(next.alwaysPrompt, 2048) ||
-            !aiString(next.defaultPrompt, 2048)
+            !aiString(next.alwaysPrompt) ||
+            !aiString(next.defaultPrompt)
           )
             invalidTab = 'prompt';
           setTab(invalidTab);
@@ -249,7 +249,6 @@ export function AiConnectionDialog({
             <SettingsInput
               data-initial-focus
               aria-label={translate('settings.aiConnectionDialog.name')}
-              maxLength={160}
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />

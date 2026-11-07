@@ -114,9 +114,9 @@ manifest.pageCollectionsは自身のobject-list設定からlocal/remoteページ
 
 一覧結果は`PageListResult { revision, pages }`、置換結果は`{ revision }`とする。動的定義は既存の`id/title/source/ui/icon/defaultDisplay/context`だけを持つ専用DTOにし、一覧にある`openCommand`を置換要求へ送り返さない。省略可能な値はJSONから省略し、`source`は`local`。登録revisionは設定revisionと別で、ホストで安全な整数として検証する。
 
-固定ページ10件、動的ページ64件、contextの16KiB上限、ID衝突・相対UIの包含検査は既存契約を使う。動的登録には`pages`と`dynamic-pages`が必要。固定の1画面だけならmanifest宣言を使い、毎回動的に登録し直す必要はない。
+固定ページ10件、動的ページ64件、contextのオブジェクト型検証、ID衝突・相対UIの包含検査は既存契約を使う。動的登録には`pages`と`dynamic-pages`が必要。固定の1画面だけならmanifest宣言を使い、毎回動的に登録し直す必要はない。
 
-これらの個別上限とは別に、一覧・置換も最終のRPCメッセージを1MiB以内に収める。contextへ大量の本文や画像を置かず、データ取得用の識別子を渡す。上限を超える要求を部分適用しない。
+context・一覧・置換・RPC本文にAppDock独自の固定容量上限は設けない。大きなデータは必要に応じて分割取得し、画像の原本は共通のファイル参照を使う。検証に失敗した要求を部分適用しない。
 
 `NotifyChangedAsync`は`{id}`を受け、自身が登録したlocalページだけを対象にする。未生成・非表示のページを開かない。受付と描画完了を区別し、結果は`{accepted:true, delivered:boolean}`。同じ処理中の通知をまとめ、`window.appletPage.onChanged`を再利用する。設定・テーマの変更通知と同様に、UIが必要なデータを取り直す合図とする。
 
@@ -142,7 +142,7 @@ public interface IPageActionHandler
 | 呼出元 | 既存の`localPageSource`でWebContents・main frame・正確なlocal URLを照合                                                     |
 | 入力   | 宣言済みidとstring/number/booleanだけ。未宣言キー・型違い・64K文字超過を既存どおり拒否                                      |
 | 実行   | 起動完了後だけ受付。停止開始・接続終了で取消。別Appletや任意RPCへ転送しない                                                 |
-| 結果   | JSON値またはnull。.NETは最終のRPCシリアライズ形式で結果部分512KiB以内を検査し、超過はエラーにする。既存の1MiB制限を緩めない |
+| 結果   | JSON値またはnull。入力・結果と最終RPCメッセージに固定容量上限は設けない |
 | 世代   | 応答時にも既存のruntimeSession照合を行い、再起動前の結果をUIへ戻さない                                                      |
 
 UIは既存の呼出方法を使う。以下は最小の利用例。実行可能なDLL/native/Nodeのfixtureは`tests/fixtures/dotnet/AppDock.PageProbe`と`scripts/dotnet-pages-ui-test.cjs`にある。
@@ -180,9 +180,9 @@ Runtimeは既存のコマンド・設定の直列化を保つ。ページ操作�
 | 項目       | 上限・検査                                                                                   |
 | ---------- | -------------------------------------------------------------------------------------------- |
 | capability | `pages`と`local-images`。自身の固定／動的localページだけ                                     |
-| 1要求      | 最大64ファイル、最終RPC形式で256KiB以内。必要なら呼出側で小分けにする                        |
-| 有効な参照 | 1ページ2,000件、1Applet8,000件。上限超過時は要求全体を拒否し、既存参照を保持                 |
-| ファイル   | PNG/JPEG/WebP、1ファイル32MiB以下、各辺2,048px以下。拡張子・実形式・実ファイルを検査         |
+| 1要求      | 固定容量・ファイル件数上限なし。必要に応じて呼出側で小分けにする                        |
+| 有効な参照 | ページとAppletに固定件数上限なし。無効な登録は要求全体を拒否し、既存参照を保持                 |
+| ファイル   | PNG/JPEG/WebP。固定容量・画素寸法上限なし。拡張子・実形式・正の寸法・実ファイルを検査         |
 | 所在       | 専用キャッシュ内の絶対パス。登録時と配信時に実パスを検査し、リンクによる領域外参照を拒否     |
 | 所有       | Applet ID、runtimeSession、localページIDに結び付ける。クライアントにディスクパスを選ばせない |
 

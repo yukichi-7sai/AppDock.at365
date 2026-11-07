@@ -67,7 +67,10 @@ export function settingInputSchema(field: SettingDefinition): Record<string, unk
     type: field.type,
     description,
     ...(field.type === 'string'
-      ? { minLength: field.minLength ?? 0, maxLength: field.maxLength ?? 10000 }
+      ? {
+          minLength: field.minLength ?? 0,
+          ...(field.maxLength !== undefined ? { maxLength: field.maxLength } : {}),
+        }
       : {}),
   };
 }

@@ -4,7 +4,7 @@ import type { SettingDefinition } from '../../shared/contracts';
 import { settingsUiGroup } from '../../shared/settings-mcp-access';
 import { settingInputSchema } from '../../shared/settings-commands';
 import { validateMcpSetting } from '../../shared/mcp-setting-fields';
-import { jsonObject, boundedJson } from '../../shared/custom-commands';
+import { jsonObject, validateJson } from '../../shared/custom-commands';
 import type { McpToolCommandService } from './mcp-tool-commands';
 import type { McpClientSettings } from './mcp-client-settings';
 import { SettingsTargetError, type SettingsListTarget } from './settings-target-types';
@@ -100,7 +100,7 @@ export function mcpToolCommandSettingsTarget(
     validateField: (field, value) => {
       if (field.key === 'arguments') {
         if (!jsonObject(value)) throw Error();
-        boundedJson(value, Infinity, 40, Infinity);
+        validateJson(value);
       } else validateMcpSetting(field, value, field.options);
     },
     createRow: () => ({

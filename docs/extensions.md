@@ -2,7 +2,7 @@
 
 画像・音声などのライブラリー登録・利用と、将来の生成APIは[アセットの実装方針](applet-assets.md)に従います。現在の公開契約と、今後追加する共通URL・生成登録機能を区別してください。
 
-翻訳の宣言・辞書の配置・manifestの参照・Node/.NET/ローカル画面のAPIは[Appletの翻訳基盤](applet-localization.md)を参照してください。最低ホスト版は0.159.0、.NET SDK/Runtimeは0.32.0です。翻訳宣言のないAppletへの言語通知は追加しません。
+翻訳の宣言・辞書の配置・manifestの参照・Node/.NET/ローカル画面のAPIは[Appletの翻訳基盤](applet-localization.md)を参照してください。最低ホスト版は0.159.0、.NET SDK/Runtimeは0.32.0以降です。翻訳宣言のないAppletへの言語通知は追加しません。
 
 説明文の `[command:コマンドID]` は、対応する設定画面で再生アイコン付きのコマンドリンクとして表示されます。クリックは本体固定パレットで対象を初期選択するだけで、明示実行までコマンドを実行しません。対応するdescription、エスケープ、検索・参照切れと対応ホスト版は[コマンドリンク](command-links-design.md)を参照してください。
 
@@ -51,7 +51,7 @@ AppDock 0.130.0から、manifestの`commands[]`とRPCのコマンド登録に任
 
 `dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大256件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
 
-.NETの`CommandRegistration`はID・タイトル・実行ハンドラーと、任意の`Description`プロパティを持ちます。manifestとRPCにも任意の`description`（1,000 UTF-16コード単位以内）を指定でき、カスタムコマンドと同じ説明の検証・表示を使います。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。
+.NETの`CommandRegistration`はID・タイトル・実行ハンドラーと、任意の`Description`プロパティを持ちます。manifestとRPCにも任意の`description`を指定でき、カスタムコマンドと同じ説明の検証・表示を使います。説明に固定文字数上限はありません。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。
 
 設定定義の `type: "shortcut-list"` は `{ id, title, keys }` の配列を扱い、追加・削除UIを提供します。IDは小文字英数字とハイフン（先頭英数字、40文字以内）、名前は100文字以内、最大32件。既定値は `[]` です。キーは `Ctrl+Shift+T` や `Win+E` などの1組の組み合わせで、フォーム保存／Host API保存時に検証します。設定型はキーを送信せず、実行はApplet側の責任です。
 
@@ -236,7 +236,7 @@ Webサービスのアカウント別ページには[WebアカウントAPI](web-a
 | Browser       | 資格情報を含まないHTTPS URLを既定ブラウザで開く     | `browser`             |
 | Logging       | 拡張ID付きホストログ                                | 常時                  |
 | Scheduler     | 定期実行、停止時のタイマー解除                      | 拡張ランナー内        |
-| Storage       | 拡張ID・キー別のJSON一時／永続データ（1件1MiBまで） | `storage`             |
+| Storage       | 拡張ID・キー別のJSON一時／永続データ（固定容量上限なし） | `storage`             |
 | Secrets       | 拡張ID・キー別の暗号化文字列                        | `secrets`             |
 
 ### Storageの保存範囲
@@ -257,7 +257,7 @@ var notes = await context.Storage.GetAsync<string>("notes", StorageScope.Shared,
 
 Nodeは`'device' | 'shared' | 'memory'`、.NETは`StorageScope.Device | StorageScope.Shared | StorageScope.Memory`です。`memory`は本体0.112.2・SDK/Runtime 0.27.3以降で使えます。ファイルを作らず、同じAppletのlocalページと実行処理でJSON値を受け渡せます。停止・異常終了・再起動で解放し、`null`の保存でそのキーを除去します。詳細は[メモリStorageと元画像表示](memory-storage.md)を参照してください。
 
-新しい.NET overloadではCancellationTokenを明示します（取消不要なら`default`）。既存の省略・CancellationToken指定のシグネチャは保持します。RPCの`host.storage.get/set`は任意の`scope`文字列を受け取り、省略は`device`、未知の値は拒否します。`storage` capability、Applet IDによる隔離、既存の1件1MiB制限を維持します。
+新しい.NET overloadではCancellationTokenを明示します（取消不要なら`default`）。既存の省略・CancellationToken指定のシグネチャは保持します。RPCの`host.storage.get/set`は任意の`scope`文字列を受け取り、省略は`device`、未知の値は拒否します。`storage` capability、Applet IDによる隔離とJSON検証を維持し、値の固定容量上限は設けません。
 
 StorageはJSON値を扱う共通APIで、設定フォームの項目はSettings、認証情報はSecretsを使います。共有scopeの同じキーを複数PCから変更した場合の自動マージや変更通知は提供しません。ファイルscopeの取得時はファイルの現在値を読みます。
 
@@ -269,7 +269,9 @@ StorageはJSON値を扱う共通APIで、設定フォームの項目はSettings�
 
 ## 通信
 
-UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上限1MB、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
+固定容量上限のない通信・Storage・本文の契約は本体0.179.0以降、.NET側はSDK/Runtime 0.33.0以降を対象とします。新しい容量契約を前提にするAppletは`minimumHostVersion`を0.179.0以降にします。分割処理と接続先・規格に基づく制約は[容量方針](settings-capacity.md#通信本文ファイルの容量)を参照してください。
+
+UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（固定容量上限なし、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
 
 拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
 
@@ -293,9 +295,9 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 - `updateRepository`: GitHubの`owner/repository`。省略時は更新確認非対応。更新比較には`major.minor.patch`の正式版タグ（先頭`v`も可）が必要。
 - 保存先は`extensions[id].startupDelaySeconds`。待機のタイマーを起動・RPCのキューで待たず、ほかのAppletの起動を妨げない。
 - snapshotの`state: waiting`、`scheduledStartAt`（Unixミリ秒）で待機を表示。無効化・再起動・終了でタイマーを解放。再起動も遅延を適用し、「今すぐ開始」だけ即時にする。
-- `type: json`の設定値は最大10000文字のJSON文字列。ホストで構文、Appletで意味と範囲を検証。
+- `type: json`の設定値は固定文字数上限のないJSON文字列。ホストで構文、Appletで意味と範囲を検証。
 
-パネルの`images`は4件まで。各項目は`title`、任意の`description`、`image`（JPEG/PNG/WebPのbase64 data URL、200000文字以内）、名前空間内の`actions`（4件まで）。ホストは外部URL・SVG・HTMLを受け付けない。.NETの既存`Panel`コンストラクターは維持し、任意の`Images`プロパティと`PanelImage`を追加。Nodeの`ui.showPanel`でも同じJSON型を使用できる。
+パネルの各画像項目は`title`、任意の`description`・`imageFile`、名前空間内の`actions`を持つ。画像は下記の専用キャッシュファイルから渡し、埋め込み画像の`image`入力は受け付けない。.NETの`PanelImage`は`Title/Description/Actions`と任意の`ImageFile/Tooltip`を持ち、Nodeの`ui.showPanel`も同じ入力を使う。SDK/Runtime 0.33.0では未使用のBase64 `Image`引数を削除したため、その旧コンストラクターを使うコードはファイル参照へ変更して再ビルドする。
 
 これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
 
@@ -309,7 +311,7 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 
 `Panel.Images`は最大1000件、`Tabs`は最大100件です。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
 
-`local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。従来のbase64 `Image`は200000文字上限のまま使用可能です。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
+`local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。Base64 `Image`入力は公開しません。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
 
 ## Node Appletの通知・ファイル選択
 
@@ -404,7 +406,7 @@ if (result.status === 'accepted')
 
 .NETはNotificationRequest/NotificationHistoryText/NotificationAction/NotificationPublishResult/NotificationPolicyをSDKで提供します。新SDK/Runtimeを使ってビルドし、最低ホスト版を宣言してください。SDKの共有AssemblyVersion 0.10.0と旧ShowAsyncの署名を維持します。古いサービス実装の新メソッドはNotSupportedExceptionとなります。
 
-発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimer/silentです。silentは0.42.0以降の任意booleanで、trueならWindows通知の音だけを抑制します。共通通知の読み上げ設定は変更しません。.NETはNotificationRequestのSilent initプロパティを使います。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトル200文字、本文2,000文字、dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
+発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimer/silentです。silentは0.42.0以降の任意booleanで、trueならWindows通知の音だけを抑制します。共通通知の読み上げ設定は変更しません。.NETはNotificationRequestのSilent initプロパティを使います。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトルと本文にAppDock独自の文字数上限は設けません。dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
 
 結果はacceptedとnotificationId、またはsuppressedとreasonです。acceptedは登録完了で、表示成功や利用者による確認を保証しません。抑制理由はtype-disabled/applet-disabled/type-definition-changed/no-available-targets。不正入力・未知種類・上限/頻度超過はエラーです。endのstatusはresolved/withdrawnのみ、他Appletや古い世代の通知は終了できません。
 

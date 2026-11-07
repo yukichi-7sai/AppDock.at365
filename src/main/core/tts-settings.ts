@@ -44,10 +44,7 @@ export class TtsSettingsController {
     };
   }
   private validateKey(key: unknown) {
-    if (
-      key != null &&
-      (typeof key !== 'string' || key.length > 8192 || /[\x00-\x1f\x7f]/.test(key))
-    )
+    if (key != null && (typeof key !== 'string' || /[\x00-\x1f\x7f]/.test(key)))
       throw Error(hostText('services.ttsSecrets.keyFormat'));
   }
   save(value: unknown, original: unknown, key: unknown, keyRevision: unknown) {

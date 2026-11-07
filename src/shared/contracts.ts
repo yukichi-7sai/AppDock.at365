@@ -197,9 +197,12 @@ export interface Panel {
     tooltip?: string;
     imageFile?: string;
     description?: string;
-    image?: string;
     actions?: PanelAction[];
   }[];
+}
+/** Host-resolved file URLs are output metadata, never embedded Applet image input. */
+export interface ResolvedPanel extends Panel {
+  images?: (NonNullable<Panel['images']>[number] & { image?: string })[];
 }
 export interface PanelAction {
   title: string;
@@ -260,7 +263,7 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   enabled: boolean;
   commands: AppletCommand[];
   tray: TrayItem[];
-  panel: Panel | null;
+  panel: ResolvedPanel | null;
   settingOptions: Record<string, SettingOption[]>;
 }
 export type LogCategory = 'normal' | 'audit';

@@ -13,7 +13,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
-  boundedJson,
+  validateJson,
   checkCustomSchema,
   jsonObject,
   type JsonObject,
@@ -99,7 +99,7 @@ function remoteValidationSchema(value: unknown): any {
   );
 }
 function safeSchema(schema: unknown) {
-  boundedJson(schema, 32768, 32, 8192);
+  validateJson(schema);
   const normalized = remoteValidationSchema(schema);
   checkCustomSchema(normalized);
   return compileCustomType({
@@ -355,45 +355,36 @@ export class McpClientService {
       });
       if (response.status === 401 || response.status === 403)
         return fail('AUTH_REQUIRED', hostText('services.mcpClient.authentication'));
-      if (Number(response.headers.get('content-length') ?? 0) > 2 * 1024 * 1024) {
-        await response.body?.cancel();
-        return fail('RESULT_TOO_LARGE', hostText('services.mcpClient.responseLimit'));
-      }
       if (!response.body) return response;
       const mime = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
       const events =
         response.ok && mime === 'text/event-stream'
           ? httpJsonErrorEvents('mcp-client', response.status)
           : undefined;
-      let bytes = 0;
       const body = response.body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
           transform(chunk, controller) {
-            bytes += chunk.byteLength;
-            if (bytes > 2 * 1024 * 1024) controller.error(new Error('MCP response limit'));
-            else {
-              events?.write(chunk);
-              controller.enqueue(chunk);
-            }
+            events?.write(chunk);
+            controller.enqueue(chunk);
           },
           flush() {
             events?.end();
           },
         }),
       );
-      const bounded = new Response(body, {
+      const forwarded = new Response(body, {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers,
       });
-      if (bounded.ok && mime === 'application/json') {
+      if (forwarded.ok && mime === 'application/json') {
         try {
-          logHttpErrorBody('mcp-client', bounded.status, await bounded.clone().text());
+          logHttpErrorBody('mcp-client', forwarded.status, await forwarded.clone().text());
         } catch {
-          // The original bounded stream still reports its existing transport/size failure.
+          // The original stream still reports transport failures to the SDK.
         }
       }
-      return bounded;
+      return forwarded;
     }) as typeof fetch;
   }
   private async session(actor: McpActor, id: string) {
@@ -416,7 +407,7 @@ export class McpClientService {
               cwd: c.cwd || undefined,
               env: { ...getDefaultEnvironment(), ...secret.env },
               stderr: 'ignore',
-              maxBufferSize: 2 * 1024 * 1024,
+              maxBufferSize: Infinity,
             })
           : new StreamableHTTPClientTransport(new URL(c.url), {
               fetch: this.fetcher(c.url, secret.token),
@@ -509,17 +500,17 @@ export class McpClientService {
       const signal = AbortSignal.any([record.controller.signal, AbortSignal.timeout(15000)]);
       let cursor: string | undefined;
       try {
-        for (let page = 0; page < 16; page++) {
+        for (;;) {
           const reply = await record.client.listTools(cursor ? { cursor } : {}, {
             signal,
             timeout: 15000,
           });
           this.configuration(actor, id);
-          boundedJson(reply, 1024 * 1024, 48, 65536);
+          validateJson(reply);
           for (const raw of reply.tools) {
             if (names.has(raw.name) || !/^[\w.-]{1,128}$/.test(raw.name))
               return fail('INVALID_CATALOG', hostText('services.mcpClient.invalidToolList'));
-            boundedJson(raw, 65536, 40, 8192);
+            validateJson(raw);
             names.add(raw.name);
             if (raw.name.startsWith('appdock_mcp_'))
               return fail('HUB_CYCLE', hostText('services.mcpClient.hubRelayForbidden'));
@@ -549,11 +540,11 @@ export class McpClientService {
           }
           cursor = reply.nextCursor;
           if (!cursor) break;
-          if (cursors.has(cursor) || page === 15)
+          if (cursors.has(cursor))
             return fail('INVALID_CATALOG', hostText('services.mcpClient.pageLimit'));
           cursors.add(cursor);
         }
-        boundedJson(tools, 1024 * 1024, 48, 65536);
+        validateJson(tools);
         if (
           record.closed ||
           record.toolsEpoch !== epoch ||
@@ -680,7 +671,7 @@ export class McpClientService {
       return Promise.reject(
         new AutomationError('INVALID_ARGUMENT', hostText('services.mcpClient.callArguments')),
       );
-    boundedJson(params.arguments, 65536, 32, 8192);
+    validateJson(params.arguments);
     this.configuration(actor, params.serverId, params.name);
     const key = actor.owner + ':' + params.requestId,
       signature = mcpDigest(params);
@@ -802,7 +793,7 @@ export class McpClientService {
             },
           },
         );
-        boundedJson(raw, 1024 * 1024, 48, 65536);
+        validateJson(raw);
         if (
           raw.isError !== true &&
           tool.outputSchema &&

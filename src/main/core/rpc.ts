@@ -1,7 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { EventEmitter } from 'node:events';
 import type { Readable, Writable } from 'node:stream';
-export const MAX_RPC_LINE_BYTES = 1024 * 1024;
+const writeChunkBytes = 64 * 1024;
 export const RPC_TIMEOUT_MS = 15000;
 /** Legacy single-frame results may consume state only after their frame was written. */
 export class RpcDelivery {
@@ -21,7 +21,8 @@ class JsonLinePeer extends EventEmitter {
   handler: (method: string, params: any) => Promise<unknown>;
   pending: Map<string, Pending>;
   sequence: number;
-  buffer: string;
+  private fragments: string[] = [];
+  private writes = Promise.resolve();
   timeout: number;
   closed: boolean;
   constructor(
@@ -37,7 +38,6 @@ class JsonLinePeer extends EventEmitter {
     this.handler = handler;
     this.pending = new Map();
     this.sequence = 0;
-    this.buffer = '';
     this.timeout = timeout;
     this.closed = false;
     input.setEncoding('utf8');
@@ -47,19 +47,16 @@ class JsonLinePeer extends EventEmitter {
     output.on('error', () => this.close());
   }
   consume(chunk: string) {
-    this.buffer += chunk;
-    let newline;
-    while ((newline = this.buffer.indexOf('\n')) !== -1) {
-      const line = this.buffer.slice(0, newline);
-      this.buffer = this.buffer.slice(newline + 1);
-      if (Buffer.byteLength(line) > MAX_RPC_LINE_BYTES) {
-        this.fail(new Error(hostText('services.rpc.sizeLimit')));
-        return;
-      }
+    let start = 0;
+    let newline: number;
+    while ((newline = chunk.indexOf('\n', start)) !== -1) {
+      this.fragments.push(chunk.slice(start, newline));
+      const line = this.fragments.join('');
+      this.fragments = [];
+      start = newline + 1;
       if (line.trim()) this.dispatch(line);
     }
-    if (Buffer.byteLength(this.buffer) > MAX_RPC_LINE_BYTES)
-      this.fail(new Error(hostText('services.rpc.sizeLimit')));
+    if (start < chunk.length) this.fragments.push(chunk.slice(start));
   }
   async dispatch(line: string) {
     let msg: any;
@@ -104,14 +101,22 @@ class JsonLinePeer extends EventEmitter {
   }
   send(msg: unknown, written?: () => void) {
     if (this.closed || this.output.destroyed) throw new Error(hostText('services.rpc.closed'));
-    const line = JSON.stringify(msg) + '\n';
-    if (Buffer.byteLength(line) > MAX_RPC_LINE_BYTES)
-      throw new Error(hostText('services.rpc.sizeLimit'));
-    if (written)
-      this.output.write(line, (error) => {
-        if (!error) written();
+    const line = Buffer.from(JSON.stringify(msg) + '\n');
+    this.writes = this.writes
+      .then(async () => {
+        for (let offset = 0; offset < line.length; offset += writeChunkBytes) {
+          if (this.closed) return;
+          await new Promise<void>((resolve, reject) => {
+            this.output.write(line.subarray(offset, offset + writeChunkBytes), (error) =>
+              error ? reject(error) : resolve(),
+            );
+          });
+        }
+        if (!this.closed) written?.();
+      })
+      .catch((error) => {
+        if (!this.closed) this.fail(error instanceof Error ? error : new Error(String(error)));
       });
-    else this.output.write(line);
   }
   request(method: string, params: unknown = {}, timeout = this.timeout): Promise<any> {
     return new Promise((resolve, reject) => {
@@ -137,6 +142,7 @@ class JsonLinePeer extends EventEmitter {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.fragments = [];
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
       p.reject(new Error(hostText('services.rpc.disconnected')));

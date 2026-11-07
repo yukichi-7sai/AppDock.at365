@@ -33,6 +33,31 @@ function wave(seconds = 0.02) {
   b.writeUInt32LE(data, 40);
   return b;
 }
+
+test('generation retains long input and large PCM audio without receipt or decoded byte caps', async (t) => {
+  const data = 65 * 1024 * 1024,
+    audio = Buffer.alloc(44 + data);
+  wave().copy(audio, 0, 0, 44);
+  audio.writeUInt32LE(audio.length - 8, 4);
+  audio.writeUInt16LE(2, 22);
+  audio.writeUInt32LE(192000, 24);
+  audio.writeUInt32LE(384000, 28);
+  audio.writeUInt16LE(2, 32);
+  audio.writeUInt16LE(8, 34);
+  audio.writeUInt32LE(data, 40);
+  const text = 'speech'.repeat(2000);
+  let received;
+  const f = setup(t, {
+    fetcher: async (_url, init) => {
+      received = JSON.parse(init.body);
+      return new Response(audio, { headers: { 'content-type': 'audio/wav' } });
+    },
+  });
+  const result = await f.s.generate('host', { text }, new AbortController().signal);
+  assert.equal(received.input, text);
+  assert.deepEqual(result.bytes, audio);
+  assert.equal(result.seconds, data / 384000);
+});
 const wait = async (fn) => {
   for (let i = 0; i < 300; i++) {
     const v = fn();
@@ -558,7 +583,6 @@ test('input validation, capacity, queued stop and ordered playback', async (t) =
   });
   for (const bad of [
     { text: ' ', requestId: 'x' },
-    { text: 'x'.repeat(4097), requestId: 'x' },
     { text: 'x', requestId: 'x', speed: Infinity },
     { text: 'x', requestId: 'x', voice: '' },
     { text: 'x', requestId: 'x', url: 'http://other' },
@@ -656,7 +680,7 @@ test('queue deadline expires; failed generation does not block next job', async 
   assert.equal(g.s.get('a', c.jobId).error.code, 'TTS_SERVER_ERROR');
   assert(!JSON.stringify(g.s.get('a', c.jobId)).includes('private text'));
 });
-test('HTTP status, content and streaming byte limits become safe errors', async (t) => {
+test('HTTP status and invalid audio content become safe errors', async (t) => {
   for (const [response, code] of [
     [() => new Response('secret', { status: 401 }), 'TTS_AUTH_FAILED'],
     [() => new Response('secret', { status: 403 }), 'TTS_AUTH_FAILED'],
@@ -667,10 +691,10 @@ test('HTTP status, content and streaming byte limits become safe errors', async 
     ],
     [
       () => new Response(Buffer.alloc(100), { headers: { 'Content-Type': 'audio/wav' } }),
-      'TTS_AUDIO_TOO_LARGE',
+      'TTS_INVALID_AUDIO',
     ],
   ]) {
-    const f = setup(t, { limits: { audioBytes: 80 }, fetcher: async () => response() });
+    const f = setup(t, { fetcher: async () => response() });
     const a = f.s.speak('a', input('a'));
     await wait(() => f.s.get('a', a.jobId).state === 'failed');
     assert.equal(f.s.get('a', a.jobId).error.code, code);
@@ -913,11 +937,6 @@ test('model discovery distinguishes empty, unsupported, auth and malformed respo
       (e) => e.code === code && !e.message.includes('PRIVATE RESPONSE'),
     );
   }
-  const large = setup(t, {
-    limits: { voiceBytes: 10 },
-    fetcher: async () => Response.json({ data: [{ id: 'too-long' }] }),
-  });
-  await assert.rejects(large.s.models('host'), (e) => e.code === 'TTS_INVALID_MODELS');
 });
 
 test('model requests coalesce per owner, remain independent from voices and cancel on reconfiguration or close', async (t) => {

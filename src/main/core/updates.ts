@@ -29,7 +29,6 @@ export async function checkUpdate(
   if (!response.ok)
     throw new Error(hostText('services.updates.httpError', { status: String(response.status) }));
   const text = await response.text();
-  if (text.length > 1024 * 1024) throw new Error(hostText('services.updates.responseLimit'));
   const release = JSON.parse(text);
   logHttpJsonError('updates', response.status, release);
   if (release.draft || release.prerelease)

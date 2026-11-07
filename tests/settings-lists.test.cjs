@@ -376,7 +376,7 @@ test('list writes preserve device-local ownership and shared bytes, and reject u
   assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
   assert.equal(f.rows().length, 2);
 });
-test('list pagination respects response limits and oversized change previews fail before persistence', (t) => {
+test('list pagination preserves complete large rows and change previews', (t) => {
   const rows = Array.from({ length: 27 }, (_, index) => ({ name: 'x'.repeat(10000), index }));
   const f = fixture(t, {
     id: false,
@@ -387,20 +387,17 @@ test('list pagination respects response limits and oversized change previews fai
   let cursor;
   do {
     const page = f.items({ ...(cursor ? { cursor } : {}) });
-    assert(Buffer.byteLength(JSON.stringify(page)) <= 256 * 1024);
     refs.push(...page.items.map((item) => item.itemRef));
     cursor = page.nextCursor;
   } while (cursor);
   assert.equal(refs.length, 27);
-  assert.throws(
-    () =>
-      f.call(
-        'apply',
-        f.request(refs.map((itemRef) => ({ kind: 'update', itemRef, changes: { name: 'small' } }))),
-      ),
-    { code: 'RESULT_TOO_LARGE' },
+  const result = f.call(
+    'apply',
+    f.request(refs.map((itemRef) => ({ kind: 'update', itemRef, changes: { name: 'small' } }))),
   );
-  assert.equal(f.writes(), 0);
+  assert.equal(result.completion, 'settingsSaved');
+  assert.equal(f.writes(), 1);
+  assert(f.items().items.every((item) => item.values.name === 'small'));
 });
 
 test('legacy JSON-string list no-ops preserve bytes and declared identity cannot be changed through another path', (t) => {

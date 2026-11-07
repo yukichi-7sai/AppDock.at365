@@ -18,7 +18,6 @@ foreach (var handle in new[] { -10, -11, -12 })
 }
 while (await input.ReadLineAsync() is { } line)
 {
-    if (line.Length > 128 * 1024) break;
     using var document = JsonDocument.Parse(line);
     var request = document.RootElement;
     var id = request.GetProperty("id").GetString();

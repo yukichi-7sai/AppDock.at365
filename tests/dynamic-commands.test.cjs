@@ -39,7 +39,7 @@ test('static and dynamic commands accept optional categories and reject invalid 
       { ...command, category: '画像' },
     ]);
     assert.deepEqual(parse('test', [{ ...command, category: '' }]), [{ ...command, category: '' }]);
-    for (const category of [null, 4, {}, 'x'.repeat(101), 'bad\ntext', 'bad\u0000text'])
+    for (const category of [null, 4, {}, 'bad\ntext', 'bad\u0000text'])
       assert.throws(() => parse('test', [{ ...command, category }]));
   }
 });
@@ -50,17 +50,28 @@ test('runtime catalog inherits manifest categories, applies overrides and preser
   manager.shellRequirement = () => undefined;
   manager.settings = { value: { extensions: {} } };
   const extension = {
-    manifest: { id: 'test.category', commands: [{ id: 'test.category.open', title: 'Open', category: '画像', aliases: ['test.category.alias'] }] },
-    commands: [], state: 'stopped',
+    manifest: {
+      id: 'test.category',
+      commands: [
+        {
+          id: 'test.category.open',
+          title: 'Open',
+          category: '画像',
+          aliases: ['test.category.alias'],
+        },
+      ],
+    },
+    commands: [],
+    state: 'stopped',
   };
   assert.equal(manager.commandCatalog(extension)[0].category, '画像');
   extension.state = 'running';
   extension.commands = [{ id: 'test.category.open', title: 'Open' }];
   assert.equal(manager.commandCatalog(extension)[0].category, '画像');
   extension.commands[0].category = '';
-  assert(manager.commandCatalog(extension).every(command => command.category === ''));
+  assert(manager.commandCatalog(extension).every((command) => command.category === ''));
   extension.commands[0].category = '操作';
-  assert(manager.commandCatalog(extension).every(command => command.category === '操作'));
+  assert(manager.commandCatalog(extension).every((command) => command.category === '操作'));
 });
 test('command replacement validates namespace, duplicates and limits before changing anything', () => {
   assert.deepEqual(parseExtensionCommands('test', [{ id: 'test.a', title: 'A', extra: 1 }]), [
@@ -91,7 +102,7 @@ test('static and runtime command descriptions use the existing common descriptio
     assert.deepEqual(parse('test', [{ id: 'test.a', title: 'A', description: '条件\r\n説明' }]), [
       { id: 'test.a', title: 'A', description: '条件\n説明' },
     ]);
-    for (const description of [null, 4, 'x'.repeat(1001), 'bad\u0000text'])
+    for (const description of [null, 4, 'bad\u0000text'])
       assert.throws(() => parse('test', [{ id: 'test.a', title: 'A', description }]));
   }
 });

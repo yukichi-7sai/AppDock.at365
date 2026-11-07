@@ -44,9 +44,6 @@ test('memory Storage uses the existing API, isolates owners and releases values 
   await assert.rejects(
     api(a, 'host.storage.set', { key: '../outside', value: 1, scope: 'memory' }),
   );
-  await assert.rejects(
-    api(a, 'host.storage.set', { key: 'history', value: 'x'.repeat(1024 * 1024), scope: 'memory' }),
-  );
   assert.equal(
     (await api(a, 'host.storage.get', { key: 'history', scope: 'memory' })).nested.value,
     3,

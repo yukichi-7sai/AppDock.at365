@@ -50,7 +50,6 @@ test('process configuration is a bounded explicit mode and never a shell fallbac
     { ...valid, showConsole: null },
     { mode: 'cmd', command: 'ok\nnext' },
     { mode: 'cmd', command: 'echo x', script: 'extra' },
-    { mode: 'powershell', script: 'x'.repeat(8193) },
   ])
     assert.throws(() => parseProcessLaunch(config));
   const spec = processLaunchSpec({ mode: 'cmd', command: '"C:\\space x\\x.exe" "a&b"' }, 'A:\\app');

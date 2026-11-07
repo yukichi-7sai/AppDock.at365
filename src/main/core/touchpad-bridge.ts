@@ -110,8 +110,6 @@ export class TouchpadBridgeManager {
   private loadHistory() {
     try {
       if (!fs.existsSync(this.options.stateFile)) return;
-      if (fs.statSync(this.options.stateFile).size > 128 * 1024)
-        throw Error(hostText('settings.touchpad-bridge.historySize'));
       this.historyBytes = fs.readFileSync(this.options.stateFile);
       const value = JSON.parse(this.historyBytes.toString('utf8')) as BridgeHistory;
       if (

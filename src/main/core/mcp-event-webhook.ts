@@ -127,14 +127,9 @@ export const postWebhook: WebhookPost = async (value, body, headers, signal) => 
         },
       },
       (response) => {
-        let size = 0;
         const chunks: Buffer[] = [];
         response.on('data', (chunk: Buffer) => {
-          size += chunk.length;
-          if (size > 16384) {
-            response.destroy();
-            reject(Error('response_too_large'));
-          } else chunks.push(chunk);
+          chunks.push(chunk);
         });
         response.on('error', reject);
         response.on('aborted', () => reject(Error('aborted')));

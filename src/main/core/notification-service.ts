@@ -97,9 +97,7 @@ export class NotificationService {
       !source ||
       source.length > 200 ||
       typeof input.title !== 'string' ||
-      input.title.length > 200 ||
       typeof input.body !== 'string' ||
-      input.body.length > 2000 ||
       !['info', 'warning', 'error'].includes(input.level) ||
       !['persistent', 'session', 'none'].includes(input.history) ||
       !Array.isArray(input.targets) ||
@@ -129,9 +127,7 @@ export class NotificationService {
       (input.history === 'persistent' &&
         (!input.historyText ||
           typeof input.historyText.title !== 'string' ||
-          input.historyText.title.length > 200 ||
-          typeof input.historyText.body !== 'string' ||
-          input.historyText.body.length > 2000))
+          typeof input.historyText.body !== 'string'))
     )
       throw Error('Invalid notification');
     this.expire();

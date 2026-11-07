@@ -317,7 +317,6 @@ test('activation synchronization uses a bounded key unchanged by focus but chang
   };
   await manager.sync();
   assert.match(payloads[0].gestures.settingsKey, /^[a-f0-9]{64}$/);
-  assert(Buffer.byteLength(JSON.stringify(payloads[0])) < 1024 * 1024);
   state.context = { appFocused: true, window: '123' };
   await manager.sync();
   assert.equal(payloads[1].gestures.settingsKey, payloads[0].gestures.settingsKey);

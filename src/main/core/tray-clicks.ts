@@ -9,7 +9,7 @@ export async function readDoubleClickTime(executable: string): Promise<number> {
   const { stdout } = await executeFile(executable, ['--double-click-time'], {
     windowsHide: true,
     timeout: 3000,
-    maxBuffer: 1024,
+    maxBuffer: Infinity,
   });
   const delay = Number(stdout.trim());
   if (!Number.isInteger(delay) || delay < 1 || delay > 5000)

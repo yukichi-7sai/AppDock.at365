@@ -28,7 +28,7 @@ LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命
 - `src/shared/host-settings.ts`: 本体の通常設定の共通登録。既定値・検証・設定カタログ・PC専用投影・MCP公開へ接続する。
 - `src/shared/settings-commands.ts`: 設定の公開Schemaとboolean派生コマンドの生成。
 - `settings-targets.ts`と`src/shared/settings-operations.ts`: 固定6入口の探索・ページ分割・公開投影・変更要求の重複処理。検証と保存はSettingsCommandsへ委譲する。
-- `automation-mcp.ts`: 従来方式は公式MCP TypeScript SDKによるstateless Streamable HTTP。`mcp-modern.ts`でMCP 2.0（2026-07-28）も同じendpointへ接続します。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
+- `automation-mcp.ts`: 従来方式は公式MCP TypeScript SDKによるstateless Streamable HTTP。`mcp-modern.ts`でMCP 2.0（2026-07-28）も同じendpointへ接続します。JSON応答、GET/DELETEは405。要求本文にAppDock独自の容量上限は設けず、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
 - `automation.ts`: PC専用設定、暗号化、起動/停止、登録状態、接続テスト。
 - `codex-registration.ts`: smol-tomlで構文・意味を検証した限定範囲の編集。既存ファイル全体を再シリアライズしません。

@@ -162,8 +162,8 @@ test('legacy API uses declared generated kind while retaining null, silence, glo
     null,
   );
   assert.equal(captured.type, 'appdock.legacy');
-  assert.equal(captured.input.title.length, 100);
-  assert.equal(captured.input.body.length, 500);
+  assert.equal(captured.input.title, 'T'.repeat(200));
+  assert.equal(captured.input.body, 'B'.repeat(700));
   assert.equal(captured.input.windowsSilent, true);
   assert.equal(captured.input.historyText.body, 'Appletから通知がありました。');
   await captured.input.actions[0].run();

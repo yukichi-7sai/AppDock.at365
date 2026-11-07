@@ -37,7 +37,7 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'worker.cjs',
     startupDelaySeconds: 0,
-    capabilities: ['storage', 'pages'],
+    capabilities: ['storage', 'secrets', 'pages'],
     commands: [
       { id: id + '.open', title: 'Open data fixture', activateOnExecute: true },
       { id: id + '.storage', title: 'Check Storage' },
@@ -62,6 +62,15 @@ fs.writeFileSync(
     await c.storage.set('item',{value:'node-device'});
     await c.storage.set('item',{value:'node-shared'},'shared');
     if((await c.storage.get('item')).value!=='node-device' || (await c.storage.get('item','device')).value!=='node-device' || (await c.storage.get('item','shared')).value!=='node-shared')throw Error('Storage scopes leaked');
+    const large='text'.repeat(300000);
+    for(const scope of ['memory','device','shared']){
+      await c.storage.set('large',large,scope);
+      if(await c.storage.get('large',scope)!==large)throw Error('Large Storage round trip failed');
+    }
+    const secret='s'.repeat(120000);
+    await c.secrets.set('large',secret);
+    if(await c.secrets.get('large')!==secret)throw Error('Large Secrets round trip failed');
+    await c.secrets.delete('large');
   });
 };`,
 );
@@ -101,9 +110,14 @@ const pageWindow = (fn) =>
     assert.deepEqual(disk(storage(id, 'shared', 'item')), { value: 'node-shared' });
     assert.equal(disk(storage('appdock.dotnet-demo', 'device', 'check')), 'dotnet-ok');
     assert.equal(disk(storage('appdock.dotnet-demo', 'shared', 'check')), 'dotnet-shared');
+    for (const owner of [id, 'appdock.dotnet-demo'])
+      for (const scope of ['device', 'shared'])
+        assert.equal(disk(storage(owner, scope, 'large')).length, 1200000);
     assert(!fs.existsSync(path.join(profile, 'data/secrets')));
     assert(fs.existsSync(path.join(profile, 'local/secrets')));
-    checks.push('Node and .NET Storage default/device/shared round trips; Secrets stay local');
+    checks.push(
+      'Node and .NET Storage default/device/shared/memory and large JSON/Secrets round trips; Secrets stay local',
+    );
     await command(id + '.open');
     await until(() => pageWindow((w) => w.isVisible()), 'Applet window visible');
     const expected = await pageWindow((w) => {

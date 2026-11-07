@@ -5,7 +5,7 @@ namespace AppDock.Runtime;
 
 internal sealed class JsonRpcConnection(TextReader input, TextWriter output, Func<Exception, object>? describeError = null) : IAsyncDisposable
 {
-    internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = int.MaxValue };
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> pending = new();
     private readonly ConcurrentDictionary<long, Task> handlers = new();
@@ -39,9 +39,8 @@ internal sealed class JsonRpcConnection(TextReader input, TextWriter output, Fun
             {
                 var line = await input.ReadLineAsync(lifetime.Token);
                 if (line is null) break;
-                if (line.Length > 1024 * 1024) throw new InvalidDataException("RPC message too large.");
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                using var document = JsonDocument.Parse(line);
+                using var document = JsonDocument.Parse(line, new JsonDocumentOptions { MaxDepth = int.MaxValue });
                 var message = document.RootElement;
                 if (message.GetProperty("jsonrpc").GetString() != "2.0") throw new InvalidDataException("JSON-RPC 2.0 required.");
                 if (message.TryGetProperty("method", out var method))
@@ -90,9 +89,17 @@ internal sealed class JsonRpcConnection(TextReader input, TextWriter output, Fun
     private async Task SendAsync(object value, CancellationToken token)
     {
         var text = JsonSerializer.Serialize(value, Json);
-        if (text.Length > 1024 * 1024) throw new InvalidDataException("RPC message too large.");
         await writeLock.WaitAsync(token);
-        try { await output.WriteLineAsync(text); await output.FlushAsync(token); }
+        try {
+            for (var offset = 0; offset < text.Length;) {
+                var length = Math.Min(32 * 1024, text.Length - offset);
+                if (offset + length < text.Length && char.IsHighSurrogate(text[offset + length - 1])) length--;
+                await output.WriteAsync(text.AsMemory(offset, length), token);
+                offset += length;
+            }
+            await output.WriteLineAsync();
+            await output.FlushAsync(token);
+        }
         finally { writeLock.Release(); }
     }
     public async ValueTask DisposeAsync()

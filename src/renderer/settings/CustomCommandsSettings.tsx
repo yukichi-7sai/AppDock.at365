@@ -564,7 +564,6 @@ function CustomCommandDialog({
                     aria-label={translate('settings.customCommandsSettings.name')}
                     data-initial-focus
                     value={title}
-                    maxLength={100}
                     onChange={(e) => setTitle(e.target.value)}
                   />
                 </SettingsField>
@@ -576,7 +575,6 @@ function CustomCommandDialog({
                   <SettingsTextarea
                     aria-label={translate('settings.customCommandsSettings.description')}
                     value={description}
-                    maxLength={1000}
                     rows={3}
                     onChange={(e) => setDescription(e.target.value)}
                   />
@@ -585,7 +583,6 @@ function CustomCommandDialog({
                   <SettingsInput
                     aria-label={translate('commands.category.label')}
                     value={category}
-                    maxLength={100}
                     onChange={(event) => setCategory(event.target.value)}
                   />
                 </SettingsField>

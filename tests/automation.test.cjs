@@ -802,10 +802,15 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
         },
-        body: JSON.stringify({ large: 'x'.repeat(65536) }),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 10,
+          method: 'ping',
+          params: { _meta: { padding: 'x'.repeat(65536) } },
+        }),
       })
     ).status,
-    413,
+    200,
   );
   assert.equal(
     (

@@ -48,11 +48,7 @@ export const customCommandId = (id: string) => `appdock.custom.${id}`;
 export const customUpdateCommand = 'appdock.customCommands.update';
 export const customCommandVersion = 2;
 export function customDescription(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    value.length > 1000 ||
-    /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)
-  )
+  if (typeof value !== 'string' || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value))
     throw Error(hostText('settings.custom-commands.descriptionLength'));
   return value.replace(/\r\n?/g, '\n');
 }
@@ -65,29 +61,31 @@ export const sameCustomOwner = (a: CustomCommandOwner, b: CustomCommandOwner) =>
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(v);
 const version = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) > 0;
-const text = (v: unknown, max: number): v is string =>
-  typeof v === 'string' && !!v.trim() && v.length <= max && !/[\x00-\x1f\x7f]/.test(v);
-export function boundedJson(value: unknown, bytes: number, depth = 16, count = 2048) {
+const text = (v: unknown): v is string =>
+  typeof v === 'string' && !!v.trim() && !/[\x00-\x1f\x7f]/.test(v);
+export function validateJson(value: unknown) {
   const seen = new Set<object>();
-  const visit = (v: unknown, level: number) => {
-    if (--count < 0 || level > depth) throw Error(hostText('settings.custom-commands.jsonDepth'));
-    if (v === null || typeof v === 'string' || typeof v === 'boolean') return;
-    if (typeof v === 'number' && Number.isFinite(v)) return;
+  const pending: { value: unknown; leave?: boolean }[] = [{ value }];
+  while (pending.length) {
+    const { value: v, leave } = pending.pop()!;
+    if (leave) {
+      seen.delete(v as object);
+      continue;
+    }
+    if (v === null || typeof v === 'string' || typeof v === 'boolean') continue;
+    if (typeof v === 'number' && Number.isFinite(v)) continue;
     if (!v || typeof v !== 'object' || seen.has(v))
       throw Error(hostText('settings.custom-commands.jsonValue'));
     if (!Array.isArray(v) && ![Object.prototype, null].includes(Object.getPrototypeOf(v)))
       throw Error(hostText('settings.custom-commands.jsonObject'));
     seen.add(v);
+    pending.push({ value: v, leave: true });
     for (const [key, child] of Object.entries(v)) {
       if (['__proto__', 'prototype', 'constructor'].includes(key))
         throw Error(hostText('settings.custom-commands.jsonKey'));
-      visit(child, level + 1);
+      pending.push({ value: child });
     }
-    seen.delete(v);
-  };
-  visit(value, 0);
-  if (Number.isFinite(bytes) && new TextEncoder().encode(JSON.stringify(value)).length > bytes)
-    throw Error(hostText('settings.custom-commands.jsonSize'));
+  }
 }
 export function customItems(block: CustomCommandBlock | undefined): CustomCommandDefinition[] {
   return block?.version === customCommandVersion ? (block.items as CustomCommandDefinition[]) : [];
@@ -95,7 +93,7 @@ export function customItems(block: CustomCommandBlock | undefined): CustomComman
 export function parseCustomCommands(value: unknown): CustomCommandBlock {
   if (!jsonObject(value) || !version(value.version))
     throw Error(hostText('settings.custom-commands.format'));
-  boundedJson(value, Infinity, 40, Infinity);
+  validateJson(value);
   if (value.version !== customCommandVersion) return structuredClone(value) as CustomCommandBlock;
   if (
     Object.keys(value).some((k) => !['version', 'items'].includes(k)) ||
@@ -123,7 +121,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
       ) ||
       !customUuid(item.id) ||
       ids.has(item.id) ||
-      !text(item.title, 100) ||
+      !text(item.title) ||
       !identifier(item.typeId) ||
       !version(item.configVersion) ||
       !jsonObject(item.config) ||
@@ -136,7 +134,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
         : Object.keys(item.owner).length !== 2 || !identifier(item.owner.id))
     )
       throw Error(hostText('settings.custom-commands.command'));
-    boundedJson(item.config, Infinity, 40, Infinity);
+    validateJson(item.config);
     ids.add(item.id);
     return {
       ...item,
@@ -156,7 +154,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
 export function checkCustomSchema(schema: unknown) {
   if (!jsonObject(schema) || schema.type !== 'object')
     throw Error(hostText('settings.custom-commands.schemaRoot'));
-  boundedJson(schema, 32 * 1024, 32, 8192);
+  validateJson(schema);
   const scalar = new Set([
     'type',
     'title',
@@ -178,10 +176,7 @@ export function checkCustomSchema(schema: unknown) {
     'minProperties',
     'maxProperties',
   ]);
-  let visits = 0;
   const walk = (node: unknown, stack: Set<unknown>) => {
-    if (++visits > 10000 || stack.size > 64)
-      throw Error(hostText('settings.custom-commands.schemaLimit'));
     if (typeof node === 'boolean') return;
     if (!jsonObject(node) || stack.has(node))
       throw Error(hostText('settings.custom-commands.schemaCycle'));
@@ -208,7 +203,7 @@ export function checkCustomSchema(schema: unknown) {
       } else if (['items', 'additionalProperties', 'not', 'if', 'then', 'else'].includes(key))
         walk(value, next);
       else if (['allOf', 'anyOf', 'oneOf'].includes(key)) {
-        if (!Array.isArray(value) || !value.length || value.length > 16)
+        if (!Array.isArray(value) || !value.length)
           throw Error(hostText('settings.custom-commands.schemaBranch'));
         for (const child of value) walk(child, next);
       } else if (!scalar.has(key))
@@ -223,7 +218,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
     throw Error(hostText('settings.custom-commands.typeLimit'));
   const ids = new Set<string>();
   return raw.map((value) => {
-    boundedJson(value, 64 * 1024, 36, 10000);
+    validateJson(value);
     if (
       !jsonObject(value) ||
       Object.keys(value).some(
@@ -241,8 +236,8 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
       !identifier(value.id) ||
       !value.id.startsWith((ownerId ?? 'appdock') + '.') ||
       ids.has(value.id) ||
-      !text(value.title, 100) ||
-      (value.description !== undefined && !text(value.description, 2000)) ||
+      !text(value.title) ||
+      (value.description !== undefined && !text(value.description)) ||
       !version(value.configVersion) ||
       (value.automation !== undefined && typeof value.automation !== 'boolean')
     )
@@ -257,7 +252,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
           !jsonObject(field) ||
           !identifier(field.key) ||
           keys.has(field.key) ||
-          !text(field.title, 100) ||
+          !text(field.title) ||
           !['string', 'number', 'boolean', 'select', 'json'].includes(String(field.type)) ||
           Object.keys(field).some(
             (k) => !['key', 'title', 'type', 'default', 'options'].includes(k),
@@ -282,7 +277,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
               (o) =>
                 !jsonObject(o) ||
                 typeof o.value !== 'string' ||
-                !text(o.label, 100) ||
+                !text(o.label) ||
                 !Array.isArray(property.enum) ||
                 !property.enum.includes(o.value),
             ))

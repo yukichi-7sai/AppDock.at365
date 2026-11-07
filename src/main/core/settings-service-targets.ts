@@ -750,7 +750,6 @@ export class SettingsServiceTargets {
         key: 'name',
         title: hostText('settings.aiConnectionDialog.name'),
         type: 'string',
-        maxLength: 160,
         default: defaults.name,
       },
       {
@@ -764,7 +763,6 @@ export class SettingsServiceTargets {
         key: 'baseUrl',
         title: hostText('settings.aiConnectionDialog.url'),
         type: 'string',
-        maxLength: 2048,
         writable: !protectedKey,
         resettable: false,
       },
@@ -783,21 +781,18 @@ export class SettingsServiceTargets {
         key: 'defaultModel',
         title: hostText('settings.aiConnectionDialog.model'),
         type: 'string',
-        maxLength: 200,
         default: '',
       },
       {
         key: 'alwaysPrompt',
         title: hostText('settings.aiConnectionDialog.alwaysPrompt'),
         type: 'string',
-        maxLength: 2048,
         default: '',
       },
       {
         key: 'defaultPrompt',
         title: hostText('settings.aiConnectionDialog.defaultPrompt'),
         type: 'string',
-        maxLength: 2048,
         default: '',
       },
       {
@@ -1256,7 +1251,6 @@ export class SettingsServiceTargets {
         key: 'speechPath',
         title: hostText('settings.ttsSettings.speechPath'),
         type: 'string',
-        maxLength: 256,
         default: defaults.speechPath,
       },
       {
@@ -1295,7 +1289,6 @@ export class SettingsServiceTargets {
         key: 'baseUrl',
         title: hostText('settings.ttsSettings.url'),
         type: 'string',
-        maxLength: 2048,
         default: defaults.baseUrl,
         writable: !protectedKey,
       },
@@ -1303,14 +1296,12 @@ export class SettingsServiceTargets {
         key: 'model',
         title: hostText('settings.ttsSettings.model'),
         type: 'string',
-        maxLength: 200,
         default: defaults.model,
       },
       {
         key: 'defaultVoice',
         title: hostText('settings.ttsSettings.defaultVoice'),
         type: 'string',
-        maxLength: 200,
         default: defaults.defaultVoice,
       },
       {
@@ -1324,7 +1315,6 @@ export class SettingsServiceTargets {
         key: 'voicesPath',
         title: hostText('settings.ttsSettings.voicePath'),
         type: 'string',
-        maxLength: 256,
         default: defaults.voicesPath,
       },
     ];
@@ -1425,7 +1415,6 @@ export class SettingsServiceTargets {
         key: 'speechPath',
         title: hostText('settings.ttsSettings.speechPath'),
         type: 'string',
-        maxLength: 256,
         default: defaults.speechPath,
       },
       {
@@ -1464,21 +1453,18 @@ export class SettingsServiceTargets {
         key: 'baseUrl',
         title: hostText('settings.ttsSettings.url'),
         type: 'string',
-        maxLength: 2048,
         default: defaults.baseUrl,
       },
       {
         key: 'model',
         title: hostText('settings.ttsSettings.model'),
         type: 'string',
-        maxLength: 200,
         default: defaults.model,
       },
       {
         key: 'defaultVoice',
         title: hostText('settings.ttsSettings.defaultVoice'),
         type: 'string',
-        maxLength: 200,
         default: defaults.defaultVoice,
       },
       {
@@ -1492,7 +1478,6 @@ export class SettingsServiceTargets {
         key: 'voicesPath',
         title: hostText('settings.ttsSettings.voicePath'),
         type: 'string',
-        maxLength: 256,
         default: defaults.voicesPath,
       },
     ];
@@ -1504,7 +1489,6 @@ export class SettingsServiceTargets {
         title: hostText('settings.ttsServers.name'),
         type: 'string',
         minLength: 1,
-        maxLength: 200,
       },
     );
     fields.push({
@@ -1519,8 +1503,8 @@ export class SettingsServiceTargets {
           required: ['id'],
           additionalProperties: false,
           properties: {
-            id: { type: 'string', minLength: 1, maxLength: 200 },
-            name: { type: 'string', maxLength: 200 },
+            id: { type: 'string', minLength: 1 },
+            name: { type: 'string' },
           },
         },
       },
@@ -1642,13 +1626,11 @@ export class SettingsServiceTargets {
         title: hostText('settings.ttsSettings.voiceId'),
         type: 'string',
         minLength: 1,
-        maxLength: 200,
       },
       {
         key: 'name',
         title: hostText('settings.ttsSettings.voiceName'),
         type: 'string',
-        maxLength: 200,
       },
     ];
     const definition: Field = {

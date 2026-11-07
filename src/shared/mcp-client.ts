@@ -1,5 +1,5 @@
 import { hostText } from './i18n';
-import { boundedJson, jsonObject, type JsonObject } from './custom-commands';
+import { validateJson, jsonObject, type JsonObject } from './custom-commands';
 
 export interface McpServerEntry {
   id: string;
@@ -60,11 +60,11 @@ export interface McpJob {
 }
 export const mcpUuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
-export const mcpText = (v: unknown, max: number): v is string =>
+export const mcpText = (v: unknown, max = Infinity): v is string =>
   typeof v === 'string' && v.length <= max && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 export function parseMcpRoster(value: unknown): McpServerRoster {
   if (value === undefined) return { version: 1, items: [] };
-  boundedJson(value, Infinity, 4, Infinity);
+  validateJson(value);
   if (
     !jsonObject(value) ||
     value.version !== 1 ||
@@ -80,9 +80,9 @@ export function parseMcpRoster(value: unknown): McpServerRoster {
         !jsonObject(v) ||
         !mcpUuid(v.id) ||
         ids.has(v.id) ||
-        !mcpText(v.name, 160) ||
+        !mcpText(v.name) ||
         !v.name.trim() ||
-        !mcpText(v.description, 1024) ||
+        !mcpText(v.description) ||
         Object.keys(v).some((k) => !['id', 'name', 'description'].includes(k))
       )
         throw Error(hostText('settings.mcp-client.server'));
@@ -103,7 +103,7 @@ export const defaultMcpConnection = (): McpConnection => ({
   publishedTools: [],
 });
 export function parseMcpConnection(value: unknown): McpConnection {
-  boundedJson(value, Infinity, 6, Infinity);
+  validateJson(value);
   if (
     !jsonObject(value) ||
     Object.keys(value).some((k) => !Object.hasOwn(defaultMcpConnection(), k)) ||
@@ -111,11 +111,11 @@ export function parseMcpConnection(value: unknown): McpConnection {
     typeof value.published !== 'boolean' ||
     !['stdio', 'http'].includes(String(value.transport)) ||
     !['none', 'bearer'].includes(String(value.authentication)) ||
-    !mcpText(value.command, 4096) ||
-    !mcpText(value.cwd, 4096) ||
-    !mcpText(value.url, 4096) ||
+    !mcpText(value.command) ||
+    !mcpText(value.cwd) ||
+    !mcpText(value.url) ||
     !Array.isArray(value.args) ||
-    !value.args.every((v) => mcpText(v, 4096)) ||
+    !value.args.every((v) => mcpText(v)) ||
     !Array.isArray(value.publishedTools) ||
     !value.publishedTools.every((v) => typeof v === 'string' && /^[\w.-]{1,128}$/.test(v)) ||
     new Set(value.publishedTools).size !== value.publishedTools.length
@@ -203,8 +203,8 @@ export const mcpClientOperations = {
               type: 'string',
               pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
             },
-            name: { type: 'string', minLength: 1, maxLength: 160 },
-            description: { type: 'string', maxLength: 1024 },
+            name: { type: 'string', minLength: 1 },
+            description: { type: 'string' },
           },
           ['id', 'name', 'description'],
         ),
@@ -212,10 +212,10 @@ export const mcpClientOperations = {
           {
             enabled: { type: 'boolean' },
             transport: { type: 'string', enum: ['stdio', 'http'] },
-            command: { type: 'string', maxLength: 4096 },
-            args: { type: 'array', items: { type: 'string', maxLength: 4096 } },
-            cwd: { type: 'string', maxLength: 4096 },
-            url: { type: 'string', maxLength: 4096 },
+            command: { type: 'string' },
+            args: { type: 'array', items: { type: 'string' } },
+            cwd: { type: 'string' },
+            url: { type: 'string' },
             authentication: { type: 'string', enum: ['none', 'bearer'] },
             published: { type: 'boolean' },
             publishedTools: { type: 'array', uniqueItems: true, items: toolName },

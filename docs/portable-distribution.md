@@ -20,7 +20,7 @@
 
 `appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、`translations`、`configs`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布元に一覧外のファイルやリンクがあれば発行・更新準備を拒否する。
 
-`update.zip`は本体フォルダーの内容だけを格納する。feedはschemaVersion=1、kind=host、id=host、payload.format=zip。SHA256と配布サイズを従来どおり照合する。圧縮ファイルは512MiB、展開済み本体は1GiB、ファイル数は10,000件を上限とする。Appletの既存512MiB上限は変えない。
+`update.zip`は本体フォルダーの内容だけを格納する。feedはschemaVersion=1、kind=host、id=host、payload.format=zip。SHA256と配布サイズを従来どおり照合する。配布物・展開後ファイル・manifestにAppDock独自の固定容量・ファイル件数上限は設けない。配布物は分割してディスクへ保存しながらSHA256と実サイズを計算し、feedの宣言値との一致を確認してから展開する。包含パス・重複パス・リンクの拒否と更新の原子的適用・復旧は維持する。
 
 ## 自己更新と配置
 

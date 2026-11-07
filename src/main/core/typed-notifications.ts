@@ -92,16 +92,12 @@ export class TypedNotifications {
     // Validate content even when preferences suppress delivery.
     if (
       typeof content.title !== 'string' ||
-      content.title.length > 200 ||
       typeof content.body !== 'string' ||
-      content.body.length > 2000 ||
       (content.dedupeKey !== undefined && (!content.dedupeKey || content.dedupeKey.length > 200)) ||
       (type.history === 'persistent' &&
         (!content.historyText ||
           typeof content.historyText.title !== 'string' ||
-          content.historyText.title.length > 200 ||
-          typeof content.historyText.body !== 'string' ||
-          content.historyText.body.length > 2000))
+          typeof content.historyText.body !== 'string'))
     )
       throw Error(hostText('services.typedNotifications.invalidContent'));
     if (owner.ownerKind === 'applet') {

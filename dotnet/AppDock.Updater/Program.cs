@@ -8,7 +8,6 @@ using System.IO.Pipes;
 
 internal static partial class Program
 {
-    private const long Limit = 512L * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
     private sealed record Item(string Kind, string Id, string Version, string Source, string Destination, string? Sha256, string? Operation = null, string? PreviousSha256 = null);
     private sealed record Swap(Item Item, string Next, string Backup);
@@ -49,17 +48,17 @@ internal static partial class Program
         using var stream = File.OpenRead(file);
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
-    private static string TreeHash(string directory, long max = Limit)
+    private static string TreeHash(string directory)
     {
         NoLinks(directory);
-        var files = Files(directory, max).OrderBy(p => Path.GetRelativePath(directory, p).Replace('\\', '/'), StringComparer.Ordinal);
+        var files = Files(directory).OrderBy(p => Path.GetRelativePath(directory, p).Replace('\\', '/'), StringComparer.Ordinal);
         var text = new StringBuilder();
         foreach (var file in files) text.Append(Path.GetRelativePath(directory, file).Replace('\\', '/')).Append('\0').Append(Hash(file)).Append('\n');
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant();
     }
-    private static List<string> Files(string directory, long max = Limit)
+    private static List<string> Files(string directory)
     {
-        var files = new List<string>(); long size = 0;
+        var files = new List<string>();
         void Walk(string current)
         {
             NoLinks(current, directory);
@@ -69,28 +68,25 @@ internal static partial class Program
                 if (Directory.Exists(file)) Walk(file);
                 else
                 {
-                    size += new FileInfo(file).Length;
-                    if (size > max || files.Count >= 10000) throw NativeMessages.Error("native.updater.fileLimit", text => new IOException(text));
                     files.Add(file);
                 }
             }
         }
         Walk(directory); return files;
     }
-    private static void Extract(string archive, string directory, long max = Limit)
+    private static void Extract(string archive, string directory)
     {
         if (Directory.Exists(directory)) throw NativeMessages.Error("native.updater.extractDestination", text => new IOException(text));
         Directory.CreateDirectory(directory); NoLinks(directory);
         using var zip = ZipFile.OpenRead(archive);
-        long size = 0; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (zip.Entries.Count > 10000) throw NativeMessages.Error("native.updater.zipFileLimit", text => new IOException(text));
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in zip.Entries)
         {
             var name = entry.FullName.TrimEnd('/'); SafeName(name);
             if (((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000) throw NativeMessages.Error("native.updater.zipLinksDenied", text => new IOException(text));
             if (!paths.Add(name)) throw NativeMessages.Error("native.updater.zipDuplicatePath", text => new IOException(text));
             var destination = Full(Path.Combine(directory, name));
-            if (!Within(directory, destination) || (size += entry.Length) > max) throw NativeMessages.Error("native.updater.zipExtractionLimit", text => new IOException(text));
+            if (!Within(directory, destination)) throw NativeMessages.Error("native.updater.zipExtractionLimit", text => new IOException(text));
             if (entry.FullName.EndsWith('/')) Directory.CreateDirectory(destination);
             else { Directory.CreateDirectory(Path.GetDirectoryName(destination)!); entry.ExtractToFile(destination, false); }
         }
@@ -106,10 +102,10 @@ internal static partial class Program
         }
         File.Move(next, file, true);
     }
-    private static void CopyDirectory(string source, string destination, long max = Limit)
+    private static void CopyDirectory(string source, string destination)
     {
         Directory.CreateDirectory(destination);
-        foreach (var file in Files(source, max))
+        foreach (var file in Files(source))
         {
             var target = Path.Combine(destination, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, false);
@@ -131,7 +127,7 @@ internal static partial class Program
     private static void Verify(Item item)
     {
         NoLinks(item.Source); NoLinks(item.Destination);
-        var digest = FileItem(item.Kind) ? Hash(item.Source) : TreeHash(item.Source, item.Kind == "host-directory" ? HostLimit : Limit);
+        var digest = FileItem(item.Kind) ? Hash(item.Source) : TreeHash(item.Source);
         if (!string.Equals(digest, item.Sha256, StringComparison.OrdinalIgnoreCase)) throw NativeMessages.Error("native.updater.preparedHashMismatch", text => new IOException(text));
         if (item.Kind == "applet")
         {
@@ -211,7 +207,7 @@ internal static partial class Program
             var suffix = Guid.NewGuid().ToString("N");
             swaps.Add(new(item, item.Destination + ".update-" + suffix, item.Destination + ".previous-" + suffix));
         }
-        if (swaps.Count is 0 or > 501) throw NativeMessages.Error("native.updater.targetCount", text => new IOException(text));
+        if (swaps.Count == 0) throw NativeMessages.Error("native.updater.targetCount", text => new IOException(text));
         var processes = new List<Process>();
         foreach (var id in root.GetProperty("processIds").EnumerateArray().Select(v => v.GetInt32()).Distinct())
         {
@@ -310,7 +306,7 @@ internal static partial class Program
         var committed = document.RootElement.TryGetProperty("committed", out var flag) && flag.GetBoolean();
         var swaps = JsonSerializer.Deserialize<List<Swap>>(document.RootElement.GetProperty("swaps"), JsonOptions)
             ?? throw NativeMessages.Error("native.updater.recoveryRecordMissing", text => new IOException(text));
-        if (swaps.Count is 0 or > 501) throw NativeMessages.Error("native.updater.recoveryCount", text => new IOException(text));
+        if (swaps.Count == 0) throw NativeMessages.Error("native.updater.recoveryCount", text => new IOException(text));
         var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // Validate the entire journal before touching any destination.
         foreach (var swap in swaps)
@@ -382,7 +378,6 @@ internal static partial class Program
                 using (var archive = ZipFile.Open(temporary, ZipArchiveMode.Create))
                     foreach (var file in files!)
                         archive.CreateEntryFromFile(file, Path.GetRelativePath(source, file).Replace('\\', '/'), CompressionLevel.Optimal);
-                if (new FileInfo(temporary).Length > Limit) throw NativeMessages.Error("native.updater.zipSizeLimit", text => new IOException(text));
                 File.Move(temporary, filePath, true);
             }
             else if (!Same(source, filePath)) { File.Copy(source, temporary); File.Move(temporary, filePath, true); }
@@ -407,7 +402,7 @@ internal static partial class Program
                 args = args[1..];
             }
             if (args.Length == 3 && args[0] == "--extract") Extract(args[1], args[2]);
-            else if (args.Length == 3 && args[0] == "--extract-host") Extract(args[1], args[2], HostLimit);
+            else if (args.Length == 3 && args[0] == "--extract-host") Extract(args[1], args[2]);
             else if (args.Length == 2 && args[0] == "--apply") Apply(args[1]);
             else if (args.Length == 2 && args[0] == "--recover") Recover(args[1]);
             else if (args.Length == 3 && args[0] == "--recover") Recover(args[1], args[2]);

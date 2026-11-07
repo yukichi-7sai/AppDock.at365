@@ -55,6 +55,18 @@ function fixture(t) {
   };
   return { dir, store, owner, crypto, add };
 }
+test('MCP credentials preserve long bearer and environment values without changing endpoint ownership', (t) => {
+  const f = fixture(t),
+    value = 'secret'.repeat(20000);
+  const bearer = f.add({ authentication: 'bearer' }, { token: value });
+  assert.equal(f.owner.secrets(bearer).token, value);
+  const stdio = f.add(
+    { transport: 'stdio', url: '', command: 'C:\\fixture.exe' },
+    { environment: { CONTENT: value } },
+  );
+  assert.deepEqual(f.owner.secrets(stdio).env, { CONTENT: value });
+});
+
 test('MCP tab resets and local JSON replacement preserve unrelated definitions and secret bytes', (t) => {
   const f = fixture(t),
     serverId = f.add({ authentication: 'bearer' }, { token: 'key' });

@@ -23,7 +23,6 @@ export async function readWebAvatar(response: Response): Promise<Buffer> {
   if (
     !response.ok ||
     !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(mime ?? '') ||
-    Number(response.headers.get('content-length')) > 65536 ||
     !response.body
   ) {
     await response.body?.cancel();
@@ -37,7 +36,6 @@ export async function readWebAvatar(response: Response): Promise<Buffer> {
       const result = await reader.read();
       if (result.done) break;
       size += result.value.byteLength;
-      if (size > 65536) throw Error('Account image is too large');
       chunks.push(result.value);
     }
     if (!size) throw Error('Empty account image');
@@ -98,10 +96,6 @@ export function webAvatarResponse(
       incoming.on('data', (chunk: Buffer) => {
         if (settled) return;
         size += chunk.length;
-        if (size > 65536) {
-          finish(undefined, Error('Account image is too large'));
-          return;
-        }
         chunks.push(chunk);
       });
       incoming.on('error', () => finish());

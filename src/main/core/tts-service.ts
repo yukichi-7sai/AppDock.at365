@@ -27,8 +27,6 @@ export const ttsLimits = {
   queueMs: 600000,
   generationMs: 180000,
   voicesMs: 5000,
-  audioBytes: 64 * 1024 * 1024,
-  voiceBytes: 1024 * 1024,
   durationSeconds: 600,
   records: 512,
   retentionMs: 1800000,
@@ -122,15 +120,13 @@ export function waveDuration(b: Buffer): number {
   const duration = data / byteRate;
   if (duration > ttsLimits.durationSeconds)
     return fail('TTS_AUDIO_TOO_LONG', hostText('services.ttsService.durationLimit'));
-  if (duration * rate * channels * 4 > 256 * 1024 * 1024)
-    return fail('TTS_AUDIO_TOO_LARGE', hostText('services.ttsService.decodedSizeLimit'));
   return duration;
 }
 export interface TtsInternalOptions {
   configuration?: { settings: TtsSettings; key?: string };
   startBefore?: number;
   canStart?(): boolean;
-  audio?: { maximumBytes: number; receive(bytes: Buffer, seconds: number): void };
+  audio?: { receive(bytes: Buffer, seconds: number): void };
 }
 interface InternalJob {
   connectionId?: string;
@@ -259,7 +255,6 @@ export class TtsService {
     owner: string,
     input: Record<string, unknown>,
     signal: AbortSignal,
-    maximumBytes: number,
     progress?: (state: 'queued' | 'generating') => void,
     receive?: (audio: { bytes: Buffer; seconds: number }) => void,
   ) {
@@ -297,7 +292,6 @@ export class TtsService {
           { ...input, requestId: randomUUID() },
           {
             audio: {
-              maximumBytes,
               receive: (bytes, seconds) => {
                 audio = { bytes, seconds };
                 receive?.(audio);
@@ -329,7 +323,6 @@ export class TtsService {
       (instructions !== undefined && typeof instructions !== 'string') ||
       typeof text !== 'string' ||
       !text.trim() ||
-      Array.from(text).length > 4096 ||
       typeof requestId !== 'string' ||
       !requestId ||
       requestId.length > 100 ||
@@ -541,7 +534,6 @@ export class TtsService {
           body: JSON.stringify(request.body),
           signal: controller.signal,
         },
-        Math.min(this.limits.audioBytes, j.internal?.audio?.maximumBytes ?? this.limits.audioBytes),
         false,
       );
       clearTimeout(j.timer);
@@ -587,7 +579,6 @@ export class TtsService {
   private async download(
     url: string,
     init: RequestInit,
-    limit: number,
     voices: boolean | 'models',
   ): Promise<Buffer> {
     const invalidCode =
@@ -642,11 +633,6 @@ export class TtsService {
           const next = await reader.read();
           if (next.done) break;
           size += next.value.length;
-          if (size > limit)
-            fail(
-              voices ? invalidCode : 'TTS_AUDIO_TOO_LARGE',
-              hostText('services.ttsService.responseLimit'),
-            );
           chunks.push(Buffer.from(next.value));
         }
       } finally {
@@ -693,7 +679,6 @@ export class TtsService {
             headers: key ? { Authorization: 'Bearer ' + key } : {},
             signal: abort.signal,
           },
-          this.limits.voiceBytes,
           'models',
         );
         if (abort.signal.aborted)
@@ -743,7 +728,6 @@ export class TtsService {
         const bytes = await this.download(
           config.baseUrl + '/' + config.voicesPath,
           { headers: key ? { Authorization: 'Bearer ' + key } : {}, signal: abort.signal },
-          this.limits.voiceBytes,
           true,
         );
         if (abort.signal.aborted)

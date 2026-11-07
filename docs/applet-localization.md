@@ -43,7 +43,7 @@ Nodeは`context.localization`、.NET SDK/Runtimeは`context.Localization`を使�
 
 登録済みのローカルAppletページとWebアカウントのローカル画面は共通preloadの`appdockLocalization`を使う。snapshot取得・翻訳・変更購読を提供する。送信元のメインフレーム・登録URL・所有Appletを照合し、リモートページ・iframe・他Appletの辞書へ公開しない。
 
-ローカル画面の`appdockLocalization.snapshot()`と`t(key, values)`はPromiseを返す。`onChanged(snapshot => ...)`は購読解除関数を返す。Nodeのsnapshotとt、.NETのSnapshotとTextは同期処理。SDK/Runtimeの版は0.32.0で、AssemblyVersionは既存Appletとの互換性のため維持する。
+ローカル画面の`appdockLocalization.snapshot()`と`t(key, values)`はPromiseを返す。`onChanged(snapshot => ...)`は購読解除関数を返す。Nodeのsnapshotとt、.NETのSnapshotとTextは同期処理。翻訳APIはSDK/Runtime 0.32.0以降に対応し、AssemblyVersionは既存Appletとの互換性のため維持する。
 
 ```json
 {

@@ -37,7 +37,7 @@ export class AiSettingsController {
     if (
       key !== undefined &&
       key !== null &&
-      (typeof key !== 'string' || key.length > 8192 || /[\x00-\x1f\x7f]/.test(key))
+      (typeof key !== 'string' || /[\x00-\x1f\x7f]/.test(key))
     )
       throw Error(hostText('settings.ai-settings.invalidKey'));
     if (c.authentication === 'none') return undefined;

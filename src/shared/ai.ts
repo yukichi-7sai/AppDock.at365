@@ -65,17 +65,14 @@ export const aiId = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[a-z0-9][a-z0-9._-]{0,99}$/.test(v) &&
   !['constructor', 'prototype', '__proto__'].includes(v);
-export const aiString = (v: unknown, max: number): v is string =>
-  typeof v === 'string' &&
-  Array.from(v).length <= max &&
-  !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
+export const aiString = (v: unknown): v is string =>
+  typeof v === 'string' && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 const keys = (v: Record<string, unknown>, names: string[]) => {
   if (Object.keys(v).some((k) => !names.includes(k))) throw Error(hostText('settings.ai.fields'));
 };
 export function aiBaseUrl(value: string): string {
   if (!value) return '';
-  if (value.length > 2048 || /[\\\s?#]/.test(value))
-    throw Error(hostText('settings.ai.urlCredentials'));
+  if (/[\\\s?#]/.test(value)) throw Error(hostText('settings.ai.urlCredentials'));
   let url: URL;
   try {
     url = new URL(value);
@@ -142,19 +139,19 @@ export function parseAiSettings(value: unknown): AiSettings {
       (item.mcpEnabled !== undefined && typeof item.mcpEnabled !== 'boolean') ||
       !aiId(item.id) ||
       ids.has(item.id) ||
-      !aiString(item.name, 160) ||
+      !aiString(item.name) ||
       item.protocol !== 'openai-chat-completions' ||
       !['ollama', 'lm-studio', 'llama-cpp', 'openai', 'custom'].includes(String(item.preset)) ||
       typeof item.baseUrl !== 'string' ||
       (item.defaultModel !== undefined &&
-        (!aiString(item.defaultModel, 200) || /[\r\n]/.test(item.defaultModel))) ||
+        (!aiString(item.defaultModel) || /[\r\n]/.test(item.defaultModel))) ||
       !['none', 'bearer'].includes(String(item.authentication)) ||
       !aiObject(item.compatibility)
     )
       throw Error(hostText('settings.ai.identity'));
     if (
-      (item.alwaysPrompt !== undefined && !aiString(item.alwaysPrompt, 2048)) ||
-      (item.defaultPrompt !== undefined && !aiString(item.defaultPrompt, 2048))
+      (item.alwaysPrompt !== undefined && !aiString(item.alwaysPrompt)) ||
+      (item.defaultPrompt !== undefined && !aiString(item.defaultPrompt))
     )
       throw Error(hostText('settings.ai.prompts'));
     ids.add(item.id);

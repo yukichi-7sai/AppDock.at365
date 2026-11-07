@@ -108,16 +108,26 @@ test('discovery and installation accept more than 256 combined command types and
   assert.equal(conflicting.discoveryIssueCount, 1);
 });
 
-test('settings above 4 MiB persist and reload thousands of custom commands without truncation', (t) => {
+test('settings above 4 MiB persist and reload thousands of custom commands without truncation', async (t) => {
   const root = path.resolve(__dirname, '../.artifacts/settings-capacity-unit');
   fs.mkdirSync(root, { recursive: true });
   const directory = fs.mkdtempSync(path.join(root, 'case-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const file = path.join(directory, 'settings.json');
   const store = new SettingsStore(file);
+  t.after(() => store.close());
   store.load();
   const items = Array.from({ length: 5000 }, (_, i) => custom(i));
   store.save({ ...store.value, customCommands: { version: 2, items } }, store.revision);
+  store.watch((error) => {
+    throw error;
+  });
+  const changed = new Promise((resolve) => store.once('changed', resolve));
+  const external = structuredClone(store.value);
+  external.host.theme = external.host.theme === 'dark' ? 'light' : 'dark';
+  require('../out/main/main/core/settings').atomicWrite(file, JSON.stringify(external));
+  await changed;
+  assert.equal(store.value.host.theme, external.host.theme);
   assert(fs.statSync(file).size > 4 * 1024 * 1024);
   const reloaded = new SettingsStore(file);
   reloaded.load();
@@ -208,10 +218,18 @@ test('settings collections accept former boundaries while rejecting malformed id
   );
   assert.equal(parseTrayMenu(ids.map((id) => ({ id, type: 'separator' }))).length, 2001);
   assert.equal(
-    validateCollectionRecords({ source: 'remote' }, Array.from({ length: 65 }, () => ({
-      id: randomUUID(), name: 'Site', enabled: true, display: 'page',
-      url: 'https://example.test/', navigation: 'same-origin', allowedOrigins: [],
-    }))).length,
+    validateCollectionRecords(
+      { source: 'remote' },
+      Array.from({ length: 65 }, () => ({
+        id: randomUUID(),
+        name: 'Site',
+        enabled: true,
+        display: 'page',
+        url: 'https://example.test/',
+        navigation: 'same-origin',
+        allowedOrigins: [],
+      })),
+    ).length,
     65,
   );
   assert.equal(

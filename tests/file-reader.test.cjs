@@ -21,10 +21,9 @@ test('reader handles simultaneous requests, UTF-8, empty files and errors withou
     '',
   ]);
   await assert.rejects(readObservedFile(path.join(root, 'missing.json')), { code: 'ENOENT' });
-  fs.writeFileSync(other, Buffer.alloc(4 * 1024 * 1024 + 1));
-  await assert.rejects(readObservedFile(other), { code: 'EFBIG' });
-  fs.writeFileSync(other, Buffer.alloc(4 * 1024 * 1024, 120));
-  assert.equal((await readObservedFile(other)).length, 4 * 1024 * 1024);
+  const large = '設定🌙'.repeat(600000);
+  fs.writeFileSync(other, large);
+  assert.equal(await readObservedFile(other), large);
   assert.equal(await readObservedFile(file), text);
 });
 

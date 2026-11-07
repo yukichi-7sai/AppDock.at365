@@ -27,23 +27,12 @@ function tools() {
 function body(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    let size = 0,
-      failed = false;
-    req.on('data', (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > 65536) {
-        if (!failed) reject(Error('TOO_LARGE'));
-        failed = true;
-        chunks.length = 0;
-      } else if (!failed) chunks.push(chunk);
-    });
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
-      if (!failed) {
-        try {
-          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-        } catch {
-          reject(Error('INVALID_JSON'));
-        }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(Error('INVALID_JSON'));
       }
     });
     req.on('error', reject);
@@ -309,7 +298,7 @@ export class AutomationMcp {
         )
           this.connected(isLocalClient(req.socket.remoteAddress));
       } catch (error) {
-        fail((error as Error).message === 'TOO_LARGE' ? 413 : 400);
+        fail(400);
         dispose();
       }
     });

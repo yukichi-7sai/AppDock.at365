@@ -9,7 +9,7 @@ internal static partial class Program
     {
         NoLinks(location);
         if (!Exists(location, item.Kind) || !Regex.IsMatch(item.PreviousSha256 ?? "", "^[a-f0-9]{64}$", RegexOptions.IgnoreCase) ||
-            !string.Equals(FileItem(item.Kind) ? Hash(location) : TreeHash(location, item.Kind == "host-directory" ? HostLimit : Limit), item.PreviousSha256, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(FileItem(item.Kind) ? Hash(location) : TreeHash(location), item.PreviousSha256, StringComparison.OrdinalIgnoreCase))
             throw NativeMessages.Error("native.package.previousMismatch", text => new IOException(text));
         if (item.Kind == "applet")
         {
@@ -24,8 +24,7 @@ internal static partial class Program
     }
     private static void ValidatePackageSwaps(string baseDirectory, string executable, string operationId, List<Swap> swaps)
     {
-        // Up to 10,000 archive files plus the existing host/Applet transaction entries.
-        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count is 0 or > 10550)
+        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count == 0)
             throw NativeMessages.Error("native.package.hostOrCount", text => new IOException(text));
         NoLinks(baseDirectory); NoLinks(executable);
         var transactionRoot = TransactionRoot(baseDirectory, operationId); NoLinks(transactionRoot);
@@ -84,7 +83,7 @@ internal static partial class Program
             {
                 if (operation == "uninstall") throw NativeMessages.Error("native.package.uninstallUnknownPayload", text => new IOException(text));
                 if (committed) Verify(item with { Source = swap.Next });
-                else if (!FileItem(item.Kind)) _ = TreeHash(swap.Next, item.Kind == "host-directory" ? HostLimit : Limit);
+                else if (!FileItem(item.Kind)) _ = TreeHash(swap.Next);
                 else NoLinks(swap.Next);
             }
             if (committed)
@@ -205,7 +204,7 @@ internal static partial class Program
                 Directory.CreateDirectory(Path.GetDirectoryName(swap.Next)!); NoLinks(swap.Next);
                 if (Operation(swap.Item) == "uninstall") continue;
                 if (FileItem(swap.Item.Kind)) File.Copy(swap.Item.Source, swap.Next);
-                else CopyDirectory(swap.Item.Source, swap.Next, swap.Item.Kind == "host-directory" ? HostLimit : Limit);
+                else CopyDirectory(swap.Item.Source, swap.Next);
                 Verify(swap.Item with { Source = swap.Next });
             }
             foreach (var swap in swaps)

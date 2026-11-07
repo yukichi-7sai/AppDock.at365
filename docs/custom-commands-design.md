@@ -54,8 +54,8 @@ MCPツールコマンドはこの一覧から分離し、[MCPクライアント�
 | --- | --- |
 | id | 小文字のUUID。作成時に発行し、名称・設定変更で変えない。公開APIの新規作成では呼出し元がUUIDを用意する |
 | commandId | `appdock.custom.<id>`として本体が生成する。保存データには重複して持たない |
-| title | 前後空白を除いて1～100文字。表示名の重複は許可し、識別に使わない |
-| description | 全種類共通の任意の説明。省略時は空文字、1,000 UTF-16コード単位以内。改行はLFへ揃え、公開コマンド一覧にも返す |
+| title | 前後空白を除いて空でない文字列。表示名の重複は許可し、識別に使わない。固定文字数上限はない |
+| description | 全種類共通の任意の説明。省略時は空文字。改行はLFへ揃え、公開コマンド一覧にも全文を返す |
 | category | 任意のカテゴリ。100 UTF-16コード単位以内で改行・制御文字は不可、前後空白を除去。省略・空文字は未分類。追加・更新API、編集ダイアログ、設定JSONで指定でき、共通選択と公開コマンド一覧へ投影する。AppDock 0.130.0から対応 |
 | typeId | 種類宣言のID。作成後は変更不可。別種類への変更は別定義の作成として扱う |
 | owner | 作成時に本体が宣言から設定する。CRUD入力では指定・変更不可。実行時は現在の宣言との一致を必須とする |
@@ -79,11 +79,11 @@ itemsの配列順は管理一覧の順序だけを表す。ショートカット
 | 保存定義 | 固定件数上限なし |
 | 種類宣言 | 1Applet16件。全提供元合計の固定上限なし |
 | typeId | 既存の公開IDに使える文字で200文字以内。本体はappdock名前空間、Appletは自身のID配下 |
-| config | 固定の合計サイズ・要素数上限なし。保存ブロックの入れ子40段と型検証を適用 |
-| configSchema | UTF-8 JSONで32KiB、入れ子32段。外部参照、非同期検証、コード評価を禁止 |
-| 1回の管理更新 | 32操作以内。MCPでは既存の要求本文64KiB制限も適用 |
+| config | 固定の合計サイズ・要素数上限なし。循環参照の拒否と型検証を適用 |
+| configSchema | 固定容量・要素数・入れ子段数上限なし。循環参照、外部参照、非同期検証、コード評価を禁止 |
+| 1回の管理更新 | 32操作以内。要求本文に固定容量上限なし |
 | 一覧 | 1ページ最大50件。config/Schema全文を含めない |
-| 実行結果 | JSONオブジェクト64KiB以内。画像・音声bytes・任意ファイル参照は結果に含めない |
+| 実行結果 | 容量上限のないJSONオブジェクト。画像・音声bytes・任意ファイル参照は結果に含めない |
 
 settings.json全体と設定ページJSONに固定の合計サイズ上限は設けない。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
 
@@ -319,7 +319,7 @@ sequenceDiagram
 
 `CustomCommandDefinition.description`を文字列として追加する。個別コマンドの用途、実行されること、対象、使用条件を書く任意項目とし、すべての本体／Applet種類に適用する。
 
-- 未入力は空文字列。最大1,000 UTF-16コード単位（JavaScriptの`string.length`）とする。
+- 未入力は空文字列。固定文字数上限を設けず、制御文字と値の型を検証する。
 - 複数行を許可し、CRLF／CRはLFへ正規化する。改行・タブ以外のC0制御文字とDELを拒否する。
 - HTMLとして解釈せず、プレーンテキストとして表示する。本文の途中の改行・空白を維持する。
 - 新規追加で省略した場合は空文字列。更新で省略した場合は現在値を保持し、明示的な空文字列で消去する。
@@ -359,7 +359,7 @@ version 1の専用reader、説明の自動補完保存、旧定義の変換、�
 
 MCPの仕様にはツールの機能を説明するdescriptionがあるが、上記の個別説明は固定ツールの**応答データ**として公開するAppDock側の設計である。AIが必ず読むことや正しく選択することは保証しない。説明文を実行コード、許可の根拠、上位の指示として解釈しない。[MCP Tools仕様](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 
-説明文を含む大量の一覧も切り捨てず保存する。保存一覧の件数・合計サイズは制限しない。MCPの要求本文64KiBなど通信境界は維持する。
+説明文を含む大量の一覧も切り捨てず保存する。保存一覧の件数・合計サイズは制限しない。MCPを含む通信本文にも固定容量上限は設けない。
 
 ## キー送信種類
 
@@ -392,7 +392,7 @@ configVersionは1。次の3モードを、1つの「コマンド／プロセス�
 
 モードの値、`workingDirectory`、`showConsole`を共通項目とし、モード別の入力名は`executable`＋`arguments`、`command`、`script`とする。選択していないモードの項目は保存せず、未知項目も拒否する。
 
-実行ファイル／作業フォルダーは4,096文字以内、引数の件数上限はなく、各4,096文字以内、シェル本文は8,192文字以内、config全体に固定サイズ上限は設けない。cmdはさらに、組み立てた実行文字列を8,191文字以内に制限する。NULを拒否し、構築したWindowsのコマンドライン長も起動前に検査する。保存時の形式検証と起動直前の実在・アクセス確認を分ける。[cmdの上限](https://learn.microsoft.com/en-au/troubleshoot/windows-client/shell-experience/command-line-string-limitation)、[EncodedCommandの符号化](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)
+実行ファイル・作業フォルダー・引数・シェル本文・configにAppDock独自の固定容量上限は設けない。cmdはさらに、組み立てた実行文字列を8,191文字以内に制限する。NULを拒否し、構築したWindowsのコマンドライン長も起動前に検査する。保存時の形式検証と起動直前の実在・アクセス確認を分ける。[cmdの上限](https://learn.microsoft.com/en-au/troubleshoot/windows-client/shell-experience/command-line-string-limitation)、[EncodedCommandの符号化](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)
 
 ### 共通APIと寿命
 

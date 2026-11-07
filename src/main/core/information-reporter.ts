@@ -24,8 +24,7 @@ export class InformationReporter {
     if (this.seen.has(key)) return;
     this.seen.add(key);
     while (this.seen.size > 512) this.seen.delete(this.seen.values().next().value!);
-    title = title.slice(0, 200);
-    const body = message.slice(0, 2000);
+    const body = message;
     const log = (text: string) => {
       try {
         this.options.log(source, text);

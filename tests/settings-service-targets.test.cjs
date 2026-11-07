@@ -658,17 +658,12 @@ test('TTS updates share validation, are atomic and side-effect free in dryRun, p
   Object.assign(expectedDevice.generationAi.tts.connections[0], operations[0].changes);
   assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)), expectedDevice);
   assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), before);
-  assert.throws(
-    () =>
-      f.call(
-        'apply',
-        f.request(id, [
-          { kind: 'set', changes: { model: 'valid', defaultVoice: 'x'.repeat(201) } },
-        ]),
-      ),
-    { code: 'INVALID_ARGUMENT' },
+  f.call(
+    'apply',
+    f.request(id, [{ kind: 'set', changes: { model: 'valid', defaultVoice: 'x'.repeat(201) } }]),
   );
-  assert.equal(f.values(id).model, 'model');
+  assert.equal(f.values(id).defaultVoice, 'x'.repeat(201));
+  assert.equal(f.values(id).model, 'valid');
   f.call(
     'apply',
     f.request(id, [{ kind: 'reset', keys: ['defaultInstructions', 'defaultVoice'] }]),
@@ -1072,16 +1067,13 @@ test('adding credentials invalidates older public schemas and AI prompts use the
     ]),
   );
   assert.equal(Array.from(f.values(f.target('ai', 'One').targetId).alwaysPrompt).length, 2048);
-  assert.throws(
-    () =>
-      f.call(
-        'apply',
-        f.request(f.target('ai', 'One').targetId, [
-          { kind: 'set', changes: { alwaysPrompt: '😀'.repeat(2049) } },
-        ]),
-      ),
-    { code: 'INVALID_ARGUMENT' },
+  f.call(
+    'apply',
+    f.request(f.target('ai', 'One').targetId, [
+      { kind: 'set', changes: { alwaysPrompt: '😀'.repeat(2049) } },
+    ]),
   );
+  assert.equal(f.values(f.target('ai', 'One').targetId).alwaysPrompt, '😀'.repeat(2049));
   assert.equal(f.decrypts(), 0);
 });
 
@@ -1737,8 +1729,6 @@ test('TTS list validates duplicate IDs and complete update batches while preserv
     { kind: 'add', values: {} },
     { kind: 'add', values: { id: '  ' } },
     { kind: 'add', values: { id: 'VOICE' } },
-    { kind: 'add', values: { id: 'long'.repeat(51) } },
-    { kind: 'add', values: { id: 'new', name: '😀'.repeat(101) } },
     { kind: 'update', itemRef: rows[1].itemRef, changes: { id: 'VOICE' } },
   ])
     assert.throws(() => voiceApply(f, [operation]), { code: 'INVALID_ARGUMENT' });
@@ -1763,9 +1753,12 @@ test('TTS list validates duplicate IDs and complete update batches while preserv
       { id: 'voice', name: ' Same ' },
     ],
   );
+  const longVoice = { id: 'voice'.repeat(10000), name: '声'.repeat(20000) };
+  voiceApply(f, [{ kind: 'add', values: longVoice }]);
+  assert.deepEqual(voiceRows(f).at(-1).values, longVoice);
 });
 
-test('TTS list paginates 1000 rows and reorders all references within the unchanged transport bounds', (t) => {
+test('TTS list paginates 1000 rows and reorders all references', (t) => {
   const f = fixture(t),
     initial = Array.from({ length: 1000 }, (_, index) => ({ id: 'v' + index, name: 'Same' }));
   f.store.save(

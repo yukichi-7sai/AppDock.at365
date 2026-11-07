@@ -494,7 +494,7 @@ test('opaque pagination is scoped to principal, filters, target and metadata rev
   });
 });
 
-test('large results paginate whole schema entries and are rejected before oversized writes', (t) => {
+test('large results preserve whole schema entries and complete writes', (t) => {
   const definitions = Array.from({ length: 30 }, (_, i) => ({
     key: 'field' + i,
     title: 'Field ' + i,
@@ -507,7 +507,7 @@ test('large results paginate whole schema entries and are rejected before oversi
     definitions.map((field) => [field.key, 'small']),
   );
   f.store.save(next, f.store.revision);
-  assert.throws(() => f.read(), { code: 'RESULT_TOO_LARGE' });
+  assert.equal(f.read().fields.length, 30);
   assert.equal(f.read(f.target(), ['field0']).fields[0].value, 'small');
   let cursor,
     found = [];
@@ -517,12 +517,10 @@ test('large results paginate whole schema entries and are rejected before oversi
       limit: 100,
       ...(cursor ? { cursor } : {}),
     });
-    assert(Buffer.byteLength(JSON.stringify(page)) <= 256 * 1024);
     found.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
   assert.equal(found.length, 30);
-  const before = fs.readFileSync(f.store.file, 'utf8');
   const request = {
     targetId: f.target(),
     operations: [{ kind: 'reset', keys: definitions.map((field) => field.key) }],
@@ -530,9 +528,9 @@ test('large results paginate whole schema entries and are rejected before oversi
     expectedSchemaRevision: f.call('schema.get', { targetId: f.target() }).schemaRevision,
     requestId: randomUUID(),
   };
-  assert.throws(() => f.call('apply', request), { code: 'RESULT_TOO_LARGE' });
-  assert.equal(f.writes(), 0);
-  assert.equal(fs.readFileSync(f.store.file, 'utf8'), before);
+  assert.equal(f.call('apply', request).completion, 'settingsSaved');
+  assert.equal(f.writes(), 1);
+  assert(f.read().fields.every((field) => field.value === 'x'.repeat(10000)));
 });
 
 test('field registration drives host defaults, validation, UI metadata, storage projection and MCP discovery', (t) => {

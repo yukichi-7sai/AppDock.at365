@@ -67,7 +67,7 @@ scopeはglobal/desktop/app/pages/owner/applets/browser/exe。globalは常時、a
 
 入力文脈は`appletId`（ownerと保存済みApplet指定用）と`pageId`（ページ指定用）を分ける。本体ページは本体Windowの実フォーカスとnavigationのroute、Appletは実フォーカスされたSurfaceのkeyから決める。独立Windowへの表示切替でも同じページIDを使い、外部Windowではページ条件を満たさない。`shortcuts.get`と`gestures.get`の`pages`で現在の候補を取得し、公開編集APIでは宣言にない新規ページ指定を拒否する。
 
-keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当てへ変換する。旧非グローバルはappとなる。キー編集後はkeybindingsを保存し、旧フィールドはコマンドパレット等の表示用に派生させる。空配列を未指定扱いにして既定割り当てを復活させない。新形式を旧バージョンで編集する往復互換は保証しない。設定全体の1MiB上限・atomic write・revision保護を維持する。
+keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当てへ変換する。旧非グローバルはappとなる。キー編集後はkeybindingsを保存し、旧フィールドはコマンドパレット等の表示用に派生させる。空配列を未指定扱いにして既定割り当てを復活させない。新形式を旧バージョンで編集する往復互換は保証しない。設定全体に固定容量上限は設けず、atomic write・revision保護を維持する。
 
 ## 入力と実行
 

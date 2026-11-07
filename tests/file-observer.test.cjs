@@ -238,14 +238,9 @@ test('missing and invalid files keep the previous value and can recover identica
   assert.equal(f.accepted.at(-1), original);
 });
 
-test('close ignores outstanding reads and oversize files are rejected', async (t) => {
+test('close ignores outstanding reads', async (t) => {
   const f = fixture(t);
   await f.start();
-  f.stat.size = BigInt(4 * 1024 * 1024 + 1);
-  await f.check();
-  assert.equal(f.errors.length, 1);
-  assert.equal(f.reads, 2);
-  f.stat.size = 11n;
   let resolve;
   f.read = () =>
     new Promise((r) => {
@@ -257,7 +252,7 @@ test('close ignores outstanding reads and oversize files are rejected', async (t
   resolve('{"value":2}');
   await pending;
   assert.equal(f.accepted.length, 1);
-  assert.equal(f.errors.length, 1);
+  assert.equal(f.errors.length, 0);
 });
 
 test('acknowledged owner content is not reapplied and a later external revert is still delivered', async (t) => {

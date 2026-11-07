@@ -76,7 +76,7 @@ test('only actions from the current running panel are callable and they are sepa
   e.state = 'stopped';
   assert.throws(() => manager.executePanelAction('test', 'test.delete.current'), /更新/);
 });
-test('image panels accept both SDK null defaults and bounded raster thumbnails', async () => {
+test('image panel metadata accepts SDK null defaults and rejects embedded image input', async () => {
   const api = createHostApi(
     {},
     '',
@@ -89,7 +89,6 @@ test('image panels accept both SDK null defaults and bounded raster thumbnails',
   const image = {
     title: 'Image',
     description: 'Info',
-    image: 'data:image/jpeg;base64,AA==',
     actions: [{ title: 'Open', command: 'test.open' }],
   };
   await api(e, 'host.ui.panel', { ...panel, images: [image] });
@@ -98,7 +97,6 @@ test('image panels accept both SDK null defaults and bounded raster thumbnails',
     Array(1001).fill(image),
     [{ ...image, image: 'https://example.com/image.png' }],
     [{ ...image, image: 'data:image/svg+xml;base64,AA==' }],
-    [{ ...image, image: 'data:image/jpeg;base64,' + 'A'.repeat(200000) }],
     [{ ...image, actions: [{ title: 'Open', command: 'other.open' }] }],
   ]) {
     await assert.rejects(api(e, 'host.ui.panel', { ...panel, images }), /サムネイル/);
@@ -106,7 +104,7 @@ test('image panels accept both SDK null defaults and bounded raster thumbnails',
   }
   await api(e, 'host.ui.panel', {
     ...panel,
-    images: [{ title: 'Missing', description: null, image: null, actions: null }],
+    images: [{ title: 'Missing', description: null, actions: null }],
   });
   e.manifest.capabilities = [];
   await assert.rejects(api(e, 'host.ui.panel', panel), /capabilities/);

@@ -10,7 +10,7 @@ Storageの共通契約は[Applet API](extensions.md#storageの保存範囲)、lo
 | `shared`       | 従来の共有JSONファイル                                                 |
 | `memory`       | 現在のホスト内・Applet実行世代だけ。ディレクトリーもファイルも作らない |
 
-既存の`get/set`にscopeを指定する。`storage` capability、所有Applet、キー検証、JSONと1件1MiBの制約は共通。取得・保存では値を複製し、受け渡したオブジェクトの直接変更で確定値を変更しない。メモリ保存の`null`はキー除去、未登録の取得は`null`。ファイルscopeの`null`保存の意味は変更しない。
+既存の`get/set`にscopeを指定する。`storage` capability、所有Applet、キー検証、JSON検証は共通で、値の固定容量上限は設けない。取得・保存では値を複製し、受け渡したオブジェクトの直接変更で確定値を変更しない。メモリ保存の`null`はキー除去、未登録の取得は`null`。ファイルscopeの`null`保存の意味は変更しない。
 
 ```csharp
 await context.Storage.SetAsync("state", new { paths = new[] { originalPath } }, StorageScope.Memory, cancellationToken);
@@ -24,7 +24,7 @@ const state = await context.storage.get('state', 'memory');
 
 localページからは`window.appletPage.call('storage.get', {key,scope})`と`storage.set`で自身のStorageへアクセスする。メモリ値の変更は、そのAppletの生成済みlocalページの`onChanged`へ通知する。未生成のページを開かない。停止開始・異常終了・次回起動前にすべての値を除去する。ディスクへの退避、復元、PC間同期、外部監視は行わない。
 
-大きな一覧はStorageの1件1MiBと各実行形式のRPC上限を守り、複数の不変なメモリキーへ分割する。全区間を保存してから索引キーを切り替え、旧区間を`null`で回収すれば途中状態を公開しない。画像バイトはStorageへ格納せず、画像取得とメタデータを分離する。
+Storageと各実行形式のRPCに固定容量上限は設けない。大きな一覧を分割処理する場合は複数の不変なメモリキーを使える。全区間を保存してから索引キーを切り替え、旧区間を`null`で回収すれば途中状態を公開しない。画像バイトはStorageへ格納せず、画像取得とメタデータを分離する。
 
 ## メモリに公開した元画像
 

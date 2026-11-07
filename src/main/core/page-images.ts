@@ -83,6 +83,36 @@ function raster(header: Buffer): { mime: string; width: number; height: number }
   }
 }
 
+async function jpegHeader(handle: fs.FileHandle, size: number) {
+  const header = Buffer.alloc(9);
+  let offset = 2;
+  while (offset + 4 <= size) {
+    const { bytesRead } = await handle.read(header, 0, 4, offset);
+    if (bytesRead !== 4 || header[0] !== 0xff) return;
+    if (header[1] === 0xff) {
+      offset++;
+      continue;
+    }
+    const marker = header[1];
+    if (marker === 0xda || marker === 0xd9) return;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      offset += 2;
+      continue;
+    }
+    const length = header.readUInt16BE(2);
+    if (length < 2 || offset + 2 + length > size) return;
+    if (
+      [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(
+        marker,
+      )
+    ) {
+      if (length < 7 || (await handle.read(header, 0, 9, offset)).bytesRead !== 9) return;
+      return { mime: 'image/jpeg', width: header.readUInt16BE(7), height: header.readUInt16BE(5) };
+    }
+    offset += 2 + length;
+  }
+}
+
 /** References belong to one live local View, never to the description panel. */
 export class PageImageRegistry {
   private files = new Map<string, ImageFile>();
@@ -92,7 +122,6 @@ export class PageImageRegistry {
     dataRoot: string,
     readonly owner: string,
     private active: () => boolean,
-    private ownerCount: () => number = () => this.size,
   ) {
     this.root = imageDirectory(dataRoot, owner);
   }
@@ -113,24 +142,19 @@ export class PageImageRegistry {
     const handle = await fs.open(actual, 'r');
     try {
       const stat = await handle.stat();
-      if (!stat.isFile() || stat.size > 32 * 1024 * 1024)
-        throw Error(hostText('services.pageImages.fileSize'));
-      const header = Buffer.alloc(Math.min(stat.size, 256 * 1024));
+      if (!stat.isFile()) throw Error(hostText('services.pageImages.fileSize'));
+      const header = Buffer.alloc(Math.min(stat.size, 30));
       const { bytesRead } = await handle.read(header, 0, header.length, 0);
-      const format = raster(header.subarray(0, bytesRead));
+      const format =
+        header[0] === 0xff && header[1] === 0xd8
+          ? await jpegHeader(handle, stat.size)
+          : raster(header.subarray(0, bytesRead));
       const extensionMime = /\.png$/i.test(actual)
         ? 'image/png'
         : /\.webp$/i.test(actual)
           ? 'image/webp'
           : 'image/jpeg';
-      if (
-        !format ||
-        format.mime !== extensionMime ||
-        format.width < 1 ||
-        format.height < 1 ||
-        format.width > 2048 ||
-        format.height > 2048
-      )
+      if (!format || format.mime !== extensionMime || format.width < 1 || format.height < 1)
         throw Error(hostText('services.pageImages.dimensions'));
       return {
         handle,
@@ -143,12 +167,7 @@ export class PageImageRegistry {
   }
   async register(input: unknown): Promise<{ images: PageImageReference[] }> {
     if (!this.active()) throw Error(hostText('services.pageImages.providerStopped'));
-    if (
-      !Array.isArray(input) ||
-      input.length > 64 ||
-      Buffer.byteLength(JSON.stringify({ files: input })) > 256 * 1024
-    )
-      throw Error(hostText('services.pageImages.batchLimit'));
+    if (!Array.isArray(input)) throw Error(hostText('services.pageImages.batchLimit'));
     const keys = new Set<string>();
     const pending: { key: string; info: ImageFile }[] = [];
     for (const item of input) {
@@ -168,9 +187,7 @@ export class PageImageRegistry {
       pending.push({ key: item.key, info });
     }
     if (!this.active()) throw Error(hostText('services.pageImages.providerStopped'));
-    // Commit the entire batch after I/O; concurrent batches must share the same quota.
-    if (this.size + pending.length > 2000 || this.ownerCount() + pending.length > 8000)
-      throw Error(hostText('services.pageImages.registrationLimit'));
+    // Publish only after the whole batch and the owner lifetime have been validated.
     return {
       images: pending.map(({ key, info }) => {
         const id = randomBytes(24).toString('base64url');
@@ -182,7 +199,6 @@ export class PageImageRegistry {
   release(input: unknown) {
     if (
       !Array.isArray(input) ||
-      input.length > 64 ||
       input.some((id) => typeof id !== 'string' || !/^[\w-]{1,80}$/.test(id))
     )
       throw Error(hostText('services.pageImages.releaseLimit'));

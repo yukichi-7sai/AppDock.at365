@@ -41,7 +41,7 @@ export class AiSecrets {
           !aiObject(item) ||
           typeof item.fingerprint !== 'string' ||
           !/^[a-f0-9]{64}$/.test(item.fingerprint) ||
-          (item.key !== undefined && (typeof item.key !== 'string' || item.key.length > 32768)) ||
+          (item.key !== undefined && typeof item.key !== 'string') ||
           Object.keys(item).some((k) => !['fingerprint', 'key'].includes(k))
         )
           throw Error();
@@ -73,7 +73,7 @@ export class AiSecrets {
     }
   }
   prepareKey(c: Pick<AiConnectionSettings, 'id' | 'baseUrl'>, value: unknown): SettingsAsset {
-    if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f\x7f]/.test(value))
+    if (typeof value !== 'string' || /[\x00-\x1f\x7f]/.test(value))
       throw Error(hostText('services.aiSecrets.keyFormat'));
     const previous = this.bytes();
     const entries = this.entries(previous);

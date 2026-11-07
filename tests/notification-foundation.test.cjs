@@ -48,6 +48,19 @@ const request = (s, id, extra = {}) => {
   };
 };
 
+test('notification titles, bodies and history retain complete long text', (t) => {
+  const { service } = fixture(t);
+  const title = 'Title'.repeat(100),
+    body = '本文🌙'.repeat(20000);
+  service.upsert('host.capacity', input({ title, body, historyText: { title, body } }));
+  const item = service.list()[0];
+  assert.equal(item.title, title);
+  assert.equal(item.body, body);
+  const history = service.historyEntries()[0];
+  assert.equal(history.title, title);
+  assert.equal(history.body, body);
+});
+
 test('locked startup defers every target and starts timed lifetime at unlock', (t) => {
   const { service: s, tick } = fixture(t);
   s.setPaused(true);

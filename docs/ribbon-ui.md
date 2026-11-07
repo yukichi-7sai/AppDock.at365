@@ -10,7 +10,7 @@
 | `ui.assets.get`     | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。任意の`monochrome: true`は画像のalphaをマスクにして項目の文字色を使う指定（0.115.0以降）。ファイルパス・任意URLは受け付けない |
 | `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する |
 
-各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。schema 1の`kind`はbutton/separator、schema 2はgroupも含み、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像1件はdata URLで1 MiB以下。構造化モデルにローカルパス・openCommand・認証情報を含めない。
+各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。schema 1の`kind`はbutton/separator、schema 2はgroupも含み、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像のdata URLにAppDock独自の固定容量上限は設けない。構造化モデルにローカルパス・openCommand・認証情報を含めない。
 
 表示用revisionは設定revisionと独立。完全snapshotを返し、設定・稼働状態・選択状態・画像等が変わったときに進む。旧`ribbon.get`は設定編集用として維持する。操作IDは返されたものをそのまま渡し、描画側で項目IDから機能を推測しない。非表示項目や失効したepoch/context、実行時に利用できなくなった操作は拒否する。
 

@@ -80,6 +80,28 @@ function setup(t, extra = {}) {
   };
 }
 const request = (id, patch = {}) => ({ requestId: id, input: '入力データ', ...patch });
+
+test('large prompts, requests and generated replies preserve all text and the selected token setting', async (t) => {
+  const text = '生成🌙'.repeat(150000);
+  let received;
+  const f = setup(t, {
+    fetcher: async (_url, init) => {
+      received = JSON.parse(init.body);
+      return response(text);
+    },
+  });
+  const input = 'input'.repeat(20000),
+    prompt = 'prompt'.repeat(3000);
+  const job = f.s.generate(
+    'owner',
+    request('large-text', { input, additionalPrompt: prompt, maxOutputTokens: 32768 }),
+  );
+  await until(() => f.s.get('owner', job.jobId).state === 'completed');
+  assert.equal(f.s.get('owner', job.jobId).text, text);
+  assert.equal(received.messages[1].content, input);
+  assert(received.messages[0].content.includes(prompt));
+  assert.equal(received.max_tokens, 32768);
+});
 test('AI settings accept old files and validate URL, keys, ids and compatibility', () => {
   assert.deepEqual(parseAiSettings(), { connections: [] });
   const settings = createDefaultSettings();
@@ -129,7 +151,7 @@ test('AI settings accept old files and validate URL, keys, ids and compatibility
       parseAiSettings({ connections: [{ ...c, [key]: '😀'.repeat(2048) }] }).connections[0][key],
       '😀'.repeat(2048),
     );
-    for (const invalid of [null, 42, 'x'.repeat(2049)])
+    for (const invalid of [null, 42])
       assert.throws(() => parseAiSettings({ connections: [{ ...c, [key]: invalid }] }));
   }
 });
@@ -276,8 +298,6 @@ test('invalid arguments, missing authorization and bearer keys fail before sendi
     { maxOutputTokens: null },
     { timeoutMs: 600001 },
     { timeoutMs: null },
-    { input: 'x'.repeat(8193) },
-    { additionalPrompt: 'x'.repeat(2049) },
     { additionalPrompt: null },
     { apiKey: 'secret' },
     { connectionId: 12 },
@@ -552,7 +572,7 @@ test('key changes cancel only the affected connection', async (t) => {
   for (const release of releases) release();
   await until(() => f.s.get('two', b.jobId).state === 'completed');
 });
-test('adapter rejects HTTP errors, refusals, truncation, malformed and oversized data safely', async () => {
+test('adapter rejects HTTP errors, refusals, truncation and malformed data safely', async () => {
   const c = { ...newAiConnection('local'), baseUrl: 'http://server/v1' };
   const invalid = [
     new Response('secret', { status: 401 }),
@@ -560,7 +580,6 @@ test('adapter rejects HTTP errors, refusals, truncation, malformed and oversized
     new Response('secret', { status: 500 }),
     new Response('<html>secret</html>', { headers: { 'Content-Type': 'text/html' } }),
     new Response('{secret', { headers: { 'Content-Type': 'application/json' } }),
-    new Response('x'.repeat(1024 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } }),
     ...[
       { finish_reason: 'length', message: { content: 'partial' } },
       { finish_reason: 'stop', message: { content: '' } },

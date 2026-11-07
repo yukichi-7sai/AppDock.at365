@@ -12,6 +12,7 @@ function fixtureServer(state = { count: 0, changed: false }) {
   );
   const input = {
     type: 'object',
+    ...(state.largeCatalog ? { description: 'schema'.repeat(8000) } : {}),
     properties: {
       message: { type: 'string' },
       seconds: { type: 'integer', minimum: 0 },
@@ -36,7 +37,7 @@ function fixtureServer(state = { count: 0, changed: false }) {
       ...(state.longTool ? [state.longTool] : []),
     ].map((name) => ({
       name,
-      description: 'Fixture ' + name,
+      description: state.largeCatalog ? 'd'.repeat(750000) : 'Fixture ' + name,
       ...(['annotated', 'invalid_output'].includes(name)
         ? {
             outputSchema: {
@@ -116,4 +117,8 @@ function fixtureServer(state = { count: 0, changed: false }) {
   return server;
 }
 module.exports = { fixtureServer };
-if (require.main === module) void fixtureServer().connect(new StdioServerTransport());
+if (require.main === module)
+  void fixtureServer({
+    count: 0,
+    largeCatalog: process.env.MCP_FIXTURE_LARGE_CATALOG === '1',
+  }).connect(new StdioServerTransport());

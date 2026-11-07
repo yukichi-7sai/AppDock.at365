@@ -2,7 +2,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { SettingDefinition } from '../../shared/contracts';
 import type { SettingsMethod } from '../../shared/settings-operations';
 import { settingInputSchema } from '../../shared/settings-commands';
-import { boundedJson, jsonObject } from '../../shared/custom-commands';
+import { validateJson, jsonObject } from '../../shared/custom-commands';
 import { hostText } from '../../shared/i18n';
 import {
   SettingsTargetError,
@@ -35,7 +35,6 @@ const digest = (value: unknown) =>
   createHash('sha256')
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
-const resultLimit = 256 * 1024;
 interface SettingsRequest {
   fingerprint: string;
   pending?: boolean;
@@ -86,11 +85,6 @@ export class SettingsTargets {
   }
   private invalid(): never {
     return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.invalid');
-  }
-  private bounded<T extends Record<string, unknown>>(value: T): T {
-    if (Buffer.byteLength(JSON.stringify(value), 'utf8') > resultLimit)
-      this.fail('RESULT_TOO_LARGE', 'services.settingsTargets.tooLarge');
-    return value;
   }
   private field(field: SettingDefinition, target: SettingsTarget) {
     return {
@@ -209,14 +203,9 @@ export class SettingsTargets {
     let index = offset;
     while (index < items.length && result.length < Number(limit)) {
       result.push(items[index]);
-      if (Buffer.byteLength(JSON.stringify(response(index + 1)), 'utf8') > resultLimit) {
-        result.pop();
-        if (!result.length) this.fail('RESULT_TOO_LARGE', 'services.settingsTargets.tooLarge');
-        break;
-      }
       index++;
     }
-    return this.bounded(response(index));
+    return response(index);
   }
   private sign(payload: string) {
     return createHmac('sha256', this.cursorSecret).update(payload).digest('base64url');
@@ -269,7 +258,7 @@ export class SettingsTargets {
   }
   call(method: SettingsMethod, params: Record<string, unknown>, authorize: () => void = () => {}) {
     try {
-      boundedJson(params, Infinity, 12, Infinity);
+      validateJson(params);
     } catch {
       return this.invalid();
     }
@@ -407,11 +396,11 @@ export class SettingsTargets {
       }
       const values = target.values();
       const overrides = target.overrides();
-      return this.bounded({
+      return {
         ...envelope,
         revision: this.revision(target),
         fields: fields.map((field) => this.state(field, values[field.key], target, overrides)),
-      });
+      };
     }
     if (method !== 'settings.apply') return this.invalid();
     if (!target.available) return this.fail('UNAVAILABLE', 'services.settingsTargets.unavailable');
@@ -540,8 +529,6 @@ export class SettingsTargets {
         effectVerified: false,
         revision: this.revision(target),
       };
-      // Reject oversized results before the owner is allowed to persist anything.
-      this.bounded({ ...value, revision: 'x'.repeat(256) });
       const assertCurrent = () => {
         authorize();
         if (this.options.principal() !== principal)

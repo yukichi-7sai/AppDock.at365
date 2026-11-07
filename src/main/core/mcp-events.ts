@@ -99,7 +99,6 @@ export class McpEvents {
     this.file = path.join(options.directory, options.fileName ?? 'automation-events.json');
     try {
       if (fs.existsSync(this.file)) {
-        if (fs.statSync(this.file).size > 8 * 1024 * 1024) throw Error();
         const envelope = JSON.parse(fs.readFileSync(this.file, 'utf8'));
         if (envelope.version !== 1 || typeof envelope.sealed !== 'string') throw Error();
         const saved = JSON.parse(options.decrypt(envelope.sealed));
@@ -151,9 +150,7 @@ export class McpEvents {
             !object(data) ||
             typeof data.notificationId !== 'string' ||
             typeof data.title !== 'string' ||
-            data.title.length > 200 ||
             typeof data.body !== 'string' ||
-            data.body.length > 2000 ||
             Object.keys(data).some(
               (k) =>
                 !['ownerKind', 'ownerId', 'typeId', 'notificationId', 'title', 'body'].includes(k),
@@ -451,7 +448,6 @@ export class McpEvents {
       .finally(() => this.queued--);
   }
   private async send(sub: Subscription, id: string, body: string) {
-    if (Buffer.byteLength(body) > 262144) throw Error('payload_too_large');
     const seconds = Math.floor(this.now() / 1000);
     const signatures = [webhookSignature(sub.secret, id, seconds, body)];
     if (sub.oldSecret && (sub.rotateUntil ?? 0) > this.now())

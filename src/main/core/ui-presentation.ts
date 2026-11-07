@@ -217,12 +217,7 @@ export class UiPresentation {
       this.assets.set(id, data);
       return id;
     }
-    if (
-      !data ||
-      data.length > 1024 * 1024 ||
-      !/^data:image\/(png|webp);base64,[A-Za-z0-9+/=]+$/.test(data)
-    )
-      return;
+    if (!data || !/^data:image\/(png|webp);base64,[A-Za-z0-9+/=]+$/.test(data)) return;
     const id = createHash('sha256').update(data).digest('hex');
     this.assets.set(id, data);
     return id;
@@ -527,7 +522,6 @@ export class UiPresentation {
       if (
         !this.assets.has(id) ||
         !dataUrl ||
-        dataUrl.length > 1024 * 1024 ||
         !/^data:image\/(png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUrl)
       )
         throw Error('Unknown presentation asset');

@@ -28,7 +28,6 @@ export const appDockOperations = localizedMetadata(
             text: {
               type: 'string',
               minLength: 1,
-              maxLength: 4096,
             },
             connectionId: {
               type: 'string',

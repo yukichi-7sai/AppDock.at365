@@ -265,10 +265,6 @@ export class AppletSurface {
             !this.closed &&
             imageSurfaces.get(options.key!) === this &&
             options.pageImages!.active(),
-          () =>
-            [...imageSurfaces.values()]
-              .filter((surface) => surface.options.appletId === options.appletId)
-              .reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0),
         );
       if (options.sourceImages)
         this.sources = new PageSourceImages(

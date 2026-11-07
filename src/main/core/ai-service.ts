@@ -142,8 +142,8 @@ export class AiService {
       !value.requestId ||
       value.requestId.length > 100 ||
       /[\x00-\x1f\x7f]/.test(value.requestId) ||
-      (value.additionalPrompt !== undefined && !aiString(value.additionalPrompt, 2048)) ||
-      !aiString(value.input ?? '', 8192) ||
+      (value.additionalPrompt !== undefined && !aiString(value.additionalPrompt)) ||
+      !aiString(value.input ?? '') ||
       (value.timeoutMs !== undefined &&
         (!Number.isInteger(value.timeoutMs) ||
           Number(value.timeoutMs) < aiTimeoutLimits.minimumSeconds * 1000 ||
@@ -210,8 +210,6 @@ export class AiService {
         : { reasoning_effort: c.compatibility.reasoningEffort }),
       ...(c.compatibility.store === 'false' ? { store: false } : {}),
     });
-    if (Buffer.byteLength(body) > 65536)
-      aiFail('INVALID_ARGUMENT', hostText('services.aiService.requestSize'));
     const now = Date.now();
     const rate = this.rates.get(c.id) ?? { tokens: this.limits.burst, at: now };
     rate.tokens = Math.min(

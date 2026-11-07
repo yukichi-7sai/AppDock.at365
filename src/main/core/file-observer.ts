@@ -5,7 +5,6 @@ import { readObservedFile } from './file-reader';
 import type { FileWatchAssistance } from './file-watch-assistance';
 
 const stableInterval = 180;
-const maximumBytes = 4 * 1024 * 1024;
 const signature = (stat: fs.BigIntStats) =>
   [stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeNs, stat.ctimeNs, stat.birthtimeNs].join(
     ':',
@@ -55,13 +54,10 @@ export function observeFile(
       if (watchedDirectory !== path.dirname(file)) watchDirectory(path.dirname(file));
       const stat = await fs.promises.stat(file, { bigint: true });
       if (closed || signal?.aborted || currentGeneration !== generation) return;
-      if (!stat.isFile() || stat.size > maximumBytes)
-        throw Error(hostText('services.fileObserver.invalidFile'));
+      if (!stat.isFile()) throw Error(hostText('services.fileObserver.invalidFile'));
       const metadata = signature(stat);
       const text = await readObservedFile(file);
       if (closed || signal?.aborted || currentGeneration !== generation) return;
-      if (Buffer.byteLength(text, 'utf8') > maximumBytes)
-        throw Error(hostText('services.fileObserver.invalidFile'));
       const after = await fs.promises.stat(file, { bigint: true });
       if (closed || signal?.aborted || currentGeneration !== generation) return;
       if (signature(after) !== metadata) {

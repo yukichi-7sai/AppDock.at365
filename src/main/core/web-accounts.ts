@@ -94,7 +94,7 @@ export function parseWebViewport(raw: unknown): Viewport | null {
 }
 export function serializeWebReport(raw: unknown): string {
   const json = JSON.stringify(raw ?? null);
-  if (!json || Buffer.byteLength(json) > 50000) throw Error('Web account report data is too large');
+  if (!json) throw Error('Invalid Web account report data');
   return json;
 }
 export function serializeWebItemKey(raw: unknown): string {
@@ -201,9 +201,7 @@ export function validateWebAccounts(
   }
   asset(folder, value.ui);
   const observer = asset(folder, value.observer);
-  if (fs.statSync(observer).size > 100000) throw Error('Web observer is too large');
-  if (value.itemOpener !== undefined && fs.statSync(asset(folder, value.itemOpener)).size > 100000)
-    throw Error('Web item opener is too large');
+  if (value.itemOpener !== undefined) asset(folder, value.itemOpener);
   return value;
 }
 export function allowedWebNavigation(raw: string, origins: string[]): boolean {
@@ -530,16 +528,9 @@ export class WebAccountController {
           abort.signal,
         );
         const image = nativeImage.createFromBuffer(bytes);
-        const size = image.getSize();
-        if (image.isEmpty() || size.width > 4096 || size.height > 4096) return;
+        if (image.isEmpty()) return;
         const png = image.resize({ width: 64, height: 64 }).toPNG();
-        if (
-          png.length > 65536 ||
-          this.disposed ||
-          this.deleting.has(id) ||
-          this.avatars.get(id) !== entry
-        )
-          return;
+        if (this.disposed || this.deleting.has(id) || this.avatars.get(id) !== entry) return;
         entry.image = 'data:image/png;base64,' + png.toString('base64');
         this.changed();
       } catch {
@@ -1370,8 +1361,6 @@ export class WebAccountController {
         const task = wc
           .executeJavaScriptInIsolatedWorld(1001, [{ code: this.source }])
           .then((result) => {
-            if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
-              throw Error('Observation too large');
             return result;
           });
         const started = { generation, url, task, settled: false };

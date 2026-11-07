@@ -46,10 +46,7 @@ export function parseDynamicPages(
       throw Error(hostText('services.sharedDynamicPages.invalidDefinition'));
     if (
       raw.context !== undefined &&
-      (!raw.context ||
-        typeof raw.context !== 'object' ||
-        Array.isArray(raw.context) ||
-        new TextEncoder().encode(JSON.stringify(raw.context)).length > 16384)
+      (!raw.context || typeof raw.context !== 'object' || Array.isArray(raw.context))
     )
       throw Error(hostText('services.sharedDynamicPages.contextLimit'));
     const openCommand = dynamicPageCommand(manifest.id, raw.id);

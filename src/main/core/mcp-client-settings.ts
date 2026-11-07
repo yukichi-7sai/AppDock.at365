@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { boundedJson, jsonObject } from '../../shared/custom-commands';
+import { validateJson, jsonObject } from '../../shared/custom-commands';
 import {
   parseMcpConnection,
   parseMcpRoster,
@@ -154,21 +154,16 @@ export class McpClientSettings {
     try {
       if (typeof cipher !== 'string') throw Error();
       const data = JSON.parse(this.encryption.decrypt(cipher));
-      boundedJson(data, Infinity, 4, Infinity);
+      validateJson(data);
       if (
         data.binding !== mcpEndpointIdentity(row.connection) ||
         !jsonObject(data.env) ||
         Object.entries(data.env).some(
           ([k, v]) =>
-            !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
-            typeof v !== 'string' ||
-            v.length > 8192 ||
-            /[\x00]/.test(v),
+            !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) || typeof v !== 'string' || /[\x00]/.test(v),
         ) ||
         (data.token !== undefined &&
-          (typeof data.token !== 'string' ||
-            data.token.length > 8192 ||
-            /[\x00-\x1f\x7f]/.test(data.token)))
+          (typeof data.token !== 'string' || /[\x00-\x1f\x7f]/.test(data.token)))
       )
         throw Error();
       return {
@@ -504,15 +499,11 @@ export class McpClientSettings {
               : request.environment
             : {};
         if (
-          (token !== undefined &&
-            (typeof token !== 'string' || token.length > 8192 || /[\x00-\x1f\x7f]/.test(token))) ||
+          (token !== undefined && (typeof token !== 'string' || /[\x00-\x1f\x7f]/.test(token))) ||
           !jsonObject(env) ||
           Object.entries(env).some(
             ([k, v]) =>
-              !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
-              typeof v !== 'string' ||
-              v.length > 8192 ||
-              /[\x00]/.test(v),
+              !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) || typeof v !== 'string' || /[\x00]/.test(v),
           )
         )
           return failure('INVALID_ARGUMENT', 'settings.mcp-client-settings.invalidEnvironment');

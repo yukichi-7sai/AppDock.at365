@@ -287,22 +287,13 @@ test('invalid WAVs, invalid targets and stale session requests do not register f
   await assert.rejects(f.generation.act('stale', { kind: 'close' }));
   assert.equal((await fs.readdir(path.join(f.directory, '通知'))).length, 0);
 });
-test('the generation-only path enforces the library byte limit and settings cancellation', async (t) => {
+test('the generation-only path preserves settings cancellation', async (t) => {
   const f = await fixture(t);
-  await assert.rejects(
-    f.tts.generate(
-      'host',
-      { requestId: randomUUID(), text: 'text' },
-      new AbortController().signal,
-      50,
-    ),
-    (error) => error.code === 'TTS_AUDIO_TOO_LARGE',
-  );
   assert.equal(f.played(), 0);
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(
-    f.tts.generate('host', { requestId: randomUUID(), text: 'text' }, controller.signal, 10000),
+    f.tts.generate('host', { requestId: randomUUID(), text: 'text' }, controller.signal),
     { name: 'AbortError' },
   );
 });
@@ -328,7 +319,7 @@ test('each internal generation returns fresh audio even when the input request I
   const f = await fixture(t);
   const input = { requestId: 'repeated', text: 'text' };
   for (let i = 0; i < 2; i++) {
-    const result = await f.tts.generate('host', input, new AbortController().signal, 100000);
+    const result = await f.tts.generate('host', input, new AbortController().signal);
     assert.deepEqual(result.bytes, wave(1000));
   }
   assert.equal(f.requests.length, 2);

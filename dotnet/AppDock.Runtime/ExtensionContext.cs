@@ -231,8 +231,6 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
             token.ThrowIfCancellationRequested();
             var result = await handler.HandlePageActionAsync(actionId, input.Clone(), pageId, token);
             token.ThrowIfCancellationRequested();
-            if (JsonSerializer.SerializeToUtf8Bytes(result, JsonRpcConnection.Json).Length > 512 * 1024)
-                throw new InvalidDataException("ページの応答が大きすぎます。データを分割してください。");
             return result;
         }
         finally { commandLock.Release(); }

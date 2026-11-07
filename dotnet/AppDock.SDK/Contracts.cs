@@ -115,7 +115,7 @@ public sealed record Panel(string Title, string? Description = null, IReadOnlyLi
     public IReadOnlyList<PanelImage>? Images { get; init; }
     public IReadOnlyList<PanelAction>? Tabs { get; init; }
 }
-public sealed record PanelImage(string Title, string? Description = null, string? Image = null, IReadOnlyList<PanelAction>? Actions = null)
+public sealed record PanelImage(string Title, string? Description = null, IReadOnlyList<PanelAction>? Actions = null)
 {
     public string? Tooltip { get; init; }
     public string? ImageFile { get; init; }

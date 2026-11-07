@@ -66,7 +66,7 @@ const job = await context.appdock.call('ai.image.jobs.get', { jobId: accepted.jo
 
 ## 内部プレビュー
 
-設定ページの試験は登録を伴わない内部ジョブを使う。`ai.image.generate`と`ai.image.results.read`は公開しない。内部では256KiB単位で保全結果を読み出し、本体rendererで表示する。結果と終端ジョブに時間による削除期限はない。Applet RPCの1MiB制限とは独立した内部転送処理であり、新しい取得APIの契約にはしない。
+設定ページの試験は登録を伴わない内部ジョブを使う。`ai.image.generate`と`ai.image.results.read`は公開しない。内部では256KiB単位で保全結果を読み出し、本体rendererで表示する。結果と終端ジョブに時間による削除期限はない。これは総容量を制限しない内部転送の分割単位であり、新しい取得APIの契約にはしない。
 
 ## 設定API
 

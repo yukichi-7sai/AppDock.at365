@@ -62,7 +62,6 @@ export function ProcessCommandFields({
             <SettingsInput
               aria-label={translate('settings.processCommandFields.executable')}
               value={String(config.executable ?? '')}
-              maxLength={4096}
               placeholder={translate('settings.processCommandFields.path')}
               onChange={(e) => onChange({ ...config, executable: e.target.value })}
             />
@@ -108,7 +107,6 @@ export function ProcessCommandFields({
                 : translate('settings.processCommandFields.script')
             }
             rows={6}
-            maxLength={8192}
             value={String(config[config.mode === 'cmd' ? 'command' : 'script'] ?? '')}
             onChange={(e) =>
               onChange({
@@ -124,7 +122,6 @@ export function ProcessCommandFields({
           <SettingsInput
             aria-label={translate('settings.processCommandFields.directory')}
             value={String(config.workingDirectory ?? '')}
-            maxLength={4096}
             placeholder={translate('settings.processCommandFields.directoryHint')}
             onChange={(e) => onChange({ ...config, workingDirectory: e.target.value })}
           />

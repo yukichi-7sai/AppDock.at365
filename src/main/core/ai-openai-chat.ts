@@ -53,14 +53,10 @@ export class AiOpenAiChat {
         aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.responseFormat'));
       const reader = response.body!.getReader();
       const chunks: Uint8Array[] = [];
-      let size = 0;
       try {
         for (;;) {
           const part = await reader.read();
           if (part.done) break;
-          size += part.value.byteLength;
-          if (size > 1024 * 1024)
-            aiFail('AI_RESPONSE_TOO_LARGE', hostText('services.aiOpenaiChat.responseTooLarge'));
           chunks.push(part.value);
         }
       } finally {
@@ -101,7 +97,7 @@ export class AiOpenAiChat {
       choice.message.refusal ||
       choice.message.tool_calls ||
       choice.message.function_call ||
-      !aiString(choice.message.content, 4096) ||
+      !aiString(choice.message.content) ||
       !choice.message.content.trim()
     )
       return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.incompleteGeneration'));
@@ -131,18 +127,18 @@ export class AiOpenAiChat {
     signal: AbortSignal,
   ): Promise<{ models: AiModel[] }> {
     const v = await this.json(c, key, 'models', signal);
-    if (!aiObject(v) || !Array.isArray(v.data) || v.data.length > 1000)
+    if (!aiObject(v) || !Array.isArray(v.data))
       return aiFail('AI_INVALID_MODELS', hostText('services.aiOpenaiChat.modelListFormat'));
     const ids = new Set<string>();
     return {
       models: v.data.map((m) => {
         if (
           !aiObject(m) ||
-          !aiString(m.id, 200) ||
+          !aiString(m.id) ||
           !m.id.trim() ||
           /[\r\n]/.test(m.id) ||
           ids.has(m.id) ||
-          (m.name !== undefined && !aiString(m.name, 200))
+          (m.name !== undefined && !aiString(m.name))
         )
           return aiFail('AI_INVALID_MODELS', hostText('services.aiOpenaiChat.modelListIds'));
         ids.add(m.id);

@@ -4,7 +4,6 @@ using System.Text.Json;
 internal static partial class Program
 {
     private const string HostManifest = "appdock-host.json";
-    private const long HostLimit = 1024L * 1024 * 1024;
     // Only program-owned top-level entries may be exchanged. User data and Applets
     // never enter the transaction, even if a downloaded manifest lists them.
     private static readonly HashSet<string> HostFiles = new(StringComparer.Ordinal) {
@@ -38,14 +37,13 @@ internal static partial class Program
     {
         NoLinks(directory);
         var manifest = Path.Combine(directory, HostManifest); NoLinks(manifest);
-        if (new FileInfo(manifest).Length > 65536) throw NativeMessages.Error("native.hostPackage.manifestSize", text => new IOException(text));
         using var document = JsonDocument.Parse(File.ReadAllText(manifest));
         var root = document.RootElement;
         if (root.GetProperty("schemaVersion").GetInt32() != 1 ||
             (version is not null && root.GetProperty("version").GetString() != version))
             throw NativeMessages.Error("native.hostPackage.versionMismatch", text => new IOException(text));
         var entries = root.GetProperty("entries").EnumerateArray().Select(e => e.GetString()!).ToList();
-        if (entries.Count is < 3 or > 50 || entries.Distinct(StringComparer.OrdinalIgnoreCase).Count() != entries.Count ||
+        if (entries.Count < 3 || entries.Distinct(StringComparer.OrdinalIgnoreCase).Count() != entries.Count ||
             entries.Any(e => !IsHostEntry(e)) || !entries.Contains("AppDock.at365.exe") ||
             !entries.Contains("resources") || !entries.Contains(HostManifest))
             throw NativeMessages.Error("native.hostPackage.manifestEntry", text => new IOException(text));
@@ -59,7 +57,7 @@ internal static partial class Program
                 if (FileItem(HostKind(name)) ? !File.Exists(location) : !Directory.Exists(location))
                     throw NativeMessages.Error("native.hostPackage.fileKind", text => new IOException(text));
             }
-            foreach (var file in Files(directory, HostLimit)) {
+            foreach (var file in Files(directory)) {
                 var relative = Path.GetRelativePath(directory, file).Replace('\\', '/');
                 if (ResourceDirectory(relative.Split('/')[0])) ResourceName(relative);
             }
@@ -76,7 +74,7 @@ internal static partial class Program
         NoLinks(Path.Combine(directory, HostManifest)); NoLinks(Path.Combine(directory, HostManifest + ".tmp"));
         Write(Path.Combine(directory, HostManifest), new { schemaVersion = 1, version, entries });
         ReadHostPackage(directory, version, true);
-        var files = Files(directory, HostLimit);
+        var files = Files(directory);
         foreach (var file in files)
         {
             var name = Path.GetFileName(file).ToLowerInvariant();
@@ -111,7 +109,7 @@ internal static partial class Program
                 // Only files shipped by this version are replaced. Additional files stay untouched.
                 if (File.Exists(target)) throw NativeMessages.Error("native.hostPackage.resourceDirectoryRequired", text => new IOException(text));
                 if (!next.Contains(name)) continue;
-                foreach (var file in Files(Path.Combine(source, name), HostLimit).Order(StringComparer.Ordinal))
+                foreach (var file in Files(Path.Combine(source, name)).Order(StringComparer.Ordinal))
                 {
                     var relative = Path.GetRelativePath(source, file).Replace('\\', '/'); ResourceName(relative);
                     var installed = Path.Combine(destination, relative); ResourceTarget(installed);
@@ -128,9 +126,9 @@ internal static partial class Program
             if (!next.Contains(name) && !present) continue;
             var staged = next.Contains(name) ? Path.Combine(source, name) : "";
             items.Add(new(kind, name == "AppDock.at365.exe" ? "host" : name, version, staged, target,
-                staged == "" ? null : FileItem(kind) ? Hash(staged) : TreeHash(staged, HostLimit),
+                staged == "" ? null : FileItem(kind) ? Hash(staged) : TreeHash(staged),
                 staged == "" ? "uninstall" : present ? "update" : "install",
-                present ? FileItem(kind) ? Hash(target) : TreeHash(target, HostLimit) : null));
+                present ? FileItem(kind) ? Hash(target) : TreeHash(target) : null));
         }
         if (!items.Any(i => i.Kind == "host" && i.Operation == "update")) throw NativeMessages.Error("native.hostPackage.executableMissing", text => new IOException(text));
         return items;
@@ -150,12 +148,12 @@ internal static partial class Program
             if (ResourceDirectory(name))
             {
                 if (!entries.Contains(name)) continue;
-                foreach (var file in Files(Path.Combine(source, name), HostLimit))
+                foreach (var file in Files(Path.Combine(source, name)))
                 {
                     ResourceTarget(Path.Combine(destination, Path.GetRelativePath(source, file)));
                 }
             }
-            else if (Directory.Exists(target)) _ = Files(target, HostLimit);
+            else if (Directory.Exists(target)) _ = Files(target);
         }
         foreach (var name in entries.Where(n => n != HostManifest))
         {
@@ -163,7 +161,7 @@ internal static partial class Program
             if (FileItem(HostKind(name))) File.Copy(origin, target, true);
             else
             {
-                var files = Files(origin, HostLimit); Directory.CreateDirectory(target);
+                var files = Files(origin); Directory.CreateDirectory(target);
                 foreach (var file in files)
                 {
                     var relative = Path.GetRelativePath(origin, file); var installed = Path.Combine(target, relative);
@@ -172,10 +170,10 @@ internal static partial class Program
                 }
                 var keep = files.Select(f => Path.GetRelativePath(origin, f)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (!ResourceDirectory(name))
-                    foreach (var file in Files(target, HostLimit)) if (!keep.Contains(Path.GetRelativePath(target, file))) File.Delete(file);
+                    foreach (var file in Files(target)) if (!keep.Contains(Path.GetRelativePath(target, file))) File.Delete(file);
             }
             var kind = HostKind(name);
-            if (!ResourceDirectory(name) && (FileItem(kind) ? Hash(origin) != Hash(target) : TreeHash(origin, HostLimit) != TreeHash(target, HostLimit))) throw NativeMessages.Error("native.hostPackage.deployedHashMismatch", text => new IOException(text));
+            if (!ResourceDirectory(name) && (FileItem(kind) ? Hash(origin) != Hash(target) : TreeHash(origin) != TreeHash(target))) throw NativeMessages.Error("native.hostPackage.deployedHashMismatch", text => new IOException(text));
         }
         foreach (var obsolete in previous.Except(entries).Where(n => !ResourceDirectory(n))) Delete(Path.Combine(destination, obsolete), HostKind(obsolete));
         File.Copy(Path.Combine(source, HostManifest), Path.Combine(destination, HostManifest), true);

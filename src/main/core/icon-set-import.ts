@@ -80,8 +80,6 @@ export async function* tarEntries(
       const name = prefix ? prefix + '/' + base : base;
       if (['1', '2'].includes(field(156, 1))) throw Error(hostText('images.archiveInvalid'));
       if (['', '0'].includes(field(156, 1)) && selected(name)) {
-        // Registered-image validation defines the supported single-image byte size.
-        if (size > 5 * 1024 * 1024) throw Error(hostText('images.archiveInvalid'));
         const bytes = Buffer.alloc(size);
         await input.read(bytes, 0, size, offset + 512);
         yield { name, bytes };

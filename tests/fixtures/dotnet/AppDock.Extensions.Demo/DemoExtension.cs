@@ -24,6 +24,15 @@ public sealed class DemoExtension : IAppDockExtension
             var secret = await context.Secrets.GetAsync("check", token);
             await context.Secrets.DeleteAsync("check", token);
             if (value != "dotnet-ok" || device != value || compatible != value || shared != "dotnet-shared" || secret != "dotnet-test-secret") throw new InvalidOperationException("Storage / Secrets round trip failed.");
+            var large = new string('x', 1200000);
+            foreach (var scope in new[] { StorageScope.Memory, StorageScope.Device, StorageScope.Shared }) {
+                await context.Storage.SetAsync("large", large, scope, token);
+                if (await context.Storage.GetAsync<string>("large", scope, token) != large) throw new InvalidOperationException("Large Storage round trip failed.");
+            }
+            var largeSecret = new string('s', 120000);
+            await context.Secrets.SetAsync("large", largeSecret, token);
+            if (await context.Secrets.GetAsync("large", token) != largeSecret) throw new InvalidOperationException("Large Secrets round trip failed.");
+            await context.Secrets.DeleteAsync("large", token);
             await context.Log.InfoAsync(".NET Storage / Secrets API の往復を確認しました。", token);
         });
         context.Tray.Add("状態を更新", "appdock.dotnet-demo.refresh");

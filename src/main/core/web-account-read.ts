@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import type { WebAccountSnapshot } from '../../shared/web-accounts';
-import { MAX_RPC_LINE_BYTES, RPC_TIMEOUT_MS } from './rpc';
+import { RPC_TIMEOUT_MS } from './rpc';
 
 export type AccountRead = WebAccountSnapshot & {
   acknowledged: string[];
@@ -19,8 +19,8 @@ type Page =
 type Payload = ({ value: AccountRead } | { bytes: Buffer }) & { confirm(): void };
 type Transfer = { id: string; ready: Promise<Payload>; progressAt: number; next: number };
 type Collect = (live: () => boolean, progress: () => void) => Promise<AccountDelivery>;
-// A base64 frame plus the JSON-RPC envelope must fit the 1 MiB wire limit.
-const chunkBytes = Math.floor(MAX_RPC_LINE_BYTES / 2);
+// Bound each transfer step without limiting the complete snapshot.
+const chunkBytes = 512 * 1024;
 const expired = () => Error(hostText('services.webAccounts.readExpired'));
 export const pendingRead = Symbol('pending Web account read');
 

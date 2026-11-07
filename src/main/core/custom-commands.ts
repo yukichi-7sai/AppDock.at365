@@ -5,7 +5,7 @@ import { hostStartupTiming } from './host-startup-timing';
 import { createHash, randomUUID } from 'node:crypto';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import {
-  boundedJson,
+  validateJson,
   customCommandId,
   customCommandVersion,
   customDescription,
@@ -453,7 +453,7 @@ export class CustomCommandService {
         );
       if (!jsonObject(item.config))
         return failure('INVALID_ARGUMENT', hostText('services.customCommands.configObject'));
-      boundedJson(item.config, Infinity, 40, Infinity);
+      validateJson(item.config);
       if (!this.validator(type)(item.config).valid)
         return failure('INVALID_ARGUMENT', hostText('services.customCommands.configSchema'));
       const provider = this.records().find((r) => r.type.id === item.typeId)?.provider;
@@ -793,7 +793,7 @@ export class CustomCommandService {
         return failure('OUTCOME_UNKNOWN', hostText('services.customCommands.providerChanged'));
       if (result !== null && result !== undefined) {
         if (!jsonObject(result)) throw Error('result');
-        boundedJson(result, 64 * 1024, 32, 8192);
+        validateJson(result);
       }
       return {
         id,

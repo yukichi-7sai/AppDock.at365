@@ -14,7 +14,7 @@ const {
 const { readManifest } = require('../out/main/main/core/extensions');
 const { createHostApi } = require('../out/main/main/core/host-api');
 
-test('Worker read excludes UI reports so multi-account history cannot overflow JSON-RPC', async () => {
+test('Worker snapshots exclude UI reports while preserving multi-account observations and acknowledgements', async () => {
   const { WebAccountController } = require('../out/main/main/core/web-accounts');
   const accounts = Array.from({ length: 10 }, (_, i) => ({
     id: String(i),
@@ -42,7 +42,6 @@ test('Worker read excludes UI reports so multi-account history cannot overflow J
   Object.setPrototypeOf(fake, WebAccountController.prototype);
   const delivery = await fake.read();
   const read = delivery.value;
-  assert.ok(Buffer.byteLength(JSON.stringify(read)) < 1024 * 1024);
   assert.ok(read.accounts.every((a) => a.data === null && a.observation.length === 59000));
   assert.deepEqual(read.acknowledged, ['0']);
   delivery.written();
@@ -300,7 +299,7 @@ test('Web account viewport and transient UI report are bounded', () => {
     assert.throws(() => parseWebViewport(v), /viewport/);
   assert.equal(serializeWebReport(undefined), 'null');
   assert.deepEqual(JSON.parse(serializeWebReport({ count: 2 })), { count: 2 });
-  assert.throws(() => serializeWebReport('あ'.repeat(20000)), /large/);
+  assert.equal(JSON.parse(serializeWebReport('あ'.repeat(20000))), 'あ'.repeat(20000));
   const circular = {};
   circular.self = circular;
   assert.throws(() => serializeWebReport(circular));
@@ -371,7 +370,7 @@ test('Web assets cannot escape Applet; observer origin and capability must be de
     /inside/,
   );
   fs.writeFileSync(path.join(folder, 'open.js'), 'x'.repeat(100001));
-  assert.throws(() => validateWebAccounts(folder, { ...web, itemOpener: 'open.js' }), /large/);
+  validateWebAccounts(folder, { ...web, itemOpener: 'open.js' });
   assert.throws(
     () => validateWebAccounts(folder, { ...web, observeOrigin: 'https://accounts.google.com' }),
     /origins/,

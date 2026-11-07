@@ -47,7 +47,6 @@ export function GenerationAuthentication({
             aria-label={t('settings.aiConnectionDialog.apiKey')}
             type="password"
             autoComplete="off"
-            maxLength={8192}
             value={apiKey ?? ''}
             placeholder={t(
               savedKey

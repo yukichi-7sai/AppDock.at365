@@ -39,6 +39,8 @@ test('native replies translate at receipt, preserve codes, variables and externa
   );
   const reply = async (result, error) => {
     const pending = peer.request('fixture', {});
+    if (!outgoing.readableLength)
+      await new Promise((resolve) => outgoing.once('readable', resolve));
     const request = JSON.parse(outgoing.read().toString());
     incoming.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result, error }) + '\n');
     return pending;
@@ -94,6 +96,8 @@ test('Applet RPC does not interpret native-looking objects', async () => {
   const peer = new JsonLinePeer(incoming, outgoing, async () => {});
   try {
     const pending = peer.request('fixture', {});
+    if (!outgoing.readableLength)
+      await new Promise((resolve) => outgoing.once('readable', resolve));
     const request = JSON.parse(outgoing.read().toString());
     const result = message('native.input.failed');
     incoming.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\n');

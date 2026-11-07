@@ -57,7 +57,7 @@ HTTPの2xxはWebhookの受領を表し、dotの仕事の完了を表さない。
 
 同じ`/mcp` endpointで従来のSDKによるinitialize方式と、`2026-07-28`方式を併存させる。旧Codex接続の登録TOML・トークン・操作許可を変更しない。
 
-`mcp-modern.ts`はmodern要求を識別し、要求単位のprotocolVersion/clientCapabilities、HTTPのMCP-Protocol-Version/Mcp-Method/Mcp-Name一致、JSON-RPC構造、Content-Type/Accept、要求サイズ、同時要求上限を検査する。成功応答へ`resultType: complete`とserverInfoを付ける。未対応メソッドは404/-32601、header不一致は400/-32020、未対応版は400/-32022。tools/callは旧接続と同じAPI・許可・入力検証・監査処理を通る。
+`mcp-modern.ts`はmodern要求を識別し、要求単位のprotocolVersion/clientCapabilities、HTTPのMCP-Protocol-Version/Mcp-Method/Mcp-Name一致、JSON-RPC構造、Content-Type/Accept、同時要求上限を検査する。成功応答へ`resultType: complete`とserverInfoを付ける。未対応メソッドは404/-32601、header不一致は400/-32020、未対応版は400/-32022。tools/callは旧接続と同じAPI・許可・入力検証・監査処理を通る。
 
 | メソッド | 役割 |
 | --- | --- |
@@ -90,7 +90,7 @@ payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。gen
 
 - HTTPS限定、URL内の資格情報とfragmentを拒否。接続ごとにDNSを解決し、全候補が公開アドレスか検査する。検査したアドレスへ接続を固定し、元のhostnameでTLS証明書を検査する。自動redirectは行わない。
 - loopback、プライベート、link-local、CGNAT、予約・文書用・multicast等のIPを拒否する。通常の公開callbackを対象とし、特殊な予約アドレスの例外は設けない。
-- DNS解決を含め要求期限10秒、応答本文16KiB、送信本文256KiBまで。
+- DNS解決を含め要求期限10秒。送受信本文にAppDock独自の容量上限は設けない。
 - whsec_付きbase64鍵を24〜64bytesへ検証。HMAC-SHA256でStandard Webhooksの`id.timestamp.body`を署名する。JSONは一度だけシリアライズし、署名対象と送信bytesを一致させる。
 - 検証challengeは要求ごとのUUID。2xxとchallengeの定時間比較を満たすまで保存・配信しない。成功検証は主体・callback・鍵の組ごとに最大5分キャッシュし、64件に制限する。
 - 鍵更新時は5分間、新旧の署名を併記する。

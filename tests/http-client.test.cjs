@@ -142,7 +142,7 @@ test('JSON error envelopes returned with HTTP success use the same complete diag
   );
 });
 
-test('MCP JSON and SSE errors with HTTP 200 are logged while preserving streams and byte limits', async (t) => {
+test('MCP JSON and SSE errors with HTTP 200 preserve complete streams and diagnostics', async (t) => {
   const entries = capture(t);
   const { McpClientService } = require('../out/main/main/core/mcp-client');
   const error = { code: -32603, data: { detail: '未知♡'.repeat(2000) } };
@@ -174,7 +174,7 @@ test('MCP JSON and SSE errors with HTTP 200 are logged while preserving streams 
     assert.equal(entries.at(-1).message, `HTTP 200\nresponse.error=${JSON.stringify(error)}`);
   }
   assert.equal(entries.length, 2);
-  const oversized = McpClientService.prototype.fetcher.call(
+  const large = McpClientService.prototype.fetcher.call(
     {
       options: {
         fetcher: async () =>
@@ -185,8 +185,9 @@ test('MCP JSON and SSE errors with HTTP 200 are logged while preserving streams 
     },
     'https://example.test/mcp',
   );
-  await assert.rejects((await oversized('https://example.test/mcp')).text(), /MCP response limit/);
-  assert.equal(entries.length, 2);
+  const complete = await (await large('https://example.test/mcp')).json();
+  assert.equal(complete.error.detail.length, 2 * 1024 * 1024);
+  assert.equal(entries.length, 3);
 });
 
 test('HTTP-success AI and image error envelopes and injected webhook transports retain their JSON', async (t) => {

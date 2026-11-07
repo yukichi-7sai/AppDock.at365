@@ -1,5 +1,5 @@
 import { hostText } from './i18n';
-import { boundedJson } from './custom-commands';
+import { validateJson } from './custom-commands';
 export interface TtsVoice {
   id: string;
   name: string;
@@ -51,8 +51,7 @@ export function parseTtsServer(value: unknown): TtsServer {
     (mcpEnabled !== undefined && typeof mcpEnabled !== 'boolean') ||
     !ttsServerId(id) ||
     typeof name !== 'string' ||
-    !name.trim() ||
-    name.length > 200
+    !name.trim()
   )
     throw Error(hostText('settings.ttsServers.invalidServer'));
   return {
@@ -183,8 +182,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export function ttsBaseUrl(value: string): string {
   if (!value) return '';
-  if (value.length > 2048 || /[\\\s?#]/.test(value))
-    throw Error(hostText('settings.tts.urlCredentials'));
+  if (/[\\\s?#]/.test(value)) throw Error(hostText('settings.tts.urlCredentials'));
   let url: URL;
   try {
     url = new URL(value);
@@ -196,7 +194,7 @@ export function ttsBaseUrl(value: string): string {
   return url.href.replace(/\/+$/, '');
 }
 export function ttsVoicesPath(value: string): string {
-  if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(value) || value.length > 256)
+  if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(value))
     throw Error(hostText('settings.tts.voicePath'));
   return value;
 }
@@ -221,7 +219,7 @@ export function parseTtsExtraBody(
   };
   if (!object(value)) return invalid();
   try {
-    boundedJson(value, Infinity, Infinity, Infinity);
+    validateJson(value);
   } catch {
     return invalid();
   }
@@ -246,8 +244,7 @@ export function parseTtsVoices(value: unknown): TtsVoice[] {
       !object(v) ||
       typeof v.id !== 'string' ||
       !v.id.trim() ||
-      v.id.length > 200 ||
-      (v.name !== undefined && (typeof v.name !== 'string' || v.name.length > 200)) ||
+      (v.name !== undefined && typeof v.name !== 'string') ||
       ids.has(v.id)
     )
       throw Error(hostText('settings.tts.voiceItem'));
@@ -289,8 +286,6 @@ export function parseTtsSettings(value: unknown): TtsSettings {
     'instructionsParameter',
   ] as const)
     if (typeof v[key] !== 'string') throw Error(hostText('settings.tts.strings'));
-  if (v.model.length > 200 || v.defaultVoice.length > 200)
-    throw Error(hostText('settings.tts.nameLength'));
   if (!['endpoint', 'manual'].includes(v.voicesSource))
     throw Error(hostText('settings.tts.voiceSource'));
   if (!ttsPresetIds.includes(v.preset) || !['none', 'json'].includes(v.instructionsMode))

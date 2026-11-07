@@ -31,11 +31,10 @@ export const aiOperations = {
         },
         additionalPrompt: {
           type: 'string',
-          maxLength: 2048,
           description:
             '省略時はサーバーのdefaultPromptを使用。空文字・空白だけを明示すると既定を使わず、alwaysPromptだけを加えます。',
         },
-        input: { type: 'string', maxLength: 8192 },
+        input: { type: 'string' },
         timeoutMs: {
           type: 'integer',
           minimum: aiTimeoutLimits.minimumSeconds * 1000,

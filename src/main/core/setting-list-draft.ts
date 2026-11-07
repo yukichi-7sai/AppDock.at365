@@ -26,8 +26,7 @@ export async function settingListDraftAction(
     if (
       !definition.list?.imageKey ||
       !owner.manifest.capabilities?.includes('registered-images') ||
-      typeof request.base64 !== 'string' ||
-      request.base64.length > 350000
+      typeof request.base64 !== 'string'
     )
       return denied();
     return importImage({ base64: request.base64 });
@@ -38,7 +37,6 @@ export async function settingListDraftAction(
   if (
     request.kind !== 'fetch' ||
     typeof request.input !== 'string' ||
-    request.input.length > 4096 ||
     !declaration ||
     Object.keys(declaration.parameters ?? {}).length !== 1 ||
     declaration.parameters?.[action.inputKey] !== 'string'
@@ -69,14 +67,13 @@ export async function settingListDraftAction(
     result.values[key] = structuredClone(raw[key]);
   }
   if (raw.message !== undefined) {
-    if (typeof raw.message !== 'string' || raw.message.length > 1000) return denied();
+    if (typeof raw.message !== 'string') return denied();
     result.message = raw.message;
   }
   if (raw.imageBytes !== undefined && definition.list?.imageKey) {
     if (
       !Array.isArray(raw.imageBytes) ||
       !raw.imageBytes.length ||
-      raw.imageBytes.length > 256000 ||
       raw.imageBytes.some(
         (value: unknown) => !Number.isInteger(value) || Number(value) < 0 || Number(value) > 255,
       )
