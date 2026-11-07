@@ -346,6 +346,8 @@ export class PortableUpdates {
       notified?(notice: NonNullable<UpdateState['notice']>, safeMessage: string): void;
       confirm(names: string[], mode?: 'host-first'): Promise<boolean>;
       shutdown(): void;
+      prepareShutdown?(): Promise<boolean>;
+      cancelShutdown?(): void;
       processIds(): number[];
       log(message: string): void;
       validateApplet?(folder: string): void;
@@ -817,6 +819,10 @@ export class PortableUpdates {
               },
         ),
       );
+      if (this.options.prepareShutdown && !(await this.options.prepareShutdown())) {
+        this.state.phase = hostText('services.portableUpdates.cancelledUnchanged');
+        return structuredClone(this.state);
+      }
       await this.handoff(temporary, jobItems);
       handedOff = true;
       this.state.phase = hostText('services.portableUpdates.applying');
@@ -834,6 +840,7 @@ export class PortableUpdates {
       }
     } finally {
       if (!handedOff) {
+        this.options.cancelShutdown?.();
         if (temporary) await fs.rm(temporary, { recursive: true, force: true }).catch(() => {});
         this.state.busy = false;
         this.state.cancellable = false;
@@ -1051,6 +1058,10 @@ export class PortableUpdates {
           throw Error(hostText('services.portableUpdates.removalTargetChanged'));
       }
       this.state.cancellable = false;
+      if (this.options.prepareShutdown && !(await this.options.prepareShutdown())) {
+        this.packageOperation = { id, status: 'failed' };
+        return structuredClone(this.state);
+      }
       await this.handoff(
         plan.temporary,
         [
@@ -1078,6 +1089,7 @@ export class PortableUpdates {
       throw error;
     } finally {
       if (!handedOff) {
+        this.options.cancelShutdown?.();
         await fs.rm(plan.temporary, { recursive: true, force: true }).catch(() => {});
         this.finishPreview();
       }

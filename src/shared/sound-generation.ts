@@ -13,8 +13,10 @@ export interface GeneratedSound {
   busy: boolean;
   error?: string;
   canRetry?: boolean;
+  hasResult?: boolean;
 }
 export interface SoundGenerationModel {
+  draft?: SoundGenerationDraft;
   id: string;
   revision: number;
   folder: string;
@@ -32,11 +34,21 @@ export interface SoundGenerationModel {
   playback?: LibraryPlayback;
   error: string;
 }
+export interface SoundGenerationDraft {
+  folder: string;
+  serverId: string;
+  text: string;
+  useDefault: boolean;
+  instructions: string;
+}
 export type SoundGenerationAction =
+  | { kind: 'draft'; draft: SoundGenerationDraft }
+  | { kind: 'recoveryFolder' }
+  | { kind: 'export' | 'discard'; itemId: string }
   | { kind: 'generate'; folder: string; connectionId: string; text: string; instructions?: string }
   | { kind: 'stop' }
   | { kind: 'close'; discard?: boolean }
-  | { kind: 'cancel' | 'retry' | 'play' | 'delete' | 'dismiss'; itemId: string }
+  | { kind: 'cancel' | 'retry' | 'regenerate' | 'play' | 'delete' | 'dismiss'; itemId: string }
   | { kind: 'rename'; itemId: string; name: string };
 /** Private trusted-renderer bridge. It never exposes WAV bytes or credentials. */
 export interface SoundGenerationApi {

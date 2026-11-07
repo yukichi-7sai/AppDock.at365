@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
+import { atomicReplaceSync } from './atomic-replace';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -80,27 +81,11 @@ function atomicWrite(
   const tmp = `${file}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-    for (let attempt = 0; ; attempt++) {
-      {
-        const current = readPrevious();
-        if (!sameBytes(previous, current))
-          throw new SettingsConflictError(hostText('services.settings.pathChanged'));
-      }
-      try {
-        fs.renameSync(tmp, file);
-        break;
-      } catch (error) {
-        if (
-          process.platform !== 'win32' ||
-          attempt >= 3 ||
-          !['EPERM', 'EACCES', 'EBUSY'].includes((error as NodeJS.ErrnoException).code ?? '')
-        )
-          throw error;
-        // Retry only the same atomic replacement, never the setting operation or a toggle.
-        // Readers can briefly deny rename on Windows; preserve any intervening writer.
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
-      }
-    }
+    atomicReplaceSync(tmp, file, () => {
+      const current = readPrevious();
+      if (!sameBytes(previous, current))
+        throw new SettingsConflictError(hostText('services.settings.pathChanged'));
+    });
   } finally {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
   }

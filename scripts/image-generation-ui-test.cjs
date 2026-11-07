@@ -457,12 +457,61 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     await dialog().getByLabel('プロンプト', { exact: true }).fill('hold');
     await dialog().getByRole('button', { name: '生成して追加', exact: true }).click();
     await until(() => held, 'pending generation');
+    await app.app.evaluate(({ dialog }) => {
+      globalThis.__generationQuitPrompts = [];
+      dialog.showMessageBox = async (options) => {
+        globalThis.__generationQuitPrompts.push(options);
+        return { response: 0 };
+      };
+    });
+    await page.evaluate(() => window.dock.executeCommand('appdock.quit'));
+    await until(
+      () => app.app.evaluate(() => globalThis.__generationQuitPrompts.length === 1),
+      'quit warning',
+    );
+    assert.equal(await app.app.evaluate(() => globalThis.__generationQuitPrompts[0].defaultId), 0);
+    await until(
+      async () =>
+        (await model()).items.find((item) => item.input === 'hold')?.job.state === 'running',
+      'generation remains running after quit cancellation',
+    );
+    check('canceling the default quit warning leaves generation and the application usable');
+    const heldJobId = (await model()).items.find((item) => item.input === 'hold').job.jobId;
+    await page.reload();
+    await page.evaluate(() =>
+      window.dock.imageGeneration.onChanged((m) => {
+        window.__imageGenerationModel = m;
+      }),
+    );
+    await page.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    await openGeneration();
+    await until(
+      async () =>
+        (await model()).items.find((item) => item.job.jobId === heldJobId)?.job.state === 'running',
+      'same job after renderer reload',
+    );
+    assert.equal(await dialog().getByLabel('プロンプト', { exact: true }).inputValue(), 'hold');
+    check('renderer reload preserves the in-flight job and prompt draft');
     await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
-    editor = page.locator('dialog.settings-modal').last();
-    await editor.getByRole('button', { name: '破棄して閉じる', exact: true }).click();
     await until(async () => !(await model()), 'closed generation');
-    held.end(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }));
-    check('responsive dialog and close cancels only its pending generation');
+    await page.evaluate(() => window.dock.executeCommand('appdock.sound-library.open'));
+    held.writeHead(200, { 'Content-Type': 'application/json' });
+    held.end(
+      JSON.stringify({
+        data: Array.from({ length: requests.at(-1).n }, () => ({
+          b64_json: png.toString('base64'),
+        })),
+      }),
+    );
+    await page.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    await openGeneration();
+    await until(
+      async () =>
+        (await model()).items.find((item) => item.input === 'hold')?.job.state === 'completed',
+      'closed generation saved in background',
+    );
+    await closeGeneration();
+    check('closing preserves the pending generation and reopening shows its saved result');
     for (const runtime of ['node', 'dotnet']) {
       const id = 'fixture.image-registration-' + runtime;
       await until(
@@ -558,6 +607,32 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     assert(denied.isError);
     assert(JSON.stringify(denied).includes('API_DISABLED'));
     check('revoking the image grant prevents new generation on both shared receiver paths');
+    const originalJobIds = [];
+    await page.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    await openGeneration();
+    originalJobIds.push(...(await model()).items.map((item) => item.job.jobId));
+    await closeGeneration();
+    for (const client of clients.splice(0)) await client.close();
+    await app.app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = async () => ({ response: 1 });
+    });
+    const requestCountBeforeRestart = requests.length;
+    await app.close();
+    app = await launch(profile, process.argv[2]);
+    page = app.main;
+    page.on('pageerror', (error) => errors.push(String(error)));
+    await page.evaluate(() =>
+      window.dock.imageGeneration.onChanged((m) => {
+        window.__imageGenerationModel = m;
+      }),
+    );
+    await page.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    await openGeneration();
+    const restoredJobIds = (await model()).items.map((item) => item.job.jobId);
+    assert(originalJobIds.every((id) => restoredJobIds.includes(id)));
+    assert.equal(requests.length, requestCountBeforeRestart);
+    await closeGeneration();
+    check('restart restores the same image jobs without sending a new generation request');
     assert.deepEqual(errors, []);
   } catch (error) {
     if (page) await page.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
@@ -565,11 +640,17 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     process.exitCode = 1;
   } finally {
     for (const client of clients) await client.close().catch(() => {});
-    if (app)
+    if (app) {
+      await app.app
+        .evaluate(({ dialog }) => {
+          dialog.showMessageBox = async () => ({ response: 1 });
+        })
+        .catch(() => {});
       await app.close().catch((error) => {
         errors.push(error.stack);
         process.exitCode = 1;
       });
+    }
     held?.destroy();
     if (server) {
       server.closeAllConnections();

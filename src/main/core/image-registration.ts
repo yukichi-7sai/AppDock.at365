@@ -5,6 +5,7 @@ import type { ImageRegistrationDestination } from '../../shared/image-ai';
 import { imageFail } from './image-ai-adapter';
 import type { RegisteredImages } from './registered-images';
 import type { ImageLibraryHost } from './image-library-host';
+import type { AssetRegistrationIntent } from './registered-assets';
 
 export interface RegistrationImage {
   id: string;
@@ -14,8 +15,11 @@ export interface RegistrationImage {
   ref?: LibraryRef;
   generation?: string;
   grouped?: boolean;
+  intent?: AssetRegistrationIntent;
+  checkpoint?(): void;
 }
 export interface ImageRegistrar {
+  restore?(image: RegistrationImage): Promise<void>;
   validate(value: unknown): ImageRegistrationDestination;
   save(
     image: RegistrationImage,
@@ -30,6 +34,12 @@ export class ImageRegistration implements ImageRegistrar {
     private files: RegisteredImages,
     private host: ImageLibraryHost,
   ) {}
+  async restore(image: RegistrationImage) {
+    if (!image.intent) return;
+    const saved = await this.files.recoverRegistration(image.intent);
+    image.ref = saved.ref;
+    image.generation = saved.generation;
+  }
   validate(value: unknown): ImageRegistrationDestination {
     if (
       !aiObject(value) ||
@@ -58,6 +68,7 @@ export class ImageRegistration implements ImageRegistrar {
       this.host.assertWritable();
     };
     check();
+    if (image.ref && image.intent) await this.restore(image);
     if (!image.ref) {
       this.validate(destination);
       if (!image.bytes) return imageFail('IMAGE_AI_RESULT_EXPIRED', 'expired');
@@ -73,10 +84,19 @@ export class ImageRegistration implements ImageRegistrar {
       const saved = await this.files.addVerified(image.bytes, filename, {
         unique: true,
         writable: check,
+        journal: image.checkpoint
+          ? {
+              intent: image.intent,
+              prepare: (intent) => {
+                image.intent = intent;
+                image.checkpoint!();
+              },
+            }
+          : undefined,
       });
       image.ref = saved.ref;
       image.generation = saved.generation;
-      image.bytes = undefined;
+      image.checkpoint?.();
     }
     if (destination.group && !image.grouped) {
       check();
@@ -97,5 +117,6 @@ export class ImageRegistration implements ImageRegistrar {
       });
     }
     image.grouped = true;
+    image.checkpoint?.();
   }
 }

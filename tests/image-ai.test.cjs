@@ -295,7 +295,7 @@ test('large results are read in bounded chunks and no raw image is in the job pr
     code: 'INVALID_ARGUMENT',
   });
 });
-test('cancellation discards late output, holds the transport slot and does not report failure', async (t) => {
+test('cancellation preserves late output, holds the transport slot and does not report failure', async (t) => {
   const resolve = [];
   const f = fixture(t, { fetcher: () => new Promise((r) => resolve.push(r)) });
   const a = f.s.generate('one', { input: 'fixture', requestId: 'a' }),
@@ -308,7 +308,8 @@ test('cancellation discards late output, holds the transport slot and does not r
   resolve[1](response());
   await completed(f.s, b.jobId);
   assert.equal(f.s.get('one', a.jobId).state, 'canceled');
-  assert.equal(f.s.get('one', a.jobId).images, undefined);
+  assert.equal(f.s.get('one', a.jobId).images.length, 1);
+  assert.deepEqual(f.s.hostExport(a.jobId)[0].bytes, png);
   assert.equal(f.failures.length, 0);
 });
 test('preset/key changes cancel only the affected work and owner shutdown forgets results', async (t) => {
@@ -346,14 +347,17 @@ test('errors are sanitized and reported once; invalid requests never send', asyn
   assert.equal(f.failures.length, 1);
   assert(!JSON.stringify(f.failures).includes('private-'));
 });
-test('expiry and permission revocation do not regenerate images', async (t) => {
-  const f = fixture(t, { resultMs: 20 });
+test('elapsed time never expires results and permission revocation does not regenerate images', async (t) => {
+  const f = fixture(t);
   const j = f.s.generate('one', { input: 'fixture', requestId: 'expire' });
   const done = await completed(f.s, j.jobId);
-  await until(() => f.s.get('one', j.jobId).resultExpired);
-  assert.throws(() => f.s.read('one', { jobId: j.jobId, imageId: done.images[0].id }), {
-    code: 'IMAGE_AI_RESULT_EXPIRED',
-  });
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
+  t.mock.timers.tick(31 * 60 * 1000);
+  assert.equal(f.s.get('one', j.jobId).resultExpiresAt, undefined);
+  assert.deepEqual(
+    Buffer.from(f.s.read('one', { jobId: j.jobId, imageId: done.images[0].id }).data, 'base64'),
+    png,
+  );
   f.s.generate('one', { input: 'fixture', requestId: 'expire' });
   assert.equal(f.requests.length, 1);
   f.deny();
@@ -510,7 +514,8 @@ test('timeouts include queue time and abort running requests without automatic r
   assert.equal(resolve.length, 1);
   resolve[0](response());
   await new Promise((r) => setTimeout(r, 5));
-  assert.equal(f.s.get('one', a.jobId).images, undefined);
+  assert.equal(f.s.get('one', a.jobId).images.length, 1);
+  assert.deepEqual(f.s.hostExport(a.jobId)[0].bytes, png);
 });
 
 test('malformed JSON is a response failure and decoder errors do not complete the job', async (t) => {
@@ -529,5 +534,7 @@ test('malformed JSON is a response failure and decoder errors do not complete th
   const k = g.s.generate('one', { input: 'fixture', requestId: 'decode' });
   await until(() => g.s.get('one', k.jobId).state === 'failed');
   assert.equal(g.s.get('one', k.jobId).error.code, 'IMAGE_AI_INVALID_RESPONSE');
-  assert.equal(g.s.get('one', k.jobId).images, undefined);
+  const imageId = g.s.get('one', k.jobId).images[0].id;
+  assert.throws(() => g.s.read('one', { jobId: k.jobId, imageId }), { code: 'NOT_FOUND' });
+  assert.deepEqual(g.s.hostExport(k.jobId)[0].bytes, png);
 });

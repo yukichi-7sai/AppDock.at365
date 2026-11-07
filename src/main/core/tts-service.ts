@@ -260,6 +260,7 @@ export class TtsService {
     signal: AbortSignal,
     maximumBytes: number,
     progress?: (state: 'queued' | 'generating') => void,
+    receive?: (audio: { bytes: Buffer; seconds: number }) => void,
   ) {
     return new Promise<{ bytes: Buffer; seconds: number }>((resolve, reject) => {
       if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
@@ -274,15 +275,20 @@ export class TtsService {
         if (!['completed', 'failed', 'canceled'].includes(job.state)) return;
         unsubscribe();
         signal.removeEventListener('abort', abort);
-        if (job.state === 'completed' && audio) resolve(audio);
-        else if (job.state === 'canceled') reject(new DOMException('Cancelled', 'AbortError'));
-        else
-          reject(
-            new TtsError(
-              job.error?.code ?? 'TTS_INVALID_AUDIO',
-              job.error?.message ?? hostText('services.ttsService.failed'),
-            ),
-          );
+        const complete = () => {
+          if (job.state === 'completed' && audio) resolve(audio);
+          else if (job.state === 'canceled') reject(new DOMException('Cancelled', 'AbortError'));
+          else
+            reject(
+              new TtsError(
+                job.error?.code ?? 'TTS_INVALID_AUDIO',
+                job.error?.message ?? hostText('services.ttsService.failed'),
+              ),
+            );
+        };
+        // Cancellation acknowledgement can precede the final response callback.
+        // Keep the library job alive until the underlying operation has settled.
+        void Promise.resolve(this.jobs.get(job.jobId)?.finished).then(complete, complete);
       });
       try {
         const accepted = this.speak(
@@ -293,6 +299,7 @@ export class TtsService {
               maximumBytes,
               receive: (bytes, seconds) => {
                 audio = { bytes, seconds };
+                receive?.(audio);
               },
             },
           },
@@ -509,6 +516,7 @@ export class TtsService {
     }
   }
   private async run(j: InternalJob) {
+    const capture = j.internal?.audio;
     try {
       this.authorize(j.owner, true);
       this.authorizeConnection(j.owner, j.connectionId);
@@ -536,15 +544,21 @@ export class TtsService {
         false,
       );
       clearTimeout(j.timer);
-      if (j.ended !== undefined) return;
-      const bytes = finalizeTtsWave(received);
+      let bytes: Buffer;
+      try {
+        bytes = finalizeTtsWave(received);
+      } catch (error) {
+        capture?.receive(received, 0);
+        throw error;
+      }
       const seconds = waveDuration(bytes);
+      // Library generation preserves complete audio before cancellation/permission checks.
+      capture?.receive(bytes, seconds);
+      if (j.ended !== undefined) return;
       this.authorize(j.owner, true);
       this.authorizeConnection(j.owner, j.connectionId);
       this.checkStart(j);
-      if (j.internal?.audio) {
-        j.internal.audio.receive(bytes, seconds);
-      } else {
+      if (!capture) {
         this.state(j, 'waitingPlayback');
         if (j.ended === undefined)
           await this.options.play(bytes, seconds, controller.signal, () => {

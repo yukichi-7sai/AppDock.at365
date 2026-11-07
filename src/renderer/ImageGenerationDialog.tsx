@@ -53,21 +53,25 @@ export function ImageGenerationDialog({
 }) {
   const { t } = useHostTranslation();
   const library = useImageLibrary();
-  const [folder, setFolder] = useState(model.folder);
-  const [serverId, setServerId] = useState(model.defaultConnectionId ?? '');
-  const [input, setInput] = useState('');
-  const [name, setName] = useState('');
-  const [referenceImages, setReferenceImages] = useState<LibraryRef[]>(
-    () => model.initialReferenceImages,
+  const [folder, setFolder] = useState(model.draft?.folder ?? model.folder);
+  const [serverId, setServerId] = useState(
+    model.draft?.serverId ?? model.defaultConnectionId ?? '',
   );
-  const [quality, setQuality] = useState<string>();
-  const [size, setSize] = useState<string>();
-  const [count, setCount] = useState<string>();
-  const [format, setFormat] = useState<ImageFormat>();
+  const [input, setInput] = useState(model.draft?.input ?? '');
+  const [name, setName] = useState(model.draft?.name ?? '');
+  const [referenceImages, setReferenceImages] = useState<LibraryRef[]>(() =>
+    model.initialReferenceImages.length
+      ? model.initialReferenceImages
+      : (model.draft?.referenceImages ?? []),
+  );
+  const [quality, setQuality] = useState<string | undefined>(model.draft?.quality);
+  const [size, setSize] = useState<string | undefined>(model.draft?.size);
+  const [count, setCount] = useState<string | undefined>(model.draft?.count);
+  const [format, setFormat] = useState<ImageFormat | undefined>(model.draft?.format);
+  const [discard, setDiscard] = useState<string>();
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const running = useRef(false);
-  const [confirmClose, setConfirmClose] = useState(false);
   const [preview, setPreview] = useState<LibraryEntry | null>(null);
   const [edit, setEdit] = useState<{
     kind: 'rename' | 'delete';
@@ -78,6 +82,12 @@ export function ImageGenerationDialog({
   const [rename, setRename] = useState('');
   const server = model.servers.find((s) => s.id === serverId);
   const act = (action: ImageGenerationAction) => window.dock.imageGeneration.act(model.id, action);
+  useEffect(() => {
+    void act({
+      kind: 'draft',
+      draft: { folder, serverId, input, name, referenceImages, quality, size, count, format },
+    }).catch(() => {});
+  }, [folder, serverId, input, name, referenceImages, quality, size, count, format]);
   const run = (action: ImageGenerationAction) => {
     if (running.current) return;
     running.current = true;
@@ -90,17 +100,7 @@ export function ImageGenerationDialog({
         setPending(false);
       });
   };
-  const close = () => {
-    if (
-      model.items.some(
-        ({ job }) =>
-          ['queued', 'running', 'saving'].includes(job.state) ||
-          (job.state === 'unsaved' && !job.resultExpired),
-      )
-    )
-      setConfirmClose(true);
-    else run({ kind: 'close' });
-  };
+  const close = () => run({ kind: 'close' });
   const heading = 'image-generation-' + model.id;
   return (
     <>
@@ -112,7 +112,7 @@ export function ImageGenerationDialog({
         onClose={close}
         closeDisabled={pending}
         collapseStatusWhenEmpty
-        error={error}
+        error={error || model.recoveryError}
         header={
           <header>
             <h2 id={heading}>{t('imageGeneration.title')}</h2>
@@ -127,6 +127,11 @@ export function ImageGenerationDialog({
             <SettingsButton disabled={pending} onClick={close}>
               {t('common.close')}
             </SettingsButton>
+            {model.recoveryError && (
+              <SettingsButton onClick={() => run({ kind: 'recoveryFolder' })}>
+                {t('generationJobs.recoveryFolder')}
+              </SettingsButton>
+            )}
           </footer>
         }
       >
@@ -333,6 +338,19 @@ export function ImageGenerationDialog({
                   </div>
                 ))}
                 <SettingsActions>
+                  {!busy && (
+                    <SettingsButton disabled={pending} onClick={() => setDiscard(item.job.jobId)}>
+                      {t('generationJobs.discard')}
+                    </SettingsButton>
+                  )}
+                  {!busy && !!item.job.images?.length && (
+                    <SettingsButton
+                      disabled={pending}
+                      onClick={() => run({ kind: 'export', jobId: item.job.jobId })}
+                    >
+                      {t('generationJobs.export')}
+                    </SettingsButton>
+                  )}
                   {busy && (
                     <SettingsButton
                       disabled={pending}
@@ -341,14 +359,17 @@ export function ImageGenerationDialog({
                       {t('common.cancel')}
                     </SettingsButton>
                   )}
-                  {item.job.state === 'unsaved' && !item.job.resultExpired && (
-                    <SettingsButton
-                      disabled={pending}
-                      onClick={() => run({ kind: 'retrySave', jobId: item.job.jobId })}
-                    >
-                      {t('soundGeneration.retrySave')}
-                    </SettingsButton>
-                  )}
+                  {!busy &&
+                    item.job.images?.some(
+                      (image) => !image.ref || image.registration === 'group-pending',
+                    ) && (
+                      <SettingsButton
+                        disabled={pending}
+                        onClick={() => run({ kind: 'retrySave', jobId: item.job.jobId })}
+                      >
+                        {t('soundGeneration.retrySave')}
+                      </SettingsButton>
+                    )}
                 </SettingsActions>
                 <details>
                   <summary>{t('soundGeneration.conditions')}</summary>
@@ -414,15 +435,19 @@ export function ImageGenerationDialog({
           )}
         </SettingsDialog>
       )}
-      {confirmClose && (
+      {discard && (
         <SettingsDialog
-          children={null}
-          title={t('common.close')}
-          description={t('imageGeneration.confirmClose')}
-          applyLabel={t('soundGeneration.discardClose')}
-          onClose={() => setConfirmClose(false)}
-          onApply={() => act({ kind: 'close', discard: true })}
-        />
+          title={t('generationJobs.discard')}
+          description={t('generationJobs.discardConfirm')}
+          applyLabel={t('common.delete')}
+          onClose={() => setDiscard(undefined)}
+          onApply={async () => {
+            await act({ kind: 'discard', jobId: discard });
+            setDiscard(undefined);
+          }}
+        >
+          {null}
+        </SettingsDialog>
       )}
       {preview && (
         <LibraryPreviewDialog

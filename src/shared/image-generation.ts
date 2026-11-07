@@ -11,6 +11,8 @@ export interface ImageGenerationItem {
   entries: { id: string; entry: LibraryEntry; changed: boolean }[];
 }
 export interface ImageGenerationModel {
+  draft?: ImageGenerationDraft;
+  recoveryError?: string;
   id: string;
   revision: number;
   folder: string;
@@ -20,7 +22,21 @@ export interface ImageGenerationModel {
   servers: { id: string; name: string; defaults: ImageGenerationOptions }[];
   items: ImageGenerationItem[];
 }
+export interface ImageGenerationDraft {
+  folder: string;
+  serverId: string;
+  input: string;
+  name: string;
+  referenceImages: LibraryRef[];
+  quality?: string;
+  size?: string;
+  count?: string;
+  format?: 'png' | 'jpeg' | 'webp';
+}
 export type ImageGenerationAction =
+  | { kind: 'draft'; draft: ImageGenerationDraft }
+  | { kind: 'recoveryFolder' }
+  | { kind: 'export' | 'discard'; jobId: string }
   | { kind: 'generate'; folder: string; name?: string; input: ImageGenerateInput }
   | { kind: 'cancel' | 'retrySave'; jobId: string }
   | { kind: 'rename' | 'delete'; jobId: string; imageId: string; name?: string }

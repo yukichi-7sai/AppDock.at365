@@ -11,6 +11,9 @@ import type {
 } from '../../shared/sound-generation';
 import type { SoundLibraryService } from './sound-library-service';
 import type { TtsService } from './tts-service';
+import { GenerationStore, type GenerationRecord } from './generation-store';
+import type { BackgroundJob, BackgroundJobs } from './background-jobs';
+import type { AssetRegistrationIntent } from './registered-assets';
 
 interface Item {
   view: GeneratedSound;
@@ -20,6 +23,24 @@ interface Item {
   groupPending: boolean;
   abort?: AbortController;
   task?: Promise<void>;
+  group?: string;
+  createdAt: string;
+  record?: GenerationRecord<SoundRecovery>;
+  durable?: boolean;
+  storageError?: boolean;
+  intent?: AssetRegistrationIntent;
+  rescued?: boolean;
+  hidden?: boolean;
+}
+interface SoundRecovery {
+  view: GeneratedSound;
+  request: Item['request'];
+  group?: string;
+  groupPending: boolean;
+  entry?: LibraryEntry;
+  createdAt: string;
+  intent?: AssetRegistrationIntent;
+  hidden?: boolean;
 }
 interface Session {
   id: string;
@@ -47,11 +68,15 @@ function filenameStem(text: string) {
       .trim() || hostText('soundGeneration.fileStem');
   return assetFilename(stem + '.wav') ? stem : '_' + stem;
 }
-/** Only this dialog's drafts and playback are disposed; committed library files are permanent. */
+/** Jobs outlive their dialog connection; only dialog playback is detached on close. */
 export class SoundGeneration {
   private session?: Session;
   private revision = 0;
   private signature = '';
+  private items: Item[] = [];
+  private closed = false;
+  private draft?: import('../../shared/sound-generation').SoundGenerationDraft;
+  private recovering = new Map<Item, Promise<void>>();
   constructor(
     private options: {
       library: SoundLibraryService;
@@ -60,8 +85,148 @@ export class SoundGeneration {
       send(model: SoundGenerationModel | null): void;
       failed(): void;
       changed(): void;
+      store?: GenerationStore;
+      background?: BackgroundJobs;
+      export?(results: { id: string; mimeType: string; bytes: Buffer }[]): Promise<boolean>;
+      recoveryFolder?(): void;
     },
-  ) {}
+  ) {
+    for (const record of options.store?.load<SoundRecovery>('sound') ?? []) {
+      try {
+        const data = record.data;
+        if (data.hidden) continue;
+        if (data.view.id !== record.id || typeof data.request.text !== 'string')
+          throw Error('Invalid sound recovery record');
+        const item: Item = { ...data, record, view: { ...data.view, busy: false } };
+        if (record.results.length) {
+          try {
+            options.store!.read(record, record.id);
+            item.durable = true;
+          } catch {
+            item.storageError = true;
+          }
+        }
+        if (['queued', 'generating', 'saving'].includes(item.view.state)) {
+          item.view.state = item.durable ? 'unsaved' : 'failed';
+          item.view.error = hostText('generationJobs.interrupted');
+        }
+        this.items.push(item);
+        if (item.intent) {
+          const task = options.library.files
+            .recoverRegistration(item.intent)
+            .then((saved) => {
+              item.entry = {
+                ...options.library.files.entry(saved.ref)!,
+                ref: saved.ref,
+                generation: saved.generation,
+              };
+              item.view.file = saved.ref.file;
+            })
+            .catch(() => {
+              item.view.state = 'changed';
+              item.view.error = hostText('generationJobs.targetChanged');
+            })
+            .finally(() => {
+              this.recovering.delete(item);
+              this.refresh();
+            });
+          this.recovering.set(item, task);
+        }
+      } catch {
+        options.store!.issues.push('Invalid sound recovery record: ' + record.id);
+      }
+    }
+    options.background?.register('sound', {
+      snapshot: () => this.backgroundSnapshot(),
+      cancel: (id) => {
+        this.items.find((item) => item.view.id === id)?.abort?.abort();
+      },
+      retry: async (id) => {
+        const item = this.items.find((item) => item.view.id === id);
+        if (!item || item.view.busy) return;
+        item.abort = new AbortController();
+        item.view.busy = true;
+        item.task = this.save(item).finally(() => this.finished(item));
+        await item.task;
+      },
+      close: () => this.close(),
+      settle: () => this.settle(),
+    });
+  }
+  private checkpoint(item: Item) {
+    if (!this.options.store) return;
+    const data: SoundRecovery = {
+      view: { ...item.view },
+      request: item.request,
+      group: item.group,
+      groupPending: item.groupPending,
+      entry: item.entry,
+      createdAt: item.createdAt,
+      intent: item.intent,
+      hidden: item.hidden,
+    };
+    item.record ??= { version: 1, id: item.view.id, kind: 'sound', data, results: [] };
+    item.record.data = data;
+    this.options.store.save(item.record);
+  }
+  private preserve(item: Item) {
+    this.checkpoint(item);
+    if (this.options.store && item.bytes && !item.durable) {
+      this.options.store.preserve(item.record!, item.view.id, 'audio/wav', item.bytes);
+      item.durable = true;
+    }
+    item.storageError = false;
+  }
+  backgroundSnapshot(): BackgroundJob[] {
+    return this.items.map((item) => ({
+      jobId: item.view.id,
+      kind: 'sound',
+      owner: 'host',
+      origin: 'sound-library',
+      state: item.view.busy
+        ? item.abort?.signal.aborted
+          ? 'canceling'
+          : item.view.state === 'queued'
+            ? 'queued'
+            : 'running'
+        : item.storageError || item.groupPending || item.view.state === 'unsaved'
+          ? 'attention'
+          : item.view.state === 'saved'
+            ? 'completed'
+            : item.view.state === 'canceled'
+              ? 'canceled'
+              : 'failed',
+      phase: item.view.state,
+      createdAt: item.createdAt,
+      updatedAt: item.createdAt,
+      actions: item.view.busy ? ['cancel', 'details'] : ['retry', 'details'],
+      shutdownImpact: {
+        active: !!item.task,
+        preserved: item.durable ? 1 : 0,
+        volatile: item.bytes && !item.durable && !item.rescued ? 1 : 0,
+      },
+      resultSummary: {
+        saved: item.entry ? 1 : 0,
+        pending:
+          (item.bytes || item.durable || item.entry) && (!item.entry || item.groupPending) ? 1 : 0,
+      },
+    }));
+  }
+  async close() {
+    this.closed = true;
+    await this.settle();
+  }
+  async settle() {
+    for (const item of this.items) item.abort?.abort();
+    await Promise.allSettled(this.items.map((item) => item.task));
+    for (const item of this.items) {
+      try {
+        this.preserve(item);
+      } catch {
+        item.storageError = true;
+      }
+    }
+  }
   open(owner: string, folder: string, group?: string): Promise<void> {
     if (this.session) throw Error(hostText('soundGeneration.busy'));
     this.checkFolder(folder);
@@ -72,7 +237,7 @@ export class SoundGeneration {
         owner,
         folder,
         group,
-        items: [],
+        items: this.items,
         closing: false,
         resolve,
       };
@@ -90,6 +255,7 @@ export class SoundGeneration {
     const config = this.options.configuration();
     return {
       id: s.id,
+      draft: this.draft,
       revision: this.revision,
       folder: s.folder,
       folders: [...new Set(['', ...this.options.library.files.folders])],
@@ -107,15 +273,22 @@ export class SoundGeneration {
           item.entry && (!current?.available || current.generation !== item.entry.generation);
         return {
           ...item.view,
+          hasResult: !!item.bytes || !!item.durable,
           state: changed ? 'changed' : item.view.state,
           canRetry:
             !item.view.busy &&
-            (!!item.bytes || item.groupPending || ['failed', 'canceled'].includes(item.view.state)),
+            item.view.state !== 'changed' &&
+            !this.recovering.has(item) &&
+            ((!item.entry && (!!item.bytes || item.durable)) ||
+              item.groupPending ||
+              ['failed', 'canceled'].includes(item.view.state)),
         };
       }),
       closing: s.closing,
       playback: this.options.library.preview.snapshot(s.id),
-      error: this.options.library.preview.errorFor(s.id),
+      error: this.options.store?.issues.length
+        ? hostText('generationJobs.recoveryFailed')
+        : this.options.library.preview.errorFor(s.id),
     };
   }
   refresh() {
@@ -127,19 +300,22 @@ export class SoundGeneration {
     model.revision = ++this.revision;
     this.options.send(model);
   }
-  private active(s: Session, item: Item) {
-    if (s !== this.session || s.closing || item.abort?.signal.aborted)
+  private active(item: Item) {
+    if (this.closed || item.abort?.signal.aborted)
       throw new DOMException('Cancelled', 'AbortError');
   }
-  private writable(s: Session, item: Item) {
-    this.active(s, item);
+  private writable(item: Item) {
+    this.active(item);
     this.options.library.host.assertWritable();
   }
-  private async save(s: Session, item: Item) {
+  private async save(item: Item) {
     item.view.state = 'saving';
     this.refresh();
     try {
-      this.writable(s, item);
+      this.writable(item);
+      this.preserve(item);
+      if (!item.bytes && item.durable)
+        item.bytes = this.options.store!.read(item.record!, item.view.id);
       if (!item.entry) {
         this.checkFolder(item.view.folder);
         if (!item.bytes) throw Error(hostText('soundGeneration.missing'));
@@ -147,7 +323,16 @@ export class SoundGeneration {
           (item.view.folder ? item.view.folder + '/' : '') + filenameStem(item.view.text) + '.wav';
         const saved = await this.options.library.files.addVerified(item.bytes, filename, {
           unique: true,
-          writable: () => this.writable(s, item),
+          writable: () => this.writable(item),
+          journal: this.options.store
+            ? {
+                intent: item.intent,
+                prepare: (intent) => {
+                  item.intent = intent;
+                  this.checkpoint(item);
+                },
+              }
+            : undefined,
         });
         item.entry = {
           ...this.options.library.files.entry(saved.ref)!,
@@ -156,10 +341,11 @@ export class SoundGeneration {
         };
         item.view.file = saved.ref.file;
         item.view.state = 'saved';
-        item.bytes = undefined;
+        this.checkpoint(item);
+        if (item.durable || !this.options.store) item.bytes = undefined;
       }
-      if (item.groupPending && s.group) {
-        this.writable(s, item);
+      if (item.groupPending && item.group) {
+        this.writable(item);
         const groups = this.options.library.host.configuration.snapshot().groups;
         const before = groups
           .filter((g) =>
@@ -170,7 +356,7 @@ export class SoundGeneration {
           kind: 'membership',
           image: item.entry.ref,
           before,
-          ids: [...new Set([...before, s.group])],
+          ids: [...new Set([...before, item.group])],
         });
         item.groupPending = false;
       }
@@ -183,11 +369,35 @@ export class SoundGeneration {
         this.options.failed();
       }
     } finally {
-      item.view.state = item.entry ? 'saved' : item.bytes ? 'unsaved' : 'canceled';
+      item.view.state =
+        item.entry && !item.groupPending
+          ? 'saved'
+          : item.bytes || item.durable || item.entry
+            ? 'unsaved'
+            : 'canceled';
+      try {
+        this.checkpoint(item);
+      } catch {
+        item.storageError = true;
+        item.view.error = hostText('generationJobs.storageFailed');
+      }
       this.options.changed();
     }
   }
-  private generate(s: Session, item: Item) {
+  private generate(item: Item) {
+    try {
+      this.options.background?.assertAccepting();
+      if (this.items.some((existing) => existing.storageError))
+        throw Error(hostText('generationJobs.storageFailed'));
+      this.options.store?.preflight();
+      this.checkpoint(item);
+    } catch (error) {
+      item.view.busy = false;
+      item.view.state = 'failed';
+      item.view.error = hostText('generationJobs.storageFailed');
+      this.refresh();
+      throw error;
+    }
     const server = this.options
       .configuration()
       .connections.find((value) => value.id === item.request.connectionId);
@@ -213,16 +423,26 @@ export class SoundGeneration {
         item.abort.signal,
         this.options.library.files.policy.maxBytes,
         (state) => {
-          if (s !== this.session || s.closing) return;
           item.view.state = state;
           this.refresh();
         },
+        (audio) => {
+          item.bytes = audio.bytes;
+          item.view.seconds = audio.seconds;
+          try {
+            this.preserve(item);
+          } catch {
+            item.storageError = true;
+            item.view.error = hostText('generationJobs.storageFailed');
+          }
+        },
       )
       .then(async (audio) => {
-        this.active(s, item);
         item.bytes = audio.bytes;
         item.view.seconds = audio.seconds;
-        await this.save(s, item);
+        this.preserve(item);
+        this.active(item);
+        await this.save(item);
       })
       .catch((error: Error) => {
         if (error.name === 'AbortError') item.view.state = 'canceled';
@@ -232,13 +452,19 @@ export class SoundGeneration {
           this.options.failed();
         }
       })
-      .finally(() => this.finished(s, item));
+      .finally(() => this.finished(item));
   }
-  private finished(s: Session, item: Item) {
+  private finished(item: Item) {
     item.view.busy = false;
     item.abort = undefined;
     item.task = undefined;
-    if (s !== this.session) item.bytes = undefined;
+    if ((item.bytes || item.durable) && item.view.state === 'canceled') item.view.state = 'unsaved';
+    try {
+      this.checkpoint(item);
+    } catch {
+      item.storageError = true;
+      item.view.error = hostText('generationJobs.storageFailed');
+    }
     this.options.changed();
     this.refresh();
   }
@@ -246,6 +472,14 @@ export class SoundGeneration {
     const s = this.session;
     if (!s || s.id !== id || !action || typeof action !== 'object')
       throw Error(hostText('soundGeneration.closed'));
+    if (action.kind === 'draft') {
+      this.draft = structuredClone(action.draft);
+      return;
+    }
+    if (action.kind === 'recoveryFolder') {
+      this.options.recoveryFolder?.();
+      return;
+    }
     if (action.kind === 'stop') {
       this.options.library.preview.stop(s.id);
       this.refresh();
@@ -253,12 +487,6 @@ export class SoundGeneration {
     }
     if (s.closing) throw Error(hostText('soundGeneration.closed'));
     if (action.kind === 'close') {
-      if (s.items.some((item) => item.view.busy || !!item.bytes) && action.discard !== true)
-        throw Error(hostText('soundGeneration.confirmClose'));
-      s.closing = true;
-      this.refresh();
-      for (const item of s.items) item.abort?.abort();
-      await Promise.allSettled(s.items.map((item) => item.task));
       this.cancel(s.owner);
       return;
     }
@@ -296,18 +524,46 @@ export class SoundGeneration {
         },
         request: { text: action.text, connectionId: action.connectionId, instructions },
         groupPending: !!s.group,
+        group: s.group,
+        createdAt: new Date().toISOString(),
       };
       s.items.unshift(item);
-      this.generate(s, item);
+      this.generate(item);
       return;
     }
     if (
-      !['cancel', 'retry', 'play', 'rename', 'delete', 'dismiss'].includes(action.kind) ||
+      ![
+        'discard',
+        'export',
+        'cancel',
+        'retry',
+        'regenerate',
+        'play',
+        'rename',
+        'delete',
+        'dismiss',
+      ].includes(action.kind) ||
       !('itemId' in action)
     )
       throw Error(hostText('soundGeneration.missing'));
     const item = s.items.find((item) => item.view.id === action.itemId);
     if (!item) throw Error(hostText('soundGeneration.missing'));
+    await this.recovering.get(item);
+    if (action.kind === 'discard') {
+      if (item.view.busy || item.task) throw Error(hostText('soundGeneration.busy'));
+      if (item.record) this.options.store?.discard(item.record);
+      this.items = s.items = s.items.filter((value) => value !== item);
+      this.refresh();
+      return;
+    }
+    if (action.kind === 'export') {
+      const bytes =
+        item.bytes ?? (item.record && this.options.store?.read(item.record, item.view.id));
+      if (!bytes) throw Error(hostText('soundGeneration.missing'));
+      if (await this.options.export?.([{ id: item.view.id, mimeType: 'audio/wav', bytes }]))
+        item.rescued = true;
+      return;
+    }
     if (action.kind === 'cancel') {
       if (!['queued', 'generating'].includes(item.view.state)) return;
       item.abort?.abort();
@@ -316,13 +572,33 @@ export class SoundGeneration {
     }
     if (item.view.busy) throw Error(hostText('soundGeneration.busy'));
     if (action.kind === 'dismiss') {
-      if (item.entry || item.bytes) throw Error(hostText('soundGeneration.busy'));
-      s.items = s.items.filter((value) => value !== item);
+      if (item.entry || item.bytes || item.durable) throw Error(hostText('soundGeneration.busy'));
+      item.hidden = true;
+      this.checkpoint(item);
+      this.items = s.items = s.items.filter((value) => value !== item);
       this.refresh();
       return;
     }
-    if (action.kind === 'retry' && !item.entry && !item.bytes) {
-      this.generate(s, item);
+    if (
+      action.kind === 'regenerate' ||
+      (action.kind === 'retry' && !item.entry && !item.bytes && !item.durable)
+    ) {
+      const retry: Item = {
+        request: structuredClone(item.request),
+        group: item.group,
+        groupPending: !!item.group,
+        view: {
+          ...item.view,
+          id: randomUUID(),
+          file: undefined,
+          state: 'queued',
+          busy: true,
+          error: undefined,
+        },
+        createdAt: new Date().toISOString(),
+      };
+      this.items.unshift(retry);
+      this.generate(retry);
       return;
     }
     item.view.busy = true;
@@ -330,12 +606,14 @@ export class SoundGeneration {
     this.refresh();
     item.task = Promise.resolve().then(async () => {
       try {
-        this.active(s, item);
+        if (action.kind === 'play' && s !== this.session)
+          throw new DOMException('Cancelled', 'AbortError');
+        this.active(item);
         if (action.kind === 'retry') {
           item.abort = new AbortController();
           if (item.entry)
             await this.options.library.files.read(item.entry.ref, item.entry.generation);
-          await this.save(s, item);
+          await this.save(item);
         } else {
           if (!item.entry) throw Error(hostText('soundGeneration.missing'));
           const entry = item.entry;
@@ -344,7 +622,7 @@ export class SoundGeneration {
           else {
             if (this.options.library.preview.snapshot(s.id)?.file === entry.ref.file)
               this.options.library.preview.stop(s.id);
-            this.writable(s, item);
+            this.writable(item);
             if (action.kind === 'rename') {
               if (
                 typeof action.name !== 'string' ||
@@ -362,9 +640,14 @@ export class SoundGeneration {
               if (!updated) throw Error(hostText('soundGeneration.missing'));
               item.entry = { ...updated };
               item.view.file = ref.file;
+              if (item.intent) item.intent.file = ref.file;
             } else {
               await this.options.library.host.removeMany([entry]);
-              s.items = s.items.filter((value) => value !== item);
+              item.view.state = 'changed';
+              item.hidden = true;
+              this.items = s.items = s.items.filter((value) => value !== item);
+              // Keep the durable tombstone so restart cannot recreate an explicitly deleted asset.
+              this.checkpoint(item);
             }
           }
         }
@@ -375,7 +658,7 @@ export class SoundGeneration {
         }
         throw error;
       } finally {
-        this.finished(s, item);
+        this.finished(item);
       }
     });
     await item.task;
@@ -384,10 +667,7 @@ export class SoundGeneration {
     const s = this.session;
     if (!s || (owner !== undefined && s.owner !== owner)) return;
     this.session = undefined;
-    s.closing = true;
-    for (const item of s.items) item.abort?.abort();
     this.options.library.preview.stop(s.id);
-    for (const item of s.items) item.bytes = undefined;
     this.options.send(null);
     s.resolve();
   }

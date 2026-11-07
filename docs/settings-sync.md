@@ -9,7 +9,7 @@ MCP接続先とMCPツールコマンドは自端末の`settings-<端末名>.json
 
 ## 保存先
 
-[バックグラウンドジョブ基盤](background-jobs-design.md)では、配置別PC専用rootに生成原本・復旧記録の`background-jobs/<jobId>/`を新設する設計を定める。時間で回収するキャッシュと分離し、登録済み素材は従来の共有`data/assets`へ保存する。これは未実装であり、以下の現行保存先へ追加済みとは扱わない。
+[バックグラウンドジョブ基盤](background-jobs-design.md)の生成原本・復旧記録は、配置別PC専用rootの`background-jobs/<jobId>/`へ保存する。時間で回収するキャッシュではない。登録済み素材は従来の共有`data/assets`へ保存し、認証情報・秘密lease・生成バイナリを共有設定へ含めない。
 
 共有設定はEXE隣の`data/settings.json`、端末別設定は同じ`data/`直下の`settings-<端末名>.json`を使う。旧配置の設定・画面状態・Storageは読込・コピー・移行しない。通常の新規起動は新しい保存先から開始する。
 

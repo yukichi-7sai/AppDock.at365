@@ -116,6 +116,9 @@ function sameLayout(actual, expected) {
     require('./test-settings.cjs').write(profile, settings);
     const start = async () => {
       app = await launch(profile, portable);
+      await app.app.evaluate(({ dialog }) => {
+        dialog.showMessageBox = async () => ({ response: 1 });
+      });
       host = app.main;
       host.on('pageerror', (e) => errors.push(String(e)));
       await host.evaluate(() =>
@@ -171,10 +174,7 @@ function sameLayout(actual, expected) {
     assert.notEqual(first.file, second.file);
     assert.equal(requests[1].body.model, 'alternate');
     assert.equal(requests[1].body.instructions, '日本語\n明るく');
-    assert.equal(
-      require('./test-settings.cjs').read(profile).tts.defaultConnectionId,
-      'default',
-    );
+    assert.equal(require('./test-settings.cjs').read(profile).tts.defaultConnectionId, 'default');
     checks.push(
       'adjacent entry, inherited folder/group, two distinct WAVs, server/nuance overrides without settings changes',
     );
@@ -349,18 +349,21 @@ function sameLayout(actual, expected) {
     sameLayout(failedLayout, pendingLayouts.get(1720));
     mode = 'success';
     await card(failed.id).getByRole('button', { name: '再生成', exact: true }).click();
+    await until(async () => (await model()).items[0].id !== failed.id, 'new regeneration card');
+    const regeneratedId = (await model()).items[0].id;
     await until(
-      async () => (await state(failed.id)).state === 'saved' && !(await state(failed.id)).busy,
-      'same card regenerated',
+      async () =>
+        (await state(regeneratedId)).state === 'saved' && !(await state(regeneratedId)).busy,
+      'new card regenerated',
     );
-    sameLayout(await cardLayout(card(failed.id), 'regenerated'), failedLayout);
+    sameLayout(await cardLayout(card(regeneratedId), 'regenerated'), failedLayout);
     checks.push(
       'stable collapsed height and row positions across queue, generation, completion, cancellation, failure and preview; explicit details show full values',
     );
     await card(interrupted.id).getByRole('button', { name: '一覧から削除', exact: true }).click();
     await until(async () => !(await state(interrupted.id)), 'canceled card removed');
     checks.push(
-      'text-derived serial filenames, active cancellation, card-local failure and regeneration without adding another card',
+      'text-derived serial filenames, active cancellation, card-local failure and explicit regeneration as a new job',
     );
     await closeDialog();
     assert.equal(
@@ -376,35 +379,48 @@ function sameLayout(actual, expected) {
     );
     await open();
     mode = 'wait';
-    await submit('閉じると中止');
-    await submit('待機も中止');
+    const heldBefore = held.length;
+    const backgroundOne = await submit('閉じても継続');
+    const backgroundTwo = await submit('待機も継続');
+    await until(() => held.length > heldBefore, 'background request');
     await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
-    const closing = host.getByRole('dialog', { name: 'ダイアログを閉じる', exact: true });
-    await closing.getByRole('button', { name: 'キャンセル', exact: true }).click();
-    assert.equal((await model()).items.length, 2);
-    await dialog().getByRole('button', { name: '閉じる', exact: true }).click();
-    await closing.getByRole('button', { name: '破棄して閉じる', exact: true }).click();
     await dialog().waitFor({ state: 'hidden' });
+    await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    mode = 'success';
+    held[heldBefore].writeHead(200, { 'Content-Type': 'audio/wav' });
+    held[heldBefore].end(bytes);
+    await until(
+      () =>
+        fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length === 6,
+      'background WAVs saved away from the library',
+    );
+    await open();
+    await until(async () => {
+      const items = (await model()).items;
+      return [backgroundOne.id, backgroundTwo.id].every(
+        (id) => items.find((item) => item.id === id)?.state === 'saved',
+      );
+    }, 'background jobs restored');
+    await closeDialog();
     assert.equal(
       fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length,
-      4,
+      6,
     );
     checks.push(
-      'close confirmation can be canceled; confirmed closure cancels queued and active cards and preserves saved files',
+      'dialog closure and navigation preserve queued and active cards until saving completes',
     );
     await app.close();
     app = null;
     await start();
     await open();
-    assert.equal((await model()).items.length, 0);
+    assert((await model()).items.some((item) => item.id === backgroundOne.id));
+    assert((await model()).items.some((item) => item.id === backgroundTwo.id));
     assert.equal(
       fs.readdirSync(path.join(directory, '通知')).filter((x) => x.endsWith('.wav')).length,
-      4,
+      6,
     );
     await closeDialog();
-    checks.push(
-      'close restores opener, persisted sounds survive restart, new dialog starts with an empty session',
-    );
+    checks.push('close restores opener and persistent jobs and saved sounds survive restart');
     assert.deepEqual(errors, []);
     fs.writeFileSync(
       path.join(profile, 'result.json'),

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   GeneratedSound,
   SoundGenerationAction,
@@ -21,11 +21,14 @@ export function SoundGenerationDialog({
   returnFocus: HTMLElement | null;
 }) {
   const { t } = useHostTranslation();
-  const [folder, setFolder] = useState(model.folder);
-  const [serverId, setServerId] = useState(model.defaultConnectionId ?? '');
-  const [text, setText] = useState('');
-  const [useDefault, setUseDefault] = useState(true);
-  const [instructions, setInstructions] = useState('');
+  const [folder, setFolder] = useState(model.draft?.folder ?? model.folder);
+  const [serverId, setServerId] = useState(
+    model.draft?.serverId ?? model.defaultConnectionId ?? '',
+  );
+  const [text, setText] = useState(model.draft?.text ?? '');
+  const [useDefault, setUseDefault] = useState(model.draft?.useDefault ?? true);
+  const [instructions, setInstructions] = useState(model.draft?.instructions ?? '');
+  const [discard, setDiscard] = useState<string>();
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Set<string>>(new Set());
   const running = useRef(new Set<string>());
@@ -33,7 +36,6 @@ export function SoundGenerationDialog({
     null,
   );
   const [name, setName] = useState('');
-  const [confirmClose, setConfirmClose] = useState(false);
   const server = model.servers.find((s) => s.id === serverId);
   const busy = model.closing;
   const act = async (action: SoundGenerationAction) => {
@@ -52,10 +54,13 @@ export function SoundGenerationDialog({
         setPending(new Set(running.current));
       });
   };
+  useEffect(() => {
+    void window.dock.soundGeneration
+      .act(model.id, { kind: 'draft', draft: { folder, serverId, text, useDefault, instructions } })
+      .catch(() => {});
+  }, [folder, serverId, text, useDefault, instructions]);
   const close = () => {
-    if (pending.size || model.items.some((item) => item.busy || item.state === 'unsaved'))
-      setConfirmClose(true);
-    else void act({ kind: 'close' }).catch((e) => setError(String(e)));
+    void act({ kind: 'close' }).catch((e) => setError(String(e)));
   };
   const heading = `sound-generation-${model.id}`;
   return (
@@ -83,6 +88,11 @@ export function SoundGenerationDialog({
             <SettingsButton disabled={busy} onClick={close}>
               {t('common.close')}
             </SettingsButton>
+            {model.error && (
+              <SettingsButton onClick={() => run({ kind: 'recoveryFolder' })}>
+                {t('generationJobs.recoveryFolder')}
+              </SettingsButton>
+            )}
           </footer>
         }
       >
@@ -309,16 +319,36 @@ export function SoundGenerationDialog({
                         </SettingsButton>
                       </>
                     )}
+                    {!itemBusy && item.hasResult && (
+                      <SettingsButton
+                        icon
+                        aria-label={t('generationJobs.export')}
+                        title={t('generationJobs.export')}
+                        onClick={() => run({ kind: 'export', itemId: item.id })}
+                      >
+                        <Icon name="download" size={18} />
+                      </SettingsButton>
+                    )}
+                    {!itemBusy && item.state === 'failed' && item.hasResult && (
+                      <SettingsButton
+                        icon
+                        aria-label={t('soundGeneration.regenerate')}
+                        title={t('soundGeneration.regenerate')}
+                        onClick={() => run({ kind: 'regenerate', itemId: item.id })}
+                      >
+                        <Icon name="refresh" size={18} />
+                      </SettingsButton>
+                    )}
                     {item.canRetry && (
                       <SettingsButton
                         icon
                         aria-label={t(
-                          ['failed', 'canceled'].includes(item.state)
+                          !item.hasResult && ['failed', 'canceled'].includes(item.state)
                             ? 'soundGeneration.regenerate'
                             : 'soundGeneration.retrySave',
                         )}
                         title={t(
-                          ['failed', 'canceled'].includes(item.state)
+                          !item.hasResult && ['failed', 'canceled'].includes(item.state)
                             ? 'soundGeneration.regenerate'
                             : 'soundGeneration.retrySave',
                         )}
@@ -327,13 +357,15 @@ export function SoundGenerationDialog({
                       >
                         <Icon
                           name={
-                            ['failed', 'canceled'].includes(item.state) ? 'refresh' : 'download'
+                            !item.hasResult && ['failed', 'canceled'].includes(item.state)
+                              ? 'refresh'
+                              : 'download'
                           }
                           size={18}
                         />
                       </SettingsButton>
                     )}
-                    {['failed', 'canceled'].includes(item.state) && (
+                    {!item.hasResult && ['failed', 'canceled'].includes(item.state) && (
                       <SettingsButton
                         icon
                         aria-label={t('soundGeneration.dismiss')}
@@ -367,6 +399,11 @@ export function SoundGenerationDialog({
                         </>
                       )}
                     </dl>
+                    <SettingsActions>
+                      <SettingsButton disabled={itemBusy} onClick={() => setDiscard(item.id)}>
+                        {t('generationJobs.discard')}
+                      </SettingsButton>
+                    </SettingsActions>
                   </details>
                 </SettingsField>
               </div>
@@ -374,6 +411,20 @@ export function SoundGenerationDialog({
           })}
         </section>
       </SettingsModal>
+      {discard && (
+        <SettingsDialog
+          title={t('generationJobs.discard')}
+          description={t('generationJobs.discardConfirm')}
+          applyLabel={t('common.delete')}
+          onClose={() => setDiscard(undefined)}
+          onApply={async () => {
+            await act({ kind: 'discard', itemId: discard });
+            setDiscard(undefined);
+          }}
+        >
+          {null}
+        </SettingsDialog>
+      )}
       {edit && (
         <SettingsDialog
           title={t(edit.kind === 'rename' ? 'soundGeneration.rename' : 'common.delete')}
@@ -406,17 +457,6 @@ export function SoundGenerationDialog({
               />
             </SettingsField>
           )}
-        </SettingsDialog>
-      )}
-      {confirmClose && (
-        <SettingsDialog
-          title={t('common.closeDialog')}
-          description={t('soundGeneration.confirmClose')}
-          onClose={() => setConfirmClose(false)}
-          applyLabel={t('soundGeneration.discardClose')}
-          onApply={() => act({ kind: 'close', discard: true })}
-        >
-          <span>{t('soundGeneration.keepAfterClose')}</span>
         </SettingsDialog>
       )}
     </>

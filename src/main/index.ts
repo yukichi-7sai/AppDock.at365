@@ -244,6 +244,9 @@ import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { AiService } from './core/ai-service';
 import { ImageAiService } from './core/image-ai-service';
+import { GenerationStore } from './core/generation-store';
+import { BackgroundJobs } from './core/background-jobs';
+import { rescueGeneration } from './core/generation-rescue';
 import { readImageReference } from './core/image-ai-references';
 import { ImageAiSettingsController } from './core/image-ai-settings';
 import { defaultImageAiSettings } from '../shared/image-ai';
@@ -1158,7 +1161,11 @@ const ai = new AiService({
       }),
     }),
 });
+const backgroundJobs = new BackgroundJobs();
+const generationStore = new GenerationStore(path.join(paths.local, 'background-jobs'));
 const imageAi = new ImageAiService({
+  store: generationStore,
+  background: backgroundJobs,
   readReference: (ref, active) => readImageReference(registeredImages, ref, active),
   registration: new ImageRegistration(registeredImages, imageLibraryHost),
   validateImage: (bytes) => decodeRegisteredImage(bytes),
@@ -1755,6 +1762,7 @@ const changed = () => {
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
     if (quitting) return;
+    backgroundJobs.changed();
     if (manager) settingsReads.run(() => navigation.history.prune(validHistoryPlace));
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
@@ -1908,9 +1916,37 @@ function temporaryResumeMenu(): Electron.MenuItemConstructorOptions[] {
     });
   return submenu.length ? [{ label: hostText('commands.session.resumeMenu'), submenu }] : [];
 }
-function quitHost(restart = false) {
+let generationQuitApproved = false;
+async function prepareGenerationQuit(): Promise<boolean> {
+  if (generationQuitApproved) return true;
+  const approved = await backgroundJobs.prepareStop(async (jobs, loss) => {
+    const active = jobs.filter((job) => job.shutdownImpact.active).length;
+    const pending = jobs.reduce((sum, job) => sum + job.resultSummary.pending, 0);
+    const count = jobs.reduce((sum, job) => sum + job.shutdownImpact.volatile, 0);
+    const response = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'AppDock',
+      message: loss
+        ? hostText('generationJobs.volatile', { count })
+        : hostText('generationJobs.shutdown'),
+      detail: loss ? undefined : hostText('generationJobs.shutdownDetail', { active, pending }),
+      buttons: [
+        hostText('common.cancel'),
+        hostText(loss ? 'generationJobs.discardExit' : 'generationJobs.exit'),
+      ],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    return response.response === 1;
+  });
+  generationQuitApproved = approved;
+  return approved;
+}
+async function quitHost(restart = false) {
   if (quitting) return;
   if (restart && settingsOperationBusy()) throw Error(hostText('services.index.restartDuringSave'));
+  if (!(await prepareGenerationQuit())) return;
+  if (quitting) return;
   if (restart) {
     const portableExecutable = app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE;
     if (portableExecutable) {
@@ -3575,11 +3611,18 @@ function settingsPageActions(
     };
     actions.restartAsAdministrator = async () => {
       if (settingsOperationBusy()) throw Error(hostText('settings.index.restartBusy'));
-      await launch.restartElevated([
-        ...launch.args,
-        '--restore-view',
-        '--appdock-elevation-attempt',
-      ]);
+      if (!(await prepareGenerationQuit())) return;
+      try {
+        await launch.restartElevated([
+          ...launch.args,
+          '--restore-view',
+          '--appdock-elevation-attempt',
+        ]);
+      } catch (error) {
+        generationQuitApproved = false;
+        backgroundJobs.resume();
+        throw error;
+      }
       quitHost();
     };
   }
@@ -4196,7 +4239,18 @@ function registerIpc() {
   });
   handle('dock:restartAsAdministrator', async () => {
     if (settingsOperationBusy()) throw Error(hostText('services.index.restartWhileBusy'));
-    await launch.restartElevated([...launch.args, '--restore-view', '--appdock-elevation-attempt']);
+    if (!(await prepareGenerationQuit())) return;
+    try {
+      await launch.restartElevated([
+        ...launch.args,
+        '--restore-view',
+        '--appdock-elevation-attempt',
+      ]);
+    } catch (error) {
+      generationQuitApproved = false;
+      backgroundJobs.resume();
+      throw error;
+    }
     quitHost();
   });
   handle('dock:restoreSettingsBackup', async (revision: number) => {
@@ -4479,7 +4533,14 @@ async function initialize() {
       ...(process.env.PORTABLE_EXECUTABLE_FILE ? [process.ppid] : []),
       ...[...manager.items.values()].flatMap((item) => (item.child?.pid ? [item.child.pid] : [])),
     ],
-    shutdown: () => quitHost(),
+    prepareShutdown: prepareGenerationQuit,
+    cancelShutdown: () => {
+      generationQuitApproved = false;
+      backgroundJobs.resume();
+    },
+    shutdown: () => {
+      void quitHost();
+    },
     log: (message) => log.write('warn', 'updates', message),
   });
   const hotKeyHost = app.isPackaged
@@ -5379,30 +5440,44 @@ async function initialize() {
   });
   imageLibraryDialogs = galleryDialogs;
   soundGeneration?.cancel();
-  const generation = new SoundGeneration({
-    library: soundLibrary,
-    tts,
-    configuration: () => settings.value.tts ?? { connections: [] },
-    send: (model) => {
-      if (window && !window.isDestroyed())
-        window.webContents.send('dock:soundGeneration:changed', model);
-    },
-    failed: soundLibraryFailed,
-    changed,
-  });
+  const generation =
+    soundGeneration ??
+    new SoundGeneration({
+      export: rescueGeneration,
+      recoveryFolder: () => {
+        void shell.openPath(generationStore.directory);
+      },
+      store: generationStore,
+      background: backgroundJobs,
+      library: soundLibrary,
+      tts,
+      configuration: () => settings.value.tts ?? { connections: [] },
+      send: (model) => {
+        if (window && !window.isDestroyed())
+          window.webContents.send('dock:soundGeneration:changed', model);
+      },
+      failed: soundLibraryFailed,
+      changed,
+    });
   soundGeneration = generation;
   imageGeneration?.cancel();
-  const imagesGeneration = new ImageGeneration({
-    ai: imageAi,
-    library: imageLibraryHost,
-    configuration: () => settings.value.imageAi ?? defaultImageAiSettings(),
-    send: (model) => {
-      if (window && !window.isDestroyed())
-        window.webContents.send('dock:imageGeneration:changed', model);
-    },
-    changed,
-    failed: () => galleryFailed(hostText('services.index.imageOperationBody')),
-  });
+  const imagesGeneration =
+    imageGeneration ??
+    new ImageGeneration({
+      export: rescueGeneration,
+      recoveryFolder: () => {
+        void shell.openPath(generationStore.directory);
+      },
+      ai: imageAi,
+      library: imageLibraryHost,
+      configuration: () => settings.value.imageAi ?? defaultImageAiSettings(),
+      send: (model) => {
+        if (window && !window.isDestroyed())
+          window.webContents.send('dock:imageGeneration:changed', model);
+      },
+      changed,
+      failed: () => galleryFailed(hostText('services.index.imageOperationBody')),
+    });
   imageGeneration = imagesGeneration;
   window.webContents.on('did-start-loading', () => imagesGeneration.cancel());
   window.webContents.on('render-process-gone', () => imagesGeneration.cancel());
@@ -5568,8 +5643,10 @@ async function initialize() {
       event.preventDefault();
       window?.hide();
     } else {
-      quitting = true;
-      app.quit();
+      if (!quitting) {
+        event.preventDefault();
+        void quitHost();
+      }
     }
   });
   window.webContents.on('render-process-gone', (_, details) =>
@@ -6053,6 +6130,11 @@ app.on('second-instance', (_event, argv) => {
   if (!activateNotification(argv, openNotificationCenter)) showWindow();
 });
 app.on('before-quit', (event) => {
+  if (!generationQuitApproved && !shutdownFinished && manager && !quitting) {
+    event.preventDefault();
+    void quitHost();
+    return;
+  }
   powerMonitor.off('resume', refreshAfterResume);
   clearTimeout(startupUpdateTimer);
   quitting = true;
@@ -6087,6 +6169,7 @@ app.on('before-quit', (event) => {
   settingsPageHost?.dispose();
   void (async () => {
     for (const stop of [
+      () => backgroundJobs.close(),
       () => tts.close(),
       () => audioPlayback.close(),
       () => ai.close(),

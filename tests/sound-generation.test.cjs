@@ -13,6 +13,7 @@ Module._load = function (name, ...args) {
 const { SoundLibraryService } = require('../out/main/main/core/sound-library-service');
 Module._load = original;
 const { SoundGeneration } = require('../out/main/main/core/sound-generation');
+const { GenerationStore } = require('../out/main/main/core/generation-store');
 const { TtsService } = require('../out/main/main/core/tts-service');
 const { newTtsServer } = require('../out/main/shared/tts');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
@@ -90,7 +91,8 @@ async function fixture(t, fetcher) {
         : new Response(wave(1000), { headers: { 'Content-Type': 'audio/wav' } });
     },
   });
-  const generation = new SoundGeneration({
+  const generationOptions = {
+    store: new GenerationStore(path.resolve(directory, '../store-' + path.basename(directory))),
     library,
     tts,
     configuration: () => config,
@@ -99,9 +101,11 @@ async function fixture(t, fetcher) {
     failed() {
       failures++;
     },
-  });
+  };
+  const generation = new SoundGeneration(generationOptions);
   t.after(async () => {
     generation.cancel();
+    await generation.close();
     await tts.close();
     library.close();
   });
@@ -130,6 +134,7 @@ async function fixture(t, fetcher) {
     library,
     tts,
     generation,
+    generationOptions,
     config,
     requests,
     id,
@@ -178,9 +183,11 @@ test('failed persistence retains the exact WAV and retries without another gener
   const item = f.generation.current().items[0];
   assert.equal(item.state, 'unsaved');
   assert.equal(item.canRetry, true);
-  await assert.rejects(f.generation.act(f.id, { kind: 'close' }));
+  await f.generation.act(f.id, { kind: 'close' });
+  void f.generation.open('page-reopened', '通知');
+  const reopened = f.generation.current().id;
   fail = false;
-  await f.generation.act(f.id, { kind: 'retry', itemId: item.id });
+  await f.generation.act(reopened, { kind: 'retry', itemId: item.id });
   const saved = f.generation.current().items[0];
   assert.equal(saved.state, 'saved');
   assert.equal(f.requests.length, 1);
@@ -191,7 +198,7 @@ test('classification failures preserve the committed file and retry only classif
   f.failSettings(true);
   await f.generate();
   let item = f.generation.current().items[0];
-  assert.equal(item.state, 'saved');
+  assert.equal(item.state, 'unsaved');
   assert.equal(item.canRetry, true);
   assert(item.error);
   f.failSettings(false);
@@ -422,13 +429,16 @@ test('a failed card does not stop the queue and regeneration reuses its captured
   await Promise.all([first, second].map(f.settle));
   assert.equal(f.item(first).state, 'failed');
   assert.equal(f.item(second).state, 'saved');
-  await f.generation.act(f.id, { kind: 'retry', itemId: first });
-  await f.settle(first);
-  assert.equal(f.item(first).state, 'saved');
+  await f.generation.act(f.id, { kind: 'regenerate', itemId: first });
+  const retry = f.generation.current().items[0].id;
+  assert.notEqual(retry, first);
+  await f.settle(retry);
+  assert.equal(f.item(retry).state, 'saved');
+  assert.equal(f.item(first).state, 'failed');
   assert.equal(f.requests[2].input, '再生成の本文');
-  assert.equal(f.generation.current().items.length, 2);
+  assert.equal(f.generation.current().items.length, 3);
 });
-test('closing cancels every dialog request while keeping saved audio and unrelated speech', async (t) => {
+test('closing keeps every generation and unrelated speech in the shared FIFO', async (t) => {
   const delayed = delayedAudio();
   let pending = false;
   const f = await fixture(t, (url, init) =>
@@ -443,14 +453,20 @@ test('closing cancels every dialog request while keeping saved audio and unrelat
   await wait(() => delayed.responses.length === 1);
   await f.enqueue();
   const foreign = f.tts.speak('other', { text: '別の読み上げ', requestId: randomUUID() });
-  await assert.rejects(f.generation.act(f.id, { kind: 'close' }));
-  await f.generation.act(f.id, { kind: 'close', discard: true });
+  await f.generation.act(f.id, { kind: 'close' });
   await f.closed;
+  assert.equal(delayed.responses.length, 1);
+  delayed.responses[0]();
   await wait(() => delayed.responses.length === 2);
-  assert.equal(f.requests.at(-1).input, '別の読み上げ');
   delayed.responses[1]();
+  await wait(() => delayed.responses.length === 3);
+  assert.equal(f.requests.at(-1).input, '別の読み上げ');
+  delayed.responses[2]();
   await wait(() => f.tts.get('other', foreign.jobId).state === 'completed');
   assert.deepEqual(await fs.readFile(path.join(f.directory, file)), wave(1000));
+  void f.generation.open('returned', '通知');
+  await wait(() => f.generation.current().items.every((item) => !item.busy));
+  assert.equal(f.generation.current().items.filter((item) => item.state === 'saved').length, 3);
 });
 test('filenames use up to twenty complete characters with a safe, collision-free serial', async (t) => {
   const f = await fixture(t);
@@ -485,4 +501,53 @@ test('page disposal prevents an accepted preview from starting after the session
   await assert.rejects(preview, { name: 'AbortError' });
   assert.equal(previews, 0);
   assert.equal(f.failures(), 0);
+});
+
+test('unsaved WAVs and group-only failures recover after reconstruction without generating again', async (t) => {
+  const f = await fixture(t);
+  f.failSettings(true);
+  const id = await f.generate();
+  assert.equal(f.item(id).state, 'unsaved');
+  const file = f.item(id).file;
+  f.generation.cancel();
+  await f.generation.close();
+  f.failSettings(false);
+  const restored = new SoundGeneration({
+    ...f.generationOptions,
+    store: new GenerationStore(f.generationOptions.store.directory),
+  });
+  t.after(() => restored.close());
+  void restored.open('recovered', '通知');
+  const session = restored.current().id;
+  await wait(() => restored.current().items[0].canRetry);
+  assert.equal(restored.current().items[0].id, id);
+  await restored.act(session, { kind: 'retry', itemId: id });
+  assert.equal(restored.current().items[0].state, 'saved');
+  assert.equal(restored.current().items[0].file, file);
+  assert.equal(f.requests.length, 1);
+  assert.equal((await fs.readdir(path.join(f.directory, '通知'))).length, 1);
+  assert.deepEqual(await fs.readFile(path.join(f.directory, file)), wave(1000));
+  restored.cancel();
+});
+
+test('a completed WAV received during cancellation is retained until the transport settles', async (t) => {
+  let release;
+  const f = await fixture(
+    t,
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const id = await f.enqueue();
+  await wait(() => release);
+  const cancel = f.generation.act(f.id, { kind: 'cancel', itemId: id });
+  release(new Response(wave(1000), { headers: { 'Content-Type': 'audio/wav' } }));
+  await cancel;
+  assert.equal(f.item(id).state, 'unsaved');
+  const record = f.generationOptions.store.load('sound')[0];
+  assert.deepEqual(f.generationOptions.store.read(record, id), wave(1000));
+  await f.generation.act(f.id, { kind: 'retry', itemId: id });
+  assert.equal(f.item(id).state, 'saved');
+  assert.equal(f.requests.length, 1);
 });

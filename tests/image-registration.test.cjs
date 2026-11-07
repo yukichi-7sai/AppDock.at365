@@ -185,8 +185,8 @@ test('partial file saves and group-only failures retain references and retry onl
   assert.equal(f.files.list().length, 2);
   assert.equal(f.requests(), 1);
 });
-test('invalid destinations reject before billing and expired unsaved results never regenerate', async (t) => {
-  const f = await fixture(t, { resultMs: 15 });
+test('invalid destinations reject before billing and retained results retry after elapsed time', async (t) => {
+  const f = await fixture(t);
   for (const destination of [
     { folder: '../escape' },
     { folder: 'missing' },
@@ -200,9 +200,11 @@ test('invalid destinations reject before billing and expired unsaved results nev
   const job = f.service.generateAndRegister('host', f.input);
   f.writes(false);
   await settled(f, job, 'unsaved');
-  await until(() => f.service.get('host', job.jobId).resultExpired);
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  t.mock.timers.tick(31 * 60 * 1000);
   f.writes(true);
-  assert.throws(() => f.service.retrySave('host', job.jobId), { code: 'IMAGE_AI_RESULT_EXPIRED' });
+  f.service.retrySave('host', job.jobId);
+  await settled(f, job, 'completed');
   assert.equal(f.requests(), 1);
 });
 test('owner leases, permission revocation and cancellation cannot save later images', async (t) => {

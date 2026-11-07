@@ -36,6 +36,15 @@ export interface DecodedAsset {
   characters?: number;
   lines?: number;
 }
+export interface AssetRegistrationIntent {
+  file: string;
+  hash: string;
+  identity: string;
+}
+export interface AssetRegistrationJournal {
+  intent?: AssetRegistrationIntent;
+  prepare(intent: AssetRegistrationIntent): void;
+}
 export type AssetDecoder = ((bytes: Buffer) => DecodedAsset | Promise<DecodedAsset>) & {
   file?(
     file: string,
@@ -616,7 +625,7 @@ export class RegisteredAssets {
   async addVerified(
     bytes: Buffer,
     filename: string,
-    options: { unique?: boolean; writable?(): void } = {},
+    options: { unique?: boolean; writable?(): void; journal?: AssetRegistrationJournal } = {},
   ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
     const run = async () => {
       options.writable?.();
@@ -624,6 +633,13 @@ export class RegisteredAssets {
         throw Error(this.text('services.registeredImages.invalidFilename'));
       const decoded = await this.validate(bytes, filename);
       await this.root(true);
+      const intent = options.journal?.intent;
+      if (intent) {
+        // A previously reserved write is never silently replaced by another unique copy.
+        const saved = await this.recoverRegistration(intent);
+        if (!saved.bytes.equals(bytes)) throw Error(this.text('services.registeredImages.changed'));
+        return { ref: saved.ref, generation: saved.generation, reused: true };
+      }
       const parent = imageParent(filename);
       safeDirectory(this.directory, parent, true);
       const files = (await fs.readdir(path.dirname(this.file(filename))))
@@ -663,9 +679,15 @@ export class RegisteredAssets {
       try {
         await handle.writeFile(bytes);
         await handle.sync();
+        const identity = await handle.stat({ bigint: true });
         await handle.close();
         try {
           options.writable?.();
+          options.journal?.prepare({
+            file: name,
+            hash: createHash('sha256').update(bytes).digest('hex'),
+            identity: `${identity.dev}:${identity.ino}`,
+          });
           await fs.link(temp, this.file(name));
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') return await duplicate();
@@ -691,6 +713,13 @@ export class RegisteredAssets {
     const task = this.queue.then(run, run);
     this.queue = task.catch(() => {});
     return task;
+  }
+  async recoverRegistration(intent: AssetRegistrationIntent) {
+    const saved = await this.read({ file: intent.file });
+    const stat = await fs.stat(this.file(intent.file), { bigint: true });
+    if (`${stat.dev}:${stat.ino}` !== intent.identity || saved.hash !== intent.hash)
+      throw Error(this.text('services.registeredImages.changed'));
+    return saved;
   }
   import(input: { filename?: string; base64: string }) {
     if (
