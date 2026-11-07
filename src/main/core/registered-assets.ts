@@ -682,11 +682,16 @@ export class RegisteredAssets {
     this.queue = task.catch(() => {});
     return task;
   }
-  /** Only the confirmed, unchanged original may be recycled; failed settings saves restore it. */
+  /** Only the confirmed, unchanged original may be removed; failed settings saves restore it. */
   remove(
     ref: RegisteredImageRef,
     generation: string,
-    options: { trash(file: string): Promise<void>; prepare(): () => void },
+    options: {
+      trash(file: string): Promise<void>;
+      prepare(): () => void;
+      failureMessage?: string;
+      restoreFailureMessage?: string;
+    },
   ): Promise<void> {
     const target = this.externalTarget(ref);
     if (target) return target.files.remove(target.ref, generation, options);
@@ -703,9 +708,9 @@ export class RegisteredAssets {
       const backup = this.policy.validateFile
         ? path.join(this.directory, `.${randomUUID()}.recovery`)
         : undefined;
-      let recycled = false,
+      let removed = false,
         keepBackup = false,
-        trashStarted = false;
+        deletionStarted = false;
       try {
         if (backup) {
           await fs.copyFile(file, backup, fs.constants.COPYFILE_EXCL);
@@ -718,12 +723,12 @@ export class RegisteredAssets {
         this.assertWritable(ref.file);
         await this.fileSignature(ref.file);
         this.assertWritable(ref.file);
-        trashStarted = true;
+        deletionStarted = true;
         await options.trash(file);
-        recycled = true;
+        removed = true;
         commit();
       } catch (error) {
-        if (!trashStarted) throw error;
+        if (!deletionStarted) throw error;
         try {
           await this.root();
           try {
@@ -741,9 +746,13 @@ export class RegisteredAssets {
           }
         } catch {
           keepBackup = true;
-          throw Error(this.text('services.registeredImages.restoreFailed'));
+          throw Error(
+            options.restoreFailureMessage ?? this.text('services.registeredImages.restoreFailed'),
+          );
         }
-        throw recycled ? error : Error(this.text('services.registeredImages.trashFailed'));
+        throw removed
+          ? error
+          : Error(options.failureMessage ?? this.text('services.registeredImages.trashFailed'));
       } finally {
         if (backup && !keepBackup) await fs.unlink(backup).catch(() => {});
         if (this.refreshing) await this.refreshing;

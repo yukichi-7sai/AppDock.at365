@@ -80,6 +80,85 @@ test('confirmed deletion removes memberships and catalogue, keeps original bytes
   await assert.rejects(f.host.remove(f.entry));
   assert.equal(f.calls(), 1);
 });
+test('UNC deletion requires the host confirmation plan; ordinary callers still use the recycle adapter', async (t) => {
+  const f = await fixture();
+  const unc = '\\\\server\\share\\sample.png';
+  f.images.file = () => unc;
+  f.images.readFile = async () => ({});
+  f.images.remove = async (_ref, _generation, options) => options.trash(unc);
+  let recycled = 0,
+    deleted = 0;
+  shell.trashItem = async (file) => {
+    assert.equal(file, unc);
+    recycled++;
+    throw Error('no recycle bin');
+  };
+  t.mock.method(fs, 'unlink', async (file) => {
+    assert.equal(file, unc);
+    deleted++;
+  });
+  await assert.rejects(f.host.removeMany([f.entry]), /no recycle bin/);
+  assert.equal(deleted, 0, 'recycle failure must never fall back to permanent deletion');
+  const targets = f.host.deletionTargets([f.entry]);
+  assert.equal(targets[0].mode, 'permanent');
+  assert.equal(targets[0].path, unc);
+  await f.host.removeMany([f.entry], targets);
+  assert.equal(deleted, 1);
+  assert.equal(recycled, 1);
+});
+
+test('confirmation binds every path and mode before any original is removed', async () => {
+  const f = await fixture();
+  const targets = f.host.deletionTargets([f.entry]);
+  assert.equal(targets[0].mode, 'trash');
+  await assert.rejects(
+    f.host.removeMany([f.entry], [{ ...targets[0], mode: 'permanent' }]),
+    /保存先が変更/,
+  );
+  await assert.rejects(
+    f.host.removeMany([f.entry], [{ ...targets[0], path: f.trash }]),
+    /保存先が変更/,
+  );
+  await assert.rejects(f.host.removeMany([f.entry], []), /保存先が変更/);
+  const second = await f.images.add(bytes, 'second.png');
+  const entries = [f.entry, f.images.entry(second)];
+  const both = f.host.deletionTargets(entries);
+  both[1].path = f.trash;
+  await assert.rejects(f.host.removeMany(entries, both), /保存先が変更/);
+  assert.equal(f.calls(), 0);
+  assert.deepEqual(await fs.readFile(f.file), bytes);
+});
+
+test('permanent removal restores original and memberships when saving settings fails', async () => {
+  const f = await fixture();
+  await assert.rejects(
+    f.images.remove(f.ref, f.entry.generation, {
+      trash: (file) => fs.unlink(file),
+      prepare: () => () => {
+        throw Error('save failed');
+      },
+      failureMessage: 'permanent deletion failed',
+    }),
+    /save failed/,
+  );
+  assert.deepEqual(await fs.readFile(f.file), bytes);
+  assert.equal(f.store.value.imageLibrary.groups[0].images.length, 1);
+  assert(f.images.entry(f.ref).available);
+  await assert.rejects(
+    f.images.remove(f.ref, f.images.entry(f.ref).generation, {
+      trash: async () => {
+        throw Error('access denied');
+      },
+      prepare: () => () => {
+        throw Error('must not commit');
+      },
+      failureMessage: 'permanent deletion failed',
+    }),
+    /permanent deletion failed/,
+  );
+  assert.deepEqual(await fs.readFile(f.file), bytes);
+});
+
 test('saved ribbon and inactive or unknown Applet references block deletion, memberships alone do not', async () => {
   const f = await fixture();
   assert.equal(f.host.inUse(f.ref), false);

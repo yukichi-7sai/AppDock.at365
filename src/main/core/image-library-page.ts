@@ -1012,6 +1012,8 @@ export class ImageLibraryPageSession implements HostPageController {
               : undefined),
           entry: item?.entry ?? entries[0],
           entries,
+          deletionTargets:
+            kind === 'delete-image' ? this.options.host.deletionTargets(entries) : undefined,
           deleteBlocked:
             ['delete-image', 'rename-images'].includes(action.kind) &&
             entries.some((entry) => this.options.host.inUse(entry.ref)),

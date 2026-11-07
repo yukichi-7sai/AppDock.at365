@@ -28,7 +28,10 @@ import { decodeRegisteredImageFile } from './image-file-decoder';
 import { fileHash, sameFileHash } from './file-content';
 import { copyImageFiles } from './image-file-clipboard';
 import { renameImageFiles } from './image-file-rename';
-import type { ImageLibraryFileAction } from '../../shared/image-library-page';
+import type {
+  ImageLibraryFileAction,
+  LibraryDeletionTarget,
+} from '../../shared/image-library-page';
 import type { RegisteredImageEntry } from '../../shared/registered-images';
 export { decodeRegisteredImage } from './registered-image-decoder';
 
@@ -347,9 +350,37 @@ export class AssetLibraryHost {
       ) || !!this.options.referenced?.(ref)
     );
   }
-  async remove(entry: import('../../shared/registered-images').RegisteredImageEntry) {
+  deletionTargets(entries: readonly RegisteredImageEntry[]): LibraryDeletionTarget[] {
+    return entries.map(({ ref }) => {
+      const file = path.resolve(this.images.file(ref.file));
+      return { ref: { ...ref }, path: file, mode: file.startsWith('\\\\') ? 'permanent' : 'trash' };
+    });
+  }
+  private checkDeletionTarget(entry: RegisteredImageEntry, target?: LibraryDeletionTarget) {
+    if (!target) return;
+    const current = this.deletionTargets([entry])[0];
+    if (
+      imageKey(current.ref) !== imageKey(target.ref) ||
+      current.path !== target.path ||
+      current.mode !== target.mode
+    )
+      throw Error(this.text('library.deleteTargetChanged'));
+  }
+  async remove(entry: RegisteredImageEntry, target?: LibraryDeletionTarget) {
+    this.checkDeletionTarget(entry, target);
     await this.images.remove(entry.ref, entry.generation ?? '', {
-      trash: (file) => shell.trashItem(file),
+      trash: (file) => {
+        this.checkDeletionTarget(entry, target);
+        if (target && path.resolve(file) !== target.path)
+          throw Error(this.text('library.deleteTargetChanged'));
+        return target?.mode === 'permanent' ? fs.unlink(file) : shell.trashItem(file);
+      },
+      failureMessage:
+        target?.mode === 'permanent' ? this.text('library.permanentDeleteFailed') : undefined,
+      restoreFailureMessage:
+        target?.mode === 'permanent'
+          ? this.text('library.permanentDeleteRestoreFailed')
+          : undefined,
       prepare: () => {
         const store = this.options.settings;
         this.options.writable();
@@ -367,18 +398,21 @@ export class AssetLibraryHost {
       },
     });
   }
-  async removeMany(entries: RegisteredImageEntry[]) {
+  async removeMany(entries: RegisteredImageEntry[], targets?: readonly LibraryDeletionTarget[]) {
     if (!entries.length) throw Error(this.text('images.selectImages'));
-    // Preflight the whole confirmation before moving the first file to the recycle bin.
-    for (const entry of entries) {
+    if (targets && targets.length !== entries.length)
+      throw Error(this.text('library.deleteTargetChanged'));
+    // Preflight the whole host-owned confirmation before removing the first original.
+    for (const [index, entry] of entries.entries()) {
+      this.checkDeletionTarget(entry, targets?.[index]);
       this.images.assertWritable(entry.ref.file);
       if (this.inUse(entry.ref)) throw Error(this.text('services.imageLibraryHost.inUse'));
       await this.images.readFile(entry.ref, entry.generation ?? '');
     }
     let removed = 0;
     try {
-      for (const entry of entries) {
-        await this.remove(entry);
+      for (const [index, entry] of entries.entries()) {
+        await this.remove(entry, targets?.[index]);
         removed++;
       }
     } catch (e) {

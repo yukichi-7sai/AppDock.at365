@@ -254,7 +254,10 @@ async function run() {
     errors,
   }));
   checks.push(
-    'access cancel/save/restart, external import/rename/move/recycle/folders/text editing, shared revocation',
+    'access cancel/save/restart, external import/rename/move/folders/text editing, shared revocation',
+    share
+      ? 'UNC image/sound/text real permanent deletion, warning and cancel preserve original'
+      : 'local image/sound/text recycle adapter, confirmation and cancel preserve original',
   );
   await session.close();
   session = undefined;

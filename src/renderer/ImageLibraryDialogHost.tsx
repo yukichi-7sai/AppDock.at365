@@ -447,26 +447,44 @@ function Editor({
       </SettingsDialog>
     );
   }
-  if (r.kind === 'delete-image')
+  if (r.kind === 'delete-image') {
+    const permanent = r.deletionTargets?.filter((target) => target.mode === 'permanent') ?? [];
+    const mixed = permanent.length > 0 && permanent.length < r.images.length;
     return (
       <SettingsDialog
         returnFocus={returnFocus}
         title={t('images.deleteImages')}
         onClose={close}
         onApply={() => save({ kind: 'delete-image' })}
-        applyLabel={t('common.delete')}
+        applyLabel={t(permanent.length && !mixed ? 'library.permanentDelete' : 'common.delete')}
         valid={!r.deleteBlocked}
-        description={t('images.deleteDescription', { count: r.images.length })}
+        description={t(
+          mixed
+            ? 'library.mixedDeleteDescription'
+            : permanent.length
+              ? 'library.permanentDeleteDescription'
+              : 'images.deleteDescription',
+          {
+            count: r.images.length,
+            permanent: permanent.length,
+            trash: r.images.length - permanent.length,
+          },
+        )}
         error={r.deleteBlocked ? t('services.imageLibraryHost.inUse') : error}
         errorTarget={r.images[0]?.file}
       >
         <ul className="library-confirm-files">
           {r.images.map((image) => (
-            <li key={image.file}>{image.file}</li>
+            <li key={image.file}>
+              {image.file}
+              {mixed &&
+                ` — ${t(permanent.some((target) => target.ref.file === image.file) ? 'library.permanentDelete' : 'library.recycleDelete')}`}
+            </li>
           ))}
         </ul>
       </SettingsDialog>
     );
+  }
   if (r.kind === 'preview')
     return (
       <LibraryPreviewDialog

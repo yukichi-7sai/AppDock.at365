@@ -60,6 +60,12 @@ export type ImageLibraryDialogOperation =
   | { kind: 'rename-images'; names: string[] }
   | { kind: 'folder'; destination: string }
   | { kind: 'import-set'; setId: string };
+/** Host-owned snapshot of the files and deletion methods shown by the confirmation. */
+export interface LibraryDeletionTarget {
+  ref: RegisteredImageRef;
+  path: string;
+  mode: 'trash' | 'permanent';
+}
 export interface ImageLibraryDialogRequest {
   media?: import('./library-assets').LibraryMedia;
   id: string;
@@ -70,6 +76,7 @@ export interface ImageLibraryDialogRequest {
   entry?: RegisteredImageEntry;
   entries?: RegisteredImageEntry[];
   deleteBlocked?: boolean;
+  deletionTargets?: LibraryDeletionTarget[];
   folder?: string;
   folders?: string[];
   iconSets?: { id: string; name: string }[];

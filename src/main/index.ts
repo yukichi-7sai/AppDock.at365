@@ -5451,7 +5451,7 @@ async function initialize() {
       if (operation.kind === 'delete-image') {
         if (!request.entry || request.deleteBlocked)
           throw Error(hostText('services.index.invalidDeletion'));
-        return library.removeMany(request.entries ?? [request.entry]);
+        return library.removeMany(request.entries ?? [request.entry], request.deletionTargets);
       }
       if (operation.kind === 'rename-images') {
         if (!request.entries || request.deleteBlocked)
