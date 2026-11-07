@@ -222,17 +222,19 @@ export function SoundGenerationDialog({
               } as const
             )[item.state];
             const folderName = item.folder || t('soundGeneration.rootFolder');
-            const status = playback
-              ? t(
-                  playback.state === 'playing'
-                    ? 'sounds.playing'
-                    : playback.state === 'waiting'
-                      ? 'sounds.waiting'
-                      : 'sounds.loading',
-                )
-              : statusKey
-                ? t(statusKey)
-                : undefined;
+            const status = item.resultDeleted
+              ? t('generationJobs.resultsDeleted')
+              : playback
+                ? t(
+                    playback.state === 'playing'
+                      ? 'sounds.playing'
+                      : playback.state === 'waiting'
+                        ? 'sounds.waiting'
+                        : 'sounds.loading',
+                  )
+                : statusKey
+                  ? t(statusKey)
+                  : undefined;
             const information = [
               status,
               folderName,
@@ -249,6 +251,16 @@ export function SoundGenerationDialog({
                 data-generated-sound={item.id}
                 aria-busy={itemBusy}
               >
+                <SettingsButton
+                  icon
+                  className="generation-job-dismiss"
+                  aria-label={t('generationJobs.remove')}
+                  title={t('generationJobs.remove')}
+                  disabled={itemBusy}
+                  onClick={() => run({ kind: 'dismiss', itemId: item.id })}
+                >
+                  <Icon name="close" size={18} />
+                </SettingsButton>
                 <SettingsField
                   title={item.file ? libraryBasename(item.file) : item.text}
                   error={item.error}
@@ -278,10 +290,10 @@ export function SoundGenerationDialog({
                         disabled={busy || pending.has(item.id)}
                         onClick={() => run({ kind: 'cancel', itemId: item.id })}
                       >
-                        <Icon name={item.state === 'queued' ? 'close' : 'square'} size={18} />
+                        <Icon name="square" size={18} />
                       </SettingsButton>
                     )}
-                    {item.state === 'saved' && (
+                    {item.state === 'saved' && !item.resultDeleted && (
                       <>
                         <SettingsButton
                           icon
@@ -313,7 +325,7 @@ export function SoundGenerationDialog({
                           aria-label={t('common.delete')}
                           title={t('common.delete')}
                           disabled={itemBusy}
-                          onClick={() => setEdit({ kind: 'delete', item })}
+                          onClick={() => setDiscard(item.id)}
                         >
                           <Icon name="trash" size={18} />
                         </SettingsButton>
@@ -365,17 +377,6 @@ export function SoundGenerationDialog({
                         />
                       </SettingsButton>
                     )}
-                    {!item.hasResult && ['failed', 'canceled'].includes(item.state) && (
-                      <SettingsButton
-                        icon
-                        aria-label={t('soundGeneration.dismiss')}
-                        title={t('soundGeneration.dismiss')}
-                        disabled={itemBusy}
-                        onClick={() => run({ kind: 'dismiss', itemId: item.id })}
-                      >
-                        <Icon name="close" size={18} />
-                      </SettingsButton>
-                    )}
                   </SettingsActions>
                   <details>
                     <summary>{t('soundGeneration.conditions')}</summary>
@@ -399,11 +400,13 @@ export function SoundGenerationDialog({
                         </>
                       )}
                     </dl>
-                    <SettingsActions>
-                      <SettingsButton disabled={itemBusy} onClick={() => setDiscard(item.id)}>
-                        {t('generationJobs.discard')}
-                      </SettingsButton>
-                    </SettingsActions>
+                    {item.hasResult && (
+                      <SettingsActions>
+                        <SettingsButton disabled={itemBusy} onClick={() => setDiscard(item.id)}>
+                          {t('generationJobs.deleteSounds')}
+                        </SettingsButton>
+                      </SettingsActions>
+                    )}
                   </details>
                 </SettingsField>
               </div>
@@ -413,12 +416,12 @@ export function SoundGenerationDialog({
       </SettingsModal>
       {discard && (
         <SettingsDialog
-          title={t('generationJobs.discard')}
-          description={t('generationJobs.discardConfirm')}
+          title={t('generationJobs.deleteSounds')}
+          description={t('generationJobs.deleteSoundsConfirm')}
           applyLabel={t('common.delete')}
           onClose={() => setDiscard(undefined)}
           onApply={async () => {
-            await act({ kind: 'discard', itemId: discard });
+            await act({ kind: 'deleteResults', itemId: discard });
             setDiscard(undefined);
           }}
         >

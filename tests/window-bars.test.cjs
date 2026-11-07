@@ -9,6 +9,7 @@ function fixture() {
     maximized: false,
     runningApplets: 2,
     activeNotificationCount: 0,
+    jobs: { active: 0, ended: 0, attention: 0, completed: 0, failed: 0, canceled: 0 },
     update: { busy: false, blocked: false, phase: '', cancellable: false },
   };
   const calls = [];
@@ -41,6 +42,11 @@ test('bar snapshots advance only with state changes, preserve opaque actions, an
   assert.equal(f.bars.snapshot('titlebar').activeNotificationCount, 0);
   next.update.busy = true;
   assert.equal(f.state.update.busy, false);
+  f.state.jobs.active = 2;
+  const status = f.bars.snapshot('statusbar');
+  assert.equal(status.jobs.active, 2);
+  status.jobs.active = 99;
+  assert.equal(f.state.jobs.active, 2);
 });
 test('stale sessions, unknown operations, wrong region and malformed request IDs never execute', () => {
   const f = fixture();

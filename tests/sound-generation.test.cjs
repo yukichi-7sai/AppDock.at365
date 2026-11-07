@@ -238,10 +238,70 @@ test('rename and recycle update real library membership and reject stale file mu
   await f.generate();
   const latest = f.generation.current().items[0];
   await f.generation.act(f.id, { kind: 'delete', itemId: latest.id });
+  assert.equal(f.item(latest.id).resultDeleted, true);
+  assert.equal(f.generation.current().items.length, 2);
+  await f.generation.act(f.id, { kind: 'dismiss', itemId: latest.id });
   assert.equal(f.generation.current().items.length, 1);
   assert.equal(f.settings.value.soundLibrary.groups[0].files.length, 1);
   await f.generation.act(f.id, { kind: 'close' });
 });
+test('saved sound job removal keeps the WAV and does not return after restart', async (t) => {
+  const f = await fixture(t);
+  const id = await f.generate();
+  const file = path.join(f.directory, f.item(id).file);
+  const bytes = await fs.readFile(file);
+  await f.generation.act(f.id, { kind: 'dismiss', itemId: id });
+  assert.equal(f.item(id), undefined);
+  assert.deepEqual(await fs.readFile(file), bytes);
+  const restored = new SoundGeneration(f.generationOptions);
+  assert.equal(restored.backgroundSnapshot().length, 0);
+  await restored.close();
+});
+
+test('sound result deletion preserves its job across restart until explicitly dismissed', async (t) => {
+  const f = await fixture(t);
+  const id = await f.generate();
+  const file = path.join(f.directory, f.item(id).file);
+  await f.generation.act(f.id, { kind: 'deleteResults', itemId: id });
+  assert.equal(f.item(id).resultDeleted, true);
+  await assert.rejects(fs.readFile(file), { code: 'ENOENT' });
+  f.generation.cancel();
+  await f.generation.close();
+  const restored = new SoundGeneration(f.generationOptions);
+  void restored.open('restart', '通知');
+  assert.equal(restored.current().items[0].resultDeleted, true);
+  assert.equal(restored.current().items[0].id, id);
+  await restored.act(restored.current().id, { kind: 'dismiss', itemId: id });
+  assert.equal(restored.backgroundSnapshot().length, 0);
+  restored.cancel();
+  await restored.close();
+});
+
+test('sound jobs with pending classification require save or a verified rescue before X removes them', async (t) => {
+  const f = await fixture(t);
+  f.failSettings(true);
+  const id = await f.generate();
+  assert.equal(f.item(id).state, 'unsaved');
+  await assert.rejects(f.generation.act(f.id, { kind: 'dismiss', itemId: id }), /保存|save/);
+  assert(f.item(id).hasResult);
+  const file = path.join(f.directory, 'rescued.wav');
+  f.generationOptions.export = async ([result]) => {
+    await fs.writeFile(file, result.bytes);
+    return [
+      {
+        id: result.id,
+        file,
+        hash: require('node:crypto').createHash('sha256').update(result.bytes).digest('hex'),
+      },
+    ];
+  };
+  await f.generation.act(f.id, { kind: 'export', itemId: id });
+  await f.generation.act(f.id, { kind: 'dismiss', itemId: id });
+  assert.equal(f.item(id), undefined);
+  assert.deepEqual(await fs.readFile(file), wave(1000));
+  assert.equal(f.requests.length, 1);
+});
+
 test('cancelling generation or leaving the page creates no asset and reports no failure', async (t) => {
   const f = await fixture(
     t,
@@ -403,7 +463,7 @@ test('saved cards can be renamed and deleted while later generation is pending',
   assert.equal(f.item(saved).file, '通知/変更.wav');
   assert.equal(f.item(next).state, 'generating');
   await f.generation.act(f.id, { kind: 'delete', itemId: saved });
-  assert.equal(f.item(saved), undefined);
+  assert.equal(f.item(saved).resultDeleted, true);
   delayed.responses[0]();
   await f.settle(next);
   assert.equal(f.item(next).state, 'saved');

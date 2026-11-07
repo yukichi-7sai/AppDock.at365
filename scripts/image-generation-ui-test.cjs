@@ -610,8 +610,67 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     const originalJobIds = [];
     await page.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
     await openGeneration();
+    const deleteJob = (await model()).items.find(
+      (item) =>
+        item.job.state === 'completed' &&
+        item.job.images?.length &&
+        item.entries.every((entry) => !entry.changed),
+    );
+    assert(deleteJob);
+    const deletedFiles = deleteJob.job.images.map((image) => path.join(directory, image.ref.file));
+    await dialog()
+      .locator(`[data-job-id="${deleteJob.job.jobId}"]`)
+      .getByRole('button', { name: '生成した画像を削除する', exact: true })
+      .click();
+    const deleteResults = page.getByRole('dialog', { name: '生成した画像を削除する', exact: true });
+    await deleteResults.getByRole('button', { name: '削除', exact: true }).click();
+    await deleteResults.waitFor({ state: 'hidden' });
+    await until(
+      async () =>
+        (await model()).items.find((item) => item.job.jobId === deleteJob.job.jobId)
+          ?.resultsDeleted,
+      'deleting images retains the job',
+    );
+    assert(deletedFiles.every((file) => !fs.existsSync(file)));
+    const dismissJob = (await model()).items.find(
+      (item) =>
+        item.job.state === 'completed' &&
+        item.job.images?.length &&
+        item.entries.every((entry) => !entry.changed),
+    );
+    assert(dismissJob);
+    const keptFiles = dismissJob.job.images.map((image) => path.join(directory, image.ref.file));
+    const keptBytes = keptFiles.map((file) => fs.readFileSync(file));
+    await dialog()
+      .locator(`[data-job-id="${dismissJob.job.jobId}"]`)
+      .getByRole('button', { name: 'ジョブを削除', exact: true })
+      .click();
+    await until(
+      async () => !(await model()).items.some((item) => item.job.jobId === dismissJob.job.jobId),
+      'X removes only the job',
+    );
+    keptFiles.forEach((file, i) => assert.deepEqual(fs.readFileSync(file), keptBytes[i]));
+    check('image deletion keeps its job and X removes a saved job without deleting library images');
     originalJobIds.push(...(await model()).items.map((item) => item.job.jobId));
     await closeGeneration();
+    const status = await require('./shell-bars-helper.cjs').barPage(page, 'statusbar');
+    const jobCounts = () =>
+      status.evaluate(async () => (await window.appdockBar.connect()).snapshot.jobs);
+    await until(async () => {
+      const c = await jobCounts();
+      return c.active + c.ended + c.attention === originalJobIds.length;
+    }, 'status bar reflects job removal');
+    const positions = await status
+      .locator('.statusbar > span')
+      .evaluateAll((elements) =>
+        elements.map((el) => ({
+          jobs: el.classList.contains('statusbar-jobs'),
+          x: el.getBoundingClientRect().x,
+        })),
+      );
+    assert(positions[0].jobs && positions.every((position) => position.x >= positions[0].x));
+    await status.screenshot({ path: path.join(profile, 'job-statusbar.png') });
+    check('job counts occupy the left edge and count jobs instead of generated images');
     for (const client of clients.splice(0)) await client.close();
     await app.app.evaluate(({ dialog }) => {
       dialog.showMessageBox = async () => ({ response: 1 });
@@ -630,6 +689,11 @@ const invoke = (action) => page.evaluate((action) => window.dock.automation(acti
     await openGeneration();
     const restoredJobIds = (await model()).items.map((item) => item.job.jobId);
     assert(originalJobIds.every((id) => restoredJobIds.includes(id)));
+    assert(!restoredJobIds.includes(dismissJob.job.jobId));
+    assert(
+      (await model()).items.find((item) => item.job.jobId === deleteJob.job.jobId)?.resultsDeleted,
+    );
+    keptFiles.forEach((file, i) => assert.deepEqual(fs.readFileSync(file), keptBytes[i]));
     assert.equal(requests.length, requestCountBeforeRestart);
     await closeGeneration();
     check('restart restores the same image jobs without sending a new generation request');

@@ -213,6 +213,15 @@ function App() {
     );
   return (
     <footer className="statusbar">
+      <span
+        className="statusbar-jobs"
+        data-attention={model.jobs.attention > 0}
+        title={t('generationJobs.countDetails', model.jobs)}
+        role="status"
+      >
+        {t('generationJobs.counts', model.jobs)}
+        {model.jobs.attention > 0 && <span>{t('generationJobs.attentionCount', model.jobs)}</span>}
+      </span>
       <span className="statusbar-activity">
         <i />
         {t('workspace.bars.runningApplets', { count: model.runningApplets })}

@@ -14,6 +14,7 @@ export interface GeneratedSound {
   error?: string;
   canRetry?: boolean;
   hasResult?: boolean;
+  resultDeleted?: boolean;
 }
 export interface SoundGenerationModel {
   draft?: SoundGenerationDraft;
@@ -44,7 +45,7 @@ export interface SoundGenerationDraft {
 export type SoundGenerationAction =
   | { kind: 'draft'; draft: SoundGenerationDraft }
   | { kind: 'recoveryFolder' }
-  | { kind: 'export' | 'discard'; itemId: string }
+  | { kind: 'export' | 'deleteResults'; itemId: string }
   | { kind: 'generate'; folder: string; connectionId: string; text: string; instructions?: string }
   | { kind: 'stop' }
   | { kind: 'close'; discard?: boolean }

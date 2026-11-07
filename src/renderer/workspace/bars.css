@@ -173,13 +173,22 @@ kbd {
   color: var(--muted);
   user-select: none;
 }
-.statusbar > span:first-child {
+.statusbar-activity {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   max-width: 36%;
   white-space: nowrap;
+}
+.statusbar-jobs {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.statusbar-jobs[data-attention='true'] {
+  color: var(--warning);
 }
 .statusbar i {
   background: var(--accent);

@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dialog } from 'electron';
 import { hostText } from '../../shared/i18n';
+import { createHash } from 'node:crypto';
+import type { GenerationCopy } from './generation-store';
 
 /** Explicit user-selected rescue copy. Never removes or overwrites the retained original. */
 export async function rescueGeneration(results: { id: string; mimeType: string; bytes: Buffer }[]) {
@@ -9,7 +11,8 @@ export async function rescueGeneration(results: { id: string; mimeType: string; 
     title: hostText('generationJobs.export'),
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (choice.canceled || !choice.filePaths[0]) return false;
+  if (choice.canceled || !choice.filePaths[0]) return undefined;
+  const copies: GenerationCopy[] = [];
   for (const result of results) {
     if (!/^[a-f0-9-]{36}$/.test(result.id) || !Buffer.isBuffer(result.bytes))
       throw Error(hostText('generationJobs.storageFailed'));
@@ -33,6 +36,11 @@ export async function rescueGeneration(results: { id: string; mimeType: string; 
     } finally {
       fs.closeSync(fd);
     }
+    copies.push({
+      id: result.id,
+      file,
+      hash: createHash('sha256').update(result.bytes).digest('hex'),
+    });
   }
-  return true;
+  return copies;
 }

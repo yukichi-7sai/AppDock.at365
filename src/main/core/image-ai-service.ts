@@ -1,7 +1,12 @@
 import { generationConnectionAllowed, generationConfigurationSignature } from './generation-access';
 import type { ImageRegistrar, RegistrationImage } from './image-registration';
 import type { ImageRegistrationDestination } from '../../shared/image-ai';
-import { GenerationStore, type GenerationRecord } from './generation-store';
+import {
+  GenerationStore,
+  verifiedGenerationCopy,
+  type GenerationRecord,
+  type GenerationCopy,
+} from './generation-store';
 import type { BackgroundJob, BackgroundJobs } from './background-jobs';
 import type { ImageGenerationItem } from '../../shared/image-generation';
 import { createHash, randomUUID } from 'node:crypto';
@@ -57,11 +62,15 @@ type Job = {
   revoked?: boolean;
   task?: Promise<void>;
   rescued?: boolean;
+  rescueCopies?: GenerationCopy[];
+  editing?: boolean;
+  editTask?: Promise<void>;
   recovering?: boolean;
   inspecting?: Promise<void>;
   changedResults?: Set<string>;
 };
 interface ImageRecovery {
+  rescueCopies?: GenerationCopy[];
   view: ImageAiJob;
   input: ImageGenerateInput;
   server: string;
@@ -128,7 +137,8 @@ export class ImageAiService {
           view: structuredClone(data.view),
           input: data.input,
           destination: data.destination,
-          images: data.images,
+          images: data.images.filter((image) => !record.deletedResults?.includes(image.id)),
+          rescueCopies: data.rescueCopies,
           record,
           durable: new Set(),
           abort: new AbortController(),
@@ -144,6 +154,10 @@ export class ImageAiService {
             j.storageError = true;
           }
           image.checkpoint = () => this.checkpoint(j);
+        }
+        if (record.deletedResults?.length) {
+          this.imageViews(j);
+          if (!j.images?.length && j.view.state === 'unsaved') j.view.state = 'completed';
         }
         if (['queued', 'running', 'saving'].includes(j.view.state)) {
           j.view.state = j.images?.length ? 'unsaved' : 'failed';
@@ -195,6 +209,7 @@ export class ImageAiService {
       server: j.connection.name,
       destination: j.destination,
       quarantined: j.quarantined,
+      rescueCopies: j.rescueCopies,
       images: (j.images ?? []).map(({ bytes: _bytes, checkpoint: _checkpoint, ...image }) => image),
     };
     j.record ??= { version: 1, id: j.view.jobId, kind: 'image', data, results: [] };
@@ -223,6 +238,8 @@ export class ImageAiService {
       server: j.connection.name,
       folder: j.destination?.folder ?? '',
       entries: [],
+      busy: !!j.editing || !!j.inspecting || !!j.saving || this.active.has(j) || !terminal(j),
+      resultsDeleted: !!j.record?.deletedResults?.length && !j.images?.length,
     }));
   }
   hostGet(id: string) {
@@ -232,16 +249,78 @@ export class ImageAiService {
     const j = this.hostJob(id);
     return !!j.inspecting || !!j.changedResults?.has(imageId);
   }
-  hostRescued(id: string) {
-    this.hostJob(id).rescued = true;
-  }
-  hostDiscard(id: string) {
+  hostRescued(id: string, copies: GenerationCopy[]) {
     const j = this.hostJob(id);
-    if (this.active.has(j) || j.saving || j.inspecting || !terminal(j))
+    j.rescued = true;
+    j.rescueCopies = copies;
+    this.checkpoint(j);
+  }
+  private async editResult(id: string, operation: (j: Job) => Promise<void>) {
+    const j = this.hostJob(id);
+    await j.inspecting;
+    if (this.active.has(j) || j.saving || j.editing || !terminal(j))
       throw Error(hostText('imageGeneration.busy'));
-    if (j.record) this.options.store?.discard(j.record);
-    this.jobs.delete(id);
+    j.editing = true;
     this.options.changed?.();
+    j.editTask = Promise.resolve()
+      .then(() => operation(j))
+      .finally(() => {
+        j.editing = false;
+        j.editTask = undefined;
+        this.options.changed?.();
+      });
+    await j.editTask;
+  }
+  async hostDismiss(id: string) {
+    await this.editResult(id, async (j) => {
+      if (
+        j.record?.results.some(
+          (result) =>
+            !j.record!.deletedResults?.includes(result.id) &&
+            !j.images?.some((image) => image.id === result.id),
+        )
+      )
+        throw Error(hostText('generationJobs.saveBeforeRemove'));
+      for (const image of j.images ?? []) {
+        const hash =
+          j.record?.results.find((result) => result.id === image.id)?.hash ??
+          (image.bytes && createHash('sha256').update(image.bytes).digest('hex'));
+        if (hash && verifiedGenerationCopy(j.rescueCopies, image.id, hash)) continue;
+        if (image.grouped && (await this.options.registration?.verify?.(image))) continue;
+        throw Error(hostText('generationJobs.saveBeforeRemove'));
+      }
+      if (j.record) this.options.store?.discard(j.record);
+      this.jobs.delete(id);
+    });
+  }
+  async hostDeleteResults(id: string, imageId?: string) {
+    await this.editResult(id, async (j) => {
+      const images = (j.images ?? []).filter((image) => !imageId || image.id === imageId);
+      for (const image of images) {
+        if (image.ref) {
+          if (!this.options.registration?.remove)
+            throw Error(hostText('generationJobs.targetChanged'));
+          await this.options.registration.remove(image);
+        }
+        try {
+          if (j.record) this.options.store?.deleteResults(j.record, [image.id]);
+        } finally {
+          if (!j.record || j.record.deletedResults?.includes(image.id)) {
+            j.images = j.images?.filter((value) => value !== image);
+            j.durable.delete(image.id);
+            j.changedResults?.delete(image.id);
+            this.imageViews(j);
+          }
+        }
+        this.checkpoint(j);
+      }
+      if (!j.images?.length) {
+        j.storageError = false;
+        j.view.error = undefined;
+        if (j.view.state === 'unsaved') j.view.state = 'completed';
+        this.checkpoint(j);
+      }
+    });
   }
   get recoveryError() {
     return this.options.store?.issues.length
@@ -275,7 +354,7 @@ export class ImageAiService {
     const j = this.hostJob(id);
     await j.inspecting;
     this.options.background?.assertAccepting();
-    if (j.saving || this.active.has(j)) return;
+    if (j.saving || j.editing || this.active.has(j)) return;
     if (j.changedResults?.size) throw Error(hostText('generationJobs.targetChanged'));
     if (!j.images?.length || j.quarantined) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     if (destination) j.destination = this.options.registration!.validate(destination);
@@ -298,7 +377,7 @@ export class ImageAiService {
   }
   backgroundSnapshot(): BackgroundJob[] {
     return [...this.jobs.values()].map((j) => {
-      const active = this.active.has(j) || !!j.saving || !terminal(j);
+      const active = this.active.has(j) || !!j.saving || !!j.editing || !terminal(j);
       const pending = (j.images ?? []).filter((image) => !image.ref || !image.grouped);
       return {
         jobId: j.view.jobId,
@@ -552,6 +631,7 @@ export class ImageAiService {
   retrySave(owner: string, id: unknown): ImageAiJob {
     this.authorize(owner, 'register');
     const j = this.owned(owner, id);
+    if (j.editing) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     if (!j.destination) return imageFail('INVALID_ARGUMENT', 'invalidRequest');
     if (j.view.state === 'saving' || j.view.state === 'completed') return structuredClone(j.view);
     if (j.view.state !== 'unsaved') return imageFail('INVALID_ARGUMENT', 'invalidRequest');
@@ -857,7 +937,9 @@ export class ImageAiService {
           this.finish(j, 'canceled');
           j.abort.abort();
         }
-    await Promise.allSettled([...this.jobs.values()].flatMap((j) => [j.task, j.saving]));
+    await Promise.allSettled(
+      [...this.jobs.values()].flatMap((j) => [j.task, j.saving, j.editTask]),
+    );
     for (const j of this.jobs.values()) {
       try {
         this.preserve(j);

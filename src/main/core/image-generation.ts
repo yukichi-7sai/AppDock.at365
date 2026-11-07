@@ -15,6 +15,7 @@ import type {
 } from '../../shared/image-generation';
 import type { ImageAiService } from './image-ai-service';
 import type { ImageLibraryHost } from './image-library-host';
+import type { GenerationCopy } from './generation-store';
 
 const busy = (item: ImageGenerationItem) =>
   ['queued', 'running', 'saving'].includes(item.job.state);
@@ -42,7 +43,9 @@ export class ImageGeneration {
       send(model: ImageGenerationModel | null): void;
       changed(): void;
       failed(): void;
-      export?(results: { id: string; mimeType: string; bytes: Buffer }[]): Promise<boolean>;
+      export?(
+        results: { id: string; mimeType: string; bytes: Buffer }[],
+      ): Promise<GenerationCopy[] | undefined>;
       recoveryFolder?(): void;
     },
   ) {}
@@ -77,14 +80,27 @@ export class ImageGeneration {
   current(): ImageGenerationModel | null {
     const s = this.session;
     if (!s) return null;
-    for (const item of this.options.ai.hostItems())
-      if (!s.items.some((existing) => existing.job.jobId === item.job.jobId)) s.items.push(item);
+    const jobs = this.options.ai.hostItems();
+    this.items = s.items = s.items.filter((item) =>
+      jobs.some((job) => job.job.jobId === item.job.jobId),
+    );
+    for (const item of jobs) {
+      const existing = s.items.find((value) => value.job.jobId === item.job.jobId);
+      if (!existing) s.items.push(item);
+      else {
+        existing.busy = item.busy;
+        existing.resultsDeleted = item.resultsDeleted;
+      }
+    }
     for (const item of s.items) {
       try {
         item.job = this.options.ai.hostGet(item.job.jobId);
       } catch {
         /* Keep saved entries after job retention ends. */
       }
+      item.entries = item.entries.filter((entry) =>
+        item.job.images?.some((image) => image.id === entry.id),
+      );
       for (const image of item.job.images ?? []) {
         if (!image.ref || item.entries.some((entry) => entry.id === image.id)) continue;
         const entry = this.options.library.images.entry(image.ref);
@@ -177,11 +193,13 @@ export class ImageGeneration {
     const item = s.items.find((item) => item.job.jobId === action.jobId);
     if (!item) throw Error(hostText('imageGeneration.missing'));
     if (action.kind === 'export') {
-      if (await this.options.export?.(this.options.ai.hostExport(action.jobId)))
-        this.options.ai.hostRescued(action.jobId);
-    } else if (action.kind === 'discard') {
-      this.options.ai.hostDiscard(action.jobId);
+      const copies = await this.options.export?.(this.options.ai.hostExport(action.jobId));
+      if (copies) this.options.ai.hostRescued(action.jobId, copies);
+    } else if (action.kind === 'dismiss') {
+      await this.options.ai.hostDismiss(action.jobId);
       this.items = s.items = s.items.filter((value) => value !== item);
+    } else if (action.kind === 'deleteResults') {
+      await this.options.ai.hostDeleteResults(action.jobId);
     } else if (action.kind === 'cancel') this.options.ai.hostCancel(action.jobId);
     else if (action.kind === 'retrySave') await this.options.ai.hostRetry(action.jobId);
     else if (action.kind === 'rename' || action.kind === 'delete') {
@@ -208,8 +226,7 @@ export class ImageGeneration {
             saved.entry.generation,
           );
         } else {
-          await this.options.library.removeMany([saved.entry]);
-          saved.changed = true;
+          await this.options.ai.hostDeleteResults(item.job.jobId, saved.id);
         }
       } catch (error) {
         this.options.failed();

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import { libraryFolder, libraryPath, libraryParent } from '../../shared/library-assets';
 import type { LibraryEntry } from '../../shared/library-assets';
@@ -11,7 +11,12 @@ import type {
 } from '../../shared/sound-generation';
 import type { SoundLibraryService } from './sound-library-service';
 import type { TtsService } from './tts-service';
-import { GenerationStore, type GenerationRecord } from './generation-store';
+import {
+  GenerationStore,
+  verifiedGenerationCopy,
+  type GenerationRecord,
+  type GenerationCopy,
+} from './generation-store';
 import type { BackgroundJob, BackgroundJobs } from './background-jobs';
 import type { AssetRegistrationIntent } from './registered-assets';
 
@@ -30,9 +35,11 @@ interface Item {
   storageError?: boolean;
   intent?: AssetRegistrationIntent;
   rescued?: boolean;
+  rescueCopies?: GenerationCopy[];
   hidden?: boolean;
 }
 interface SoundRecovery {
+  rescueCopies?: GenerationCopy[];
   view: GeneratedSound;
   request: Item['request'];
   group?: string;
@@ -87,7 +94,9 @@ export class SoundGeneration {
       changed(): void;
       store?: GenerationStore;
       background?: BackgroundJobs;
-      export?(results: { id: string; mimeType: string; bytes: Buffer }[]): Promise<boolean>;
+      export?(
+        results: { id: string; mimeType: string; bytes: Buffer }[],
+      ): Promise<GenerationCopy[] | undefined>;
       recoveryFolder?(): void;
     },
   ) {
@@ -98,7 +107,8 @@ export class SoundGeneration {
         if (data.view.id !== record.id || typeof data.request.text !== 'string')
           throw Error('Invalid sound recovery record');
         const item: Item = { ...data, record, view: { ...data.view, busy: false } };
-        if (record.results.length) {
+        if (record.deletedResults?.includes(record.id)) this.clearResult(item);
+        if (record.results.length && !item.view.resultDeleted) {
           try {
             options.store!.read(record, record.id);
             item.durable = true;
@@ -164,6 +174,7 @@ export class SoundGeneration {
       createdAt: item.createdAt,
       intent: item.intent,
       hidden: item.hidden,
+      rescueCopies: item.rescueCopies,
     };
     item.record ??= { version: 1, id: item.view.id, kind: 'sound', data, results: [] };
     item.record.data = data;
@@ -176,6 +187,18 @@ export class SoundGeneration {
       item.durable = true;
     }
     item.storageError = false;
+  }
+  private clearResult(item: Item) {
+    item.bytes = undefined;
+    item.durable = false;
+    item.entry = undefined;
+    item.intent = undefined;
+    item.groupPending = false;
+    item.storageError = false;
+    item.view.file = undefined;
+    item.view.error = undefined;
+    item.view.resultDeleted = true;
+    if (item.view.state === 'unsaved' || item.view.state === 'changed') item.view.state = 'saved';
   }
   backgroundSnapshot(): BackgroundJob[] {
     return this.items.map((item) => ({
@@ -273,7 +296,12 @@ export class SoundGeneration {
           item.entry && (!current?.available || current.generation !== item.entry.generation);
         return {
           ...item.view,
-          hasResult: !!item.bytes || !!item.durable,
+          hasResult:
+            !!item.bytes ||
+            !!item.durable ||
+            !!item.record?.results.some(
+              (result) => !item.record!.deletedResults?.includes(result.id),
+            ),
           state: changed ? 'changed' : item.view.state,
           canRetry:
             !item.view.busy &&
@@ -531,7 +559,7 @@ export class SoundGeneration {
     }
     if (
       ![
-        'discard',
+        'deleteResults',
         'export',
         'cancel',
         'retry',
@@ -547,19 +575,18 @@ export class SoundGeneration {
     const item = s.items.find((item) => item.view.id === action.itemId);
     if (!item) throw Error(hostText('soundGeneration.missing'));
     await this.recovering.get(item);
-    if (action.kind === 'discard') {
-      if (item.view.busy || item.task) throw Error(hostText('soundGeneration.busy'));
-      if (item.record) this.options.store?.discard(item.record);
-      this.items = s.items = s.items.filter((value) => value !== item);
-      this.refresh();
-      return;
-    }
     if (action.kind === 'export') {
       const bytes =
         item.bytes ?? (item.record && this.options.store?.read(item.record, item.view.id));
       if (!bytes) throw Error(hostText('soundGeneration.missing'));
-      if (await this.options.export?.([{ id: item.view.id, mimeType: 'audio/wav', bytes }]))
+      const copies = await this.options.export?.([
+        { id: item.view.id, mimeType: 'audio/wav', bytes },
+      ]);
+      if (copies) {
         item.rescued = true;
+        item.rescueCopies = copies;
+        this.checkpoint(item);
+      }
       return;
     }
     if (action.kind === 'cancel') {
@@ -568,13 +595,38 @@ export class SoundGeneration {
       await item.task;
       return;
     }
-    if (item.view.busy) throw Error(hostText('soundGeneration.busy'));
+    if (item.view.busy || item.task) throw Error(hostText('soundGeneration.busy'));
     if (action.kind === 'dismiss') {
-      if (item.entry || item.bytes || item.durable) throw Error(hostText('soundGeneration.busy'));
-      item.hidden = true;
-      this.checkpoint(item);
-      this.items = s.items = s.items.filter((value) => value !== item);
-      this.refresh();
+      item.view.busy = true;
+      item.task = (async () => {
+        if (
+          !item.view.resultDeleted &&
+          (item.entry || item.bytes || item.durable || item.record?.results.length)
+        ) {
+          const hash =
+            item.record?.results.find((result) => result.id === item.view.id)?.hash ??
+            (item.bytes && createHash('sha256').update(item.bytes).digest('hex'));
+          let safe = !!hash && verifiedGenerationCopy(item.rescueCopies, item.view.id, hash);
+          if (!safe && item.entry && item.intent && !item.groupPending) {
+            try {
+              await this.options.library.files.recoverRegistration(item.intent);
+              safe = true;
+            } catch {
+              /* Preserve the only original. */
+            }
+          }
+          if (!safe) throw Error(hostText('generationJobs.saveBeforeRemove'));
+        }
+        this.options.library.preview.stop(s.id);
+        if (item.record) this.options.store?.discard(item.record);
+        this.items = s.items = s.items.filter((value) => value !== item);
+      })().finally(() => {
+        item.view.busy = false;
+        item.task = undefined;
+        this.options.changed();
+        this.refresh();
+      });
+      await item.task;
       return;
     }
     if (
@@ -589,6 +641,7 @@ export class SoundGeneration {
           ...item.view,
           id: randomUUID(),
           file: undefined,
+          resultDeleted: undefined,
           state: 'queued',
           busy: true,
           error: undefined,
@@ -612,6 +665,23 @@ export class SoundGeneration {
           if (item.entry)
             await this.options.library.files.read(item.entry.ref, item.entry.generation);
           await this.save(item);
+        } else if (action.kind === 'delete' || action.kind === 'deleteResults') {
+          this.options.library.preview.stop(s.id);
+          this.writable(item);
+          if (item.entry && this.options.library.files.entry(item.entry.ref)?.available) {
+            if (item.intent) {
+              const saved = await this.options.library.files.recoverRegistration(item.intent);
+              item.entry = { ...item.entry, generation: saved.generation };
+            }
+            await this.options.library.host.removeMany([item.entry]);
+          }
+          try {
+            if (item.record) this.options.store?.deleteResults(item.record, [item.view.id]);
+          } finally {
+            if (!item.record || item.record.deletedResults?.includes(item.view.id))
+              this.clearResult(item);
+          }
+          this.checkpoint(item);
         } else {
           if (!item.entry) throw Error(hostText('soundGeneration.missing'));
           const entry = item.entry;
@@ -639,13 +709,6 @@ export class SoundGeneration {
               item.entry = { ...updated };
               item.view.file = ref.file;
               if (item.intent) item.intent.file = ref.file;
-            } else {
-              await this.options.library.host.removeMany([entry]);
-              item.view.state = 'changed';
-              item.hidden = true;
-              this.items = s.items = s.items.filter((value) => value !== item);
-              // Keep the durable tombstone so restart cannot recreate an explicitly deleted asset.
-              this.checkpoint(item);
             }
           }
         }

@@ -19,6 +19,8 @@ export interface RegistrationImage {
   checkpoint?(): void;
 }
 export interface ImageRegistrar {
+  verify?(image: RegistrationImage): Promise<boolean>;
+  remove?(image: RegistrationImage): Promise<void>;
   restore?(image: RegistrationImage): Promise<void>;
   validate(value: unknown): ImageRegistrationDestination;
   save(
@@ -34,6 +36,22 @@ export class ImageRegistration implements ImageRegistrar {
     private files: RegisteredImages,
     private host: ImageLibraryHost,
   ) {}
+  async verify(image: RegistrationImage) {
+    if (!image.ref || !image.intent) return false;
+    try {
+      await this.restore(image);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async remove(image: RegistrationImage) {
+    if (!image.ref) return;
+    const entry = this.files.entry(image.ref);
+    if (!entry?.available) return;
+    await this.restore(image);
+    await this.host.removeMany([{ ...entry, generation: image.generation! }]);
+  }
   async restore(image: RegistrationImage) {
     if (!image.intent) return;
     const saved = await this.files.recoverRegistration(image.intent);

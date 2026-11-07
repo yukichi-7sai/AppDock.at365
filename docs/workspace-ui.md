@@ -13,6 +13,8 @@ Viteの本体ビルドで`out/renderer/workspace`を生成し、app.asarへ収�
 
 Appletのnative Viewとの重なり順、フォーカス、ドラッグ領域を保つため、リボンとバーは独立WebContentsViewを使う。デスクトップ通知は本体Windowを隠していても表示できる専用Windowを維持する。rendererへの移動は描画コードの所有・配置の変更であり、全画面を一つのDOMにするものではない。
 
+ステータスバーの左端には共通ジョブ基盤の進行中・終了済み件数と、該当時の要対処件数を表示する。詳細な集計・削除契約は[バックグラウンドジョブ](background-jobs-design.md)を参照する。既存の実行中Applet数・版・更新操作はその右に並べる。
+
 ## 起動と境界
 
 本体の初期本文とリボン・両バーのreadyを確認してウィンドウを表示し、その後に通常Appletを開始する。各Viewはsandbox/contextIsolationを使用し、登録済みWebContents・main frame・URL・session・readyと操作可否をmainで照合する。専用bridgeは本体の画面だけに渡し、Applet向け公開APIにはしない。

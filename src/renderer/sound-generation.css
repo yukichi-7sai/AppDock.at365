@@ -58,10 +58,17 @@
   overflow-wrap: anywhere;
 }
 .sound-generation-item {
+  position: relative;
+  padding-right: 42px;
   margin-top: 12px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
   overflow-wrap: anywhere;
+}
+.generation-job-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 0;
 }
 .sound-generation-conditions {
   white-space: pre-wrap;

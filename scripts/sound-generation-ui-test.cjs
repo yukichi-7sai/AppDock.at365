@@ -202,10 +202,17 @@ function sameLayout(actual, expected) {
       .locator(`[data-generated-sound="${first.id}"]`)
       .getByRole('button', { name: '削除', exact: true })
       .click();
-    const deletion = host.getByRole('dialog', { name: '削除', exact: true });
-    await deletion.getByRole('button', { name: 'ごみ箱へ移動', exact: true }).click();
+    const deletion = host.getByRole('dialog', { name: '生成した音声を削除する', exact: true });
+    await deletion.getByRole('button', { name: '削除', exact: true }).click();
     await deletion.waitFor({ state: 'hidden' });
     await until(() => !fs.existsSync(path.join(directory, first.file)), 'recycled asset');
+    assert.equal((await model()).items.length, 2);
+    assert.equal((await model()).items.find((item) => item.id === first.id).resultDeleted, true);
+    await dialog()
+      .locator(`[data-generated-sound="${first.id}"]`)
+      .getByRole('button', { name: 'ジョブを削除', exact: true })
+      .click();
+    await until(async () => (await model()).items.length === 1, 'only X removes the job');
     assert.equal((await model()).items.length, 1);
     checks.push(
       'shared playback stop, rename preserves WAV, confirmed recycle removes asset and membership',
@@ -360,7 +367,7 @@ function sameLayout(actual, expected) {
     checks.push(
       'stable collapsed height and row positions across queue, generation, completion, cancellation, failure and preview; explicit details show full values',
     );
-    await card(interrupted.id).getByRole('button', { name: '一覧から削除', exact: true }).click();
+    await card(interrupted.id).getByRole('button', { name: 'ジョブを削除', exact: true }).click();
     await until(async () => !(await state(interrupted.id)), 'canceled card removed');
     checks.push(
       'text-derived serial filenames, active cancellation, card-local failure and explicit regeneration as a new job',
@@ -422,6 +429,39 @@ function sameLayout(actual, expected) {
     await closeDialog();
     checks.push('close restores opener and persistent jobs and saved sounds survive restart');
     assert.deepEqual(errors, []);
+    await open();
+    const savedJob = (await model()).items.find((item) => item.id === backgroundOne.id);
+    const savedFile = path.join(directory, savedJob.file);
+    const savedBytes = fs.readFileSync(savedFile);
+    await dialog()
+      .locator(`[data-generated-sound="${savedJob.id}"]`)
+      .getByRole('button', { name: 'ジョブを削除', exact: true })
+      .click();
+    await until(
+      async () => !(await model()).items.some((item) => item.id === savedJob.id),
+      'sound X removes the saved job',
+    );
+    assert.deepEqual(fs.readFileSync(savedFile), savedBytes);
+    const remaining = (await model()).items.length;
+    await closeDialog();
+    const status = await require('./shell-bars-helper.cjs').barPage(host, 'statusbar');
+    await until(async () => {
+      const c = await status.evaluate(
+        async () => (await window.appdockBar.connect()).snapshot.jobs,
+      );
+      return c.active + c.ended + c.attention === remaining;
+    }, 'sound jobs update shared status bar');
+    await status.screenshot({ path: path.join(profile, 'job-statusbar.png') });
+    await app.close();
+    app = null;
+    await start();
+    await open();
+    assert(!(await model()).items.some((item) => item.id === savedJob.id || item.id === first.id));
+    assert.deepEqual(fs.readFileSync(savedFile), savedBytes);
+    await closeDialog();
+    checks.push(
+      'sound X removes only the job, shared counts update, and dismissed jobs do not return after restart',
+    );
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify(

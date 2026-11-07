@@ -16,6 +16,14 @@ export interface WindowBarModel {
   paletteKey: string;
   maximized: boolean;
   runningApplets: number;
+  jobs: {
+    active: number;
+    ended: number;
+    attention: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+  };
   activeNotificationCount: number;
   update: {
     busy: boolean;

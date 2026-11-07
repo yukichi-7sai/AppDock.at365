@@ -2,6 +2,8 @@ import type { ImageAiJob, ImageGenerateInput, ImageGenerationOptions } from './i
 import type { LibraryEntry, LibraryRef } from './library-assets';
 
 export interface ImageGenerationItem {
+  busy?: boolean;
+  resultsDeleted?: boolean;
   job: ImageAiJob;
   input: string;
   referenceImages: LibraryRef[];
@@ -36,7 +38,7 @@ export interface ImageGenerationDraft {
 export type ImageGenerationAction =
   | { kind: 'draft'; draft: ImageGenerationDraft }
   | { kind: 'recoveryFolder' }
-  | { kind: 'export' | 'discard'; jobId: string }
+  | { kind: 'export' | 'deleteResults' | 'dismiss'; jobId: string }
   | { kind: 'generate'; folder: string; name?: string; input: ImageGenerateInput }
   | { kind: 'cancel' | 'retrySave'; jobId: string }
   | { kind: 'rename' | 'delete'; jobId: string; imageId: string; name?: string }

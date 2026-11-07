@@ -81,6 +81,20 @@ export class BackgroundJobs {
     }
     return { revision: this.revision, jobs };
   }
+  summary() {
+    const counts = { active: 0, ended: 0, attention: 0, completed: 0, failed: 0, canceled: 0 };
+    for (const job of this.snapshot().jobs) {
+      if (job.shutdownImpact.active || ['queued', 'running', 'canceling'].includes(job.state))
+        counts.active++;
+      else if (job.state === 'attention') counts.attention++;
+      else {
+        counts.ended++;
+        if (job.state === 'completed' || job.state === 'failed' || job.state === 'canceled')
+          counts[job.state]++;
+      }
+    }
+    return counts;
+  }
   changed() {
     this.snapshot();
     for (const listener of this.listeners) listener();

@@ -87,6 +87,110 @@ function imageFixture(t, change = {}) {
   };
 }
 
+test('unsaved images cannot be dismissed; deleting results retains the job across restart until X removes it', async (t) => {
+  const f = imageFixture(t);
+  f.failSave(true);
+  const job = f.start();
+  await until(() => f.service.hostGet(job.jobId).state === 'unsaved');
+  await assert.rejects(f.service.hostDismiss(job.jobId), /保存|save/);
+  assert.equal(f.background.summary().attention, 1);
+  const resultId = f.service.hostGet(job.jobId).images[0].id;
+  await f.service.hostDeleteResults(job.jobId);
+  assert.equal(fs.existsSync(path.join(f.store.directory, job.jobId, resultId + '.bin')), false);
+  assert.equal(f.service.hostItems()[0].resultsDeleted, true);
+  assert.equal(f.background.summary().ended, 1);
+  await f.service.close();
+  const next = imageFixture(t, { store: new GenerationStore(f.store.directory) });
+  assert.equal(next.service.hostItems()[0].job.jobId, job.jobId);
+  assert.equal(next.service.hostItems()[0].resultsDeleted, true);
+  await next.service.hostDismiss(job.jobId);
+  assert.equal(next.background.snapshot().jobs.length, 0);
+  assert.deepEqual(new GenerationStore(f.store.directory).load('image'), []);
+});
+
+test('dismissal verifies rescue copies again and keeps the exported bytes after removing a job', async (t) => {
+  const f = imageFixture(t);
+  f.failSave(true);
+  const job = f.start();
+  await until(() => f.service.hostGet(job.jobId).state === 'unsaved');
+  const id = f.service.hostGet(job.jobId).images[0].id;
+  const file = path.join(root(), 'rescued.png');
+  fs.writeFileSync(file, png);
+  const hash = require('node:crypto').createHash('sha256').update(png).digest('hex');
+  f.service.hostRescued(job.jobId, [{ id, file, hash }]);
+  await f.service.close();
+  const next = imageFixture(t, { store: new GenerationStore(f.store.directory) });
+  fs.writeFileSync(file, 'replaced');
+  await assert.rejects(next.service.hostDismiss(job.jobId));
+  assert.deepEqual(next.service.hostExport(job.jobId)[0].bytes, png);
+  fs.writeFileSync(file, png);
+  await next.service.hostDismiss(job.jobId);
+  assert.deepEqual(fs.readFileSync(file), png);
+  assert.equal(next.background.summary().ended + next.background.summary().attention, 0);
+});
+
+test('explicit result deletion resumes after a crash without removing the job or reviving bytes', () => {
+  const store = new GenerationStore(root());
+  const record = { version: 1, kind: 'image', id: randomUUID(), data: {}, results: [] };
+  const id = randomUUID();
+  store.preserve(record, id, 'image/png', png);
+  record.deletedResults = [id];
+  store.save(record); // Crash boundary: intent committed, bytes not removed yet.
+  const recovered = new GenerationStore(store.directory).load('image');
+  assert.equal(recovered.length, 1);
+  assert.equal(fs.existsSync(path.join(store.directory, record.id, id + '.bin')), false);
+  assert.throws(() => store.read(recovered[0], id));
+  recovered[0].retired = true;
+  store.save(recovered[0]);
+  assert.deepEqual(new GenerationStore(store.directory).load('image'), []);
+  assert.equal(fs.existsSync(path.join(store.directory, record.id)), false);
+});
+
+test('job summary counts requests once and keeps attention separate from terminal outcomes', () => {
+  const jobs = new BackgroundJobs();
+  const values = [
+    'queued',
+    'running',
+    'canceling',
+    'attention',
+    'completed',
+    'failed',
+    'canceled',
+  ].map((state, i) => ({
+    jobId: String(i),
+    state,
+    shutdownImpact: { active: false },
+    resultSummary: { saved: 5, pending: 0 },
+  }));
+  jobs.register('fixture', { snapshot: () => values });
+  assert.deepEqual(jobs.summary(), {
+    active: 3,
+    ended: 3,
+    attention: 1,
+    completed: 1,
+    failed: 1,
+    canceled: 1,
+  });
+  values.pop();
+  assert.equal(jobs.summary().ended, 2);
+});
+
+test('job removal never sweeps uncommitted recovery files or treats malformed retirement as consent', () => {
+  const store = new GenerationStore(root());
+  const record = { version: 1, kind: 'image', id: randomUUID(), data: {}, results: [] };
+  store.save(record);
+  const partial = path.join(store.directory, record.id, '.preserved.partial');
+  fs.writeFileSync(partial, png);
+  assert.throws(() => store.discard(record), /Uncommitted/);
+  assert.deepEqual(fs.readFileSync(partial), png);
+  record.retired = 'false';
+  store.save(record);
+  const restored = new GenerationStore(store.directory);
+  assert.deepEqual(restored.load('image'), []);
+  assert(restored.issues.length);
+  assert.deepEqual(fs.readFileSync(partial), png);
+});
+
 test('results survive restart and clock changes; corrupt and orphan files are retained for inspection', () => {
   const store = new GenerationStore(path.join(root(), 'recovery'));
   const record = {

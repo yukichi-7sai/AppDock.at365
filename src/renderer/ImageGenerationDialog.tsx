@@ -13,6 +13,7 @@ import { SettingsModal, SettingsDialog } from './settings-ui/SettingsModal';
 import { SettingsField, SettingsActions } from './settings-ui/SettingsSections';
 import { SettingsInput, SettingsTextarea } from './settings-ui/SettingsInput';
 import { SettingsButton } from './settings-ui/SettingsButton';
+import { Icon } from './Icon';
 import { LibraryPreviewDialog } from './settings-ui/LibraryPreviewDialog';
 import {
   RegisteredGalleryPreview,
@@ -287,15 +288,26 @@ export function ImageGenerationDialog({
             {t('soundGeneration.results', { count: model.items.length })}
           </h3>
           {model.items.map((item) => {
-            const busy = ['queued', 'running', 'saving'].includes(item.job.state);
+            const busy = item.busy || ['queued', 'running', 'saving'].includes(item.job.state);
             return (
               <article
                 key={item.job.jobId}
                 className="sound-generation-item"
                 data-job-id={item.job.jobId}
               >
+                <SettingsButton
+                  icon
+                  className="generation-job-dismiss"
+                  aria-label={t('generationJobs.remove')}
+                  title={t('generationJobs.remove')}
+                  disabled={pending || busy}
+                  onClick={() => run({ kind: 'dismiss', jobId: item.job.jobId })}
+                >
+                  <Icon name="close" size={18} />
+                </SettingsButton>
                 <strong>{item.input}</strong>
                 <p role="status">{t(`imageGeneration.state.${item.job.state}`)}</p>
+                {item.resultsDeleted && <p>{t('generationJobs.resultsDeleted')}</p>}
                 {item.job.error && <p role="alert">{item.job.error.message}</p>}
                 {item.job.state === 'unsaved' && item.job.resultExpired && (
                   <p>{t('imageAi.expired')}</p>
@@ -338,9 +350,9 @@ export function ImageGenerationDialog({
                   </div>
                 ))}
                 <SettingsActions>
-                  {!busy && (
+                  {!busy && !!item.job.images?.length && (
                     <SettingsButton disabled={pending} onClick={() => setDiscard(item.job.jobId)}>
-                      {t('generationJobs.discard')}
+                      {t('generationJobs.deleteImages')}
                     </SettingsButton>
                   )}
                   {!busy && !!item.job.images?.length && (
@@ -437,12 +449,12 @@ export function ImageGenerationDialog({
       )}
       {discard && (
         <SettingsDialog
-          title={t('generationJobs.discard')}
-          description={t('generationJobs.discardConfirm')}
+          title={t('generationJobs.deleteImages')}
+          description={t('generationJobs.deleteImagesConfirm')}
           applyLabel={t('common.delete')}
           onClose={() => setDiscard(undefined)}
           onApply={async () => {
-            await act({ kind: 'discard', jobId: discard });
+            await act({ kind: 'deleteResults', jobId: discard });
             setDiscard(undefined);
           }}
         >

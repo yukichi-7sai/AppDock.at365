@@ -5058,6 +5058,7 @@ async function initialize() {
           paletteKey: settings.value.shortcuts['appdock.commands.search']?.[0] ?? '',
           maximized: window?.isMaximized() ?? false,
           activeNotificationCount: notificationService?.activeCount ?? 0,
+          jobs: backgroundJobs.summary(),
           runningApplets: allApplets().filter(
             (e) => e.sourceKind !== 'builtin' && e.state === 'running',
           ).length,
