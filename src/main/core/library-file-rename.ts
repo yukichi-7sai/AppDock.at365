@@ -20,6 +20,8 @@ export async function renameLibraryFiles(
   prepare: (mapping: Map<string, RegisteredImageRef>) => () => void,
   destinationFolder?: string,
 ) {
+  for (const entry of entries) images.assertWritable(entry.ref.file);
+  if (destinationFolder !== undefined) images.assertWritable(destinationFolder);
   const text = (key: string, values?: Record<string, string | number>) =>
     libraryText(images.policy.media, key, values);
   if (

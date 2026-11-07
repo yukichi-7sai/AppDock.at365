@@ -1,4 +1,5 @@
 import { SoundLibraryService } from './core/sound-library-service';
+import { ExternalLibrarySources } from './core/external-library-sources';
 import { setHttpErrorLog } from './core/http-client';
 import { TextLibraryService } from './core/text-library-service';
 import { snippetGroupId } from '../shared/text-library';
@@ -948,6 +949,11 @@ const textLibrary = new TextLibraryService(
   },
   () => changed(),
   fileWatchAssistance,
+);
+const externalLibrarySources = new ExternalLibrarySources(
+  settings,
+  [registeredImages, soundLibrary.files, textLibrary.files],
+  assertSettingsWritable,
 );
 let updater: PortableUpdates;
 let gestureIndicatorHost: GestureIndicatorHost | undefined;
@@ -4769,6 +4775,7 @@ async function initialize() {
     touchpad?.settingsChanged();
     try {
       applyFileWatchAssistanceSettings();
+      externalLibrarySources.configure();
       reconcilePermissionChanges();
       customCommands.reconcile();
       mcpClient.reconcile();
@@ -4815,6 +4822,7 @@ async function initialize() {
   endServices();
   hostStartupTiming.phase('apply', () => applySettings());
   applyFileWatchAssistanceSettings();
+  externalLibrarySources.configure();
   await Promise.all([
     hostStartupTiming.phaseAsync('images', () => registeredImages.watch()),
     soundLibrary.files.watch(),
@@ -5361,6 +5369,13 @@ async function initialize() {
         window.webContents.send('dock:imageLibraryDialog', request);
     },
     edit: (operation, request) => {
+      if (operation.kind === 'source-add')
+        return externalLibrarySources.add(operation.name, operation.path);
+      if (operation.kind === 'source-remove') {
+        if (!request.source) throw Error(hostText('library.sources.invalid'));
+        externalLibrarySources.remove(request.source);
+        return Promise.resolve();
+      }
       const library =
         request.media === 'text'
           ? textLibrary.host

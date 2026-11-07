@@ -57,6 +57,7 @@ export class ImageGeneration {
   ): Promise<void> {
     if (this.session) throw Error(hostText('imageGeneration.busy'));
     if (!libraryFolder(folder)) throw Error(hostText('imageGeneration.invalidFolder'));
+    this.options.library.images.assertWritable(folder);
     this.options.library.assertWritable();
     if (this.draft && this.openingFolder !== folder) {
       this.draft.folder = folder;
@@ -122,7 +123,14 @@ export class ImageGeneration {
       recoveryError: this.options.ai.recoveryError,
       revision: this.revision,
       folder: s.folder,
-      folders: [...new Set(['', ...this.options.library.images.folders])],
+      folders: [
+        ...new Set([
+          '',
+          ...this.options.library.images.folders.filter((folder) =>
+            this.options.library.images.canWrite(folder),
+          ),
+        ]),
+      ],
       initialReferenceImages: s.initialReferenceImages,
       defaultConnectionId: configuration.defaultConnectionId,
       servers: configuration.connections.map(({ id, name, defaults }) => ({

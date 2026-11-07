@@ -63,6 +63,7 @@ export class ImageRegistration implements ImageRegistrar {
       !aiObject(value) ||
       Object.keys(value).some((key) => !['folder', 'name', 'group'].includes(key)) ||
       !libraryFolder(value.folder) ||
+      !this.files.canWrite(value.folder) ||
       (value.folder && !this.files.folders.includes(value.folder)) ||
       (value.name !== undefined &&
         (typeof value.name !== 'string' ||

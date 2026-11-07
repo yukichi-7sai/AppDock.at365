@@ -2,6 +2,7 @@ import { clipboard, ClipboardItem, dialog, shell, type BrowserWindow } from 'ele
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { orderedReads } from './ordered-io';
+import { externalLibraryLocation } from '../../shared/library-sources';
 import { audioExtensions } from '../../shared/audio-formats';
 import { AssignedAssets } from './assigned-assets';
 import { imageBasename, imageFolder, imageParent } from '../../shared/image-paths';
@@ -78,13 +79,21 @@ export class AssetLibraryHost {
         ref,
         saved.hash,
         this.options.writable,
+        externalLibraryLocation(ref.file) ? saved.file : undefined,
       );
       await this.images.refresh(false, [result.file]);
       return result;
     }
     const saved = await this.images.read(ref);
     this.options.writable();
-    const result = new AssignedAssets(this.images.directory, this.media).retain(ref, saved.bytes);
+    const result = externalLibraryLocation(ref.file)
+      ? await new AssignedAssets(this.images.directory, this.media).retainFile(
+          ref,
+          createHash('sha256').update(saved.bytes).digest('hex'),
+          this.options.writable,
+          this.images.file(ref.file),
+        )
+      : new AssignedAssets(this.images.directory, this.media).retain(ref, saved.bytes);
     await this.images.refresh(false, [result.file]);
     return result;
   }
@@ -105,9 +114,12 @@ export class AssetLibraryHost {
     for (const group of next.groups) {
       group.images = group.images
         .map((ref) => {
+          if (externalLibraryLocation(ref.file)) return ref;
           const entry = this.images.entry(ref);
           if (entry && entry.state !== 'missing') return ref;
-          const matches = candidates.get(imageBasename(ref.file).toLowerCase());
+          const matches = candidates
+            .get(imageBasename(ref.file).toLowerCase())
+            ?.filter((candidate) => !externalLibraryLocation(candidate.file));
           return matches?.length === 1 ? matches[0] : ref;
         })
         .filter(
@@ -125,6 +137,9 @@ export class AssetLibraryHost {
     entries?: RegisteredImageEntry[],
   ) {
     this.options.writable();
+    this.images.assertWritable(folder);
+    if (destination !== undefined) this.images.assertWritable(destination);
+    for (const ref of images) this.images.assertWritable(ref.file);
     if (!imageFolder(folder) || (destination !== undefined && !imageFolder(destination)))
       throw Error(this.text('images.folderInvalid'));
     const root = this.images.directory;
@@ -192,6 +207,7 @@ export class AssetLibraryHost {
     return {
       images: this.images.list(),
       folders: this.images.folders,
+      sources: this.images.sources,
       groups: this.configuration.snapshot().groups,
       revision: this.options.settings.revision,
       error: this.images.error,
@@ -279,6 +295,8 @@ export class AssetLibraryHost {
     }
   }
   async rename(entries: RegisteredImageEntry[], names: string[], destinationFolder?: string) {
+    for (const entry of entries) this.images.assertWritable(entry.ref.file);
+    if (destinationFolder !== undefined) this.images.assertWritable(destinationFolder);
     if (this.filesBusy) throw Error(this.text('services.imageLibraryPage.busy'));
     this.filesBusy = true;
     try {
@@ -308,7 +326,7 @@ export class AssetLibraryHost {
   async openFolder(folder: string) {
     let directory: string;
     try {
-      directory = safeDirectory(this.images.directory, folder);
+      directory = await this.images.folderDirectory(folder);
     } catch (e) {
       if (folder || (e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
       this.options.writable();
@@ -396,6 +414,7 @@ export class AssetLibraryHost {
     }
   }
   async registerMany(folder = '') {
+    this.images.assertWritable(folder);
     if (!imageFolder(folder)) throw Error(this.text('images.folderInvalid'));
     this.options.writable();
     const parent = this.options.window();

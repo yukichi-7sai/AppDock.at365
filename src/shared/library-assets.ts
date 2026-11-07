@@ -1,5 +1,6 @@
 import { assetFilename } from './asset-names';
 import { audioExtensionPattern } from './audio-formats';
+import { externalLibraryLocation } from './library-sources';
 
 export type LibraryMedia = 'image' | 'sound' | 'text';
 // The colon keeps this identity outside the namespace of user-created group IDs.
@@ -28,6 +29,11 @@ export const libraryParent = (file: string) =>
   file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : '';
 export const assignedAsset = (file: string) => file.startsWith('@assigned/');
 export function libraryFolder(value: unknown): value is string {
+  const external = externalLibraryLocation(value);
+  if (external) return external.relative === '*' || localLibraryFolder(external.relative);
+  return localLibraryFolder(value);
+}
+export function localLibraryFolder(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     (value === '' ||
@@ -36,6 +42,13 @@ export function libraryFolder(value: unknown): value is string {
 }
 export function libraryPath(value: unknown, media: LibraryMedia): value is string {
   if (typeof value !== 'string') return false;
+  const external = externalLibraryLocation(value);
+  if (external)
+    return (
+      !!external.relative &&
+      localLibraryFolder(external.relative) &&
+      libraryPath(external.relative, media)
+    );
   const extensions =
     media === 'image' ? '(png|jpe?g|webp|svg)' : media === 'sound' ? audioExtensionPattern : 'txt';
   if (media === 'text' && assignedAsset(value)) return false;

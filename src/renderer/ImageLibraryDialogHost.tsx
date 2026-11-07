@@ -99,6 +99,7 @@ function Editor({
   const before = (image: { file: string }) =>
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
   const [name, setName] = useState(current?.name ?? '');
+  const [sourcePath, setSourcePath] = useState('');
   const [ids, setIds] = useState(r.images[0] ? before(r.images[0]) : []);
   const [target, setTarget] = useState(current?.id ?? r.groups[0]?.id ?? '');
   const entries = r.entries ?? (r.entry ? [r.entry] : []);
@@ -126,6 +127,47 @@ function Editor({
     await window.dock.imageLibraryDialog.complete(r.id, operation);
     completed.current = true;
   };
+  if (r.kind === 'source-add' || r.kind === 'source-remove')
+    return (
+      <SettingsDialog
+        title={t(r.kind === 'source-add' ? 'library.sources.add' : 'library.sources.remove')}
+        description={
+          r.kind === 'source-add'
+            ? t('library.sources.hint')
+            : t('library.sources.removeConfirm', { name: r.source?.name ?? '' })
+        }
+        returnFocus={returnFocus}
+        closeAfterApply={false}
+        error={error}
+        onClose={close}
+        onApply={() =>
+          save(
+            r.kind === 'source-add'
+              ? { kind: 'source-add', name, path: sourcePath }
+              : { kind: 'source-remove' },
+          )
+        }
+      >
+        {r.kind === 'source-add' ? (
+          <>
+            <SettingsField title={t('library.sources.path')}>
+              <SettingsInput
+                aria-label={t('library.sources.path')}
+                value={sourcePath}
+                onChange={(e) => setSourcePath(e.target.value)}
+              />
+            </SettingsField>
+            <SettingsField title={t('library.sources.name')}>
+              <SettingsInput
+                aria-label={t('library.sources.name')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </SettingsField>
+          </>
+        ) : null}
+      </SettingsDialog>
+    );
   if (r.kind === 'text-create' || r.kind === 'text-edit' || r.kind === 'text-preview')
     return (
       <TextLibraryEditor

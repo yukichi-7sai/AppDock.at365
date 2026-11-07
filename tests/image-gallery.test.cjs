@@ -259,7 +259,14 @@ function fixture() {
   const host = {
     media: 'image',
     inUse: () => false,
-    images: { list: () => structuredClone(entries), refresh: async () => {} },
+    images: {
+      list: () => structuredClone(entries),
+      refresh: async () => {},
+      folders: [''],
+      sources: [],
+      canWrite: () => true,
+      assertWritable() {},
+    },
     edit: async (operation) => {
       value = editImageLibrary(value, operation);
     },

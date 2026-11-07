@@ -33,6 +33,7 @@ export interface LibraryPlayback {
   error?: string;
 }
 export interface ImageLibrarySnapshot {
+  sources?: import('./library-sources').LibrarySourceSnapshot[];
   playback?: LibraryPlayback;
   folders?: string[];
   images: RegisteredImageEntry[];

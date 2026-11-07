@@ -21,6 +21,7 @@ import { ImageLibraryMenu, type LibraryMenuItem } from './ImageLibraryMenu';
 import '../image-gallery/gallery.css';
 import './image-library.css';
 import { ImageBrowserNavigation } from '../image-browser/ImageBrowserNavigation';
+import { externalLibraryLocation, libraryFolderLabel } from '../../shared/library-sources';
 import {
   ImageBrowserFilters,
   ImageBrowserSplitter,
@@ -368,10 +369,16 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             return {
               element,
               id: 'folder:' + folder,
+              canDrop: latest.current.content.canWrite && !externalLibraryLocation(folder),
               description: (count: number) =>
                 libraryText(media, 'images.dragMoveToFolder', {
                   count,
-                  folder: folder || libraryText(media, 'images.rootFolder'),
+                  folder:
+                    libraryFolderLabel(
+                      folder,
+                      latest.current.content.sources,
+                      libraryText(media, 'library.sources.direct'),
+                    ) || libraryText(media, 'images.rootFolder'),
                 }),
               hover: () => {
                 const current = layoutRef.current;
@@ -531,12 +538,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         ? [
             {
               label: t('texts.edit'),
-              disabled: count !== 1 || unreadable,
+              disabled: !c.canWrite || count !== 1 || unreadable,
               run: () => edit('text-edit'),
             },
             {
               label: t('texts.duplicate'),
-              disabled: count !== 1 || unreadable,
+              disabled: !c.canWrite || count !== 1 || unreadable,
               run: () => edit('text-duplicate'),
             },
             {
@@ -548,7 +555,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         : []),
       {
         label: t('images.renameImages'),
-        disabled: !count || unreadable,
+        disabled: !c.canWrite || !count || unreadable,
         run: () => edit('rename-images'),
       },
       {
@@ -589,14 +596,14 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       },
       {
         label: t('images.moveImages'),
-        disabled: !count || unreadable,
+        disabled: !c.canWrite || !count || unreadable,
         run: () => edit('folder-move'),
       },
       {
         label: t('images.deleteImages'),
         separator: true,
         danger: true,
-        disabled: !count || unreadable,
+        disabled: !c.canWrite || !count || unreadable,
         run: () => edit('delete-image'),
       },
     ];
@@ -622,7 +629,9 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       },
     ];
   } else if (menu) {
-    menuTitle = menu.target || t('images.rootFolder');
+    menuTitle =
+      libraryFolderLabel(menu.target ?? '', c.sources, t('library.sources.direct')) ||
+      t('images.rootFolder');
     menuItems = [
       {
         label: t('images.openFolder'),
@@ -630,19 +639,28 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       },
       {
         label: t('images.createFolder'),
+        disabled: !!externalLibraryLocation(menu.target),
         run: () => dialog('folder-create', undefined, menu.target, undefined, menu.opener),
       },
       {
         label: t('images.renameFolder'),
-        disabled: !menu.target,
+        disabled: !menu.target || !!externalLibraryLocation(menu.target),
         run: () => dialog('folder-rename', undefined, menu.target, undefined, menu.opener),
       },
       {
         label: t('images.deleteFolder'),
-        disabled: !menu.target,
+        disabled: !menu.target || !!externalLibraryLocation(menu.target),
         danger: true,
         run: () => dialog('folder-delete', undefined, menu.target, undefined, menu.opener),
       },
+      ...(externalLibraryLocation(menu.target)
+        ? [
+            {
+              label: t('library.sources.remove'),
+              run: () => dialog('source-remove', undefined, menu.target, undefined, menu.opener),
+            },
+          ]
+        : []),
     ];
   }
   return (
@@ -684,7 +702,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           ['F2', 'Delete'].includes(e.key)
         ) {
           e.preventDefault();
-          dialog(e.key === 'F2' ? 'rename-images' : 'delete-image');
+          if (c.canWrite) dialog(e.key === 'F2' ? 'rename-images' : 'delete-image');
         } else if (e.key === 'Enter' && (e.target as Element).matches('.ad-gallery-image')) {
           e.preventDefault();
           const imageId = (e.target as Element).closest<HTMLElement>('[data-image-id]')?.dataset
@@ -704,7 +722,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
         <div className="library-header-actions">
           {media === 'text' && (
             <SettingsButton
-              disabled={c.busy}
+              disabled={c.busy || !c.canWrite}
               appearance="filled"
               onClick={() => dialog('text-create')}
             >
@@ -713,7 +731,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             </SettingsButton>
           )}
           <SettingsButton
-            disabled={c.busy}
+            disabled={c.busy || !c.canWrite}
             appearance={media === 'text' ? undefined : 'filled'}
             onClick={() => run({ command: 'add' })}
           >
@@ -721,19 +739,25 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
             {t('images.addImages')}
           </SettingsButton>
           {media === 'sound' && (
-            <SettingsButton disabled={c.busy} onClick={() => run({ command: 'sound-generation' })}>
+            <SettingsButton
+              disabled={c.busy || !c.canWrite}
+              onClick={() => run({ command: 'sound-generation' })}
+            >
               <Icon name="volume" size={15} />
               {t('soundGeneration.open')}
             </SettingsButton>
           )}
           {media === 'image' && (
-            <SettingsButton disabled={c.busy} onClick={() => run({ command: 'image-generation' })}>
+            <SettingsButton
+              disabled={c.busy || !c.canWrite}
+              onClick={() => run({ command: 'image-generation' })}
+            >
               <Icon name="image" size={15} />
               {t('imageGeneration.open')}
             </SettingsButton>
           )}
           {media === 'image' && (
-            <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
+            <SettingsButton disabled={c.busy || !c.canWrite} onClick={() => dialog('import-set')}>
               <Icon name="download" size={15} />
               {t('images.importSet')}
             </SettingsButton>
@@ -748,6 +772,16 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           aria-label={t('images.navigation')}
         >
           <ImageBrowserNavigation
+            sources={c.sources}
+            folderFooter={
+              <SettingsButton
+                className="library-add-group"
+                disabled={c.busy}
+                onClick={() => dialog('source-add')}
+              >
+                ＋ {t('library.sources.add')}
+              </SettingsButton>
+            }
             folders={c.folders}
             folder={c.folder}
             groups={c.groups}
@@ -763,7 +797,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                 className="library-icon-button"
                 title={t('images.createFolder')}
                 aria-label={t('images.createFolder')}
-                disabled={c.busy}
+                disabled={c.busy || !c.canWrite}
                 onClick={() => dialog('folder-create')}
               >
                 ＋
@@ -793,7 +827,11 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                 type="button"
                 className="library-icon-button"
                 disabled={c.busy}
-                aria-label={t('images.itemActions', { name: folder || t('images.rootFolder') })}
+                aria-label={t('images.itemActions', {
+                  name:
+                    libraryFolderLabel(folder, c.sources, t('library.sources.direct')) ||
+                    t('images.rootFolder'),
+                })}
                 aria-haspopup="menu"
                 onClick={(e) =>
                   setMenu({ kind: 'folder', target: folder, opener: e.currentTarget })
@@ -847,6 +885,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           <div className="library-scroll" ref={scroll}>
             <div className="library-filter-panel" ref={filters}>
               <ImageBrowserFilters
+                sources={c.sources}
                 folder={c.folder}
                 onFolder={(folder) => navigate({ command: 'folder', folder })}
                 query={query}
@@ -1017,7 +1056,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                           {t('texts.preview')}
                         </SettingsButton>
                         <SettingsButton
-                          disabled={c.selected !== 1 || c.busy}
+                          disabled={c.selected !== 1 || c.busy || !c.canWrite}
                           onClick={() => dialog('text-edit')}
                         >
                           <Icon name="edit" size={15} />
@@ -1071,7 +1110,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                   </div>
                   <div className="library-action-group">
                     <SettingsButton
-                      disabled={!c.selected || c.busy}
+                      disabled={!c.selected || c.busy || !c.canWrite}
                       onClick={() => dialog('folder-move')}
                     >
                       <Icon name="folder-move" size={15} />
@@ -1092,7 +1131,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                     <SettingsButton
                       className="library-selection-delete"
                       title={`${t('images.delete')} (Delete)`}
-                      disabled={!c.selected || c.busy}
+                      disabled={!c.selected || c.busy || !c.canWrite}
                       onClick={() => dialog('delete-image')}
                     >
                       <Icon name="trash" size={15} />
@@ -1112,7 +1151,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                     {t('images.clearSearch')}
                   </button>
                 ) : (
-                  <button disabled={c.busy} onClick={() => run({ command: 'add' })}>
+                  <button disabled={c.busy || !c.canWrite} onClick={() => run({ command: 'add' })}>
                     {t('images.addImages')}
                   </button>
                 )}

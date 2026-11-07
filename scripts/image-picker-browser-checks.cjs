@@ -146,14 +146,14 @@ module.exports = async ({ host, app, picker, profile, until, checks }) => {
   await opener.waitFor();
   await opener.click();
   await navigation.locator(':scope:popover-open').waitFor();
-  await navigation.getByRole('button', { name: 'すべてのフォルダー', exact: true }).press('Escape');
+  await navigation.getByRole('button', { name: 'データフォルダ', exact: true }).press('Escape');
   await until(
     () => opener.evaluate((node) => node === document.activeElement),
     'drawer Escape returns focus',
   );
   assert(await picker.isVisible(), 'drawer Escape does not cancel picker');
   await opener.click();
-  await navigation.getByRole('button', { name: 'すべてのフォルダー', exact: true }).click();
+  await navigation.getByRole('button', { name: 'データフォルダ', exact: true }).click();
   await until(
     () => navigation.evaluate((node) => !node.matches(':popover-open')),
     'folder navigation closes drawer',
@@ -198,7 +198,7 @@ module.exports = async ({ host, app, picker, profile, until, checks }) => {
   assert.equal(await search.inputValue(), '');
   assert.equal(
     await navigation
-      .getByRole('button', { name: 'すべてのフォルダー', exact: true })
+      .getByRole('button', { name: 'データフォルダ', exact: true })
       .getAttribute('aria-current'),
     'page',
   );

@@ -77,12 +77,17 @@ export class AssignedAssets {
     }
     return { file: `@assigned/${name}` };
   }
-  async retainFile(ref: RegisteredImageRef, hash: string, writable: () => void) {
+  async retainFile(
+    ref: RegisteredImageRef,
+    hash: string,
+    writable: () => void,
+    verifiedSource?: string,
+  ) {
     if (!libraryReference(ref, this.media))
       throw Error(libraryText(this.media, 'services.registeredImages.invalidReference'));
     if (assignedImage(ref.file)) return ref;
-    safeDirectory(this.library, imageParent(ref.file));
-    const source = assetFile(this.library, ref.file, this.media);
+    if (!verifiedSource) safeDirectory(this.library, imageParent(ref.file));
+    const source = verifiedSource ?? assetFile(this.library, ref.file, this.media);
     if (!(await sameFileHash(source, hash)))
       throw Error(libraryText(this.media, 'services.registeredImages.changed'));
     safeDirectory(this.directory, '', true);

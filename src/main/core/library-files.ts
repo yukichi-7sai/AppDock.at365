@@ -4,13 +4,14 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import {
   assignedAsset as assignedImage,
-  libraryFolder as imageFolder,
+  localLibraryFolder as imageFolder,
   libraryPath,
   type LibraryMedia,
 } from '../../shared/library-assets';
+import { externalLibraryLocation } from '../../shared/library-sources';
 
 export function assetFile(root: string, name: string, media: LibraryMedia) {
-  if (!libraryPath(name, media)) throw Error('Invalid image path');
+  if (externalLibraryLocation(name) || !libraryPath(name, media)) throw Error('Invalid image path');
   return assignedImage(name)
     ? path.join(
         path.dirname(root),
@@ -50,7 +51,7 @@ export async function scanAssetTree(root: string, media: LibraryMedia) {
   const files: string[] = [],
     folders: string[] = [''];
   async function visit(folder: string) {
-    const directory = safeDirectory(root, folder);
+    const directory = await safeDirectoryAsync(root, folder);
     for (const entry of await fsp.readdir(directory, { withFileTypes: true })) {
       const name = folder ? `${folder}/${entry.name}` : entry.name;
       if (entry.isSymbolicLink()) continue;
@@ -63,4 +64,21 @@ export async function scanAssetTree(root: string, media: LibraryMedia) {
   }
   await visit('');
   return { files, folders: folders.sort((a, b) => a.localeCompare(b, 'ja')) };
+}
+
+/** Network reads must not block the main thread; preserve the same link boundary as writes. */
+export async function safeDirectoryAsync(root: string, relative: string) {
+  if (!imageFolder(relative)) throw Error('Invalid image folder');
+  let current = path.resolve(root);
+  for (const part of ['', ...(relative ? relative.split('/') : [])]) {
+    if (part) current = path.join(current, part);
+    const stat = await fsp.lstat(current);
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      (await fsp.realpath(current)).toLowerCase() !== current.toLowerCase()
+    )
+      throw Error(hostText('services.registeredImages.redirectedDirectory'));
+  }
+  return current;
 }

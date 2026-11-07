@@ -312,7 +312,7 @@ const choose = (page, file, options) =>
       fs.readFileSync(path.join(directory, '移動先/imported.txt'), 'utf8'),
       '取り込み本文',
     );
-    await page.getByRole('button', { name: 'すべてのフォルダー', exact: true }).click();
+    await page.getByRole('button', { name: 'データフォルダ', exact: true }).click();
     checks.push('batch toolbar move, context rename, UTF-8 import into selected folder');
     await page.getByRole('button', { name: 'グループを追加', exact: true }).click();
     dialog = host.getByRole('dialog', { name: 'テキストグループを追加', exact: true });

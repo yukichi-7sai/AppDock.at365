@@ -153,6 +153,9 @@
 .library-nav-row button > svg {
   flex: none;
 }
+.library-source-name small {
+  display: block;
+}
 .library-nav-row small,
 .library-prefix-toggle small {
   color: var(--muted);

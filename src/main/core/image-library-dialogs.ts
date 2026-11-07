@@ -80,6 +80,8 @@ export class ImageLibraryDialogs {
       if ((operation.kind === 'rename-images') !== (pending.request.kind === 'rename-images'))
         throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
       if (
+        (operation.kind === 'source-add') !== (pending.request.kind === 'source-add') ||
+        (operation.kind === 'source-remove') !== (pending.request.kind === 'source-remove') ||
         (operation.kind === 'folder') !== pending.request.kind.startsWith('folder-') ||
         (operation.kind === 'import-set') !== (pending.request.kind === 'import-set')
       )

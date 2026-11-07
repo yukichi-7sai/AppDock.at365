@@ -27,6 +27,7 @@ import {
 import { ImagePickerBrowser } from '../image-browser/ImagePickerBrowser';
 import { Icon } from '../Icon';
 import './registered-images.css';
+import { externalLibraryLocation } from '../../shared/library-sources';
 
 const ImagesContext = createContext<ImageLibraryApi | undefined>(undefined);
 export function RegisteredImagesProvider({
@@ -291,7 +292,7 @@ export function RegisteredImagePicker(props: ImagePickerProps) {
         collapseStatusWhenEmpty
         secondaryAction={{
           label: translate('settings.registeredImagePicker.register'),
-          disabled: !library.api,
+          disabled: !library.api || !!externalLibraryLocation(folder),
           pending: registering,
           onClick: () => void register(),
         }}

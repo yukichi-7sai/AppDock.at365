@@ -1,4 +1,16 @@
 import { imageKey, type ImageGroup, type RegisteredImageRef } from './registered-images';
+import { externalLibraryLocation } from './library-sources';
+
+export function matchesLibraryFolder(file: string, folder: string) {
+  const source = externalLibraryLocation(file),
+    selected = externalLibraryLocation(folder);
+  if (source?.id !== selected?.id) return false;
+  const relative = source?.relative ?? file,
+    target = selected?.relative ?? folder;
+  return (
+    target === '*' || (target === '' ? !relative.includes('/') : relative.startsWith(target + '/'))
+  );
+}
 
 /** Shared browsing order and intersection of folder, group and filename filters. */
 export function filterImageBrowser(
@@ -18,11 +30,11 @@ export function filterImageBrowser(
   const query = filter.query.toLocaleLowerCase();
   return ordered.filter(
     (ref) =>
-      (filter.folder === '*' ||
-        (filter.folder === ''
-          ? !ref.file.includes('/')
-          : ref.file.startsWith(filter.folder + '/'))) &&
+      matchesLibraryFolder(ref.file, filter.folder) &&
       (filter.group !== 'unfiled' || !members.has(imageKey(ref))) &&
-      (ref.file.toLocaleLowerCase().includes(query) || !!matchesBody?.(ref, query)),
+      ((externalLibraryLocation(ref.file)?.relative ?? ref.file)
+        .toLocaleLowerCase()
+        .includes(query) ||
+        !!matchesBody?.(ref, query)),
   );
 }

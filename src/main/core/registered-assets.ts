@@ -13,7 +13,14 @@ import {
   type LibraryRef as RegisteredImageRef,
   type LibraryEntry as RegisteredImageEntry,
 } from '../../shared/library-assets';
-import { assetFile, safeDirectory, scanAssetTree } from './library-files';
+import { assetFile, safeDirectory, safeDirectoryAsync, scanAssetTree } from './library-files';
+import {
+  externalLibraryLocation,
+  externalLibraryPath,
+  type ExternalLibrarySource,
+  type LibrarySourceSnapshot,
+} from '../../shared/library-sources';
+import { hostText } from '../../shared/i18n';
 import { orderedReads } from './ordered-io';
 import { libraryText } from '../../shared/library-text';
 import { atomicWrite, SettingsConflictError } from './settings';
@@ -23,6 +30,8 @@ export interface AssetPolicy {
   assignedDirectory: string;
   maxBytes: number;
   allowEmpty?: boolean;
+  /** External sources have independent readers and never inspect sibling assigned directories. */
+  readOnly?: boolean;
   format(bytes: Buffer): string;
   validate(bytes: Buffer, name: string): Promise<DecodedAsset>;
   validateFile?(file: string, name: string, active?: () => boolean): Promise<DecodedAsset>;
@@ -85,7 +94,81 @@ type ReadAssetFile = Omit<ReadAsset, 'bytes'> & { file: string; bytes?: Buffer }
 export class LibraryReadCancelled extends Error {}
 export class RegisteredAssets {
   private entries = new Map<string, AssetRecord>();
-  folders: string[] = [''];
+  private localFolders: string[] = [''];
+  private external = new Map<string, { source: ExternalLibrarySource; files: RegisteredAssets }>();
+  private loaded = false;
+  private sourceSignature = '';
+  get folders(): string[] {
+    return [
+      ...this.localFolders,
+      ...[...this.external.values()].flatMap(({ source, files }) => [
+        externalLibraryPath(source.id, '*'),
+        ...files.localFolders.map((f) => externalLibraryPath(source.id, f)),
+      ]),
+    ];
+  }
+  get sources(): LibrarySourceSnapshot[] {
+    return [...this.external.values()].map(({ source, files }) => ({
+      ...source,
+      available: files.loaded && !files.error,
+      loading: !files.loaded,
+      canWrite: !files.policy.readOnly,
+    }));
+  }
+  configureSources(sources: ExternalLibrarySource[]) {
+    const signature = JSON.stringify(sources);
+    if (signature === this.sourceSignature || this.stopped) return;
+    this.sourceSignature = signature;
+    const byId = new Map(sources.map((source) => [source.id, source]));
+    for (const [id, item] of this.external) {
+      const next = byId.get(id);
+      if (!next || next.path !== item.source.path || next.access !== item.source.access) {
+        item.files.stop();
+        this.external.delete(id);
+      }
+    }
+    for (const source of sources) {
+      const existing = this.external.get(source.id);
+      if (existing) {
+        existing.source = structuredClone(source);
+        continue;
+      }
+      const files = new RegisteredAssets(
+        source.path,
+        { ...this.policy, readOnly: true },
+        () => this.notify(),
+        this.assistance,
+      );
+      this.external.set(source.id, { source: structuredClone(source), files });
+      void files.watch();
+    }
+    this.notify();
+  }
+  private externalTarget(ref: unknown) {
+    const location = externalLibraryLocation(
+      typeof ref === 'string' ? ref : (ref as RegisteredImageRef)?.file,
+    );
+    if (!location) return undefined;
+    const target = this.external.get(location.id);
+    if (!target || this.stopped) throw Error(hostText('library.sources.unavailable'));
+    return { ...target, ref: { file: location.relative }, id: location.id };
+  }
+  canWrite(name = ''): boolean {
+    const location = externalLibraryLocation(name);
+    return (
+      !this.policy.readOnly &&
+      (!location || this.external.get(location.id)?.files.canWrite() === true)
+    );
+  }
+  assertWritable(name = '') {
+    if (!this.canWrite(name)) throw Error(hostText('library.sources.readOnly'));
+  }
+  async folderDirectory(folder: string) {
+    const target = this.externalTarget(folder);
+    return target
+      ? safeDirectoryAsync(target.files.directory, target.ref.file === '*' ? '' : target.ref.file)
+      : safeDirectoryAsync(this.directory, folder === '*' ? '' : folder);
+  }
   private queue: Promise<unknown> = Promise.resolve();
   private reads: Promise<unknown> = Promise.resolve();
   private stopped = false;
@@ -111,7 +194,9 @@ export class RegisteredAssets {
   validName = (value: unknown): value is string => libraryPath(value, this.policy.media);
   reference = (value: unknown): value is RegisteredImageRef =>
     libraryReference(value, this.policy.media);
-  file(name: string) {
+  file(name: string): string {
+    const target = this.externalTarget(name);
+    if (target) return target.files.file(target.ref.file);
     return assetFile(this.directory, name, this.policy.media);
   }
   private text = (key: string, values?: Record<string, string | number>) =>
@@ -133,6 +218,7 @@ export class RegisteredAssets {
     }
   }
   private async root(create = false) {
+    if (create) this.assertWritable();
     if (create) safeDirectory(this.directory, '', true);
     const real = await fs.realpath(this.directory);
     if (
@@ -190,7 +276,7 @@ export class RegisteredAssets {
     const file = this.file(name);
     const parent = path.dirname(file);
     if (!checkedParents?.has(parent)) {
-      safeDirectory(
+      await safeDirectoryAsync(
         assignedImage(name) ? parent : this.directory,
         assignedImage(name) ? '' : imageParent(name),
       );
@@ -217,6 +303,8 @@ export class RegisteredAssets {
     options: { active?(): boolean; cachePreview?: boolean } = {},
   ): Promise<ReadAsset> {
     if (!this.reference(ref)) throw Error(this.text('services.registeredImages.invalidReference'));
+    const target = this.externalTarget(ref);
+    if (target) return { ...(await target.files.read(target.ref, generation, options)), ref };
     const interest = {
       active: options.active ?? (() => true),
       cachePreview: options.cachePreview !== false,
@@ -355,6 +443,9 @@ export class RegisteredAssets {
     generation?: string,
     options: { active?(): boolean; cachePreview?: boolean } = {},
   ): Promise<ReadAssetFile> {
+    if (!this.reference(ref)) throw Error(this.text('services.registeredImages.invalidReference'));
+    const target = this.externalTarget(ref);
+    if (target) return { ...(await target.files.readFile(target.ref, generation, options)), ref };
     if (!this.policy.validateFile) {
       const saved = await this.read(ref, generation, options);
       return { ...saved, file: this.file(saved.ref.file) };
@@ -462,6 +553,7 @@ export class RegisteredAssets {
   /** Copy to a private stage, validate it, then publish exclusively in the destination. */
   addFile(source: string, filename: string, writable: () => void = () => {}) {
     const run = async () => {
+      this.assertWritable(filename);
       writable();
       if (!this.validName(filename) || assignedImage(filename) || !this.policy.validateFile)
         throw Error(this.text('services.registeredImages.invalidFilename'));
@@ -521,6 +613,7 @@ export class RegisteredAssets {
   }
   /** Replace the confirmed generation only; external edits are rechecked at atomic commit. */
   updateContent(ref: RegisteredImageRef, generation: string, bytes: Buffer, writable: () => void) {
+    this.assertWritable(ref.file);
     const run = async () => {
       if (this.policy.media !== 'text' || !this.reference(ref) || !generation)
         throw Error(this.text('services.registeredImages.invalidReference'));
@@ -553,6 +646,7 @@ export class RegisteredAssets {
     options: { trash(file: string): Promise<void>; prepare(): () => void },
   ): Promise<void> {
     const run = async () => {
+      this.assertWritable(ref.file);
       if (!this.reference(ref))
         throw Error(this.text('services.registeredImages.invalidReference'));
       const expectedHash = this.entries.get(imageKey(ref))?.hash;
@@ -629,6 +723,7 @@ export class RegisteredAssets {
     options: { unique?: boolean; writable?(): void; journal?: AssetRegistrationJournal } = {},
   ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
     const run = async () => {
+      this.assertWritable(filename);
       options.writable?.();
       if (assignedImage(filename))
         throw Error(this.text('services.registeredImages.invalidFilename'));
@@ -716,6 +811,7 @@ export class RegisteredAssets {
     return task;
   }
   async recoverRegistration(intent: AssetRegistrationIntent) {
+    this.assertWritable(intent.file);
     const saved = await this.read({ file: intent.file });
     const stat = await fs.stat(this.file(intent.file), { bigint: true });
     if (`${stat.dev}:${stat.ino}` !== intent.identity || saved.hash !== intent.hash)
@@ -733,38 +829,70 @@ export class RegisteredAssets {
         `web-${createHash('sha256').update(bytes).digest('hex')}.${format === 'jpeg' ? 'jpg' : format}`,
     );
   }
-  list() {
-    return [...this.entries.values()]
+  list(): RegisteredImageEntry[] {
+    const own = [...this.entries.values()]
       .filter((v) => !assignedImage(v.entry.ref.file) && v.entry.state !== 'missing')
       .map((v) => structuredClone(v.entry))
       .sort((a, b) => a.ref.file.localeCompare(b.ref.file, 'ja'));
+    return [
+      ...own,
+      ...[...this.external.values()].flatMap(({ source, files }) =>
+        files
+          .list()
+          .map((e) => ({ ...e, ref: { file: externalLibraryPath(source.id, e.ref.file) } })),
+      ),
+    ];
   }
   /** Host-only metadata; never reads bytes or changes the public library entry model. */
-  modified(ref: RegisteredImageRef) {
+  modified(ref: RegisteredImageRef): number | undefined {
+    const target = this.externalTarget(ref);
+    if (target) return target.files.modified(target.ref);
     const record = this.entries.get(imageKey(ref));
     return record?.entry.available ? record.modifiedAt : undefined;
   }
   /** Cached selection candidates only; never reads, decodes or returns image content. */
   availableReferences(): RegisteredImageRef[] {
     if (this.error) return [];
-    return [...this.entries.values()]
-      .filter(({ entry }) => entry.available && !assignedImage(entry.ref.file))
-      .map(({ entry }) => ({ file: entry.ref.file }))
+    return this.list()
+      .filter((entry) => entry.available)
+      .map((entry) => ({ file: entry.ref.file }))
       .sort((a, b) => a.file.localeCompare(b.file, 'ja'));
   }
-  entry(ref: unknown) {
+  entry(ref: unknown): RegisteredImageEntry | undefined {
     if (!this.reference(ref)) return undefined;
+    if (externalLibraryLocation(ref.file)) {
+      try {
+        const target = this.externalTarget(ref)!;
+        const entry = target.files.entry(target.ref);
+        return entry ? { ...entry, ref } : undefined;
+      } catch {
+        return undefined;
+      }
+    }
     const value = this.entries.get(imageKey(ref));
     return value ? structuredClone(value.entry) : undefined;
   }
-  icon(ref: unknown, shape = 'square') {
+  icon(ref: unknown, shape = 'square'): string | undefined {
     if (!this.reference(ref)) return undefined;
+    const target = this.externalTarget(ref);
+    if (target) return target.files.icon(target.ref, shape);
     const entry = this.entries.get(imageKey(ref));
     return shape === 'circle' ? entry?.circle : entry?.entry.thumbnail;
   }
   /** Only the consumer of this opaque asset starts a read, not model construction. */
-  asset(ref: unknown, shape = 'square') {
+  asset(
+    ref: unknown,
+    shape = 'square',
+  ):
+    string | { key: string; monochrome: boolean; load(): Promise<string | undefined> } | undefined {
     if (!this.reference(ref)) return undefined;
+    const target = this.externalTarget(ref);
+    if (target) {
+      const asset = target.files.asset(target.ref, shape);
+      return asset && typeof asset !== 'string'
+        ? { ...asset, key: `${target.id}:${asset.key}` }
+        : asset;
+    }
     const record = this.entries.get(imageKey(ref));
     if (!record) return undefined;
     if (!record.entry.available) return this.icon(ref, shape) || undefined;
@@ -785,7 +913,9 @@ export class RegisteredAssets {
     const asset = this.asset(ref);
     return typeof asset === 'string' ? asset : asset ? asset.load() : undefined;
   }
-  contentHash(ref: RegisteredImageRef, generation: string) {
+  contentHash(ref: RegisteredImageRef, generation: string): string | undefined {
+    const target = this.externalTarget(ref);
+    if (target) return target.files.contentHash(target.ref, generation);
     const record = this.entries.get(imageKey(ref));
     return record && this.current(record) && record.entry.generation === generation && record.hash
       ? record.hash
@@ -820,6 +950,27 @@ export class RegisteredAssets {
   }
   refresh(retry = false, files?: string[]): Promise<void> {
     if (this.stopped) return Promise.resolve();
+    if (files) {
+      const external = files.filter((file) => !!externalLibraryLocation(file));
+      if (external.length)
+        return Promise.all(
+          external
+            .map((file) => {
+              const target = this.externalTarget(file)!;
+              return target.files.refresh(retry, [target.ref.file]);
+            })
+            .concat(
+              files.length > external.length
+                ? [
+                    this.refresh(
+                      retry,
+                      files.filter((file) => !externalLibraryLocation(file)),
+                    ),
+                  ]
+                : [],
+            ),
+        ).then(() => {});
+    } else for (const target of this.external.values()) void target.files.refresh(retry);
     if (retry && this.refreshing) return this.refreshing.then(() => this.refresh(true));
     if (retry)
       for (const record of this.entries.values())
@@ -837,6 +988,8 @@ export class RegisteredAssets {
   }
   private beginRefresh(files?: string[]): Promise<void> {
     this.refreshing = this.scan(files).finally(() => {
+      const initial = !this.loaded;
+      this.loaded = true;
       this.refreshing = undefined;
       const full = this.pendingFull,
         pending = [...this.pendingFiles];
@@ -844,11 +997,12 @@ export class RegisteredAssets {
       this.pendingFiles.clear();
       if (!this.stopped && (full || pending.length))
         void this.beginRefresh(full ? undefined : pending);
+      if (initial && this.policy.readOnly) this.notify();
     });
     return this.refreshing;
   }
   private async connectWatch(
-    directory = path.dirname(this.directory),
+    directory = this.policy.readOnly ? this.directory : path.dirname(this.directory),
     recover = true,
   ): Promise<void> {
     const connectionGeneration = ++this.connectionGeneration;
@@ -925,14 +1079,19 @@ export class RegisteredAssets {
           this.error = this.watchError = this.text('services.registeredImages.readFailed');
           this.notify();
           const parent = path.dirname(directory);
-          if (recover && parent !== directory) void this.connectWatch(parent, false);
+          if (!this.policy.readOnly && recover && parent !== directory)
+            void this.connectWatch(parent, false);
         });
         return;
       } catch (error) {
         if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
           return;
         const parent = path.dirname(directory);
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT' && parent !== directory) {
+        if (
+          !this.policy.readOnly &&
+          (error as NodeJS.ErrnoException).code === 'ENOENT' &&
+          parent !== directory
+        ) {
           directory = parent;
           continue;
         }
@@ -948,7 +1107,7 @@ export class RegisteredAssets {
       try {
         await this.root();
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();
@@ -956,29 +1115,31 @@ export class RegisteredAssets {
       if (files) names = files.map((name) => ({ name }));
       else {
         const tree = await scanAssetTree(this.directory, this.policy.media).catch((error) => {
-          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT')
+            throw error;
           return { folders: [''], files: [] as string[] };
         });
         if (
-          this.folders.length !== tree.folders.length ||
-          this.folders.some((folder, i) => folder !== tree.folders[i])
+          this.localFolders.length !== tree.folders.length ||
+          this.localFolders.some((folder, i) => folder !== tree.folders[i])
         ) {
-          this.folders = tree.folders;
+          this.localFolders = tree.folders;
           changed = true;
         }
         names = tree.files.map((name) => ({ name }));
         const assignedRoot = path.join(path.dirname(this.directory), this.policy.assignedDirectory);
-        try {
-          safeDirectory(assignedRoot, '');
-          names.push(
-            ...(await fs.readdir(assignedRoot))
-              .map((n) => '@assigned/' + n)
-              .filter((name) => this.validName(name))
-              .map((name) => ({ name })),
-          );
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        }
+        if (!this.policy.readOnly)
+          try {
+            safeDirectory(assignedRoot, '');
+            names.push(
+              ...(await fs.readdir(assignedRoot))
+                .map((n) => '@assigned/' + n)
+                .filter((name) => this.validName(name))
+                .map((name) => ({ name })),
+            );
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
       }
       if (this.stopped) return;
       const seen = new Set<string>();
@@ -1048,7 +1209,7 @@ export class RegisteredAssets {
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();
       if (this.stopped) return;
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+      if (this.policy.readOnly || (error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = this.text('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
         const state = (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';
@@ -1074,6 +1235,7 @@ export class RegisteredAssets {
     return this.refresh();
   }
   stop() {
+    for (const target of this.external.values()) target.files.stop();
     this.stopped = true;
     this.watching = false;
     this.unregister?.();

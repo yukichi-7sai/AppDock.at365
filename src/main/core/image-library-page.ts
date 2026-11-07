@@ -1,9 +1,10 @@
 import type { LibraryEntry, LibraryRef } from '../../shared/library-assets';
+import { externalLibraryLocation, libraryRootFolder } from '../../shared/library-sources';
 import { libraryText } from '../../shared/library-text';
 import type { LibrarySoundPreview } from './library-sound-preview';
 import type { TextLibraryService } from './text-library-service';
 import { snippetGroupId } from '../../shared/text-library';
-import { filterImageBrowser } from '../../shared/image-browser';
+import { filterImageBrowser, matchesLibraryFolder } from '../../shared/image-browser';
 import {
   compareLibraryEntries,
   validLibraryView,
@@ -235,6 +236,7 @@ export class ImageLibraryPageSession implements HostPageController {
     const matched = this.catalogue(),
       s = this.options.state,
       groups = this.options.groups();
+    const sourceFolder = libraryRootFolder(s.folder);
     const membership = new Map<string, string[]>();
     for (const g of groups)
       for (const ref of g.images) {
@@ -242,6 +244,8 @@ export class ImageLibraryPageSession implements HostPageController {
         membership.set(key, [...(membership.get(key) ?? []), g.name]);
       }
     const content: ImageLibraryPageModel['content'] = {
+      sources: this.options.host.images.sources,
+      canWrite: this.options.host.images.canWrite(s.folder),
       playback: this.options.preview?.snapshot(),
       indexing: this.options.texts?.indexing,
       iconSets:
@@ -250,17 +254,26 @@ export class ImageLibraryPageSession implements HostPageController {
       folders: this.options.host.images.folders,
       folder: s.folder,
       groups: [
-        { id: 'all', title: this.text('services.imageLibraryPage.all'), count: this.items.size },
+        {
+          id: 'all',
+          title: this.text('services.imageLibraryPage.all'),
+          count: [...this.items.values()].filter((item) =>
+            matchesLibraryFolder(item.entry.ref.file, sourceFolder),
+          ).length,
+        },
         {
           id: 'unfiled',
           title: this.text('services.imageLibraryPage.ungrouped'),
-          count: [...this.items.keys()].filter((k) => !membership.has(k)).length,
+          count: [...this.items].filter(
+            ([k, item]) =>
+              !membership.has(k) && matchesLibraryFolder(item.entry.ref.file, sourceFolder),
+          ).length,
         },
         ...groups.map((g) => ({
           id: this.groups.get(g.id)!,
           ...(this.options.texts && g.id === snippetGroupId ? { fixed: true } : {}),
           title: g.name,
-          count: g.images.length,
+          count: g.images.filter((ref) => matchesLibraryFolder(ref.file, sourceFolder)).length,
         })),
       ],
       group: this.groups.get(s.group.slice(6)) ?? s.group,
@@ -269,7 +282,7 @@ export class ImageLibraryPageSession implements HostPageController {
         id,
         assetId: this.options.texts ? '' : assetId,
         textPreview: this.options.texts ? e.textPreview || hostText('texts.emptyBody') : undefined,
-        title: e.ref.file,
+        title: externalLibraryLocation(e.ref.file)?.relative ?? e.ref.file,
         metadata: {
           format: e.ref.file.split('.').at(-1)!.toUpperCase(),
           measurement: this.options.texts
@@ -352,6 +365,7 @@ export class ImageLibraryPageSession implements HostPageController {
       throw Error('Stale gallery action');
     const s = this.options.state;
     if (action.command === 'sound-generation' || action.command === 'image-generation') {
+      this.options.host.images.assertWritable(s.folder);
       const generate =
         action.command === 'sound-generation' && this.options.host.media === 'sound'
           ? this.options.generateSounds
@@ -515,6 +529,7 @@ export class ImageLibraryPageSession implements HostPageController {
     } else if (action.command === 'cancel-import') {
       s.importAbort?.abort();
     } else if (action.command === 'retry-import' || action.command === 'import-set') {
+      this.options.host.images.assertWritable(s.folder);
       if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       const setId = action.command === 'import-set' ? action.setId : s.retryIconSet;
       const retry = action.command === 'retry-import' ? s.retryIcons : undefined;
@@ -863,6 +878,8 @@ export class ImageLibraryPageSession implements HostPageController {
       } else if (action.command === 'dialog') {
         if (
           ![
+            'source-add',
+            'source-remove',
             'add',
             'rename',
             'delete',
@@ -918,6 +935,23 @@ export class ImageLibraryPageSession implements HostPageController {
         if (action.kind === 'folder-move' && !images.length)
           throw Error(this.text('services.imageLibraryPage.selectImage'));
         const folder = action.folder ?? (s.folder === '*' ? '' : s.folder);
+        if (
+          [
+            'text-create',
+            'text-duplicate',
+            'text-edit',
+            'rename-images',
+            'delete-image',
+            'folder-create',
+            'folder-rename',
+            'folder-delete',
+            'folder-move',
+            'import-set',
+          ].includes(action.kind)
+        ) {
+          this.options.host.images.assertWritable(folder);
+          for (const entry of entries) this.options.host.images.assertWritable(entry.ref.file);
+        }
         if (!imageFolder(folder) || !(this.options.host.images.folders ?? ['']).includes(folder))
           throw Error(this.text('images.folderInvalid'));
         if (['folder-rename', 'folder-delete'].includes(action.kind) && !folder)
@@ -950,10 +984,15 @@ export class ImageLibraryPageSession implements HostPageController {
           media: this.options.host.media,
           kind: kind === 'membership' && images.length > 1 ? 'batch-add' : kind,
           document,
+          source: this.options.host.images.sources.find(
+            (source) => source.id === externalLibraryLocation(folder)?.id,
+          ),
           groups: this.options.groups(),
           images,
           folder,
-          folders: this.options.host.images.folders,
+          folders: this.options.host.images.folders.filter((folder) =>
+            this.options.host.images.canWrite(folder),
+          ),
           iconSets:
             this.options.host.media === 'image'
               ? iconSets.map(({ id, name }) => ({ id, name }))

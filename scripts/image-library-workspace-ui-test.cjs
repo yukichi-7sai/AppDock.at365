@@ -431,7 +431,7 @@ const resize = (width, height) =>
     await until(async () => (await page.getAttribute('inert')) === null, 'folder create released');
     await page
       .getByRole('complementary')
-      .getByRole('button', { name: 'すべてのフォルダー', exact: true })
+      .getByRole('button', { name: 'データフォルダ', exact: true })
       .click();
     const batchCards = page.locator('.ad-gallery-card').filter({ hasText: 'aa-batch-' });
     await batchCards.nth(0).locator('.ad-gallery-image').click();
@@ -491,7 +491,7 @@ const resize = (width, height) =>
     assert.equal(fs.readdirSync(path.join(directory, '変更テスト')).length, 0);
     await page
       .getByRole('complementary')
-      .getByRole('button', { name: 'すべてのフォルダー', exact: true })
+      .getByRole('button', { name: 'データフォルダ', exact: true })
       .click();
     await until(async () => (await model()).content.total === 199, 'remaining images');
     checks.push(

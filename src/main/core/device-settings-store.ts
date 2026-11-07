@@ -1,4 +1,8 @@
 import { hostText } from '../../shared/i18n';
+import {
+  parseExternalLibrarySources,
+  type ExternalLibrarySources,
+} from '../../shared/library-sources';
 import { withoutDeviceMcp } from '../../shared/mcp-device-settings';
 import type { McpServerSettings } from '../../shared/automation';
 import { hostStartupTiming } from './host-startup-timing';
@@ -91,6 +95,20 @@ export class DeviceSettingsStore extends SettingsStore {
     if (this.device.recovered || this.writesBlocked)
       throw Error(hostText('services.deviceSettingsStore.recoveryRequired'));
     return this.device.value.mcpServer;
+  }
+  readLibrarySources(): ExternalLibrarySources {
+    return structuredClone(this.device.value.librarySources ?? []);
+  }
+  saveLibrarySources(next: ExternalLibrarySources, previous: ExternalLibrarySources) {
+    if (this.writesBlocked || this.mutating || fs.existsSync(this.journal))
+      throw Error(hostText('services.deviceSettingsStore.busy'));
+    this.device.reload();
+    if (this.device.recovered || !same(previous, this.readLibrarySources()))
+      throw new SettingsConflictError(hostText('services.settings.changedBeforeSave'));
+    this.device.save(
+      { ...this.device.value, librarySources: parseExternalLibrarySources(next) },
+      this.device.revision,
+    );
   }
   saveMcpServer(next: McpServerSettings, previous: McpServerSettings | undefined) {
     if (this.mutating || fs.existsSync(this.journal))

@@ -1,4 +1,8 @@
 import { hostText } from '../../shared/i18n';
+import {
+  parseExternalLibrarySources,
+  type ExternalLibrarySources,
+} from '../../shared/library-sources';
 import { appletApiPermissionLabels, type AppletApiPermissions } from '../../shared/appdock-api';
 import { mcpPermissionKeys, type McpPermissions } from '../../shared/automation';
 import { parseMcpDeviceSettings, type McpDeviceSettings } from '../../shared/mcp-device-settings';
@@ -68,6 +72,7 @@ export interface DeviceSettings {
   mcpClient?: McpDeviceSettings;
   mcpServer?: McpServerSettings;
   generationAi?: GenerationSettings;
+  librarySources?: ExternalLibrarySources;
   operationPermissions?: OperationPermissions;
   uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
@@ -200,12 +205,14 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'mcpServer',
           'mcpServers',
           'generationAi',
+          'librarySources',
           'operationPermissions',
         ].includes(key),
     )
   )
     throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
+  if (raw.librarySources !== undefined) parseExternalLibrarySources(raw.librarySources);
   if (raw.operationPermissions !== undefined)
     validateOperationPermissions(raw.operationPermissions);
   if (raw.mcpServers !== undefined) parseMcpRoster(raw.mcpServers);

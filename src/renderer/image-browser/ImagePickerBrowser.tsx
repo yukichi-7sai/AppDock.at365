@@ -19,6 +19,7 @@ import {
 import { useLibraryTranslation } from './LibraryMedia';
 import { Icon } from '../../shared/ui-icons';
 import { ImageBrowserNavigation } from './ImageBrowserNavigation';
+import { externalLibraryLocation, libraryRootFolder } from '../../shared/library-sources';
 import {
   ImageBrowserFilters,
   ImageBrowserSplitter,
@@ -125,14 +126,24 @@ export function ImagePickerBrowser({
       }
     return names;
   }, [snapshot.groups]);
+  const sourceRefs = filterImageBrowser(refs, [], {
+    folder: libraryRootFolder(folder),
+    group: 'all',
+    query: '',
+  });
+  const sourceKeys = new Set(sourceRefs.map(imageKey));
   const groups = [
-    { id: 'all', title: t('settings.registeredImagePicker.all'), count: entries.size },
+    { id: 'all', title: t('settings.registeredImagePicker.all'), count: sourceRefs.length },
     {
       id: 'unfiled',
       title: t('settings.registeredImagePicker.ungrouped'),
-      count: refs.filter((ref) => !memberships.has(imageKey(ref))).length,
+      count: sourceRefs.filter((ref) => !memberships.has(imageKey(ref))).length,
     },
-    ...snapshot.groups.map((g) => ({ id: `group:${g.id}`, title: g.name, count: g.images.length })),
+    ...snapshot.groups.map((g) => ({
+      id: `group:${g.id}`,
+      title: g.name,
+      count: g.images.filter((ref) => sourceKeys.has(imageKey(ref))).length,
+    })),
   ];
   const model: GalleryModel = {
     cardWidth,
@@ -144,7 +155,7 @@ export function ImagePickerBrowser({
       return {
         id: imageKey(ref),
         assetId: `${imageKey(ref)}:${entry.generation ?? ''}`,
-        title: ref.file,
+        title: externalLibraryLocation(ref.file)?.relative ?? ref.file,
         detail:
           media === 'sound'
             ? soundDuration(entry.durationMs, entry.ref.file)
@@ -307,6 +318,7 @@ export function ImagePickerBrowser({
           aria-label={t('images.navigation')}
         >
           <ImageBrowserNavigation
+            sources={snapshot.sources}
             folders={snapshot.folders ?? ['']}
             folder={folder}
             groups={groups}
@@ -339,6 +351,7 @@ export function ImagePickerBrowser({
           <div className="library-scroll image-picker-scroll" ref={scroll} onScroll={maybeMore}>
             <div className="library-filter-panel" ref={filters}>
               <ImageBrowserFilters
+                sources={snapshot.sources}
                 folder={folder}
                 onFolder={onFolder}
                 query={queryInput}

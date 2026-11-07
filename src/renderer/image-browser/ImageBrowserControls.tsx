@@ -1,3 +1,4 @@
+import { externalLibraryLocation, externalLibraryPath } from '../../shared/library-sources';
 import {
   useLayoutEffect,
   useRef,
@@ -163,6 +164,7 @@ export function ImageBrowserSplitter({
 }
 
 export function ImageBrowserFilters({
+  sources = [],
   folder,
   onFolder,
   query,
@@ -176,6 +178,7 @@ export function ImageBrowserFilters({
   children,
 }: {
   folder: string;
+  sources?: import('../../shared/library-sources').LibrarySourceSnapshot[];
   onFolder(value: string): void;
   query: string;
   onQuery(value: string): void;
@@ -188,6 +191,10 @@ export function ImageBrowserFilters({
   children?: ReactNode;
 }) {
   const { t } = useLibraryTranslation();
+  const location = externalLibraryLocation(folder);
+  const source = sources.find((source) => source.id === location?.id);
+  const relative = location?.relative ?? folder;
+  const prefix = location ? externalLibraryPath(location.id) : '';
   return (
     <>
       <div className="library-location">
@@ -207,12 +214,12 @@ export function ImageBrowserFilters({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onFolder(folder === '*' ? '*' : '')}
+            onClick={() => onFolder(location ? prefix + '/*' : folder === '*' ? '*' : '')}
           >
-            {t(folder === '*' ? 'images.allFolders' : 'images.rootFolder')}
+            {source?.name ?? t(folder === '*' ? 'images.allFolders' : 'images.rootFolder')}
           </button>
-          {folder !== '*' &&
-            folder
+          {relative !== '*' &&
+            relative
               .split('/')
               .filter(Boolean)
               .map((part, i, parts) => (
@@ -222,7 +229,9 @@ export function ImageBrowserFilters({
                     type="button"
                     disabled={disabled}
                     title={parts.slice(0, i + 1).join('/')}
-                    onClick={() => onFolder(parts.slice(0, i + 1).join('/'))}
+                    onClick={() =>
+                      onFolder((prefix ? prefix + '/' : '') + parts.slice(0, i + 1).join('/'))
+                    }
                   >
                     {part}
                   </button>

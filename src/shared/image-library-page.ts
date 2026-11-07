@@ -21,6 +21,8 @@ export type ImageLibraryPageRequest = { id: string } & (
   | { kind: 'text-library'; route: 'text-library' }
 );
 export type ImageLibraryDialogKind =
+  | 'source-add'
+  | 'source-remove'
   | 'text-create'
   | 'text-duplicate'
   | 'text-edit'
@@ -43,6 +45,8 @@ export type ImageLibraryDialogKind =
   | 'import-progress'
   | 'delete-image';
 export type ImageLibraryDialogOperation =
+  | { kind: 'source-add'; name: string; path: string }
+  | { kind: 'source-remove' }
   | { kind: 'text-save'; name: string; body: string }
   | ImageLibraryEdit
   | { kind: 'delete-image' }
@@ -65,6 +69,7 @@ export interface ImageLibraryDialogRequest {
   importing?: IconImportProgress;
   cancelling?: boolean;
   document?: import('./text-library').LibraryTextDocument;
+  source?: import('./library-sources').ExternalLibrarySource;
 }
 export interface ImageLibraryLayout {
   sidebarWidth: number;
@@ -135,6 +140,8 @@ export interface ImageLibraryPageModel {
   revision: number;
   dark: boolean;
   content: {
+    sources: import('./library-sources').LibrarySourceSnapshot[];
+    canWrite: boolean;
     playback?: import('./registered-images').LibraryPlayback;
     indexing?: boolean;
     iconSets: { id: string; name: string }[];

@@ -269,6 +269,7 @@ export class SoundGeneration {
     });
   }
   private checkFolder(folder: unknown): asserts folder is string {
+    if (typeof folder === 'string') this.options.library.files.assertWritable(folder);
     if (!libraryFolder(folder) || (folder && !this.options.library.files.folders.includes(folder)))
       throw Error(hostText('soundGeneration.invalidFolder'));
   }
@@ -281,7 +282,14 @@ export class SoundGeneration {
       draft: this.draft,
       revision: this.revision,
       folder: s.folder,
-      folders: [...new Set(['', ...this.options.library.files.folders])],
+      folders: [
+        ...new Set([
+          '',
+          ...this.options.library.files.folders.filter((folder) =>
+            this.options.library.files.canWrite(folder),
+          ),
+        ]),
+      ],
       servers: config.connections.map((server) => ({
         id: server.id,
         name: server.name,

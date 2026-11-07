@@ -193,7 +193,7 @@ async function choose(cancel) {
     let d = await folderDialog('フォルダーを作成', '移動先');
     await d.getByRole('button', { name: '適用', exact: true }).click();
     await d.waitFor({ state: 'hidden' });
-    await host.getByRole('button', { name: 'すべてのフォルダー', exact: true }).click();
+    await host.getByRole('button', { name: 'データフォルダ', exact: true }).click();
     await card(host, 'heart.svg').getByRole('checkbox').check();
     d = await folderDialog('選択画像を移動');
     await d.getByLabel('保存先').selectOption('移動先');
