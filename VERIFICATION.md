@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-11-07 読み取り専用の外部フォルダ（0.181.0）
+
+- 画像・音・テキスト共用の外部フォルダ登録をPC専用設定へ追加。データフォルダと独立したルート、単一フォルダ選択、検索・グループ編集、切断時の登録保持、元ファイルを削除しない登録解除を実装した。将来の編集可能モードに備えてsource ID・access・共通書込み判定を分離し、現在はread-onlyのみを受け付ける。
+- 型検査・build・関連単体178件が成功。書込みの入口、生成保存先の事前拒否、原本保持、内部assigned-images/soundsへのコピー、切断・再接続、junction走査拒否、PC設定保存・競合、既存フォルダ移動・削除・画像/音API・翻訳を確認。最終ログは`.artifacts/external-library-verification-20261107/unit-final.log`。通常画像/音/テキストと共通保存処理の既存検査を維持した。
+- 新規`external-library-ui-test.cjs`を開発実行と発行EXEで実施。登録ダイアログ、ルート分離、読み取り専用表示・操作拒否、画像ピッカーから内部保管コピーへの確定、3種類の閲覧、本文検索、グループ所属、再起動後の保持、登録解除と元ファイルhash不変を確認した。固定EXE結果・画像は`.artifacts/external-library-ui-Btfxbw/`、開発実行は`external-library-ui-FKi9Mx/`。既存`image-library-workspace-ui-test.cjs`と`text-library-ui-test.cjs`も成功し、後続の製品変更がないため成功を再利用した。
+- 初回のUI検査は追加ボタンの複数一致と描画待ち不足を修正。登録解除では実装の照合に表示状態が混入していたため登録フィールドに限定して修正した。単体の22件失敗は旧gallery fixtureにsource/capability契約を補い、junction拒否の文言期待は既存翻訳キーに合わせて修正し、すべて再実行成功。元の失敗ログ・画像を保持する。版更新直後のPrettierはpnpm依存整合性検査で停止したが、標準publishの`install --frozen-lockfile`後に成功し、依存版や検査は変更していない。
+- 発行前レビューと修正確認は`.artifacts/external-library-verification-20261107/review.md`。新しいPC専用設定項目により本体を0.181.0へminor更新。SDK/Runtime/Appletの公開型・契約に変更がないため版を維持した。`publish.bat`終了0、発行物/更新メタデータ/ZIPサイズ・SHA256、buildと発行EXEの一致を確認。発行先は`A:\40.ARTIFACT\AppDock.at365`。
+- 発行EXE SHA256: `210e5166dda50c38e79182dd6810b5a75423f538974846ad6e82dd0103ee53e9`、app.asar: `d995917ccfc69d0a8af9ba288ea184512254680dedceb3634b1dd606acce0737`、update.zip（175,199,626 bytes）: `b9f521f4315659ce10c1b8717a36e16c8279ac7caa92a41d8fb039a596e98ee5`。共通test-runtimeの固定EXEを隔離profileで2回起動し、正常終了・hash一致を確認した。
+- 実SMB/UNC共有への接続、すべてのWindowsリパース種別、物理スピーカー出力は未検証。UNCの絶対パス形式とローカルjunctionを検査した。実生成サービスの呼出し、実利用先設定の変更、push・GitHub Releaseは行っていない。
+- 整理による削除は0件。今回のGUI成功分は実行方式ごとの直近3件以内で、失敗・診断証跡とjunctionを含む単体fixtureは保持した。専用EXEの複製は作らず、共用test-runtime・固定ビルド・発行物は保持。入力hash・発行ログ・成功/失敗ログ・stage/commit照合は`.artifacts/external-library-verification-20261107/`に保存する。
+
 ## 2026-11-07 ステータスバーのジョブ件数と削除操作の分離（0.180.1）
 
 - cleanな`main` / `8c3a6a8`から開始し、`pull --ff-only`で追跡先の最新を確認した。ステータスバー左端へ共通ジョブ基盤の進行中・終了済み・該当時の要対処件数を追加した。生成要求を1件とし、進行中・終了済み・要対処は重複しない。終了済みの完了・失敗・中止内訳はツールチップへ表示する。既存の本体変更通知を使い、時間による消去や新しいpollingは追加していない。
