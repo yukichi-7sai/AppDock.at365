@@ -53,7 +53,17 @@ async function run() {
   session = await launch(profile, portable);
   page = session.main;
   page.on('pageerror', (e) => errors.push(String(e)));
-  await session.resize(1300, 900);
+  await session.resize(1720, 1000);
+  const display = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+    devicePixelRatio,
+  }));
+  const zoomFactor = await session.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((window) => window.webContents.getURL().startsWith('appdock://host/index.html'))
+      .webContents.getZoomFactor(),
+  );
   await open('image');
   await page.getByRole('button', { name: /外部フォルダを追加/ }).click();
   let dialog = page.getByRole('dialog', { name: hostText('library.sources.add'), exact: true });
@@ -67,6 +77,31 @@ async function run() {
   await dialog.waitFor({ state: 'hidden' });
   await until(async () => (await model()).content.sources[0]?.available, 'external indexed');
   assert.equal((await model()).content.total, 0, 'data root never includes external files');
+  const dataRoot = () =>
+    page
+      .locator('.library-sidebar')
+      .getByRole('button', { name: hostText('images.allFolders'), exact: true });
+  const dataToggle = (scope, expanded) =>
+    scope.getByRole('button', {
+      name: hostText(expanded ? 'images.collapseItem' : 'images.expandItem', {
+        name: hostText('images.allFolders'),
+      }),
+      exact: true,
+    });
+  await page.keyboard.press('Tab');
+  await dataRoot().focus();
+  await page.screenshot({ path: path.join(profile, 'data-root-focus.png') });
+  await dataToggle(page, true).press('Enter');
+  await until(
+    async () => (await model()).content.layout.collapsedFolders.includes('*'),
+    'data root collapse saved',
+  );
+  assert.equal(await page.locator('[data-gallery-folder=""]').count(), 0);
+  assert.equal(
+    (await model()).content.folder,
+    '*',
+    'collapse does not change the folder or destination',
+  );
   await page.getByRole('button', { name: /External fixture 読み取り専用/ }).click();
   await until(async () => (await model()).content.total === 2, 'external subtree');
   await page.locator('.ad-gallery-card').first().waitFor();
@@ -99,6 +134,28 @@ async function run() {
     'real dialog registration, root isolation, read-only controls/backend, shared group edits',
   );
   const source = (await model()).content.sources[0];
+  const externalToggle = () =>
+    page.getByRole('button', {
+      name: hostText('images.collapseItem', { name: 'External fixture' }),
+      exact: true,
+    });
+  await page.getByRole('button', { name: /External fixture 読み取り専用/ }).focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.screenshot({ path: path.join(profile, 'external-toggle-focus.png') });
+  await externalToggle().press('Enter');
+  await until(
+    async () => (await model()).content.layout.collapsedFolders.includes(`@external:${source.id}`),
+    'external collapse',
+  );
+  assert.equal((await model()).content.total, 2);
+  assert.equal((await model()).content.selected, 2, 'collapse preserves selection');
+  await page
+    .getByRole('button', {
+      name: hostText('images.expandItem', { name: 'External fixture' }),
+      exact: true,
+    })
+    .press('Enter');
+  checks.push('both roots collapse by keyboard while preserving the selected folder and assets');
   await page.evaluate(() => {
     window.externalPickResult = undefined;
     void window.dock.imageLibrary.pick().then((result) => {
@@ -109,6 +166,13 @@ async function run() {
     name: hostText('settings.registeredImagePicker.select'),
     exact: true,
   });
+  await dataToggle(picker, true).waitFor();
+  await dataToggle(picker, true).press('Enter');
+  assert.equal(
+    await picker.locator('[data-gallery-folder=""]').count(),
+    0,
+    'picker root collapse is independent of the management page',
+  );
   await picker.getByRole('button', { name: /External fixture 読み取り専用/ }).click();
   await until(
     () =>
@@ -133,6 +197,21 @@ async function run() {
   );
   checks.push('external image picker selection retains a verified internal settings copy');
   await page.screenshot({ path: path.join(profile, 'image-external.png') });
+  await session.save({ host: { theme: 'dark' } });
+  await session.resize(900, 620);
+  const navigation = page.locator('.library-navigation-button');
+  if (await navigation.isVisible()) await navigation.click();
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', { name: /External fixture 読み取り専用/ }).focus();
+  await page.screenshot({ path: path.join(profile, 'root-focus-narrow-dark.png') });
+  await page.keyboard.press('Escape');
+  await session.resize(1720, 1000);
+  await session.save({ host: { theme: 'light' } });
+  const childFolder = page.locator(`[data-gallery-folder="@external:${source.id}/nested"]`);
+  await childFolder.click();
+  await page.keyboard.press('Tab');
+  await childFolder.focus();
+  await page.screenshot({ path: path.join(profile, 'child-folder-focus.png') });
   await action('folder', { folder: `@external:${source.id}` });
   await until(async () => (await model()).content.total === 1, 'direct children');
   for (const media of ['sound', 'text']) {
@@ -161,6 +240,12 @@ async function run() {
   session = await launch(profile, portable);
   page = session.main;
   await open('image');
+  await dataToggle(page, false).waitFor();
+  assert.equal(
+    await page.locator('[data-gallery-folder=""]').count(),
+    0,
+    'data root collapse survives restart',
+  );
   await page.getByRole('button', { name: /External fixture 読み取り専用/ }).click();
   await until(async () => (await model()).content.total === 2, 'registration survives restart');
   assert.equal(
@@ -193,7 +278,15 @@ async function run() {
   fs.writeFileSync(
     path.join(profile, 'result.json'),
     JSON.stringify(
-      { ok: true, portable, sha256: portable ? hash(portable) : undefined, checks, errors },
+      {
+        ok: true,
+        portable,
+        sha256: portable ? hash(portable) : undefined,
+        display,
+        zoomFactor,
+        checks,
+        errors,
+      },
       null,
       2,
     ),

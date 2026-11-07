@@ -338,6 +338,24 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           run({ command: 'select-range', imageIds, additive });
         },
         targets: () => [
+          ...[...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-root]') ?? [])].map(
+            (element) => ({
+              element,
+              id: 'root:' + element.dataset.galleryRoot!,
+              canDrop: false,
+              description: (count: number) =>
+                libraryText(media, 'images.dragChooseFolder', { count }),
+              hover: () => {
+                const key = element.dataset.galleryRoot!,
+                  current = layoutRef.current;
+                if (current.collapsedFolders.includes(key))
+                  saveLayout({
+                    ...current,
+                    collapsedFolders: current.collapsedFolders.filter((folder) => folder !== key),
+                  });
+              },
+            }),
+          ),
           ...(removeDrop.current && !removeDrop.current.hidden
             ? [
                 {

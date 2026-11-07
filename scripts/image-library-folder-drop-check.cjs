@@ -72,6 +72,16 @@ module.exports = async ({
     await host.getByTestId('gallery-drag-card').waitFor();
     if (release) await host.mouse.up();
   };
+  await page.getByRole('button', { name: 'データフォルダを折りたたむ', exact: true }).click();
+  await dragTo(originals[0], page.locator('[data-gallery-root="*"]'), false);
+  await exactTarget('移動先').waitFor({ state: 'visible' });
+  await host.keyboard.press('Escape');
+  await host.mouse.up();
+  await host.getByTestId('gallery-drag-card').waitFor({ state: 'hidden' });
+  assert(
+    originals.every((file) => fs.existsSync(path.join(directory, file))),
+    'root hover expands without moving files',
+  );
   await page.getByRole('button', { name: '移動先を折りたたむ', exact: true }).click();
   const gridTop = (await page.locator('.library-grid-pad').boundingBox()).y;
   await dragTo(originals[0], exactTarget('移動先'), false);

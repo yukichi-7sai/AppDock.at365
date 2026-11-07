@@ -108,7 +108,10 @@ export function ImageBrowserNavigation({
       closed = layout.collapsedFolders.includes(value);
     return (
       <div key={value}>
-        <div className="library-nav-row" style={{ '--folder-depth': level } as CSSProperties}>
+        <div
+          className="library-nav-row library-folder-row"
+          style={{ '--folder-depth': level } as CSSProperties}
+        >
           {children.length ? (
             <button
               type="button"
@@ -149,6 +152,58 @@ export function ImageBrowserNavigation({
       </div>
     );
   };
+  const rootRow = (
+    key: string,
+    label: string,
+    children: ReactNode,
+    source?: LibrarySourceSnapshot,
+  ) => {
+    const closed = layout.collapsedFolders.includes(key);
+    const value = source ? key + '/*' : '*';
+    return (
+      <div key={key}>
+        <div className="library-nav-row library-folder-row">
+          <button
+            type="button"
+            className="library-folder-toggle library-icon-button"
+            aria-expanded={!closed}
+            aria-label={t(closed ? 'images.expandItem' : 'images.collapseItem', { name: label })}
+            disabled={disabled}
+            onClick={() => toggle('collapsedFolders', key)}
+          >
+            <Icon name="chevron" size={12} />
+          </button>
+          <button
+            type="button"
+            className="library-folder-name"
+            data-gallery-root={key}
+            disabled={disabled}
+            title={source?.path ?? label}
+            aria-current={folder === value ? 'page' : undefined}
+            onClick={() => onFolder(value)}
+          >
+            <Icon name="folder" size={15} />
+            <span className="library-source-name">
+              {label}
+              {source && (
+                <small>
+                  {t(
+                    source.loading
+                      ? 'library.sources.loading'
+                      : !source.available
+                        ? 'library.sources.unavailable'
+                        : 'library.sources.readOnlyLabel',
+                  )}
+                </small>
+              )}
+            </span>
+          </button>
+          {source && folderAction?.(value)}
+        </div>
+        {!closed && children}
+      </div>
+    );
+  };
   return (
     <>
       <div className="library-section-heading">
@@ -156,70 +211,26 @@ export function ImageBrowserNavigation({
         {folderHeading}
       </div>
       <nav aria-label={t('images.folder')}>
-        <div className="library-nav-row">
-          <button
-            type="button"
-            disabled={disabled}
-            aria-current={folder === '*' ? 'page' : undefined}
-            onClick={() => onFolder('*')}
-          >
-            <Icon name="folder" size={15} />
-            <span>{t('images.allFolders')}</span>
-          </button>
-        </div>
-        {folderRow('')}
-        {(folderChildren.get('') ?? [])
-          .filter((value) => !externalLibraryLocation(value))
-          .map((value) => folderRow(value))}
+        {rootRow(
+          '*',
+          t('images.allFolders'),
+          <>
+            {folderRow('', 1)}
+            {(folderChildren.get('') ?? [])
+              .filter((value) => !externalLibraryLocation(value))
+              .map((value) => folderRow(value, 1))}
+          </>,
+        )}
         {sources.map((source) => {
           const root = externalLibraryPath(source.id);
-          const closed = layout.collapsedFolders.includes(root);
-          return (
-            <div key={root}>
-              <div className="library-nav-row">
-                <button
-                  type="button"
-                  className="library-folder-toggle library-icon-button"
-                  aria-expanded={!closed}
-                  aria-label={t(closed ? 'images.expandItem' : 'images.collapseItem', {
-                    name: source.name,
-                  })}
-                  disabled={disabled}
-                  onClick={() => toggle('collapsedFolders', root)}
-                >
-                  <Icon name="chevron" size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="library-folder-name"
-                  disabled={disabled}
-                  title={source.path}
-                  aria-current={folder === root + '/*' ? 'page' : undefined}
-                  onClick={() => onFolder(root + '/*')}
-                >
-                  <Icon name="folder" size={15} />
-                  <span className="library-source-name">
-                    {source.name}
-                    <small>
-                      {t(
-                        source.loading
-                          ? 'library.sources.loading'
-                          : !source.available
-                            ? 'library.sources.unavailable'
-                            : 'library.sources.readOnlyLabel',
-                      )}
-                    </small>
-                  </span>
-                </button>
-                {folderAction?.(root + '/*')}
-              </div>
-              {!closed && (
-                <>
-                  {folderRow(root, 1)}
-                  {(folderChildren.get(root) ?? []).map((value) => folderRow(value, 1))}
-                </>
-              )}
-            </div>
+          return rootRow(
+            root,
+            source.name,
+            <>
+              {folderRow(root, 1)}
+              {(folderChildren.get(root) ?? []).map((value) => folderRow(value, 1))}
+            </>,
+            source,
           );
         })}
       </nav>
